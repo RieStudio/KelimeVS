@@ -1,121 +1,102 @@
 import 'package:flutter/material.dart';
+import 'core/icons/app_icons.dart';
+import 'core/strings/app_strings.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_text_styles.dart';
+import 'core/theme/app_theme.dart';
+import 'core/widgets/app_widgets.dart';
+import 'gallery/component_gallery.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const KelimeGoApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class KelimeGoApp extends StatelessWidget {
+  const KelimeGoApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'Kelime Go',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const MainShell(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<MainShell> createState() => _MainShellState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _MainShellState extends State<MainShell> {
+  int _currentIndex = 0;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  static const List<AppNavItem> _navItems = [
+    AppNavItem(
+      icon: AppIcons.home,
+      label: AppStrings.navHome,
+    ),
+    AppNavItem(
+      icon: AppIcons.leaderboard,
+      label: AppStrings.navLeaderboard,
+    ),
+    AppNavItem(
+      icon: AppIcons.shop,
+      label: AppStrings.navShop,
+    ),
+    AppNavItem(
+      icon: AppIcons.profile,
+      label: AppStrings.navProfile,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: IndexedStack(
+        index: _currentIndex,
+        children: const [
+          ComponentGallery(),
+          _TabPlaceholder(title: AppStrings.navLeaderboard),
+          _TabPlaceholder(title: AppStrings.navShop),
+          _TabPlaceholder(title: AppStrings.navProfile),
+        ],
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: _navItems,
+      ),
+    );
+  }
+}
+
+class _TabPlaceholder extends StatelessWidget {
+  final String title;
+
+  const _TabPlaceholder({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text(title, style: AppTextStyles.screenTitle),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: Text(
+          title,
+          style: AppTextStyles.cardTitle,
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
