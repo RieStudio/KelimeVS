@@ -116,7 +116,7 @@ matches/{matchId}: {
 
 ### 5.3 Kullanıcı verisi (Firestore)
 
-`users/{uid}`: ad, avatar, jeton, istatistikler, ayarlar. `inventory`, `quests`, `leaderboards` ayrı koleksiyonlardır. Jeton değişiklikleri yalnızca sunucudan yapılır.
+`users/{uid}`: ad, avatar, jeton, istatistikler, ayarlar. `inventory`, `quests`, `leaderboards` ayrı koleksiyonlardır. Jeton değişiklikleri yalnızca sunucudan yapılır. Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) `users/{uid}/matches/{matchId}` altında saklanır; "Maç Detayı" ekranı bunu okur.
 
 ## 6. Eşleştirme ve bot
 
@@ -128,7 +128,6 @@ matches/{matchId}: {
 ## 7. Modlar
 
 - Hızlı maç (rastgele rakip + bot yedeği)
-- Tek kişilik antrenman (bota karşı)
 - Arkadaşla düello (davet kodu/bağlantı)
 - Günlük meydan okuma
 - Turnuva / sezon
