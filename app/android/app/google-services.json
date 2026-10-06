@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "487342637535",
+    "firebase_url": "https://kelimegov2-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "kelimegov2",
+    "storage_bucket": "kelimegov2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:487342637535:android:29c6a45eeda5f0e0e3846a",
+        "android_client_info": {
+          "package_name": "com.kelimego.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPjo3v1tyuaygWby29Pmz2CY7zeefnBXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

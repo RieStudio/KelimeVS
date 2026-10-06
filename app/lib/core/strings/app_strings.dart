@@ -38,7 +38,11 @@ abstract final class AppStrings {
   static const String inputPlaceholder = 'Cevabını yaz…';
   static const String questionMark = '?';
 
-  // Geliştirme / Galeri
+  // Geliştirme / Galeri / Debug
   static const String componentGallery = 'Bileşen Galerisi';
+  static const String firebaseUidPrefix = 'Firebase UID: ';
+  static const String authErrorPrefix = 'Bağlantı hatası: ';
+  static const String authSigningIn = 'Giriş yapılıyor…';
+  static const String authNoUser = 'Giriş yapılmadı';
 }
 

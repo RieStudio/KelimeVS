@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/icons/app_icons.dart';
 import '../core/strings/app_strings.dart';
@@ -9,7 +11,20 @@ import '../core/widgets/app_widgets.dart';
 /// Geliştirme sürecinde tasarım altyapısını ve tüm bileşenleri
 /// canlı olarak incelemek için kullanılan galeri ekranı.
 class ComponentGallery extends StatelessWidget {
-  const ComponentGallery({super.key});
+  final String? authError;
+
+  const ComponentGallery({
+    super.key,
+    this.authError,
+  });
+
+  String get _currentUid {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? AppStrings.authNoUser;
+    } catch (_) {
+      return AppStrings.authNoUser;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +43,29 @@ class ComponentGallery extends StatelessWidget {
             vertical: AppDimens.screenPaddingTop,
           ),
           children: [
+            // BAĞLANTI / HATA BİLGİSİ (Hata varsa sade hata kutusu)
+            if (authError != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppDimens.space12),
+                decoration: BoxDecoration(
+                  color: AppColors.dangerSurface,
+                  borderRadius: AppDimens.borderRadiusAlertBox,
+                  border: Border.all(
+                    color: AppColors.dangerSoft,
+                    width: AppDimens.borderThin,
+                  ),
+                ),
+                child: Text(
+                  '${AppStrings.authErrorPrefix}$authError',
+                  style: AppTextStyles.secondaryText.copyWith(
+                    color: AppColors.dangerDark,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimens.space16),
+            ],
+
             // 1. BÖLÜM ETİKETLERİ
             const SectionLabel('Bölüm Etiketleri (Türkçe İ / I Desteği)'),
             const SizedBox(height: AppDimens.space10),
@@ -229,6 +267,34 @@ class ComponentGallery extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppDimens.space24),
+
+            // 9. DEBUG (Geliştirme Amaçlı: Firebase UID)
+            if (kDebugMode) ...[
+              const SectionLabel('Geliştirici / Hata Ayıklama (Debug)'),
+              const SizedBox(height: AppDimens.space10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.space14,
+                  vertical: AppDimens.space10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: AppDimens.borderRadiusBadge,
+                  border: Border.all(
+                    color: AppColors.mint,
+                    width: AppDimens.borderThin,
+                  ),
+                ),
+                child: Text(
+                  '${AppStrings.firebaseUidPrefix}$_currentUid',
+                  style: AppTextStyles.secondaryText.copyWith(
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimens.space24),
+            ],
           ],
         ),
       ),
@@ -311,4 +377,3 @@ class _IconItem extends StatelessWidget {
     );
   }
 }
-
