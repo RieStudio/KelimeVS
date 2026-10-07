@@ -38,8 +38,15 @@ abstract final class MatchEngine {
       playerIds[1]: 0,
     };
 
+    final eligibleQuestions = _filterQuestions(questions, config.minAnswersPerQuestion);
+    if (eligibleQuestions.isEmpty) {
+      throw ArgumentError(
+        'Eşik (${config.minAnswersPerQuestion} cevap) sonrası havuzda yeterli soru bulunamadı.',
+      );
+    }
+
     final question = _pickNextQuestion(
-      questions: questions,
+      questions: eligibleQuestions,
       usedQuestionIds: {},
       random: random,
     );
@@ -273,8 +280,15 @@ abstract final class MatchEngine {
       return EngineResult(state, [const Ignored('round_not_ended')]);
     }
 
+    final eligibleQuestions = _filterQuestions(questions, state.config.minAnswersPerQuestion);
+    if (eligibleQuestions.isEmpty) {
+      throw StateError(
+        'Eşik (${state.config.minAnswersPerQuestion} cevap) sonrası havuzda yeterli soru bulunamadı.',
+      );
+    }
+
     final nextQuestion = _pickNextQuestion(
-      questions: questions,
+      questions: eligibleQuestions,
       usedQuestionIds: state.usedQuestionIds,
       roundHistory: state.roundHistory,
       random: random,
@@ -406,5 +420,10 @@ abstract final class MatchEngine {
     final minCount = counts.values.isEmpty ? 0 : counts.values.reduce(math.min);
     final leastUsed = questions.where((q) => (counts[q.id] ?? 0) == minCount).toList();
     return leastUsed[random.nextInt(leastUsed.length)];
+  }
+
+  static List<Question> _filterQuestions(List<Question> questions, int minAnswers) {
+    if (minAnswers <= 0) return questions;
+    return questions.where((q) => q.answers.length >= minAnswers).toList();
   }
 }

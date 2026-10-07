@@ -9,6 +9,7 @@ import 'package:app/features/game/domain/match/match_engine.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
+import 'package:app/features/game/domain/text_normalizer.dart';
 
 String _formatTimeLeft(int deadlineMs, int nowMs) {
   final remainingMs = math.max(0, deadlineMs - nowMs);
@@ -53,55 +54,163 @@ String _makeTypo(String word) {
   return '${word}x';
 }
 
-void main(List<String> args) {
-  int? seed;
-  if (args.isNotEmpty) {
-    seed = int.tryParse(args[0]);
-  }
-  final random = seed != null ? math.Random(seed) : math.Random();
-
-  // 1. Soruları questions.json dosyasından oku
-  File? questionsFile;
-  const candidates = [
-    'assets/dev/questions.json',
-    'app/assets/dev/questions.json',
+/// 4-5 cevaplı yapay sorular (Tükenmeyi ve beraberliği sınamak için)
+List<Question> _createSmallPool() {
+  const rawData = [
+    ('sp_1', 'Mevsimler', ['İlkbahar', 'Yaz mevsimi', 'Sonbahar', 'Kış mevsimi']),
+    ('sp_2', 'Dört element', ['Ateş', 'Toprak', 'Hava', 'Su elementi']),
+    ('sp_3', 'Ana yönler', ['Kuzey', 'Güney', 'Doğu', 'Batı']),
+    ('sp_4', 'Dört büyük halife', ['Ebubekir', 'Ömer', 'Osman', 'Ali']),
+    ('sp_5', 'Dört işlem', ['Toplama', 'Çıkarma', 'Çarpma', 'Bölme']),
+    ('sp_6', 'İskambil sembolleri', ['Kupa', 'Karo', 'Maça', 'Sinek']),
+    ('sp_7', 'Duyu organları', ['Göz', 'Kulak', 'Burun', 'Dil', 'Deri']),
+    ('sp_8', 'Okyanuslar', ['Büyük Okyanus', 'Atlas Okyanusu', 'Hint Okyanusu', 'Arktik Okyanusu']),
+    ('sp_9', 'Temel tatlar', ['Tatlı', 'Tuzlu', 'Ekşi', 'Acı', 'Umami']),
+    ('sp_10', 'Güneşe en yakın gezegenler', ['Merkür', 'Venüs', 'Dünya', 'Mars', 'Jüpiter']),
+    ('sp_11', 'Marmara bölgesi illeri', ['İstanbul', 'Bursa', 'Kocaeli', 'Balıkesir', 'Tekirdağ']),
+    ('sp_12', 'Ege bölgesi illeri', ['İzmir', 'Aydın', 'Muğla', 'Manisa', 'Denizli']),
+    ('sp_13', 'Akdeniz bölgesi illeri', ['Antalya', 'Adana', 'Mersin', 'Hatay', 'Isparta']),
+    ('sp_14', 'İç Anadolu illeri', ['Ankara', 'Konya', 'Kayseri', 'Eskişehir', 'Sivas']),
+    ('sp_15', 'Karadeniz illeri', ['Trabzon', 'Samsun', 'Ordu', 'Giresun', 'Rize']),
+    ('sp_16', 'Güneydoğu Anadolu illeri', ['Gaziantep', 'Diyarbakır', 'Şanlıurfa', 'Mardin', 'Batman']),
+    ('sp_17', 'Doğu Anadolu illeri', ['Erzurum', 'Van', 'Malatya', 'Elazığ', 'Ağrı']),
+    ('sp_18', 'Müzik notaları', ['Do notası', 'Re notası', 'Mi notası', 'Fa notası', 'Sol notası']),
+    ('sp_19', 'Temel renkler', ['Kırmızı', 'Mavi', 'Sarı', 'Yeşil', 'Beyaz']),
+    ('sp_20', 'İlk 5 asal sayı', ['İki sayısı', 'Üç sayısı', 'Beş sayısı', 'Yedi sayısı', 'On bir sayısı']),
+    ('sp_21', 'El parmakları', ['Başparmak', 'İşaret parmağı', 'Orta parmak', 'Yüzük parmağı', 'Serçe parmak']),
+    ('sp_22', 'Evcil hayvanlar', ['Kedi', 'Köpek', 'Kuş', 'Balık', 'Hamster']),
+    ('sp_23', 'Çiftlik hayvanları', ['İnek', 'Koyun', 'Keçi', 'At', 'Tavuk']),
+    ('sp_24', 'Vahşi hayvanlar', ['Aslan', 'Kaplan', 'Ayı', 'Kurt', 'Fil']),
+    ('sp_25', 'Sürüngenler', ['Yılan', 'Kertenkele', 'Timsah', 'Kaplumbağa', 'Bukalemun']),
+    ('sp_26', 'Yırtıcı ve uçucu kuşlar', ['Kartal', 'Şahin', 'Güvercin', 'Martı', 'Karga']),
+    ('sp_27', 'Orman ağaçları', ['Çam ağacı', 'Meşe ağacı', 'Gürgen ağacı', 'Kavak ağacı', 'Çınar ağacı']),
+    ('sp_28', 'Popüler çiçekler', ['Gül çiçeği', 'Papatya', 'Lale çiçeği', 'Karanfil', 'Menekşe']),
+    ('sp_29', 'Narenciye meyveleri', ['Portakal', 'Mandalina', 'Limon', 'Greyfurt', 'Turunç']),
+    ('sp_30', 'Kış mevsimi meyveleri', ['Elma', 'Armut', 'Ayva', 'Nar', 'Portakal']),
+    ('sp_31', 'Yaz mevsimi meyveleri', ['Karpuz', 'Kavun', 'Şeftali', 'Kiraz', 'Çilek']),
+    ('sp_32', 'Kuru yemişler', ['Fındık', 'Fıstık', 'Ceviz', 'Badem', 'Kaju']),
+    ('sp_33', 'Kuru bakliyatlar', ['Mercimek', 'Nohut', 'Fasulye', 'Bezelye', 'Barbunya']),
+    ('sp_34', 'Tahıl ürünleri', ['Buğday', 'Arpa', 'Yulaf', 'Çavdar', 'Mısır']),
+    ('sp_35', 'Temel içecekler', ['Su', 'Çay', 'Kahve', 'Ayran', 'Limonata']),
+    ('sp_36', 'Sıcak kış içecekleri', ['Çay', 'Kahve', 'Sıcak çikolata', 'Salep', 'Ihlamur']),
+    ('sp_37', 'Soğuk meşrubatlar', ['Su', 'Ayran', 'Limonata', 'Meyve suyu', 'Gazoz']),
+    ('sp_38', 'Geleneksel çorbalar', ['Mercimek çorbası', 'Tarhana çorbası', 'Yayla çorbası', 'Domates çorbası', 'Ezogelin çorbası']),
+    ('sp_39', 'Temel kahvaltılıklar', ['Peynir', 'Zeytin', 'Yumurta', 'Bal', 'Reçel']),
+    ('sp_40', 'Şerbetli ve sütlü tatlılar', ['Baklava', 'Sütlaç', 'Kazandibi', 'Künefe', 'Revani']),
+    ('sp_41', 'Popüler takım sporları', ['Futbol', 'Basketbol', 'Voleybol', 'Hentbol', 'Ragbi']),
+    ('sp_42', 'Su sporları', ['Yüzme', 'Kürek sporu', 'Su topu', 'Yelken sporu', 'Sörf']),
+    ('sp_43', 'Kış sporları', ['Kayak', 'Kızak sporu', 'Buz pateni', 'Snowboard', 'Körling']),
+    ('sp_44', 'Dövüş sporları', ['Boks sporu', 'Güreş sporu', 'Karate', 'Judo', 'Taekwondo']),
+    ('sp_45', 'Temel müzik aletleri', ['Gitar', 'Piyano', 'Keman', 'Bateri', 'Flüt']),
+    ('sp_46', 'Telli enstrümanlar', ['Gitar', 'Keman', 'Bağlama', 'Ud enstrümanı', 'Kanun']),
+    ('sp_47', 'Üflemeli çalgılar', ['Flüt', 'Klarnet', 'Trompet', 'Saksafon', 'Ney çalgısı']),
+    ('sp_48', 'Vurmalı ritim çalgıları', ['Bateri', 'Darbuka', 'Davul', 'Tef çalgısı', 'Bendir']),
+    ('sp_49', 'Temel okul dersleri', ['Türkçe dersi', 'Matematik', 'Fen bilimleri', 'Tarih dersi', 'Coğrafya']),
+    ('sp_50', 'Yazı ve çizim gereçleri', ['Kurşun kalem', 'Tükenmez kalem', 'Silgi', 'Kalemtıraş', 'Cetvel']),
+    ('sp_51', 'Masaüstü kırtasiye ürünleri', ['Defter', 'Kitap', 'Dosya', 'Zımba', 'Makas']),
+    ('sp_52', 'Temel bilgisayar bileşenleri', ['İşlemci', 'Ekran kartı', 'Anakart', 'Bellek ram', 'Sabit disk']),
+    ('sp_53', 'Bilgisayar çevre birimleri', ['Klavye', 'Fare mouse', 'Monitör', 'Yazıcı', 'Kulaklık']),
+    ('sp_54', 'Kara taşıtları', ['Otomobil', 'Otobüs', 'Kamyon', 'Motosiklet', 'Bisiklet']),
+    ('sp_55', 'Deniz taşıtları', ['Gemi', 'Vapur', 'Tekne', 'Feribot', 'Sandal']),
+    ('sp_56', 'Hava araçları', ['Uçak', 'Helikopter', 'Sıcak hava balonu', 'Zeplin', 'Planör']),
+    ('sp_57', 'Raylı toplu taşıma araçları', ['Tren', 'Metro', 'Tramvay', 'Teleferik', 'Füniküler']),
+    ('sp_58', 'Günlük giyim ürünleri', ['Gömlek', 'Pantolon', 'Kazak', 'Ceket', 'Etek']),
+    ('sp_59', 'Kışlık giysiler', ['Mont', 'Kaban', 'Atkı', 'Bere', 'Eldiven']),
+    ('sp_60', 'Ayakkabı modelleri', ['Spor ayakkabı', 'Kışlık bot', 'Çizme', 'Sandalet', 'Terlik']),
   ];
-  for (final path in candidates) {
-    final file = File(path);
-    if (file.existsSync()) {
-      questionsFile = file;
-      break;
+
+  return rawData.map((item) {
+    return Question(
+      id: item.$1,
+      categoryId: 'small_pool',
+      text: item.$2,
+      answers: item.$3.map((ans) {
+        final norm = TextNormalizer.normalize(ans);
+        return Answer(
+          id: norm,
+          display: ans,
+          aliases: [norm],
+        );
+      }).toList(),
+    );
+  }).toList();
+}
+
+class SimulationStats {
+  int timeoutCount = 0;
+  int wrongCount = 0;
+  int repeatedCount = 0;
+  int exhaustedCount = 0;
+
+  int totalRoundsPlayed = 0;
+  int maxRoundsPlayed = 0;
+  int extendedMatchesCount = 0;
+
+  int nearMissTriggeredCount = 0;
+  int secondNearMissLostCount = 0;
+
+  int invariantViolations = 0;
+}
+
+List<String> _checkInvariants(MatchState state, int poolSize) {
+  final errors = <String>[];
+
+  // 1. Sonuçlanan tur sayısı tam 3
+  if (state.decisiveRounds != 3) {
+    errors.add('Sonuçlanan tur sayısı 3 değil: ${state.decisiveRounds}');
+  }
+  final wonRoundsCount = state.roundHistory.where((r) => r.winnerId != null).length;
+  if (wonRoundsCount != 3) {
+    errors.add('Kazanılan tur kaydı 3 değil: $wonRoundsCount');
+  }
+
+  // 2. Skorların toplamı 3, skorlar eşit değil, kazanan yüksek skorlu oyuncu
+  final p1Score = state.scores['p1'] ?? 0;
+  final p2Score = state.scores['p2'] ?? 0;
+  if (p1Score + p2Score != 3) {
+    errors.add('Skorlar toplamı 3 değil: $p1Score + $p2Score');
+  }
+  if (p1Score == p2Score) {
+    errors.add('Skorlar eşit: $p1Score - $p2Score');
+  }
+  final expectedWinner = p1Score > p2Score ? 'p1' : 'p2';
+  if (state.winnerId != expectedWinner) {
+    errors.add('Kazanan hatalı: beklenen $expectedWinner, gerçek ${state.winnerId}');
+  }
+
+  // 3. Bir maçta aynı soru iki kez gelmedi (havuz boyutu tur sayısına yetiyorsa)
+  if (poolSize >= state.roundHistory.length) {
+    final questionIds = state.roundHistory.map((r) => r.questionId).toList();
+    if (questionIds.toSet().length != questionIds.length) {
+      errors.add('Aynı maçta soru tekrar etti: $questionIds');
     }
   }
 
-  if (questionsFile == null) {
-    stderr.writeln('Hata: assets/dev/questions.json dosyası bulunamadı!');
-    exit(1);
+  // 4. Bir turda aynı answerId iki kez kabul edilmedi
+  for (int i = 0; i < state.roundHistory.length; i++) {
+    final round = state.roundHistory[i];
+    final acceptedAnswerIds = round.attempts
+        .where((a) => a.resultType == AttemptResultType.correct && a.answerId != null)
+        .map((a) => a.answerId!)
+        .toList();
+    if (acceptedAnswerIds.toSet().length != acceptedAnswerIds.length) {
+      errors.add('Tur ${i + 1} içinde aynı answerId iki kez kabul edildi: $acceptedAnswerIds');
+    }
   }
 
-  final jsonString = questionsFile.readAsStringSync();
-  final jsonData = json.decode(jsonString) as Map<String, dynamic>;
-  final List<Question> questions = Question.parseQuestionsPool(jsonData);
+  return errors;
+}
 
-  if (questions.isEmpty) {
-    stderr.writeln('Hata: Soru havuzunda soru bulunamadı!');
-    exit(1);
-  }
-
-  stdout.writeln('========================================');
-  stdout.writeln('     KELİMEGO MAÇ SİMÜLASYONU           ');
-  stdout.writeln('========================================');
-  stdout.writeln('Yüklenen Soru Sayısı: ${questions.length}');
-  stdout.writeln('Kurallar: 3 Karar Turu, 15s Süre, 1 Çok Yakın Hakkı');
-  stdout.writeln('----------------------------------------\n');
-
-  final config = const MatchConfig(
-    totalDecisiveRounds: 3,
-    answerSeconds: 15,
-    graceMs: 0,
-    nearMissPerRound: 1,
-  );
-
+void _playMatch({
+  required MatchConfig config,
+  required List<Question> questions,
+  required math.Random random,
+  required int matchNumber,
+  required int matchSeed,
+  required bool verbose,
+  required bool isSmallPool,
+  required SimulationStats stats,
+}) {
   int nowMs = 1000;
   var engineResult = MatchEngine.start(
     config: config,
@@ -128,59 +237,79 @@ void main(List<String> args) {
     final currentQuestion = state.currentQuestion!;
     final starterName = _playerName(state.turnPlayerId!);
 
-    stdout.writeln('--- Tur $currentRoundNum: ${currentQuestion.text} (Başlayan: $starterName) ---');
+    if (verbose) {
+      stdout.writeln('--- Tur $currentRoundNum: ${currentQuestion.text} (Başlayan: $starterName) ---');
+    }
 
     // Tur içi döngü
     while (state.phase == MatchPhase.roundActive) {
       final activePlayerId = state.turnPlayerId!;
       final activePlayerName = _playerName(activePlayerId);
 
-      // Henüz kullanılmamış cevaplar
       final unusedAnswers = currentQuestion.answers
           .where((a) => !state.usedAnswerIds.contains(a.id))
           .toList();
 
       if (unusedAnswers.isEmpty) {
-        // Beklenmeyen durum koruması
         break;
       }
 
-      // Oyuncuların karar dinamikleri:
-      // Oyuncu 2 bazen süre aşsın (12% ihtimal), Oyuncu 1 daha nadir (4%)
-      final willTimeout = ((activePlayerId == 'p2' && random.nextDouble() < 0.12) ||
-              (activePlayerId == 'p1' && random.nextDouble() < 0.04)) &&
-          state.currentRoundAttempts.length >= 3;
+      // 1. Süre Aşımı (timeout)
+      final willTimeout = state.currentRoundAttempts.length >= 2 &&
+          random.nextDouble() < (isSmallPool ? 0.04 : 0.07);
 
       if (willTimeout) {
         nowMs = state.deadlineMs + 500;
-        stdout.writeln('[00s kaldı] $activePlayerName: (Süre doldu)');
+        if (verbose) {
+          stdout.writeln('[00s kaldı] $activePlayerName: (Süre doldu)');
+        }
         engineResult = MatchEngine.checkTimeout(state: state, nowMs: nowMs);
         state = engineResult.state;
         break;
       }
 
-      // Düşünme süresi (2 - 5 saniye)
+      // Düşünme süresi
       final thinkSeconds = 2 + random.nextInt(4);
       nowMs += thinkSeconds * 1000;
 
-      // Oyuncu 2 bazen yazım hatası yapsın (20% ihtimal), Oyuncu 1 daha nadir (10%)
-      final nearMissQuota = state.remainingNearMisses[activePlayerId] ?? 0;
-      final willMakeTypo = nearMissQuota > 0 &&
-          (activePlayerId == 'p2' ? random.nextDouble() < 0.20 : random.nextDouble() < 0.10);
+      // 2. Tekrar Cevap (repeated)
+      final willRepeat = state.usedAnswerIds.isNotEmpty &&
+          state.currentRoundAttempts.length >= 2 &&
+          random.nextDouble() < (isSmallPool ? 0.04 : 0.06);
 
-      // Bazen yanlış kelime söylesinler (hakkı kalmadıktan sonra)
-      final willFailWrong = !willMakeTypo &&
-          nearMissQuota == 0 &&
-          (activePlayerId == 'p2' ? random.nextDouble() < 0.08 : random.nextDouble() < 0.04) &&
-          state.currentRoundAttempts.length >= 3;
-
-      if (willMakeTypo) {
-        // En az 4 harfli uygun bir kelime seçip yazım hatası yap
-        final candidate = unusedAnswers.firstWhere(
-          (a) => a.display.length >= 4,
-          orElse: () => unusedAnswers.first,
+      if (willRepeat) {
+        final repeatedAnswer = currentQuestion.answers.firstWhere(
+          (a) => state.usedAnswerIds.contains(a.id),
         );
-        final typo = _makeTypo(candidate.display.toLowerCase());
+        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+
+        engineResult = MatchEngine.submit(
+          state: state,
+          playerId: activePlayerId,
+          rawInput: repeatedAnswer.display,
+          nowMs: nowMs,
+        );
+        state = engineResult.state;
+        if (verbose) {
+          stdout.writeln('[$timeStr] $activePlayerName: "${repeatedAnswer.display.toLowerCase()}" -> Tekrar cevap!');
+        }
+        break;
+      }
+
+      // 3. Çok Yakın (near miss)
+      final quota = state.remainingNearMisses[activePlayerId] ?? 0;
+      final nearMissCandidates = unusedAnswers.where((a) => a.id.length >= 4).toList();
+
+      final willTryNearMiss = nearMissCandidates.isNotEmpty &&
+          quota > 0 &&
+          random.nextDouble() < (isSmallPool ? 0.16 : 0.20);
+
+      if (willTryNearMiss) {
+        final candidate = nearMissCandidates[random.nextInt(nearMissCandidates.length)];
+        var typo = _makeTypo(candidate.id);
+        if (currentQuestion.answers.any((a) => a.aliases.contains(typo))) {
+          typo = '${candidate.id}x';
+        }
         final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
 
         engineResult = MatchEngine.submit(
@@ -193,71 +322,318 @@ void main(List<String> args) {
 
         final isNearMissEvent = engineResult.events.any((e) => e is NearMiss);
         if (isNearMissEvent) {
+          stats.nearMissTriggeredCount++;
           final remaining = state.remainingNearMisses[activePlayerId] ?? 0;
-          stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Çok yakın! (Kalan hak: $remaining)');
+          if (verbose) {
+            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Çok yakın! (Kalan hak: $remaining)');
+          }
 
-          // Hemen ardından doğru halini yazsın (3 saniye sonra)
-          nowMs += 3000;
+          // Hakkı bittikten sonra hemen retry yapar:
+          nowMs += 2500;
           final retryTimeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+
+          // %25 ihtimalle ikinci kez yazım hatası yapıp turu kaybetsin
+          final willSecondFail = random.nextDouble() < 0.25;
+          if (willSecondFail) {
+            // İkinci yakın cevap (quota == 0 iken)
+            final secondTypo = '${candidate.id}z';
+            stats.secondNearMissLostCount++;
+
+            engineResult = MatchEngine.submit(
+              state: state,
+              playerId: activePlayerId,
+              rawInput: secondTypo,
+              nowMs: nowMs,
+            );
+            state = engineResult.state;
+            if (verbose) {
+              stdout.writeln('[$retryTimeStr] $activePlayerName: "$secondTypo" -> İkinci yakın cevap (hakkı bitti)!');
+            }
+            break;
+          } else {
+            // Başarılı düzeltme
+            engineResult = MatchEngine.submit(
+              state: state,
+              playerId: activePlayerId,
+              rawInput: candidate.display,
+              nowMs: nowMs,
+            );
+            state = engineResult.state;
+            if (verbose) {
+              stdout.writeln('[$retryTimeStr] $activePlayerName: "${candidate.display.toLowerCase()}" -> Doğru!');
+            }
+          }
+          continue;
+        } else {
+          if (verbose) {
+            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Yanlış cevap!');
+          }
+          break;
+        }
+      }
+
+      // 4. Yanlış Cevap (wrong)
+      final willFailWrong = quota == 0 &&
+          state.currentRoundAttempts.length >= 2 &&
+          random.nextDouble() < (isSmallPool ? 0.05 : 0.08);
+
+      if (willFailWrong) {
+        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+
+        // %40 ihtimalle hakkı kalmamışken ikinci bir yakın cevap verip kaybetsin
+        if (nearMissCandidates.isNotEmpty && random.nextDouble() < 0.40) {
+          final candidate = nearMissCandidates[random.nextInt(nearMissCandidates.length)];
+          final typo = _makeTypo(candidate.id);
+          stats.secondNearMissLostCount++;
+
           engineResult = MatchEngine.submit(
             state: state,
             playerId: activePlayerId,
-            rawInput: candidate.display,
+            rawInput: typo,
             nowMs: nowMs,
           );
           state = engineResult.state;
-          stdout.writeln('[$retryTimeStr] $activePlayerName: "${candidate.display.toLowerCase()}" -> Doğru!');
+          if (verbose) {
+            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> İkinci yakın cevap (hakkı bitti)!');
+          }
         } else {
-          // Çok yakın tetiklenmediyse (örn. 3 harf veya başka sebep)
-          stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Yanlış cevap!');
+          const fakeWrongWords = ['kesinlikle_yanlis_mars', 'atlantis_uydurma_kelime', 'samanyolu_bilinmeyen_99'];
+          final wrongWord = fakeWrongWords[random.nextInt(fakeWrongWords.length)];
+
+          engineResult = MatchEngine.submit(
+            state: state,
+            playerId: activePlayerId,
+            rawInput: wrongWord,
+            nowMs: nowMs,
+          );
+          state = engineResult.state;
+          if (verbose) {
+            stdout.writeln('[$timeStr] $activePlayerName: "$wrongWord" -> Yanlış cevap!');
+          }
         }
-      } else if (willFailWrong) {
-        const fakeWrongAnswers = ['atlantis', 'mars', 'samanyolu', 'ejderha', 'bilinmeyen'];
-        final wrongWord = fakeWrongAnswers[random.nextInt(fakeWrongAnswers.length)];
-        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+        break;
+      }
 
-        engineResult = MatchEngine.submit(
-          state: state,
-          playerId: activePlayerId,
-          rawInput: wrongWord,
-          nowMs: nowMs,
-        );
-        state = engineResult.state;
-        stdout.writeln('[$timeStr] $activePlayerName: "$wrongWord" -> Yanlış cevap!');
-      } else {
-        // Normal doğru cevap
-        final targetAnswer = unusedAnswers[random.nextInt(unusedAnswers.length)];
-        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+      // 5. Doğru Cevap (correct)
+      final targetAnswer = unusedAnswers[random.nextInt(unusedAnswers.length)];
+      final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
 
-        engineResult = MatchEngine.submit(
-          state: state,
-          playerId: activePlayerId,
-          rawInput: targetAnswer.display,
-          nowMs: nowMs,
-        );
-        state = engineResult.state;
-
+      engineResult = MatchEngine.submit(
+        state: state,
+        playerId: activePlayerId,
+        rawInput: targetAnswer.display,
+        nowMs: nowMs,
+      );
+      state = engineResult.state;
+      if (verbose) {
         stdout.writeln('[$timeStr] $activePlayerName: "${targetAnswer.display.toLowerCase()}" -> Doğru!');
       }
     }
 
-    // Tur bitti bilgisi
+    // Tur bittiği andaki istatistikler
     final lastRecord = state.roundHistory.last;
-    final p1Score = state.scores['p1'] ?? 0;
-    final p2Score = state.scores['p2'] ?? 0;
+    switch (lastRecord.reason) {
+      case RoundEndReason.timeout:
+        stats.timeoutCount++;
+        break;
+      case RoundEndReason.wrong:
+        stats.wrongCount++;
+        break;
+      case RoundEndReason.repeated:
+        stats.repeatedCount++;
+        break;
+      case RoundEndReason.exhausted:
+        stats.exhaustedCount++;
+        break;
+    }
 
-    if (lastRecord.winnerId != null) {
-      final roundWinner = _playerName(lastRecord.winnerId!);
-      final reason = _reasonText(lastRecord.reason);
-      stdout.writeln('Tur $currentRoundNum Bitti: $roundWinner kazandı ($reason). Skor: $p1Score - $p2Score\n');
-    } else {
-      stdout.writeln('Tur $currentRoundNum Bitti: Berabere bitti (cevaplar tükendi). Skor: $p1Score - $p2Score\n');
+    if (verbose) {
+      final p1Score = state.scores['p1'] ?? 0;
+      final p2Score = state.scores['p2'] ?? 0;
+      if (lastRecord.winnerId != null) {
+        final roundWinner = _playerName(lastRecord.winnerId!);
+        final reason = _reasonText(lastRecord.reason);
+        stdout.writeln('Tur $currentRoundNum Bitti: $roundWinner kazandı ($reason). Skor: $p1Score - $p2Score\n');
+      } else {
+        stdout.writeln('Tur $currentRoundNum Bitti: Berabere bitti (cevaplar tükendi). Skor: $p1Score - $p2Score\n');
+      }
     }
   }
 
-  // Maç bitti
-  final matchWinner = _playerName(state.winnerId!);
-  final p1Final = state.scores['p1'] ?? 0;
-  final p2Final = state.scores['p2'] ?? 0;
-  stdout.writeln('=== MAÇ BİTTİ: $matchWinner KAZANDI ($p1Final - $p2Final) ===\n');
+  // Maç bitti istatistikleri
+  stats.totalRoundsPlayed += state.totalRoundsPlayed;
+  stats.maxRoundsPlayed = math.max(stats.maxRoundsPlayed, state.totalRoundsPlayed);
+  if (state.totalRoundsPlayed > 3) {
+    stats.extendedMatchesCount++;
+  }
+
+  if (verbose) {
+    final matchWinner = _playerName(state.winnerId!);
+    final p1Final = state.scores['p1'] ?? 0;
+    final p2Final = state.scores['p2'] ?? 0;
+    stdout.writeln('=== MAÇ BİTTİ: $matchWinner KAZANDI ($p1Final - $p2Final) ===\n');
+  }
+
+  // Değişmezleri kontrol et
+  final violations = _checkInvariants(state, questions.length);
+  if (violations.isNotEmpty) {
+    stats.invariantViolations++;
+    stdout.writeln('[İHLAL] Maç #$matchNumber (Tohum: $matchSeed):');
+    for (final v in violations) {
+      stdout.writeln('  - $v');
+    }
+  }
+}
+
+void main(List<String> args) {
+  int? baseSeed;
+  int matchesCount = 1;
+  bool isSmallPool = false;
+  int minAnswers = 0;
+
+  for (int i = 0; i < args.length; i++) {
+    final arg = args[i];
+    if (arg.startsWith('--seed=')) {
+      baseSeed = int.tryParse(arg.substring('--seed='.length));
+    } else if (arg == '--seed' && i + 1 < args.length) {
+      baseSeed = int.tryParse(args[++i]);
+    } else if (arg.startsWith('--matches=')) {
+      matchesCount = int.tryParse(arg.substring('--matches='.length)) ?? 1;
+    } else if (arg == '--matches' && i + 1 < args.length) {
+      matchesCount = int.tryParse(args[++i]) ?? 1;
+    } else if (arg.startsWith('--min-answers=')) {
+      minAnswers = int.tryParse(arg.substring('--min-answers='.length)) ?? 0;
+    } else if (arg == '--min-answers' && i + 1 < args.length) {
+      minAnswers = int.tryParse(args[++i]) ?? 0;
+    } else if (arg == '--small-pool') {
+      isSmallPool = true;
+    } else if (int.tryParse(arg) != null && baseSeed == null) {
+      baseSeed = int.tryParse(arg);
+    }
+  }
+
+  final List<Question> questions;
+  if (isSmallPool) {
+    questions = _createSmallPool();
+  } else {
+    File? questionsFile;
+    const candidates = [
+      'assets/dev/questions.json',
+      'app/assets/dev/questions.json',
+    ];
+    for (final path in candidates) {
+      final file = File(path);
+      if (file.existsSync()) {
+        questionsFile = file;
+        break;
+      }
+    }
+
+    if (questionsFile == null) {
+      stderr.writeln('Hata: assets/dev/questions.json dosyası bulunamadı!');
+      exit(1);
+    }
+
+    final jsonString = questionsFile.readAsStringSync();
+    final jsonData = json.decode(jsonString) as Map<String, dynamic>;
+    questions = Question.parseQuestionsPool(jsonData);
+  }
+
+  if (questions.isEmpty) {
+    stderr.writeln('Hata: Soru havuzunda soru bulunamadı!');
+    exit(1);
+  }
+
+  final config = MatchConfig(
+    totalDecisiveRounds: 3,
+    answerSeconds: 15,
+    graceMs: 0,
+    nearMissPerRound: 1,
+    minAnswersPerQuestion: minAnswers,
+  );
+
+  final masterRandom = baseSeed != null ? math.Random(baseSeed) : math.Random();
+  final stats = SimulationStats();
+
+  if (matchesCount == 1) {
+    // Tek maç: Ayrıntılı günlük yazdır
+    final matchSeed = baseSeed ?? masterRandom.nextInt(1000000000);
+    final matchRandom = math.Random(matchSeed);
+
+    stdout.writeln('========================================');
+    stdout.writeln('     KELİMEGO MAÇ SİMÜLASYONU           ');
+    stdout.writeln('========================================');
+    stdout.writeln('Havuz: ${isSmallPool ? "Küçük Havuz (60 soru)" : "Normal Havuz (140 soru)"}');
+    stdout.writeln('Tohum: $matchSeed');
+    stdout.writeln('Kurallar: 3 Karar Turu, 15s Süre, 1 Çok Yakın Hakkı');
+    stdout.writeln('----------------------------------------\n');
+
+    _playMatch(
+      config: config,
+      questions: questions,
+      random: matchRandom,
+      matchNumber: 1,
+      matchSeed: matchSeed,
+      verbose: true,
+      isSmallPool: isSmallPool,
+      stats: stats,
+    );
+
+    if (stats.invariantViolations == 0) {
+      stdout.writeln('Değişmez Kontrolü: BAŞARILI (0 ihlal)\n');
+    }
+  } else {
+    // Çoklu maç: Günlük yazdırma, her maçı farklı tohumla çalıştır ve özet raporla
+    for (int m = 1; m <= matchesCount; m++) {
+      final matchSeed = masterRandom.nextInt(1000000000);
+      final matchRandom = math.Random(matchSeed);
+
+      _playMatch(
+        config: config,
+        questions: questions,
+        random: matchRandom,
+        matchNumber: m,
+        matchSeed: matchSeed,
+        verbose: false,
+        isSmallPool: isSmallPool,
+        stats: stats,
+      );
+    }
+
+    final poolDesc = isSmallPool
+        ? 'Küçük Havuz (60 yapay soru, 4-5 cevaplı)'
+        : 'Normal Havuz (140 soru${minAnswers > 0 ? ", minAnswers: $minAnswers" : ""})';
+    final avgRounds = (stats.totalRoundsPlayed / matchesCount).toStringAsFixed(2);
+    final extPercent = (stats.extendedMatchesCount / matchesCount * 100).toStringAsFixed(1);
+
+    stdout.writeln('============================================================');
+    stdout.writeln('              $matchesCount MAÇ SİMÜLASYON ÖZETİ');
+    stdout.writeln('============================================================');
+    stdout.writeln('Kullanılan Havuz: $poolDesc');
+    stdout.writeln('Toplam Maç: $matchesCount');
+    stdout.writeln('Toplam Oynanan Tur: ${stats.totalRoundsPlayed}\n');
+
+    stdout.writeln('1. Tur Bitiş Sebepleri:');
+    stdout.writeln('   - Süre Aşımı (timeout)     : ${stats.timeoutCount} (%${(stats.timeoutCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
+    stdout.writeln('   - Yanlış Cevap (wrong)      : ${stats.wrongCount} (%${(stats.wrongCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
+    stdout.writeln('   - Tekrar Cevap (repeated)   : ${stats.repeatedCount} (%${(stats.repeatedCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
+    stdout.writeln('   - Tükenme (exhausted)       : ${stats.exhaustedCount} (%${(stats.exhaustedCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})\n');
+
+    stdout.writeln('2. Tur Sayısı İstatistikleri:');
+    stdout.writeln('   - Maç Başına Ortalama Tur  : $avgRounds');
+    stdout.writeln('   - En Yüksek Tur Sayısı     : ${stats.maxRoundsPlayed}');
+    stdout.writeln('   - Beraberlik Yüzünden >3 Tur Süren Maç: ${stats.extendedMatchesCount} (%$extPercent)\n');
+
+    stdout.writeln('3. "Çok Yakın" (Near Miss) İstatistikleri:');
+    stdout.writeln('   - Tetiklenme Sayısı         : ${stats.nearMissTriggeredCount}');
+    stdout.writeln('   - İkinci Yakın Cevapla Tur Kaybetme: ${stats.secondNearMissLostCount}\n');
+
+    stdout.writeln('4. Değişmez (Invariant) Kontrolleri:');
+    if (stats.invariantViolations == 0) {
+      stdout.writeln('   - İhlal Sayısı: 0 (Tüm değişmezler 1000 maçta eksiksiz sağlandı)');
+    } else {
+      stdout.writeln('   - İhlal Sayısı: ${stats.invariantViolations} (DİKKAT: İhlal tespit edildi!)');
+    }
+    stdout.writeln('============================================================');
+  }
 }

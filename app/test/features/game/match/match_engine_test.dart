@@ -619,5 +619,81 @@ void main() {
       expect(record.attempts[3].resultType, equals(AttemptResultType.wrong));
       expect(record.attempts[3].nowMs, equals(11000));
     });
+
+    test('9. minAnswersPerQuestion eşiğinin altındaki soru hiç seçilmez', () {
+      final qFew = _createQuestion(
+        id: 'q_few',
+        text: 'Az Cevaplı Soru (2 Cevap)',
+        answersMap: {'Cevap1': [], 'Cevap2': []},
+      );
+      final qAdequate1 = _createQuestion(
+        id: 'q_adeq1',
+        text: 'Yeterli Soru 1 (10 Cevap)',
+        answersMap: {for (var i = 1; i <= 10; i++) 'Cevap$i': []},
+      );
+      final qAdequate2 = _createQuestion(
+        id: 'q_adeq2',
+        text: 'Yeterli Soru 2 (12 Cevap)',
+        answersMap: {for (var i = 1; i <= 12; i++) 'Cevap$i': []},
+      );
+
+      final config = const MatchConfig(minAnswersPerQuestion: 10);
+      final random = math.Random(123);
+
+      for (int i = 0; i < 15; i++) {
+        final res = MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [qFew, qAdequate1, qAdequate2],
+          random: random,
+          nowMs: 1000,
+        );
+        expect(res.state.currentQuestion!.id, isNot(equals('q_few')));
+        expect(res.state.currentQuestion!.answers.length, greaterThanOrEqualTo(10));
+      }
+    });
+
+    test('10. minAnswersPerQuestion sonrası havuz yetersizse (boşsa) hata fırlatır', () {
+      final qFew = _createQuestion(
+        id: 'q_few',
+        text: 'Az Cevaplı Soru (2 Cevap)',
+        answersMap: {'Cevap1': [], 'Cevap2': []},
+      );
+
+      final config = const MatchConfig(minAnswersPerQuestion: 10);
+      final random = math.Random(1);
+
+      expect(
+        () => MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [qFew],
+          random: random,
+          nowMs: 1000,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('11. minAnswersPerQuestion varsayılan 0 eski davranışı korur', () {
+      final qFew = _createQuestion(
+        id: 'q_few',
+        text: 'Az Cevaplı Soru (2 Cevap)',
+        answersMap: {'Cevap1': [], 'Cevap2': []},
+      );
+
+      final config = const MatchConfig(); // varsayılan minAnswersPerQuestion = 0
+      expect(config.minAnswersPerQuestion, equals(0));
+
+      final random = math.Random(1);
+      final res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: [qFew],
+        random: random,
+        nowMs: 1000,
+      );
+      expect(res.state.currentQuestion!.id, equals('q_few'));
+    });
   });
 }

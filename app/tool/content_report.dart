@@ -127,5 +127,67 @@ void main() {
   stdout.writeln('Rapor hazırlandı: ${outputFile.path}');
   stdout.writeln('Toplam Soru: ${questions.length}');
   stdout.writeln('Toplam Uyarı: ${entries.length}');
+
+  // 5. Cevap sayısı (ana cevap sayısı) dağılımı
+  final counts = questions.map((q) => q.answers.length).toList()..sort();
+  final minCount = counts.isEmpty ? 0 : counts.first;
+  final maxCount = counts.isEmpty ? 0 : counts.last;
+  final sum = counts.fold<int>(0, (a, b) => a + b);
+  final mean = counts.isEmpty ? 0.0 : sum / counts.length;
+  final median = counts.isEmpty
+      ? 0.0
+      : (counts.length % 2 == 1
+          ? counts[counts.length ~/ 2].toDouble()
+          : (counts[(counts.length ~/ 2) - 1] + counts[counts.length ~/ 2]) / 2.0);
+
+  int b0_4 = 0;
+  int b5_9 = 0;
+  int b10_14 = 0;
+  int b15_19 = 0;
+  int b20_29 = 0;
+  int b30plus = 0;
+
+  for (final c in counts) {
+    if (c <= 4) {
+      b0_4++;
+    } else if (c <= 9) {
+      b5_9++;
+    } else if (c <= 14) {
+      b10_14++;
+    } else if (c <= 19) {
+      b15_19++;
+    } else if (c <= 29) {
+      b20_29++;
+    } else {
+      b30plus++;
+    }
+  }
+
+  final fewAnswerQuestions = questions.where((q) => q.answers.length < 10).toList()
+    ..sort((a, b) {
+      final cmp = a.answers.length.compareTo(b.answers.length);
+      if (cmp != 0) return cmp;
+      return a.text.compareTo(b.text);
+    });
+
+  stdout.writeln('\n========================================');
+  stdout.writeln('    CEVAP SAYISI DAĞILIMI (${questions.length} Soru)    ');
+  stdout.writeln('========================================');
+  stdout.writeln('min      : $minCount');
+  stdout.writeln('ortanca  : ${median.toStringAsFixed(1)}');
+  stdout.writeln('ortalama : ${mean.toStringAsFixed(2)}');
+  stdout.writeln('en büyük : $maxCount');
+  stdout.writeln('\nHistogram (5\'lik aralıklar):');
+  stdout.writeln('  0-4   : $b0_4 (%${(b0_4 / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('  5-9   : $b5_9 (%${(b5_9 / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('  10-14 : $b10_14 (%${(b10_14 / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('  15-19 : $b15_19 (%${(b15_19 / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('  20-29 : $b20_29 (%${(b20_29 / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('  30+   : $b30plus (%${(b30plus / questions.length * 100).toStringAsFixed(1)})');
+  stdout.writeln('\nCevap Sayısı 10\'dan Az Olan Sorular (${fewAnswerQuestions.length} adet):');
+  for (final q in fewAnswerQuestions) {
+    stdout.writeln('[${q.categoryId}] "${q.text}" | ${q.answers.length}');
+  }
+  stdout.writeln('========================================');
 }
 

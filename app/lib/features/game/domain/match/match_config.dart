@@ -13,11 +13,15 @@ class MatchConfig {
   /// Her turda oyuncu başına izin verilen maksimum "çok yakın" hakkı
   final int nearMissPerRound;
 
+  /// Maçta kullanılacak sorular için minimum ana cevap sayısı eşiği (0 = kapalı)
+  final int minAnswersPerQuestion;
+
   const MatchConfig({
     this.totalDecisiveRounds = 3,
     this.answerSeconds = 15,
     this.graceMs = 0,
     this.nearMissPerRound = 1,
+    this.minAnswersPerQuestion = 0,
   });
 }
 
