@@ -58,5 +58,22 @@ abstract final class AppStrings {
   static const String noQuestionsFound = 'Soru bulunamadı.';
   static const String categoryPrefix = 'Kategori: ';
   static const String send = 'Gönder';
+
+  // Maç Test Sayfası (Geçici)
+  static const String matchTest = 'Maç Testi';
+  static const String matchTestTitle = 'Maç Test Sayfası';
+  static const String matchTestNotice = 'Bu sayfa geçicidir, sonraki adımlarda gerçek ekranlarla değiştirilecek.';
+  static const String roundPrefix = 'Tur ';
+  static const String timeLeftPrefix = 'Kalan Süre: ';
+  static const String secondsSuffix = ' sn';
+  static const String turnPrefix = 'Sıra: ';
+  static const String turnMy = 'Sende';
+  static const String turnOpponent = 'Rakipte';
+  static const String newMatch = 'Yeni Maç';
+  static const String matchFinishedTitle = 'Maç Bitti!';
+  static const String winnerPrefix = 'Kazanan: ';
+  static const String eventLogTitle = 'Olay Günlüğü';
+  static const String scorePrefix = 'Skor: ';
+  static const String nearMissExclamation = 'Çok yakın!';
 }
 

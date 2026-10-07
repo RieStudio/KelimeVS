@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/icons/app_icons.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
@@ -26,7 +27,7 @@ Future<void> main() async {
     authError = e.toString();
   }
 
-  runApp(KelimeGoApp(authError: authError));
+  runApp(ProviderScope(child: KelimeGoApp(authError: authError)));
 }
 
 class KelimeGoApp extends StatelessWidget {

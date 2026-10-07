@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/main.dart';
@@ -6,7 +7,7 @@ void main() {
   testWidgets('KelimeGoApp smoke test - verifies navigation and gallery load', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const KelimeGoApp());
+    await tester.pumpWidget(const ProviderScope(child: KelimeGoApp()));
 
     // Galerideki başlık ve alt gezinme sekmelerinin varlığını doğrula
     expect(find.text(AppStrings.componentGallery), findsOneWidget);
