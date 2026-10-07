@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/question_repository.dart';
 import '../domain/bot/bot_config.dart';
+import '../domain/bot/bot_decision.dart';
 import '../domain/bot/bot_player.dart';
 import '../domain/match/match_config.dart';
 import '../domain/match/match_engine.dart';
@@ -48,6 +49,8 @@ class MatchController extends Notifier<MatchUiState> {
   Timer? _tickTimer;
   Timer? _botTimer;
   Timer? _transitionTimer;
+  List<BotAction> _pendingBotActions = const [];
+  int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
 
   static const List<String> _opponentNames = [
@@ -161,6 +164,30 @@ class MatchController extends Notifier<MatchUiState> {
     );
   }
 
+  /// Kullanıcının maçı terk etmesini sağlar.
+  void leaveMatch() {
+    // TODO: arka plan davranışı
+    final match = state.matchState;
+    if (match == null || match.phase == MatchPhase.matchFinished) return;
+
+    _cancelAllTimers();
+    final clock = _clock;
+    final random = _random;
+    final now = clock.nowMs();
+
+    final res = MatchEngine.forfeit(
+      state: match,
+      playerId: 'me',
+      nowMs: now,
+    );
+
+    _applyEngineResult(
+      engineResult: res,
+      clock: clock,
+      random: random,
+    );
+  }
+
   void _applyEngineResult({
     required EngineResult engineResult,
     required GameClock clock,
@@ -169,9 +196,14 @@ class MatchController extends Notifier<MatchUiState> {
   }) {
     final nextState = engineResult.state;
     final events = engineResult.events;
+    final prevState = state.matchState;
+    final wasBotActive = prevState?.phase == MatchPhase.roundActive &&
+        prevState?.turnPlayerId == 'bot';
 
-    // Sıra veya faz değiştiği için bekleyen bot aksiyonunu iptal et
-    _cancelBotTimer();
+    // Sıra veya faz bota ait değilse bekleyen bot aksiyonunu iptal et
+    if (nextState.phase != MatchPhase.roundActive || nextState.turnPlayerId != 'bot') {
+      _cancelBotTimer();
+    }
 
     final now = clock.nowMs();
     final remaining = nextState.phase == MatchPhase.roundActive
@@ -214,8 +246,8 @@ class MatchController extends Notifier<MatchUiState> {
         _startNextRound(clock, random);
       });
     } else if (nextState.phase == MatchPhase.roundActive) {
-      // Sıra bota geçtiyse bot zamanlayıcısını kur
-      if (nextState.turnPlayerId == 'bot') {
+      // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur
+      if (!wasBotActive && nextState.turnPlayerId == 'bot') {
         _scheduleBotTurn(nextState, clock, random);
       }
     }
@@ -231,31 +263,50 @@ class MatchController extends Notifier<MatchUiState> {
       config: _botConfig,
     );
 
-    if (decision.input != null) {
-      _botTimer = Timer(Duration(milliseconds: decision.delayMs), () {
-        final currentMatch = state.matchState;
-        if (currentMatch == null ||
-            currentMatch.phase != MatchPhase.roundActive ||
-            currentMatch.turnPlayerId != 'bot') {
-          return;
-        }
-
-        final now = clock.nowMs();
-        final res = MatchEngine.submit(
-          state: currentMatch,
-          playerId: 'bot',
-          rawInput: decision.input!,
-          nowMs: now,
-        );
-
-        _applyEngineResult(
-          engineResult: res,
-          clock: clock,
-          random: random,
-        );
-      });
+    if (decision.actions.isNotEmpty) {
+      _pendingBotActions = decision.actions;
+      _botActionIndex = 0;
+      _scheduleNextBotAction(clock, random);
     }
-    // decision.input == null ise zamanlayıcı kurulmaz; 200ms tick timer süreyi doldurur.
+    // decision.actions.isEmpty ise zamanlayıcı kurulmaz; 200ms tick timer süreyi doldurur.
+  }
+
+  void _scheduleNextBotAction(GameClock clock, math.Random random) {
+    if (_botActionIndex >= _pendingBotActions.length) return;
+    final action = _pendingBotActions[_botActionIndex];
+
+    _botTimer = Timer(Duration(milliseconds: action.delayMs), () {
+      final currentMatch = state.matchState;
+      if (currentMatch == null ||
+          currentMatch.phase != MatchPhase.roundActive ||
+          currentMatch.turnPlayerId != 'bot') {
+        return;
+      }
+
+      final now = clock.nowMs();
+      final res = MatchEngine.submit(
+        state: currentMatch,
+        playerId: 'bot',
+        rawInput: action.input,
+        nowMs: now,
+      );
+
+      _applyEngineResult(
+        engineResult: res,
+        clock: clock,
+        random: random,
+      );
+
+      // Cevap kabul edilmediyse (yanlış, tekrar, yakın ipucu) sıra hala botta kalır;
+      // Bu durumda sıradaki bot eylemini zamanla
+      final updatedMatch = state.matchState;
+      if (updatedMatch != null &&
+          updatedMatch.phase == MatchPhase.roundActive &&
+          updatedMatch.turnPlayerId == 'bot') {
+        _botActionIndex++;
+        _scheduleNextBotAction(clock, random);
+      }
+    });
   }
 
   void _startNextRound(GameClock clock, math.Random random) {
@@ -311,6 +362,8 @@ class MatchController extends Notifier<MatchUiState> {
   void _cancelBotTimer() {
     _botTimer?.cancel();
     _botTimer = null;
+    _pendingBotActions = const [];
+    _botActionIndex = 0;
   }
 
   void _cancelTransitionTimer() {

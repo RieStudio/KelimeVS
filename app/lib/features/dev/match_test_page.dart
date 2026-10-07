@@ -45,6 +45,37 @@ class _MatchTestPageState extends ConsumerState<MatchTestPage> {
     ref.read(matchControllerProvider.notifier).submit(text);
   }
 
+  void _confirmLeaveMatch() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppDimens.borderRadiusQuestionCard,
+          side: const BorderSide(color: AppColors.ink, width: AppDimens.borderThin),
+        ),
+        title: const Text(AppStrings.leaveMatchConfirmTitle, style: AppTextStyles.cardTitle),
+        content: const Text(AppStrings.leaveMatchConfirmMessage, style: AppTextStyles.secondaryText),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(AppStrings.cancel, style: AppTextStyles.cardTitle),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(matchControllerProvider.notifier).leaveMatch();
+            },
+            child: Text(
+              AppStrings.leaveMatchConfirm,
+              style: AppTextStyles.cardTitle.copyWith(color: AppColors.dangerText),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatEvent(MatchEvent event, String opponentName) {
     return switch (event) {
       AnswerAccepted(:final playerId, :final answerDisplay) =>
@@ -55,26 +86,42 @@ class _MatchTestPageState extends ConsumerState<MatchTestPage> {
         playerId == 'me'
             ? 'Sen: ${AppStrings.nearMissExclamation}'
             : '$opponentName: ${AppStrings.nearMissExclamation}',
+      WrongAnswer(:final playerId, :final rawInput) =>
+        playerId == 'me'
+            ? 'Sen: "$rawInput" → ${AppStrings.eventWrongAnswer}'
+            : '$opponentName: "$rawInput" → ${AppStrings.eventWrongAnswer}',
+      AlreadySaid(:final playerId, :final answerDisplay) =>
+        playerId == 'me'
+            ? 'Sen: "$answerDisplay" → ${AppStrings.eventAlreadySaid}'
+            : '$opponentName: "$answerDisplay" → ${AppStrings.eventAlreadySaid}',
       RoundWon(:final winnerId, :final reason) =>
         winnerId == 'me'
             ? 'Tur kazandın (${_reasonStr(reason)})'
             : '$opponentName turu kazandı (${_reasonStr(reason)})',
       RoundDrawn(:final reason) =>
         'Tur berabere (${_reasonStr(reason)})',
-      MatchFinished(:final winnerId) =>
-        winnerId == 'me'
-            ? 'Maçı kazandın!'
-            : 'Maçı $opponentName kazandı!',
-      Ignored(:final reason) => 'Yoksayıldı: $reason',
+      MatchFinished(:final winnerId, :final reason) =>
+        reason == 'forfeit'
+            ? (winnerId == 'me'
+                ? 'Rakip maçı terk etti, kazandın!'
+                : 'Maçı terk ettin, $opponentName kazandı!')
+            : (winnerId == 'me'
+                ? 'Maçı kazandın!'
+                : 'Maçı $opponentName kazandı!'),
+      Ignored(:final reason) =>
+        reason == 'tooFast'
+            ? 'Çok hızlı deneme yoksayıldı (<600ms)'
+            : reason == 'tooManyAttempts'
+                ? 'Maksimum deneme aşıldı (>25)'
+                : 'Yoksayıldı: $reason',
     };
   }
 
   String _reasonStr(RoundEndReason reason) {
     return switch (reason) {
-      RoundEndReason.timeout => 'süre doldu',
-      RoundEndReason.repeated => 'tekrar cevap',
-      RoundEndReason.wrong => 'yanlış cevap',
-      RoundEndReason.exhausted => 'cevaplar bitti',
+      RoundEndReason.timeout => AppStrings.eventTimeout,
+      RoundEndReason.exhausted => AppStrings.eventExhausted,
+      RoundEndReason.forfeit => AppStrings.eventForfeit,
     };
   }
 
@@ -93,6 +140,22 @@ class _MatchTestPageState extends ConsumerState<MatchTestPage> {
           icon: AppIcons.back,
           onTap: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          if (match != null && !uiState.isMatchFinished)
+            Padding(
+              padding: const EdgeInsets.only(right: AppDimens.space12),
+              child: TextButton(
+                onPressed: _confirmLeaveMatch,
+                child: Text(
+                  AppStrings.leaveMatch,
+                  style: AppTextStyles.secondaryText.copyWith(
+                    color: AppColors.dangerText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: uiState.isLoading

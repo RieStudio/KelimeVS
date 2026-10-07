@@ -72,6 +72,9 @@ abstract final class MatchEngine {
       roundHistory: const [],
       currentRoundAttempts: const [],
       winnerId: null,
+      lastSubmitTimes: const {},
+      currentTurnAttempts: 0,
+      endedBy: null,
     );
 
     return EngineResult(state, const []);
@@ -113,11 +116,26 @@ abstract final class MatchEngine {
       );
     }
 
-    // 3. Normalizasyon ve boşluk kontrolü
+    // 3. Kötüye kullanım: minSubmitIntervalMs (600 ms) kontrolü
+    final lastSubmit = state.lastSubmitTimes[playerId];
+    if (lastSubmit != null && (nowMs - lastSubmit) < state.config.minSubmitIntervalMs) {
+      return EngineResult(state, const [Ignored('tooFast')]);
+    }
+
+    // 4. Kötüye kullanım: maxAttemptsPerTurn (25 deneme) kontrolü
+    if (state.currentTurnAttempts >= state.config.maxAttemptsPerTurn) {
+      return EngineResult(state, const [Ignored('tooManyAttempts')]);
+    }
+
+    // 5. Normalizasyon ve boşluk kontrolü
     final normalized = TextNormalizer.normalize(rawInput);
     if (normalized.isEmpty) {
       return EngineResult(state, [const Ignored('empty_input')]);
     }
+
+    // Geçerli bir deneme yapılıyor -> zamanı ve deneme sayısını güncelle
+    final updatedLastSubmitTimes = Map<String, int>.from(state.lastSubmitTimes)..[playerId] = nowMs;
+    final updatedTurnAttempts = state.currentTurnAttempts + 1;
 
     final question = state.currentQuestion!;
     final matcher = AnswerMatcher(question);
@@ -142,6 +160,8 @@ abstract final class MatchEngine {
           final intermediateState = state.copyWith(
             usedAnswerIds: updatedUsedAnswerIds,
             currentRoundAttempts: updatedAttempts,
+            currentTurnAttempts: updatedTurnAttempts,
+            lastSubmitTimes: updatedLastSubmitTimes,
           );
           return _endRound(
             state: intermediateState,
@@ -153,7 +173,7 @@ abstract final class MatchEngine {
           );
         }
 
-        // Sıra rakibe geçer, süre sıfırlanır
+        // Sıra rakibe geçer, süre sıfırlanır, rakip için sıra deneme sayacı 0 olur
         final opponentId = state.opponentOf(playerId);
         final nextDeadlineMs = nowMs + state.config.answerSeconds * 1000;
 
@@ -162,6 +182,8 @@ abstract final class MatchEngine {
           turnPlayerId: opponentId,
           deadlineMs: nextDeadlineMs,
           currentRoundAttempts: updatedAttempts,
+          currentTurnAttempts: 0,
+          lastSubmitTimes: updatedLastSubmitTimes,
         );
 
         return EngineResult(nextState, [
@@ -169,7 +191,7 @@ abstract final class MatchEngine {
         ]);
 
       case MatchResultRepeated(:final answer):
-        // Daha önce söylenmiş cevap -> Oyuncu turu kaybeder
+        // Tekrar cevap turu kaybettirmez: cevap kabul edilmez, sıra ve deadline aynı kalır
         final attempt = TurnAttempt(
           playerId: playerId,
           rawInput: rawInput,
@@ -177,16 +199,19 @@ abstract final class MatchEngine {
           answerId: answer.id,
           nowMs: nowMs,
         );
-        final winnerId = state.opponentOf(playerId);
-        return _endRound(
-          state: state,
-          winnerId: winnerId,
-          reason: RoundEndReason.repeated,
-          attempt: attempt,
+
+        final nextState = state.copyWith(
+          currentRoundAttempts: [...state.currentRoundAttempts, attempt],
+          currentTurnAttempts: updatedTurnAttempts,
+          lastSubmitTimes: updatedLastSubmitTimes,
         );
 
+        return EngineResult(nextState, [
+          AlreadySaid(playerId, answer.display),
+        ]);
+
       case MatchResultWrong():
-        // Önce "Çok Yakın" kontrolü yapılır
+        // Önce "Çok Yakın" kontrolü yapılır (tur başına oyuncu başına en fazla 1 ipucu)
         final playerQuota = state.remainingNearMisses[playerId] ?? 0;
 
         if (playerQuota > 0) {
@@ -214,26 +239,29 @@ abstract final class MatchEngine {
             final nextState = state.copyWith(
               remainingNearMisses: updatedNearMisses,
               currentRoundAttempts: [...state.currentRoundAttempts, attempt],
+              currentTurnAttempts: updatedTurnAttempts,
+              lastSubmitTimes: updatedLastSubmitTimes,
             );
 
             return EngineResult(nextState, [NearMiss(playerId)]);
           }
         }
 
-        // Çok yakın değil veya hakkı bitti -> Oyuncu turu kaybeder
+        // Çok yakın değil veya hakkı bitti -> Yanlış cevap turu kaybettirmez, sıra ve süre DEĞİŞMEZ
         final attempt = TurnAttempt(
           playerId: playerId,
           rawInput: rawInput,
           resultType: AttemptResultType.wrong,
           nowMs: nowMs,
         );
-        final winnerId = state.opponentOf(playerId);
-        return _endRound(
-          state: state,
-          winnerId: winnerId,
-          reason: RoundEndReason.wrong,
-          attempt: attempt,
+
+        final nextState = state.copyWith(
+          currentRoundAttempts: [...state.currentRoundAttempts, attempt],
+          currentTurnAttempts: updatedTurnAttempts,
+          lastSubmitTimes: updatedLastSubmitTimes,
         );
+
+        return EngineResult(nextState, [WrongAnswer(playerId, rawInput)]);
 
       case MatchResultEmpty():
         return EngineResult(state, [const Ignored('empty_input')]);
@@ -267,6 +295,41 @@ abstract final class MatchEngine {
     }
 
     return EngineResult(state, const []);
+  }
+
+  /// Oyuncu maçı terk ettiğinde maçı hemen bitirir.
+  static EngineResult forfeit({
+    required MatchState state,
+    required String playerId,
+    required int nowMs,
+  }) {
+    if (state.phase == MatchPhase.matchFinished) {
+      return EngineResult(state, const [Ignored('already_finished')]);
+    }
+
+    final opponentId = state.opponentOf(playerId);
+
+    final starterIndex = state.totalRoundsPlayed % 2;
+    final starterPlayerId = state.playerIds[starterIndex];
+
+    final currentRoundRecord = RoundRecord(
+      questionId: state.currentQuestion?.id ?? '',
+      starterPlayerId: starterPlayerId,
+      attempts: state.currentRoundAttempts,
+      winnerId: opponentId,
+      reason: RoundEndReason.forfeit,
+    );
+
+    final updatedRoundHistory = [...state.roundHistory, currentRoundRecord];
+
+    final finishedState = state.copyWith(
+      phase: MatchPhase.matchFinished,
+      roundHistory: updatedRoundHistory,
+      winnerId: opponentId,
+      endedBy: 'forfeit',
+    );
+
+    return EngineResult(finishedState, [MatchFinished(opponentId, 'forfeit')]);
   }
 
   /// Tur bittikten sonra (roundEnded fazında) bir sonraki turu başlatır.
@@ -312,6 +375,7 @@ abstract final class MatchEngine {
       remainingNearMisses: updatedNearMisses,
       usedQuestionIds: {...state.usedQuestionIds, nextQuestion.id},
       currentRoundAttempts: const [],
+      currentTurnAttempts: 0,
     );
 
     return EngineResult(nextState, const []);
@@ -371,7 +435,7 @@ abstract final class MatchEngine {
 
       final matchWinnerId = s1 > s2 ? p1 : p2;
 
-      events.add(MatchFinished(matchWinnerId));
+      events.add(MatchFinished(matchWinnerId, 'normal'));
 
       final finishedState = state.copyWith(
         scores: Map.unmodifiable(updatedScores),
@@ -381,6 +445,7 @@ abstract final class MatchEngine {
         roundHistory: updatedRoundHistory,
         currentRoundAttempts: attempts,
         winnerId: matchWinnerId,
+        endedBy: 'normal',
       );
 
       return EngineResult(finishedState, events);

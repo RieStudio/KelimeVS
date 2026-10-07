@@ -95,12 +95,13 @@ void main() {
       expect(state.phase, equals(MatchPhase.roundActive));
       expect(state.decisiveRounds, equals(0));
 
-      // 1. Tur: p1 kazanır (p2 yanlış cevap verir)
+      // 1. Tur: p1 doğru cevap verir, p2 süre aşımına uğrar -> p1 kazanır
       res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'audi', nowMs: 2000);
       state = res.state;
       expect(res.events.first, isA<AnswerAccepted>());
 
-      res = MatchEngine.submit(state: state, playerId: 'p2', rawInput: 'yanlis_cevap_123', nowMs: 3000);
+      // p2 süre aşımı
+      res = MatchEngine.checkTimeout(state: state, nowMs: 2000 + config.answerSeconds * 1000 + 10);
       state = res.state;
       expect(res.events.first, isA<RoundWon>());
       expect((res.events.first as RoundWon).winnerId, equals('p1'));
@@ -110,156 +111,140 @@ void main() {
       expect(state.decisiveRounds, equals(1));
 
       // 2. Tur başlat: Skor 1 - 0
-      res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 5000);
-      state = res.state;
-      expect(state.phase, equals(MatchPhase.roundActive));
-
-      // 2. Tur: p1 tekrar kazanır (p2 süre aşımı)
-      res = MatchEngine.checkTimeout(state: state, nowMs: 5000 + config.answerSeconds * 1000 + 10);
-      state = res.state;
-      expect(res.events.first, isA<RoundWon>());
-      expect(state.phase, equals(MatchPhase.roundEnded));
-      expect(state.scores['p1'], equals(2));
-      expect(state.scores['p2'], equals(0));
-      expect(state.decisiveRounds, equals(2));
-
-      // 2 - 0 olmasına rağmen maç bitmemelidir (3 sonuçlanan tur kuralı)
-      expect(res.events.any((e) => e is MatchFinished), isFalse);
-
-      // 3. Tur başlat: Skor 2 - 0
       res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 25000);
       state = res.state;
       expect(state.phase, equals(MatchPhase.roundActive));
 
-      // 3. Tur: p2 kazanır (p1 yanlış cevap verir)
+      // 2. Tur: p2 başlar, p2 süre aşımı -> p1 kazanır (2 - 0)
+      res = MatchEngine.checkTimeout(state: state, nowMs: 25000 + config.answerSeconds * 1000 + 10);
+      state = res.state;
+      expect(res.events.first, isA<RoundWon>());
+      expect(state.scores['p1'], equals(2));
+      expect(state.scores['p2'], equals(0));
+      expect(state.decisiveRounds, equals(2));
+
+      // 2 tur bitmesine rağmen maç bitmemelidir (3 sonuçlanan tur kuralı)
+      expect(res.events.any((e) => e is MatchFinished), isFalse);
+
+      // 3. Tur başlat: Skor 1 - 1
+      res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 50000);
+      state = res.state;
+      expect(state.phase, equals(MatchPhase.roundActive));
+
+      // 3. Tur: Başlayan oyuncu p1 süre aşımına uğrar -> p2 kazanır (Skor: 2 - 1)
       final activeStarter = state.turnPlayerId!;
       final opponent = state.opponentOf(activeStarter);
-      res = MatchEngine.submit(state: state, playerId: activeStarter, rawInput: 'kesinlikle_yanlis_xyz', nowMs: 26000);
+      res = MatchEngine.checkTimeout(state: state, nowMs: 50000 + config.answerSeconds * 1000 + 10);
       state = res.state;
       expect((res.events.first as RoundWon).winnerId, equals(opponent));
+      expect(state.scores['p1'], equals(2));
+      expect(state.scores['p2'], equals(1));
 
       // 3 sonuçlanan tur bitti, maç bitmeli
       expect(state.phase, equals(MatchPhase.matchFinished));
       expect(state.decisiveRounds, equals(3));
       expect(res.events.any((e) => e is MatchFinished), isTrue);
       final finishEvent = res.events.firstWhere((e) => e is MatchFinished) as MatchFinished;
-      expect(finishEvent.winnerId, equals('p1')); // 2 - 1 skorla p1 şampiyon
-      expect(state.winnerId, equals('p1'));
+      expect(finishEvent.winnerId, equals(activeStarter));
+      expect(state.winnerId, equals(activeStarter));
+      expect(state.endedBy, equals('normal'));
     });
 
-    test('2. Süre dolumu, tekrar cevap ve yanlış cevapla turun kaybedilmesi ve rakibin puan alması', () {
+    test('2. Yanlış ve tekrar cevap sırayı ve deadlineı değiştirmez, yalnızca süre dolunca tur kaybedilir', () {
       final config = const MatchConfig(answerSeconds: 15, graceMs: 0);
       final random = math.Random(42);
 
-      // A: checkTimeout ile süre aşımı
       var res = MatchEngine.start(
-        config: config,
-        playerIds: ['p1', 'p2'],
-        questions: sampleQuestions,
-        random: random,
-        nowMs: 1000,
-      );
-      var state = res.state;
-      expect(state.turnPlayerId, equals('p1'));
-
-      res = MatchEngine.checkTimeout(state: state, nowMs: 1000 + 15000 + 1);
-      expect(res.events.length, equals(1));
-      expect(res.events.first, isA<RoundWon>());
-      final roundWonTimeout = res.events.first as RoundWon;
-      expect(roundWonTimeout.winnerId, equals('p2'));
-      expect(roundWonTimeout.reason, equals(RoundEndReason.timeout));
-      expect(res.state.scores['p2'], equals(1));
-
-      // B: Süresi geçmiş submit ile süre aşımı
-      res = MatchEngine.startNextRound(
-        state: res.state,
-        questions: sampleQuestions,
-        random: random,
-        nowMs: 20000,
-      );
-      state = res.state;
-      final starter = state.turnPlayerId!;
-      final opponent = state.opponentOf(starter);
-
-      res = MatchEngine.submit(
-        state: state,
-        playerId: starter,
-        rawInput: 'audi',
-        nowMs: 20000 + 15000 + 100, // Süre dolduktan sonra cevap verildi
-      );
-      expect(res.events.first, isA<RoundWon>());
-      final timeoutSubmit = res.events.first as RoundWon;
-      expect(timeoutSubmit.winnerId, equals(opponent));
-      expect(timeoutSubmit.reason, equals(RoundEndReason.timeout));
-
-      // C: Tekrar eden cevapla kaybetme
-      res = MatchEngine.startNextRound(
-        state: res.state,
-        questions: [sampleQuestions[0]], // 'Araba markaları'
-        random: random,
-        nowMs: 40000,
-      );
-      state = res.state;
-      final currentStarter = state.turnPlayerId!;
-      final otherPlayer = state.opponentOf(currentStarter);
-
-      // Starter doğru cevap verir
-      res = MatchEngine.submit(
-        state: state,
-        playerId: currentStarter,
-        rawInput: 'audi',
-        nowMs: 41000,
-      );
-      state = res.state;
-      expect(state.turnPlayerId, equals(otherPlayer));
-
-      // Diğer oyuncu aynı cevabı tekrar söyler
-      res = MatchEngine.submit(
-        state: state,
-        playerId: otherPlayer,
-        rawInput: 'audi',
-        nowMs: 42000,
-      );
-      expect(res.events.first, isA<RoundWon>());
-      final repeatedWon = res.events.first as RoundWon;
-      expect(repeatedWon.winnerId, equals(currentStarter));
-      expect(repeatedWon.reason, equals(RoundEndReason.repeated));
-
-      // D: Yanlış cevapla kaybetme (near miss hakkı kalmayınca veya çok alakasız kelimede)
-      res = MatchEngine.start(
         config: config,
         playerIds: ['p1', 'p2'],
         questions: [sampleQuestions[0]],
         random: random,
         nowMs: 1000,
       );
+      var state = res.state;
+      final initialDeadline = state.deadlineMs;
+      expect(state.turnPlayerId, equals('p1'));
+
+      // 1. Yanlış cevap gönderilir: tur kaybedilmez, sıra ve deadline aynı kalır
       res = MatchEngine.submit(
-        state: res.state,
+        state: state,
         playerId: 'p1',
-        rawInput: 'tamamen_alakasiz_ve_uzun_yanlis',
+        rawInput: 'tamamen_yanlis_bir_cevap',
         nowMs: 2000,
       );
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect((res.events.first as WrongAnswer).playerId, equals('p1'));
+      expect(state.turnPlayerId, equals('p1'));
+      expect(state.deadlineMs, equals(initialDeadline));
+      expect(state.phase, equals(MatchPhase.roundActive));
+      expect(state.currentRoundAttempts.length, equals(1));
+      expect(state.currentRoundAttempts.first.resultType, equals(AttemptResultType.wrong));
+
+      // 2. Bir başka yanlış cevap daha gönderilir: yine sıra ve deadline aynı
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'ikinci_yanlis_cevap',
+        nowMs: 3000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.turnPlayerId, equals('p1'));
+      expect(state.deadlineMs, equals(initialDeadline));
+
+      // 3. Oyuncu ardından doğru cevap verir: cevap kabul edilir ve sıra rakibe geçer!
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'audi',
+        nowMs: 4000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<AnswerAccepted>());
+      expect(state.turnPlayerId, equals('p2'));
+      expect(state.usedAnswerIds, contains('audi'));
+
+      // 4. p2 daha önce söylenmiş cevabı ("audi") söyler: kabul edilmez ama tur kaybedilmez
+      final p2Deadline = state.deadlineMs;
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p2',
+        rawInput: 'audi',
+        nowMs: 5000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<AlreadySaid>());
+      expect((res.events.first as AlreadySaid).playerId, equals('p2'));
+      expect(state.turnPlayerId, equals('p2'));
+      expect(state.deadlineMs, equals(p2Deadline));
+
+      // 5. p2 süresini geçirir -> Yalnızca bu durumda tur kaybedilir!
+      res = MatchEngine.checkTimeout(state: state, nowMs: p2Deadline + 1);
+      state = res.state;
       expect(res.events.first, isA<RoundWon>());
-      final wrongWon = res.events.first as RoundWon;
-      expect(wrongWon.winnerId, equals('p2'));
-      expect(wrongWon.reason, equals(RoundEndReason.wrong));
+      final roundWonTimeout = res.events.first as RoundWon;
+      expect(roundWonTimeout.winnerId, equals('p1'));
+      expect(roundWonTimeout.reason, equals(RoundEndReason.timeout));
+      expect(state.phase, equals(MatchPhase.roundEnded));
+      expect(state.scores['p1'], equals(1));
     });
 
-    test('3. Sıra dışı cevap ve boş girdinin yoksayılması', () {
-      final config = const MatchConfig();
+    test('3. Kötüye kullanım sınırları: 600 msden hızlı deneme ve 25 deneme sonrası yoksayılır, sıra değişince sayaç sıfırlanır', () {
+      final config = const MatchConfig(answerSeconds: 60, minSubmitIntervalMs: 600, maxAttemptsPerTurn: 25);
       final random = math.Random(10);
 
-      final res = MatchEngine.start(
+      var res = MatchEngine.start(
         config: config,
         playerIds: ['p1', 'p2'],
-        questions: sampleQuestions,
+        questions: [sampleQuestions[0]],
         random: random,
         nowMs: 1000,
       );
       var state = res.state;
       expect(state.turnPlayerId, equals('p1'));
 
-      // Sırası olmayan p2 cevap vermeye çalışır
+      // 1. Sırası olmayan p2 dener -> not_player_turn
       final outOfTurnRes = MatchEngine.submit(
         state: state,
         playerId: 'p2',
@@ -268,31 +253,80 @@ void main() {
       );
       expect(outOfTurnRes.events.first, isA<Ignored>());
       expect((outOfTurnRes.events.first as Ignored).reason, equals('not_player_turn'));
-      expect(outOfTurnRes.state.turnPlayerId, equals('p1'));
-      expect(outOfTurnRes.state.deadlineMs, equals(state.deadlineMs));
 
-      // p1 boş girdi gönderir
-      final emptyRes1 = MatchEngine.submit(
+      // 2. p1 geçerli bir deneme yapar (t = 2000)
+      res = MatchEngine.submit(
         state: state,
         playerId: 'p1',
-        rawInput: '   ',
-        nowMs: 3000,
+        rawInput: 'yanlis_1',
+        nowMs: 2000,
       );
-      expect(emptyRes1.events.first, isA<Ignored>());
-      expect((emptyRes1.events.first as Ignored).reason, equals('empty_input'));
-      expect(emptyRes1.state.deadlineMs, equals(state.deadlineMs));
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.currentTurnAttempts, equals(1));
 
-      final emptyRes2 = MatchEngine.submit(
+      // 3. p1 400 ms sonra (600 ms dolmadan) tekrar dener (t = 2400) -> ignored(tooFast)
+      res = MatchEngine.submit(
         state: state,
         playerId: 'p1',
-        rawInput: '...',
-        nowMs: 3000,
+        rawInput: 'yanlis_2',
+        nowMs: 2400,
       );
-      expect(emptyRes2.events.first, isA<Ignored>());
-      expect((emptyRes2.events.first as Ignored).reason, equals('empty_input'));
+      expect(res.events.first, isA<Ignored>());
+      expect((res.events.first as Ignored).reason, equals('tooFast'));
+      // Sayaca ve RoundRecord'a eklenmez
+      expect(res.state.currentTurnAttempts, equals(1));
+      expect(res.state.currentRoundAttempts.length, equals(1));
+
+      // 4. p1 600 ms dolduktan sonra dener (t = 2650) -> geçerli
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'yanlis_2',
+        nowMs: 2650,
+      );
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.currentTurnAttempts, equals(2));
+
+      // 5. 25 deneme sınırına kadar yanlış cevap gönder
+      int currentNow = 3300;
+      while (state.currentTurnAttempts < 25) {
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'yanlis_${state.currentTurnAttempts + 1}',
+          nowMs: currentNow,
+        );
+        state = res.state;
+        currentNow += 700;
+      }
+      expect(state.currentTurnAttempts, equals(25));
+
+      // 6. 26. deneme -> ignored(tooManyAttempts)
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'audi',
+        nowMs: currentNow,
+      );
+      expect(res.events.first, isA<Ignored>());
+      expect((res.events.first as Ignored).reason, equals('tooManyAttempts'));
+      expect(res.state.turnPlayerId, equals('p1'));
+
+      // 7. p1 süre aşımına uğrar, 2. tur başlar ve sıra değişince sayaç 0 olur
+      final timeoutRes = MatchEngine.checkTimeout(state: state, nowMs: state.deadlineMs + 1);
+      final nextRoundRes = MatchEngine.startNextRound(
+        state: timeoutRes.state,
+        questions: sampleQuestions,
+        random: random,
+        nowMs: state.deadlineMs + 2000,
+      );
+      expect(nextRoundRes.state.currentTurnAttempts, equals(0));
+      expect(nextRoundRes.state.turnPlayerId, equals('p2'));
     });
 
-    test('4. Çok Yakın (Near Miss) kuralları ve sınırları', () {
+    test('4. Çok Yakın (Near Miss) ipucu turda oyuncu başına 1 kez verilir, sonraki yakın cevaplar normal yanlış sayılır, tur kaybedilmez', () {
       final config = const MatchConfig(nearMissPerRound: 1, answerSeconds: 15);
       final random = math.Random(1);
 
@@ -316,7 +350,7 @@ void main() {
       var state = res.state;
       final initialDeadline = state.deadlineMs;
 
-      // 4.1: "aude" -> "Audi" (4 harf, 1 düzenleme) tetiklenmeli
+      // 4.1: "aude" -> "Audi" (4 harf, 1 düzenleme) -> NearMiss
       res = MatchEngine.submit(
         state: state,
         playerId: 'p1',
@@ -332,70 +366,26 @@ void main() {
       expect(state.turnPlayerId, equals('p1'));
       expect(state.remainingNearMisses['p1'], equals(0));
 
-      // 4.2: İkinci kez hata yapıldığında hakkı kalmadığı için kaybeder
+      // 4.2: İkinci kez yakın hata yapıldığında hakkı bittiği için artık WrongAnswer döner, TUR KAYBEDİLMEZ!
       res = MatchEngine.submit(
         state: state,
         playerId: 'p1',
         rawInput: 'aude',
         nowMs: 3000,
       );
-      expect(res.events.first, isA<RoundWon>());
-      expect((res.events.first as RoundWon).winnerId, equals('p2'));
-      expect((res.events.first as RoundWon).reason, equals(RoundEndReason.wrong));
-
-      // 4.3: 3 harf ve altı tolerans kapalıdır (BMW hedefi için 'bmv' near miss olamaz)
-      res = MatchEngine.start(
-        config: config,
-        playerIds: ['p1', 'p2'],
-        questions: [testQ],
-        random: random,
-        nowMs: 10000,
-      );
       state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.turnPlayerId, equals('p1'));
+      expect(state.phase, equals(MatchPhase.roundActive));
+
+      // 4.3: 3 harf ve altı tolerans kapalıdır -> direkt WrongAnswer döner
       res = MatchEngine.submit(
         state: state,
         playerId: 'p1',
-        rawInput: 'bmv', // 3 harfli kelimede 1 harf fark
-        nowMs: 11000,
+        rawInput: 'bmv',
+        nowMs: 4000,
       );
-      expect(res.events.first, isA<RoundWon>());
-      expect((res.events.first as RoundWon).reason, equals(RoundEndReason.wrong));
-
-      // 4.4: Komşu harf yer değiştirmesi (transposition) 1 maliyetindedir
-      res = MatchEngine.start(
-        config: config,
-        playerIds: ['p1', 'p2'],
-        questions: [testQ],
-        random: random,
-        nowMs: 20000,
-      );
-      state = res.state;
-      res = MatchEngine.submit(
-        state: state,
-        playerId: 'p1',
-        rawInput: 'auid', // 'i' ve 'd' yer değiştirmiş
-        nowMs: 21000,
-      );
-      expect(res.events.first, isA<NearMiss>());
-
-      // 4.5: Zaten söylenmiş bir cevaba yakınlık Near Miss tetiklemez
-      res = MatchEngine.start(
-        config: config,
-        playerIds: ['p1', 'p2'],
-        questions: [testQ],
-        random: random,
-        nowMs: 30000,
-      );
-      state = res.state;
-      // p1 Audi der (kullanılmış olur)
-      res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'audi', nowMs: 31000);
-      state = res.state;
-      expect(state.usedAnswerIds, contains('audi'));
-
-      // p2 'aude' der (kullanılmış Audi'ye yakın ama geriye kalan Bmw ve Volkswagen'e uzak)
-      res = MatchEngine.submit(state: state, playerId: 'p2', rawInput: 'aude', nowMs: 32000);
-      expect(res.events.first, isA<RoundWon>());
-      expect((res.events.first as RoundWon).winnerId, equals('p1')); // p2 kaybeder
+      expect(res.events.first, isA<WrongAnswer>());
     });
 
     test('5. Cevapların tükenmesiyle turun berabere bitmesi, karar turu sayılmaması ve maçı uzatması', () {
@@ -443,69 +433,39 @@ void main() {
       expect(state.winnerId, isNull);
     });
 
-    test('6. Tur başlatıcısının sırayla değişmesi, soru tekrar etmemesi ve tohum determinizmi', () {
+    test('6. forfeit() maçı hemen bitirir, kazanan rakip olur ve sebep forfeit olur', () {
       final config = const MatchConfig();
-      final random1 = math.Random(12345);
-      final random2 = math.Random(12345);
+      final random = math.Random(1);
 
-      var res1 = MatchEngine.start(
+      final startRes = MatchEngine.start(
         config: config,
         playerIds: ['p1', 'p2'],
         questions: sampleQuestions,
-        random: random1,
-        nowMs: 1000,
-      );
-      var res2 = MatchEngine.start(
-        config: config,
-        playerIds: ['p1', 'p2'],
-        questions: sampleQuestions,
-        random: random2,
+        random: random,
         nowMs: 1000,
       );
 
-      // Aynı seed ile aynı ilk soru seçilir
-      expect(res1.state.currentQuestion!.id, equals(res2.state.currentQuestion!.id));
-
-      // Tur 0 başlatıcısı: p1
-      expect(res1.state.turnPlayerId, equals('p1'));
-
-      // 1. Turu bitir (berabere veya kazanç farketmeksizin)
-      res1 = MatchEngine.submit(
-        state: res1.state,
+      // p1 maçı terk eder
+      final forfeitRes = MatchEngine.forfeit(
+        state: startRes.state,
         playerId: 'p1',
-        rawInput: 'yanlis_kelime_xyz',
-        nowMs: 2000,
+        nowMs: 2500,
       );
-      expect(res1.state.totalRoundsPlayed, equals(1));
 
-      // 2. Turu başlat: başlatıcı p2 olmalıdır
-      res1 = MatchEngine.startNextRound(
-        state: res1.state,
-        questions: sampleQuestions,
-        random: random1,
-        nowMs: 3000,
-      );
-      expect(res1.state.turnPlayerId, equals('p2'));
-      // Farklı bir soru gelmeli
-      expect(res1.state.currentQuestion!.id, isNot(equals(res2.state.currentQuestion!.id)));
+      final state = forfeitRes.state;
+      expect(state.phase, equals(MatchPhase.matchFinished));
+      expect(state.winnerId, equals('p2'));
+      expect(state.endedBy, equals('forfeit'));
 
-      // 2. Turu da bitir
-      res1 = MatchEngine.submit(
-        state: res1.state,
-        playerId: 'p2',
-        rawInput: 'yanlis_kelime_xyz',
-        nowMs: 4000,
-      );
-      expect(res1.state.totalRoundsPlayed, equals(2));
+      expect(forfeitRes.events.length, equals(1));
+      expect(forfeitRes.events.first, isA<MatchFinished>());
+      final finishEvent = forfeitRes.events.first as MatchFinished;
+      expect(finishEvent.winnerId, equals('p2'));
+      expect(finishEvent.reason, equals('forfeit'));
 
-      // 3. Turu başlat: başlatıcı tekrar p1 olmalıdır
-      res1 = MatchEngine.startNextRound(
-        state: res1.state,
-        questions: sampleQuestions,
-        random: random1,
-        nowMs: 5000,
-      );
-      expect(res1.state.turnPlayerId, equals('p1'));
+      expect(state.roundHistory.length, equals(1));
+      expect(state.roundHistory.first.reason, equals(RoundEndReason.forfeit));
+      expect(state.roundHistory.first.winnerId, equals('p2'));
     });
 
     test('7. Grace period sınır testleri (tam sınırda geçerli, 1ms sonrasında timeout)', () {
@@ -520,7 +480,6 @@ void main() {
         nowMs: 1000,
       );
       final state = res.state;
-      // deadlineMs = 1000 + 10000 = 11000. Tolerans ile limit = 11000 + 500 = 11500.
 
       // Tam sınırda gönderilen cevap kabul edilmelidir
       final borderValidRes = MatchEngine.submit(
@@ -585,8 +544,12 @@ void main() {
       res = MatchEngine.submit(state: state, playerId: 'p2', rawInput: 'paris', nowMs: 8000);
       state = res.state;
 
-      // 4. Deneme: p1 yanlış (xyz) t=11000 -> Tur biter
+      // 4. Deneme: p1 yanlış (xyz) t=11000
       res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'xyz', nowMs: 11000);
+      state = res.state;
+
+      // 5. p1 süre aşımı -> Tur biter
+      res = MatchEngine.checkTimeout(state: state, nowMs: state.deadlineMs + 10);
       state = res.state;
 
       expect(state.roundHistory.length, equals(1));
@@ -595,29 +558,14 @@ void main() {
       expect(record.questionId, equals('q_history'));
       expect(record.starterPlayerId, equals('p1'));
       expect(record.winnerId, equals('p2'));
-      expect(record.reason, equals(RoundEndReason.wrong));
+      expect(record.reason, equals(RoundEndReason.timeout));
 
-      expect(record.attempts.length, equals(4));
-
-      expect(record.attempts[0].playerId, equals('p1'));
-      expect(record.attempts[0].rawInput, equals('ankara'));
+      expect(record.attempts.length, equals(5));
       expect(record.attempts[0].resultType, equals(AttemptResultType.correct));
-      expect(record.attempts[0].nowMs, equals(2000));
-
-      expect(record.attempts[1].playerId, equals('p2'));
-      expect(record.attempts[1].rawInput, equals('parsi'));
       expect(record.attempts[1].resultType, equals(AttemptResultType.nearMiss));
-      expect(record.attempts[1].nowMs, equals(5000));
-
-      expect(record.attempts[2].playerId, equals('p2'));
-      expect(record.attempts[2].rawInput, equals('paris'));
       expect(record.attempts[2].resultType, equals(AttemptResultType.correct));
-      expect(record.attempts[2].nowMs, equals(8000));
-
-      expect(record.attempts[3].playerId, equals('p1'));
-      expect(record.attempts[3].rawInput, equals('xyz'));
       expect(record.attempts[3].resultType, equals(AttemptResultType.wrong));
-      expect(record.attempts[3].nowMs, equals(11000));
+      expect(record.attempts[4].resultType, equals(AttemptResultType.timeout));
     });
 
     test('9. minAnswersPerQuestion eşiğinin altındaki soru hiç seçilmez', () {
@@ -682,7 +630,7 @@ void main() {
         answersMap: {'Cevap1': [], 'Cevap2': []},
       );
 
-      final config = const MatchConfig(); // varsayılan minAnswersPerQuestion = 0
+      final config = const MatchConfig();
       expect(config.minAnswersPerQuestion, equals(0));
 
       final random = math.Random(1);

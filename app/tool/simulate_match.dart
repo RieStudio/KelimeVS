@@ -24,9 +24,8 @@ String _playerName(String playerId) {
 String _reasonText(RoundEndReason reason) {
   return switch (reason) {
     RoundEndReason.timeout => 'süre aşımı',
-    RoundEndReason.repeated => 'tekrar cevap',
-    RoundEndReason.wrong => 'yanlış cevap',
     RoundEndReason.exhausted => 'cevaplar tükendi',
+    RoundEndReason.forfeit => 'maçı terk etme',
   };
 }
 
@@ -138,16 +137,17 @@ List<Question> _createSmallPool() {
 
 class SimulationStats {
   int timeoutCount = 0;
-  int wrongCount = 0;
-  int repeatedCount = 0;
   int exhaustedCount = 0;
+  int forfeitCount = 0;
+
+  int wrongAttemptsCount = 0;
+  int repeatedAttemptsCount = 0;
+  int ignoredAttemptsCount = 0;
+  int nearMissTriggeredCount = 0;
 
   int totalRoundsPlayed = 0;
   int maxRoundsPlayed = 0;
   int extendedMatchesCount = 0;
-
-  int nearMissTriggeredCount = 0;
-  int secondNearMissLostCount = 0;
 
   int invariantViolations = 0;
 }
@@ -155,27 +155,56 @@ class SimulationStats {
 List<String> _checkInvariants(MatchState state, int poolSize) {
   final errors = <String>[];
 
-  // 1. Sonuçlanan tur sayısı tam 3
-  if (state.decisiveRounds != 3) {
-    errors.add('Sonuçlanan tur sayısı 3 değil: ${state.decisiveRounds}');
-  }
-  final wonRoundsCount = state.roundHistory.where((r) => r.winnerId != null).length;
-  if (wonRoundsCount != 3) {
-    errors.add('Kazanılan tur kaydı 3 değil: $wonRoundsCount');
+  // 1. Maç terk edildiyse 3 karar turu kuralı aranmaz ama terk etmeyen kazanmış olmalı
+  if (state.endedBy == 'forfeit') {
+    if (state.winnerId == null) {
+      errors.add('Terk edilen maçta kazanan yok');
+    }
+    final lastRecord = state.roundHistory.isEmpty ? null : state.roundHistory.last;
+    if (lastRecord == null || lastRecord.reason != RoundEndReason.forfeit) {
+      errors.add('Terk edilen maçın son tur kaydı forfeit değil: ${lastRecord?.reason}');
+    } else if (lastRecord.winnerId != state.winnerId) {
+      errors.add('Terk edilen maçta son tur kazananı ile maç kazananı uyuşmuyor: ${lastRecord.winnerId} vs ${state.winnerId}');
+    }
+  } else {
+    // Normal biten maç:
+    // Sonuçlanan tur sayısı tam 3
+    if (state.decisiveRounds != 3) {
+      errors.add('Sonuçlanan tur sayısı 3 değil: ${state.decisiveRounds}');
+    }
+    final wonRoundsCount = state.roundHistory.where((r) => r.winnerId != null).length;
+    if (wonRoundsCount != 3) {
+      errors.add('Kazanılan tur kaydı 3 değil: $wonRoundsCount');
+    }
+
+    // Skorların toplamı 3, skorlar eşit değil, kazanan yüksek skorlu oyuncu
+    final p1Score = state.scores['p1'] ?? 0;
+    final p2Score = state.scores['p2'] ?? 0;
+    if (p1Score + p2Score != 3) {
+      errors.add('Skorlar toplamı 3 değil: $p1Score + $p2Score');
+    }
+    if (p1Score == p2Score) {
+      errors.add('Skorlar eşit: $p1Score - $p2Score');
+    }
+    final expectedWinner = p1Score > p2Score ? 'p1' : 'p2';
+    if (state.winnerId != expectedWinner) {
+      errors.add('Kazanan hatalı: beklenen $expectedWinner, gerçek ${state.winnerId}');
+    }
   }
 
-  // 2. Skorların toplamı 3, skorlar eşit değil, kazanan yüksek skorlu oyuncu
-  final p1Score = state.scores['p1'] ?? 0;
-  final p2Score = state.scores['p2'] ?? 0;
-  if (p1Score + p2Score != 3) {
-    errors.add('Skorlar toplamı 3 değil: $p1Score + $p2Score');
-  }
-  if (p1Score == p2Score) {
-    errors.add('Skorlar eşit: $p1Score - $p2Score');
-  }
-  final expectedWinner = p1Score > p2Score ? 'p1' : 'p2';
-  if (state.winnerId != expectedWinner) {
-    errors.add('Kazanan hatalı: beklenen $expectedWinner, gerçek ${state.winnerId}');
+  // Tüm maçlar için kontroller:
+  // 2. Tur kaybetmenin TEK sebebi süre aşımı olmalı (veya maç terk edildiyse son tur için forfeit)
+  for (int i = 0; i < state.roundHistory.length; i++) {
+    final round = state.roundHistory[i];
+    if (round.winnerId != null) {
+      if (round.reason != RoundEndReason.timeout && round.reason != RoundEndReason.forfeit) {
+        errors.add('Tur ${i + 1} kaybetme sebebi geçersiz: ${round.reason}');
+      }
+    } else {
+      if (round.reason != RoundEndReason.exhausted) {
+        errors.add('Berabere biten tur ${i + 1} sebebi exhausted değil: ${round.reason}');
+      }
+    }
   }
 
   // 3. Bir maçta aynı soru iki kez gelmedi (havuz boyutu tur sayısına yetiyorsa)
@@ -221,6 +250,13 @@ void _playMatch({
   );
   var state = engineResult.state;
 
+  // %3 maçta bir oyuncu ortada maçı terk etsin (forfeit)
+  final willForfeitThisMatch = random.nextDouble() < 0.03;
+  final forfeitRound = 1 + random.nextInt(2); // 1. veya 2. turda
+  final forfeitingPlayer = random.nextBool() ? 'p1' : 'p2';
+  final forfeitTurn = 1 + random.nextInt(2); // tur içindeki 1. veya 2. sırada
+  bool forfeited = false;
+
   while (state.phase != MatchPhase.matchFinished) {
     if (state.phase == MatchPhase.roundEnded) {
       nowMs += 2500; // Turlar arası bekleme
@@ -241,10 +277,31 @@ void _playMatch({
       stdout.writeln('--- Tur $currentRoundNum: ${currentQuestion.text} (Başlayan: $starterName) ---');
     }
 
+    int turnInRound = 0;
+
     // Tur içi döngü
     while (state.phase == MatchPhase.roundActive) {
       final activePlayerId = state.turnPlayerId!;
       final activePlayerName = _playerName(activePlayerId);
+      turnInRound++;
+
+      // Terk etme kontrolü
+      if (willForfeitThisMatch && !forfeited && currentRoundNum >= forfeitRound && turnInRound >= forfeitTurn) {
+        nowMs += 1000;
+        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+        engineResult = MatchEngine.forfeit(
+          state: state,
+          playerId: forfeitingPlayer,
+          nowMs: nowMs,
+        );
+        state = engineResult.state;
+        stats.forfeitCount++;
+        forfeited = true;
+        if (verbose) {
+          stdout.writeln('[$timeStr] ${_playerName(forfeitingPlayer)}: Maçı terk etti!');
+        }
+        break;
+      }
 
       final unusedAnswers = currentQuestion.answers
           .where((a) => !state.usedAnswerIds.contains(a.id))
@@ -254,137 +311,64 @@ void _playMatch({
         break;
       }
 
-      // 1. Süre Aşımı (timeout)
-      final willTimeout = state.currentRoundAttempts.length >= 2 &&
-          random.nextDouble() < (isSmallPool ? 0.04 : 0.07);
+      final totalAnswers = currentQuestion.answers.length;
+      final remainingRatio = unusedAnswers.length / totalAnswers;
+      // Kalan cevap azaldıkça bilme şansı düşer
+      final knowChance = (0.35 + 0.60 * remainingRatio).clamp(0.20, 0.95);
+      final playerKnows = random.nextDouble() < knowChance;
 
-      if (willTimeout) {
-        nowMs = state.deadlineMs + 500;
-        if (verbose) {
-          stdout.writeln('[00s kaldı] $activePlayerName: (Süre doldu)');
-        }
-        engineResult = MatchEngine.checkTimeout(state: state, nowMs: nowMs);
-        state = engineResult.state;
-        break;
-      }
+      // Sırası gelen oyuncu başarısız denemeler yapabilir (yanlış, tekrar, çok yakın)
+      final numFailedAttempts = playerKnows
+          ? (random.nextDouble() < 0.25 ? 1 + random.nextInt(2) : 0)
+          : random.nextInt(3);
 
-      // Düşünme süresi
-      final thinkSeconds = 2 + random.nextInt(4);
-      nowMs += thinkSeconds * 1000;
-
-      // 2. Tekrar Cevap (repeated)
-      final willRepeat = state.usedAnswerIds.isNotEmpty &&
-          state.currentRoundAttempts.length >= 2 &&
-          random.nextDouble() < (isSmallPool ? 0.04 : 0.06);
-
-      if (willRepeat) {
-        final repeatedAnswer = currentQuestion.answers.firstWhere(
-          (a) => state.usedAnswerIds.contains(a.id),
-        );
-        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
-
-        engineResult = MatchEngine.submit(
-          state: state,
-          playerId: activePlayerId,
-          rawInput: repeatedAnswer.display,
-          nowMs: nowMs,
-        );
-        state = engineResult.state;
-        if (verbose) {
-          stdout.writeln('[$timeStr] $activePlayerName: "${repeatedAnswer.display.toLowerCase()}" -> Tekrar cevap!');
-        }
-        break;
-      }
-
-      // 3. Çok Yakın (near miss)
-      final quota = state.remainingNearMisses[activePlayerId] ?? 0;
-      final nearMissCandidates = unusedAnswers.where((a) => a.id.length >= 4).toList();
-
-      final willTryNearMiss = nearMissCandidates.isNotEmpty &&
-          quota > 0 &&
-          random.nextDouble() < (isSmallPool ? 0.16 : 0.20);
-
-      if (willTryNearMiss) {
-        final candidate = nearMissCandidates[random.nextInt(nearMissCandidates.length)];
-        var typo = _makeTypo(candidate.id);
-        if (currentQuestion.answers.any((a) => a.aliases.contains(typo))) {
-          typo = '${candidate.id}x';
-        }
-        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
-
-        engineResult = MatchEngine.submit(
-          state: state,
-          playerId: activePlayerId,
-          rawInput: typo,
-          nowMs: nowMs,
-        );
-        state = engineResult.state;
-
-        final isNearMissEvent = engineResult.events.any((e) => e is NearMiss);
-        if (isNearMissEvent) {
-          stats.nearMissTriggeredCount++;
-          final remaining = state.remainingNearMisses[activePlayerId] ?? 0;
-          if (verbose) {
-            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Çok yakın! (Kalan hak: $remaining)');
-          }
-
-          // Hakkı bittikten sonra hemen retry yapar:
-          nowMs += 2500;
-          final retryTimeStr = _formatTimeLeft(state.deadlineMs, nowMs);
-
-          // %25 ihtimalle ikinci kez yazım hatası yapıp turu kaybetsin
-          final willSecondFail = random.nextDouble() < 0.25;
-          if (willSecondFail) {
-            // İkinci yakın cevap (quota == 0 iken)
-            final secondTypo = '${candidate.id}z';
-            stats.secondNearMissLostCount++;
-
-            engineResult = MatchEngine.submit(
-              state: state,
-              playerId: activePlayerId,
-              rawInput: secondTypo,
-              nowMs: nowMs,
-            );
-            state = engineResult.state;
-            if (verbose) {
-              stdout.writeln('[$retryTimeStr] $activePlayerName: "$secondTypo" -> İkinci yakın cevap (hakkı bitti)!');
-            }
-            break;
-          } else {
-            // Başarılı düzeltme
-            engineResult = MatchEngine.submit(
-              state: state,
-              playerId: activePlayerId,
-              rawInput: candidate.display,
-              nowMs: nowMs,
-            );
-            state = engineResult.state;
-            if (verbose) {
-              stdout.writeln('[$retryTimeStr] $activePlayerName: "${candidate.display.toLowerCase()}" -> Doğru!');
-            }
-          }
-          continue;
-        } else {
-          if (verbose) {
-            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Yanlış cevap!');
-          }
+      for (int a = 0; a < numFailedAttempts; a++) {
+        if (nowMs + 2000 >= state.deadlineMs) {
           break;
         }
-      }
 
-      // 4. Yanlış Cevap (wrong)
-      final willFailWrong = quota == 0 &&
-          state.currentRoundAttempts.length >= 2 &&
-          random.nextDouble() < (isSmallPool ? 0.05 : 0.08);
+        // Anti-abuse testi: %6 ihtimalle 600 ms'den erken gönderip Ignored('tooFast') test et
+        final testTooFast = state.lastSubmitTimes[activePlayerId] != null &&
+            random.nextDouble() < 0.06;
 
-      if (willFailWrong) {
+        if (testTooFast) {
+          nowMs += 200;
+          final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+          const spamWord = 'hizli_cevap';
+          engineResult = MatchEngine.submit(
+            state: state,
+            playerId: activePlayerId,
+            rawInput: spamWord,
+            nowMs: nowMs,
+          );
+          state = engineResult.state;
+          if (engineResult.events.any((e) => e is Ignored)) {
+            stats.ignoredAttemptsCount++;
+            if (verbose) {
+              stdout.writeln('[$timeStr] $activePlayerName: "$spamWord" -> Yok sayıldı (tooFast)!');
+            }
+          }
+          nowMs += 700;
+          continue;
+        }
+
+        // Normal düşünme / yazma süresi
+        nowMs += 700 + random.nextInt(1200);
+        if (nowMs >= state.deadlineMs) {
+          break;
+        }
+
         final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+        final attemptType = random.nextDouble();
 
-        // %40 ihtimalle hakkı kalmamışken ikinci bir yakın cevap verip kaybetsin
-        if (nearMissCandidates.isNotEmpty && random.nextDouble() < 0.40) {
+        // 1. Çok Yakın denemesi (%35)
+        final nearMissCandidates = unusedAnswers.where((ans) => ans.id.length >= 4).toList();
+        if (attemptType < 0.35 && nearMissCandidates.isNotEmpty) {
           final candidate = nearMissCandidates[random.nextInt(nearMissCandidates.length)];
-          final typo = _makeTypo(candidate.id);
-          stats.secondNearMissLostCount++;
+          var typo = _makeTypo(candidate.id);
+          if (currentQuestion.answers.any((ans) => ans.aliases.contains(typo))) {
+            typo = '${candidate.id}x';
+          }
 
           engineResult = MatchEngine.submit(
             state: state,
@@ -393,40 +377,106 @@ void _playMatch({
             nowMs: nowMs,
           );
           state = engineResult.state;
-          if (verbose) {
-            stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> İkinci yakın cevap (hakkı bitti)!');
+
+          if (engineResult.events.any((e) => e is NearMiss)) {
+            stats.nearMissTriggeredCount++;
+            if (verbose) {
+              stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Çok yakın!');
+            }
+          } else if (engineResult.events.any((e) => e is WrongAnswer)) {
+            stats.wrongAttemptsCount++;
+            if (verbose) {
+              stdout.writeln('[$timeStr] $activePlayerName: "$typo" -> Yanlış cevap (ipucu hakkı bitti)!');
+            }
           }
-        } else {
-          const fakeWrongWords = ['kesinlikle_yanlis_mars', 'atlantis_uydurma_kelime', 'samanyolu_bilinmeyen_99'];
-          final wrongWord = fakeWrongWords[random.nextInt(fakeWrongWords.length)];
+          continue;
+        }
+
+        // 2. Tekrar Cevap denemesi (%25)
+        if (attemptType < 0.60 && state.usedAnswerIds.isNotEmpty) {
+          final repeatedAnswer = currentQuestion.answers.firstWhere(
+            (ans) => state.usedAnswerIds.contains(ans.id),
+          );
 
           engineResult = MatchEngine.submit(
             state: state,
             playerId: activePlayerId,
-            rawInput: wrongWord,
+            rawInput: repeatedAnswer.display,
             nowMs: nowMs,
           );
           state = engineResult.state;
+
+          if (engineResult.events.any((e) => e is AlreadySaid)) {
+            stats.repeatedAttemptsCount++;
+            if (verbose) {
+              stdout.writeln('[$timeStr] $activePlayerName: "${repeatedAnswer.display.toLowerCase()}" -> Tekrar cevap!');
+            }
+          }
+          continue;
+        }
+
+        // 3. Yanlış Cevap denemesi (%40)
+        const fakeWrongWords = [
+          'kesinlikle_yanlis_kelime',
+          'uydurma_cevap_123',
+          'bilinmeyen_yanlis_99',
+          'gecersiz_bir_kelime',
+        ];
+        final wrongWord = fakeWrongWords[random.nextInt(fakeWrongWords.length)];
+
+        engineResult = MatchEngine.submit(
+          state: state,
+          playerId: activePlayerId,
+          rawInput: wrongWord,
+          nowMs: nowMs,
+        );
+        state = engineResult.state;
+
+        if (engineResult.events.any((e) => e is WrongAnswer)) {
+          stats.wrongAttemptsCount++;
           if (verbose) {
             stdout.writeln('[$timeStr] $activePlayerName: "$wrongWord" -> Yanlış cevap!');
           }
         }
-        break;
       }
 
-      // 5. Doğru Cevap (correct)
-      final targetAnswer = unusedAnswers[random.nextInt(unusedAnswers.length)];
-      final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+      // Başarısız denemelerden sonra oyuncunun hamlesi:
+      if (playerKnows) {
+        nowMs += 700 + random.nextInt(1300);
+        if (nowMs >= state.deadlineMs) {
+          // Süre yazarken doldu -> timeout
+          nowMs = state.deadlineMs + 200;
+          if (verbose) {
+            stdout.writeln('[00s kaldı] $activePlayerName: (Süre doldu)');
+          }
+          engineResult = MatchEngine.checkTimeout(state: state, nowMs: nowMs);
+          state = engineResult.state;
+          break;
+        }
 
-      engineResult = MatchEngine.submit(
-        state: state,
-        playerId: activePlayerId,
-        rawInput: targetAnswer.display,
-        nowMs: nowMs,
-      );
-      state = engineResult.state;
-      if (verbose) {
-        stdout.writeln('[$timeStr] $activePlayerName: "${targetAnswer.display.toLowerCase()}" -> Doğru!');
+        final targetAnswer = unusedAnswers[random.nextInt(unusedAnswers.length)];
+        final timeStr = _formatTimeLeft(state.deadlineMs, nowMs);
+
+        engineResult = MatchEngine.submit(
+          state: state,
+          playerId: activePlayerId,
+          rawInput: targetAnswer.display,
+          nowMs: nowMs,
+        );
+        state = engineResult.state;
+
+        if (verbose) {
+          stdout.writeln('[$timeStr] $activePlayerName: "${targetAnswer.display.toLowerCase()}" -> Doğru!');
+        }
+      } else {
+        // Oyuncu cevabı bilmiyor -> Süresi dolar
+        nowMs = state.deadlineMs + 500;
+        if (verbose) {
+          stdout.writeln('[00s kaldı] $activePlayerName: (Süre doldu)');
+        }
+        engineResult = MatchEngine.checkTimeout(state: state, nowMs: nowMs);
+        state = engineResult.state;
+        break;
       }
     }
 
@@ -436,21 +486,20 @@ void _playMatch({
       case RoundEndReason.timeout:
         stats.timeoutCount++;
         break;
-      case RoundEndReason.wrong:
-        stats.wrongCount++;
-        break;
-      case RoundEndReason.repeated:
-        stats.repeatedCount++;
-        break;
       case RoundEndReason.exhausted:
         stats.exhaustedCount++;
+        break;
+      case RoundEndReason.forfeit:
         break;
     }
 
     if (verbose) {
       final p1Score = state.scores['p1'] ?? 0;
       final p2Score = state.scores['p2'] ?? 0;
-      if (lastRecord.winnerId != null) {
+      if (lastRecord.reason == RoundEndReason.forfeit) {
+        final roundWinner = _playerName(lastRecord.winnerId!);
+        stdout.writeln('Tur $currentRoundNum Bitti: $roundWinner hükmen kazandı (maçı terk etme). Skor: $p1Score - $p2Score\n');
+      } else if (lastRecord.winnerId != null) {
         final roundWinner = _playerName(lastRecord.winnerId!);
         final reason = _reasonText(lastRecord.reason);
         stdout.writeln('Tur $currentRoundNum Bitti: $roundWinner kazandı ($reason). Skor: $p1Score - $p2Score\n');
@@ -461,9 +510,10 @@ void _playMatch({
   }
 
   // Maç bitti istatistikleri
-  stats.totalRoundsPlayed += state.totalRoundsPlayed;
-  stats.maxRoundsPlayed = math.max(stats.maxRoundsPlayed, state.totalRoundsPlayed);
-  if (state.totalRoundsPlayed > 3) {
+  final roundsInMatch = state.roundHistory.length;
+  stats.totalRoundsPlayed += roundsInMatch;
+  stats.maxRoundsPlayed = math.max(stats.maxRoundsPlayed, roundsInMatch);
+  if (roundsInMatch > 3 && state.endedBy != 'forfeit') {
     stats.extendedMatchesCount++;
   }
 
@@ -471,7 +521,11 @@ void _playMatch({
     final matchWinner = _playerName(state.winnerId!);
     final p1Final = state.scores['p1'] ?? 0;
     final p2Final = state.scores['p2'] ?? 0;
-    stdout.writeln('=== MAÇ BİTTİ: $matchWinner KAZANDI ($p1Final - $p2Final) ===\n');
+    if (state.endedBy == 'forfeit') {
+      stdout.writeln('=== MAÇ BİTTİ (HÜKMEN): $matchWinner KAZANDI (Rakip terk etti) ===\n');
+    } else {
+      stdout.writeln('=== MAÇ BİTTİ: $matchWinner KAZANDI ($p1Final - $p2Final) ===\n');
+    }
   }
 
   // Değişmezleri kontrol et
@@ -605,6 +659,7 @@ void main(List<String> args) {
         : 'Normal Havuz (140 soru${minAnswers > 0 ? ", minAnswers: $minAnswers" : ""})';
     final avgRounds = (stats.totalRoundsPlayed / matchesCount).toStringAsFixed(2);
     final extPercent = (stats.extendedMatchesCount / matchesCount * 100).toStringAsFixed(1);
+    final forfeitPercent = (stats.forfeitCount / matchesCount * 100).toStringAsFixed(1);
 
     stdout.writeln('============================================================');
     stdout.writeln('              $matchesCount MAÇ SİMÜLASYON ÖZETİ');
@@ -615,22 +670,24 @@ void main(List<String> args) {
 
     stdout.writeln('1. Tur Bitiş Sebepleri:');
     stdout.writeln('   - Süre Aşımı (timeout)     : ${stats.timeoutCount} (%${(stats.timeoutCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
-    stdout.writeln('   - Yanlış Cevap (wrong)      : ${stats.wrongCount} (%${(stats.wrongCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
-    stdout.writeln('   - Tekrar Cevap (repeated)   : ${stats.repeatedCount} (%${(stats.repeatedCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
-    stdout.writeln('   - Tükenme (exhausted)       : ${stats.exhaustedCount} (%${(stats.exhaustedCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})\n');
+    stdout.writeln('   - Tükenme (exhausted)       : ${stats.exhaustedCount} (%${(stats.exhaustedCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})');
+    stdout.writeln('   - Terk Etme (forfeit)       : ${stats.forfeitCount} (%${(stats.forfeitCount / stats.totalRoundsPlayed * 100).toStringAsFixed(1)})\n');
 
-    stdout.writeln('2. Tur Sayısı İstatistikleri:');
+    stdout.writeln('2. Deneme ve İpucu İstatistikleri:');
+    stdout.writeln('   - Yanlış Deneme Sayısı      : ${stats.wrongAttemptsCount}');
+    stdout.writeln('   - Tekrar Deneme Sayısı      : ${stats.repeatedAttemptsCount}');
+    stdout.writeln('   - "Çok Yakın" Tetiklenme    : ${stats.nearMissTriggeredCount}');
+    stdout.writeln('   - Yok Sayılan (Ignored)     : ${stats.ignoredAttemptsCount}');
+    stdout.writeln('   - Terk Edilen Maç Sayısı    : ${stats.forfeitCount} (%$forfeitPercent)\n');
+
+    stdout.writeln('3. Tur Sayısı İstatistikleri:');
     stdout.writeln('   - Maç Başına Ortalama Tur  : $avgRounds');
     stdout.writeln('   - En Yüksek Tur Sayısı     : ${stats.maxRoundsPlayed}');
     stdout.writeln('   - Beraberlik Yüzünden >3 Tur Süren Maç: ${stats.extendedMatchesCount} (%$extPercent)\n');
 
-    stdout.writeln('3. "Çok Yakın" (Near Miss) İstatistikleri:');
-    stdout.writeln('   - Tetiklenme Sayısı         : ${stats.nearMissTriggeredCount}');
-    stdout.writeln('   - İkinci Yakın Cevapla Tur Kaybetme: ${stats.secondNearMissLostCount}\n');
-
     stdout.writeln('4. Değişmez (Invariant) Kontrolleri:');
     if (stats.invariantViolations == 0) {
-      stdout.writeln('   - İhlal Sayısı: 0 (Tüm değişmezler 1000 maçta eksiksiz sağlandı)');
+      stdout.writeln('   - İhlal Sayısı: 0 (Tüm değişmezler $matchesCount maçta eksiksiz sağlandı)');
     } else {
       stdout.writeln('   - İhlal Sayısı: ${stats.invariantViolations} (DİKKAT: İhlal tespit edildi!)');
     }

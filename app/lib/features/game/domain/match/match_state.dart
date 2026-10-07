@@ -66,6 +66,9 @@ class MatchState {
   final List<RoundRecord> roundHistory;
   final List<TurnAttempt> currentRoundAttempts;
   final String? winnerId;
+  final Map<String, int> lastSubmitTimes;
+  final int currentTurnAttempts;
+  final String? endedBy;
 
   const MatchState({
     required this.config,
@@ -83,6 +86,9 @@ class MatchState {
     required this.roundHistory,
     required this.currentRoundAttempts,
     this.winnerId,
+    this.lastSubmitTimes = const {},
+    this.currentTurnAttempts = 0,
+    this.endedBy,
   });
 
   String opponentOf(String playerId) {
@@ -108,6 +114,9 @@ class MatchState {
     List<RoundRecord>? roundHistory,
     List<TurnAttempt>? currentRoundAttempts,
     String? winnerId,
+    Map<String, int>? lastSubmitTimes,
+    int? currentTurnAttempts,
+    String? endedBy,
   }) {
     return MatchState(
       config: config ?? this.config,
@@ -125,7 +134,9 @@ class MatchState {
       roundHistory: roundHistory ?? this.roundHistory,
       currentRoundAttempts: currentRoundAttempts ?? this.currentRoundAttempts,
       winnerId: winnerId ?? this.winnerId,
+      lastSubmitTimes: lastSubmitTimes ?? this.lastSubmitTimes,
+      currentTurnAttempts: currentTurnAttempts ?? this.currentTurnAttempts,
+      endedBy: endedBy ?? this.endedBy,
     );
   }
 }
-

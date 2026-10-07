@@ -2,9 +2,8 @@
 
 enum RoundEndReason {
   timeout,
-  repeated,
-  wrong,
   exhausted,
+  forfeit,
 }
 
 sealed class MatchEvent {
@@ -30,6 +29,26 @@ class NearMiss extends MatchEvent {
   String toString() => 'NearMiss(playerId: $playerId)';
 }
 
+class WrongAnswer extends MatchEvent {
+  final String playerId;
+  final String rawInput;
+
+  const WrongAnswer(this.playerId, [this.rawInput = '']);
+
+  @override
+  String toString() => 'WrongAnswer(playerId: $playerId, rawInput: $rawInput)';
+}
+
+class AlreadySaid extends MatchEvent {
+  final String playerId;
+  final String answerDisplay;
+
+  const AlreadySaid(this.playerId, [this.answerDisplay = '']);
+
+  @override
+  String toString() => 'AlreadySaid(playerId: $playerId, answer: $answerDisplay)';
+}
+
 class RoundWon extends MatchEvent {
   final String winnerId;
   final RoundEndReason reason;
@@ -51,11 +70,12 @@ class RoundDrawn extends MatchEvent {
 
 class MatchFinished extends MatchEvent {
   final String winnerId;
+  final String reason;
 
-  const MatchFinished(this.winnerId);
+  const MatchFinished(this.winnerId, [this.reason = 'normal']);
 
   @override
-  String toString() => 'MatchFinished(winnerId: $winnerId)';
+  String toString() => 'MatchFinished(winnerId: $winnerId, reason: $reason)';
 }
 
 class Ignored extends MatchEvent {
@@ -66,4 +86,3 @@ class Ignored extends MatchEvent {
   @override
   String toString() => 'Ignored(reason: $reason)';
 }
-

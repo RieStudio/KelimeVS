@@ -75,5 +75,14 @@ abstract final class AppStrings {
   static const String eventLogTitle = 'Olay Günlüğü';
   static const String scorePrefix = 'Skor: ';
   static const String nearMissExclamation = 'Çok yakın!';
+  static const String leaveMatch = 'Maçtan Çık';
+  static const String leaveMatchConfirmTitle = 'Maçtan çıkmak istiyor musun?';
+  static const String leaveMatchConfirmMessage = 'Maçı terk edersen maçı kaybedeceksin. Devam etmek istiyor musun?';
+  static const String leaveMatchConfirm = 'Çık ve Terk Et';
+  static const String eventWrongAnswer = 'Yanlış cevap';
+  static const String eventAlreadySaid = 'Daha önce söylendi';
+  static const String eventForfeit = 'Maçı terk etti';
+  static const String eventTimeout = 'Süre doldu';
+  static const String eventExhausted = 'Cevaplar tükendi';
 }
 

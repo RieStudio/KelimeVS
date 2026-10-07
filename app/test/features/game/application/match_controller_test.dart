@@ -23,7 +23,6 @@ class FakeClock implements GameClock {
 
   @override
   int nowMs() {
-    // FakeAsync provides elapsed Duration
     final elapsed = (_asyncObject as dynamic).elapsed as Duration;
     return baseMs + elapsed.inMilliseconds;
   }
@@ -81,6 +80,7 @@ void main() {
                 thinkMaxMs: 1500,
                 baseKnowChance: 1.0,
                 extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
               ),
             ),
             matchConfigProvider.overrideWithValue(
@@ -128,6 +128,60 @@ void main() {
       });
     });
 
+    test('Bot wrongBeforeChance ile önce yanlış dener, sıra bota kalır, sonra doğru cevapla sıra kullanıcıya geçer', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(7)),
+            questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 3000,
+                thinkMaxMs: 3000,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 1.0, // Her zaman önce yanlış dene
+              ),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        // Kullanıcı doğru cevap verir -> Sıra bota geçer
+        controller.submit('elma');
+        var state = container.read(matchControllerProvider);
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // 1. Bot ilk (yanlış) eylemini yapar (delay1 en fazla 2300 ms'dir)
+        async.elapse(const Duration(milliseconds: 2400));
+        state = container.read(matchControllerProvider);
+        // İlk eylem yapıldı: WrongAnswer
+        expect(state.recentEvents.last, isA<WrongAnswer>());
+        // Sıra HALA botta olmalı (yeni kural gereği yanlış cevap sırayı değiştirmez)
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // 2. Bot sıradaki doğru eylemini yapar (toplam süre 3000 ms tamamlanır)
+        async.elapse(const Duration(milliseconds: 700));
+        state = container.read(matchControllerProvider);
+        expect(state.recentEvents.last, isA<AnswerAccepted>());
+        // Artık sıra kullanıcıya geçmiş olmalıdır
+        expect(state.matchState!.turnPlayerId, 'me');
+        expect(state.isMyTurn, isTrue);
+
+        container.dispose();
+      });
+    });
+
     test('Kullanıcı süre aşımına uğrayınca tur bot lehine biter', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
@@ -170,7 +224,7 @@ void main() {
       });
     });
 
-    test('Kullanıcı yanlış cevap verince tur hemen biter', () {
+    test('Kullanıcı yanlış cevap verince tur bitmez, sıra ve süre korunur, ardından doğru cevap verip sırayı geçirebilir', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
         final container = ProviderContainer(
@@ -189,16 +243,23 @@ void main() {
         final controller = container.read(matchControllerProvider.notifier);
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
 
+        // Yanlış cevap gönderilir
         controller.submit('tamamen_yanlis_ve_alakasiz_bir_cevap');
 
-        final state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.roundEnded);
-        expect(state.matchState!.scores['bot'], 1);
-        expect(state.matchState!.scores['me'], 0);
+        var state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundActive);
+        expect(state.isMyTurn, isTrue);
+        expect(state.matchState!.turnPlayerId, 'me');
+        expect(state.recentEvents.last, isA<WrongAnswer>());
 
-        final lastWon = state.recentEvents.last as RoundWon;
-        expect(lastWon.winnerId, 'bot');
-        expect(lastWon.reason, RoundEndReason.wrong);
+        // 700 ms bekleyip ardından doğru cevap gönderilir (600ms sınırını geçmek için)
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('elma');
+
+        state = container.read(matchControllerProvider);
+        expect(state.recentEvents.last, isA<AnswerAccepted>());
+        expect(state.isMyTurn, isFalse);
+        expect(state.matchState!.turnPlayerId, 'bot');
 
         container.dispose();
       });
@@ -226,8 +287,8 @@ void main() {
         final controller = container.read(matchControllerProvider.notifier);
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
 
-        // Yanlış cevap ile turu hemen bitir
-        controller.submit('yanlis_cevap_123');
+        // Süre aşımı ile turu bitir
+        async.elapse(const Duration(milliseconds: 15200));
 
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
@@ -260,6 +321,7 @@ void main() {
                 thinkMaxMs: 1000,
                 baseKnowChance: 1.0,
                 extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
               ),
             ),
             matchControllerProvider.overrideWith(
@@ -277,8 +339,8 @@ void main() {
         final controller = container.read(matchControllerProvider.notifier);
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
 
-        // 1. Tur: Sıra me'de. Me yanlış cevap verir -> Bot 1-0 kazanır
-        controller.submit('yanlis_1');
+        // 1. Tur: Sıra me'de. Süre aşımı ile Bot 1-0 kazanır
+        async.elapse(const Duration(milliseconds: 15200));
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -294,8 +356,8 @@ void main() {
         state = container.read(matchControllerProvider);
         expect(state.matchState!.turnPlayerId, 'me');
 
-        // Me yanlış cevap verir -> Bot 2-0 kazanır
-        controller.submit('yanlis_2');
+        // Me süre aşımına uğrar -> Bot 2-0 kazanır
+        async.elapse(const Duration(milliseconds: 15200));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 2);
@@ -306,8 +368,8 @@ void main() {
         expect(state.matchState!.phase, MatchPhase.roundActive);
         expect(state.matchState!.turnPlayerId, 'me');
 
-        // 3. Tur: Sıra me'de. Me yanlış cevap verir -> Bot 3-0 kazanır
-        controller.submit('yanlis_3');
+        // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 3-0 kazanır
+        async.elapse(const Duration(milliseconds: 15200));
 
         // Artık 3 sonuçlanan tur bitti (bot: 3, me: 0) -> MatchFinished!
         state = container.read(matchControllerProvider);
@@ -323,20 +385,13 @@ void main() {
       });
     });
 
-    test('Bot bilmediğinde süre aşımına uğrar ve tur kullanıcı lehine biter', () {
+    test('leaveMatch() çağrıldığında maçı hemen terk eder ve rakip kazanır (forfeit)', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
         final container = ProviderContainer(
           overrides: [
             gameClockProvider.overrideWithValue(fakeClock),
             randomProvider.overrideWithValue(math.Random(1)),
-            botConfigProvider.overrideWithValue(
-              const BotConfig(
-                baseKnowChance: 0.0,
-                extraKnowChance: 0.0,
-                wrongAnswerChance: 0.0,
-              ),
-            ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
                 answerSeconds: 15,
@@ -349,22 +404,14 @@ void main() {
         final controller = container.read(matchControllerProvider.notifier);
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
 
-        // Kullanıcı doğru cevap verir -> Sıra bota geçer
-        controller.submit('elma');
-        var state = container.read(matchControllerProvider);
-        expect(state.matchState!.turnPlayerId, 'bot');
+        controller.leaveMatch();
 
-        // Bot cevap bilmediği için zamanlayıcı kurulmaz, 15200 ms sonra süre aşımına uğrar
-        async.elapse(const Duration(milliseconds: 15200));
-
-        state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.roundEnded);
-        expect(state.matchState!.scores['me'], 1);
-        expect(state.matchState!.scores['bot'], 0);
-
-        final lastWon = state.recentEvents.last as RoundWon;
-        expect(lastWon.winnerId, 'me');
-        expect(lastWon.reason, RoundEndReason.timeout);
+        final state = container.read(matchControllerProvider);
+        expect(state.isMatchFinished, isTrue);
+        expect(state.matchState!.phase, MatchPhase.matchFinished);
+        expect(state.summary, isNotNull);
+        expect(state.summary!.winnerId, 'bot');
+        expect(state.matchState!.endedBy, 'forfeit');
 
         container.dispose();
       });
