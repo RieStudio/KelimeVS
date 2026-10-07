@@ -3,6 +3,7 @@
 import 'models.dart';
 
 enum QuestionWarningType {
+  duplicateId,
   duplicateAlias,
   subwordConflict,
   fewAnswers,
@@ -40,6 +41,25 @@ class QuestionValidator {
             'Soruda 3\'ten az cevap var (Mevcut cevap sayısı: ${question.answers.length}).',
       ));
     }
+
+    // 2. İki farklı ana cevap aynı normalleştirilmiş kimliğe sahip mi?
+    final Map<String, Answer> seenIds = {};
+    for (final answer in question.answers) {
+      if (answer.id.isEmpty) continue;
+      if (seenIds.containsKey(answer.id)) {
+        final firstAnswer = seenIds[answer.id]!;
+        warnings.add(QuestionValidationWarning(
+          questionId: question.id,
+          questionText: question.text,
+          type: QuestionWarningType.duplicateId,
+          message:
+              'İki farklı ana cevap aynı normalleştirilmiş kimliğe ("${answer.id}") sahip: "${firstAnswer.display}" ve "${answer.display}".',
+        ));
+      } else {
+        seenIds[answer.id] = answer;
+      }
+    }
+
 
     // 2. Aynı normalleştirilmiş alias iki farklı cevapta geçiyor
     final Map<String, Answer> seenAliases = {};

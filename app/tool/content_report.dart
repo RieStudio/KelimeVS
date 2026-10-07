@@ -50,12 +50,24 @@ void main() {
   final List<WarningEntry> entries = [];
   final conflictRegex = RegExp(r'Olası aynı cevap / kelime sınırı çakışması: "(.*?)" ve "(.*?)"\.');
   final aliasRegex = RegExp(r'Aynı alias \("(.*?)"\) hem "(.*?)" hem de "(.*?)" cevaplarında geçiyor\.');
+  final duplicateIdRegex = RegExp(
+    r'İki farklı ana cevap aynı normalleştirilmiş kimliğe \("(.*?)"\) sahip: "(.*?)" ve "(.*?)"\.',
+  );
 
   for (final question in questions) {
     final warnings = QuestionValidator.validate(question);
     for (final warning in warnings) {
       String detail;
       switch (warning.type) {
+        case QuestionWarningType.duplicateId:
+          final match = duplicateIdRegex.firstMatch(warning.message);
+          if (match != null) {
+            detail = '"${match.group(2)}" <-> "${match.group(3)}"';
+          } else {
+            detail = warning.message;
+          }
+          break;
+
         case QuestionWarningType.subwordConflict:
           final match = conflictRegex.firstMatch(warning.message);
           if (match != null) {

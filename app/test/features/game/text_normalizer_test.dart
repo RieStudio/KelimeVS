@@ -37,6 +37,24 @@ void main() {
       expect(TextNormalizer.normalize('...'), equals(''));
       expect(TextNormalizer.normalize('   !?,.  '), equals(''));
     });
+
+    test('Preserves + and # characters (c, c++, c# distinct)', () {
+      expect(
+        TextNormalizer.normalize('c++'),
+        isNot(equals(TextNormalizer.normalize('c'))),
+      );
+      expect(
+        TextNormalizer.normalize('c#'),
+        isNot(equals(TextNormalizer.normalize('c'))),
+      );
+      expect(
+        TextNormalizer.normalize('c++'),
+        isNot(equals(TextNormalizer.normalize('c#'))),
+      );
+      expect(TextNormalizer.normalize('C++'), equals('c++'));
+      expect(TextNormalizer.normalize('C#'), equals('c#'));
+    });
   });
 }
+
 

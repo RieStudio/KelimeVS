@@ -75,7 +75,27 @@ void main() {
       );
     });
 
+    test('İki farklı ana cevap aynı normalleştirilmiş kimliğe sahip olunca duplicateId uyarısı üretir', () {
+      const question = Question(
+        id: 'dup_id_q',
+        categoryId: 'c1',
+        text: 'Programlama dilleri',
+        answers: [
+          Answer(id: 'c', display: 'C', aliases: ['c']),
+          Answer(id: 'c', display: 'C (varyant)', aliases: ['c']),
+          Answer(id: 'java', display: 'Java', aliases: ['java']),
+        ],
+      );
+
+      final warnings = QuestionValidator.validate(question);
+      expect(
+        warnings.any((w) => w.type == QuestionWarningType.duplicateId),
+        isTrue,
+      );
+    });
+
     test('gerçek questions.json üzerinde çalışır ve uyarıları konsola yazdırır', () {
+
       File? file;
       for (final p in [
         'assets/dev/questions.json',

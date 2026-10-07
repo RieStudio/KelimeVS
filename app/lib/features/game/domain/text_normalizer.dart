@@ -19,7 +19,7 @@ abstract final class TextNormalizer {
   };
 
   static final RegExp _combiningMarksRegex = RegExp(r'[\u0300-\u036f]');
-  static final RegExp _nonAlphaNumSpacesRegex = RegExp(r'[^a-z0-9\s]');
+  static final RegExp _nonAlphaNumSpacesRegex = RegExp(r'[^a-z0-9\s+#]');
   static final RegExp _whitespaceRegex = RegExp(r'\s+');
 
   /// Hem kullanıcı girdisi hem de kayıtlı cevaplar için standart normalizasyon.
