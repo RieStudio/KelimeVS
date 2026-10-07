@@ -1,16 +1,13 @@
 {
   "app": "KelimeGo CMS",
   "version": "1.0",
-  "exported_at": "2026-10-06T21:24:22.352Z",
+  "exported_at": "2026-10-07T20:48:04.932Z",
   "questions_pool": {
     "bilim_teknoloji": {
       "q_1783886983012": {
         "acceptable_answers": {
           "alpaca": [
             "alpaca"
-          ],
-          "banana": [
-            "banana"
           ],
           "bilge": [
             "bilge"
@@ -79,7 +76,8 @@
             "midjourney"
           ],
           "nano banana": [
-            "nano banana"
+            "nano banana",
+            "banana"
           ],
           "nanobanana": [
             "nanobanana"
@@ -3750,9 +3748,6 @@
             "abd",
             "amerika birleşik devletleri"
           ],
-          "arabistan": [
-            "arabistan"
-          ],
           "arjantin": [
             "arjantin"
           ],
@@ -3790,9 +3785,6 @@
           "kanada": [
             "kanada"
           ],
-          "kore": [
-            "kore"
-          ],
           "meksika": [
             "meksika"
           ],
@@ -3800,7 +3792,8 @@
             "rusya"
           ],
           "suudi arabistan": [
-            "suudi arabistan"
+            "suudi arabistan",
+            "arabistan"
           ],
           "türkiye": [
             "türkiye"
@@ -3809,6 +3802,7 @@
             "çin"
           ]
         },
+        "category": "Genel Kültür",
         "question": "G20 ülkeleri"
       },
       "q_1783893618279": {
@@ -5877,11 +5871,9 @@
           "parsek": [
             "parsek"
           ],
-          "planck": [
-            "planck"
-          ],
           "planck uzunluğu": [
-            "planck uzunluğu"
+            "planck uzunluğu",
+            "planck"
           ],
           "sanimetre": [
             "sanimetre",
@@ -10574,13 +10566,6 @@
           "ameliyathane": [
             "ameliyathane"
           ],
-          "ameliyathane ekipmanları": [
-            "ameliyathane ekipmanları",
-            "neşter",
-            "makas",
-            "pens",
-            "klemp"
-          ],
           "asansör": [
             "asansör"
           ],
@@ -11758,9 +11743,6 @@
           "krank": [
             "krank"
           ],
-          "krank kolu": [
-            "krank kolu"
-          ],
           "lastik": [
             "lastik"
           ],
@@ -12709,11 +12691,9 @@
           "gün ağardı": [
             "gün ağardı"
           ],
-          "harbi": [
-            "harbi"
-          ],
           "harbi güzel": [
-            "harbi güzel"
+            "harbi güzel",
+            "harbi"
           ],
           "hayat öpücüğü": [
             "hayat öpücüğü"
@@ -15943,9 +15923,6 @@
           "badem": [
             "badem"
           ],
-          "beyaz leblebi": [
-            "beyaz leblebi"
-          ],
           "ceviz": [
             "ceviz"
           ],
@@ -15994,7 +15971,9 @@
             "üzüm"
           ],
           "leblebi": [
-            "leblebi"
+            "leblebi",
+            "sarı leblebi",
+            "beyaz leblebi"
           ],
           "menengiç": [
             "menengiç",
@@ -16002,9 +15981,6 @@
           ],
           "mısır": [
             "mısır"
-          ],
-          "sarı leblebi": [
-            "sarı leblebi"
           ],
           "yer fıstığı": [
             "yer fıstığı"
@@ -16017,7 +15993,7 @@
             "ay çekirdeği"
           ]
         },
-        "category": "Yemek",
+        "category": "Yemek & İçecek",
         "question": "Kuruyemiş çeşitleri"
       },
       "q_1784327378197": {
