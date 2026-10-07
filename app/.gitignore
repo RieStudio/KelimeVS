@@ -55,3 +55,6 @@ functions/lib/
 key.properties
 *.jks
 *.keystore
+
+# Tool output
+tool/output/
