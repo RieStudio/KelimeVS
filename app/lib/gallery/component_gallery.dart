@@ -7,6 +7,7 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_dimens.dart';
 import '../core/theme/app_text_styles.dart';
 import '../core/widgets/app_widgets.dart';
+import '../features/dev/question_test_page.dart';
 
 /// Geliştirme sürecinde tasarım altyapısını ve tüm bileşenleri
 /// canlı olarak incelemek için kullanılan galeri ekranı.
@@ -268,7 +269,7 @@ class ComponentGallery extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space24),
 
-            // 9. DEBUG (Geliştirme Amaçlı: Firebase UID)
+            // 9. DEBUG (Geliştirme Amaçlı: Firebase UID ve Soru Testi)
             if (kDebugMode) ...[
               const SectionLabel('Geliştirici / Hata Ayıklama (Debug)'),
               const SizedBox(height: AppDimens.space10),
@@ -292,6 +293,17 @@ class ComponentGallery extends StatelessWidget {
                     color: AppColors.ink,
                   ),
                 ),
+              ),
+              const SizedBox(height: AppDimens.space14),
+              SecondaryButton(
+                text: AppStrings.questionTest,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const QuestionTestPage(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: AppDimens.space24),
             ],

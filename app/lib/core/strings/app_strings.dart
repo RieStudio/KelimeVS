@@ -38,11 +38,25 @@ abstract final class AppStrings {
   static const String inputPlaceholder = 'Cevabını yaz…';
   static const String questionMark = '?';
 
-  // Geliştirme / Galeri / Debug
+  // Geliştirme / Galeri / Debug / Soru Testi
   static const String componentGallery = 'Bileşen Galerisi';
   static const String firebaseUidPrefix = 'Firebase UID: ';
   static const String authErrorPrefix = 'Bağlantı hatası: ';
   static const String authSigningIn = 'Giriş yapılıyor…';
   static const String authNoUser = 'Giriş yapılmadı';
+  static const String questionTest = 'Soru Testi';
+  static const String questionTestTitle = 'Soru Test Sayfası';
+  static const String newQuestion = 'Yeni Soru';
+  static const String resultCorrect = 'Doğru!';
+  static const String resultRepeated = 'Daha önce söylendi!';
+  static const String resultWrong = 'Yanlış cevap!';
+  static const String resultEmpty = 'Lütfen bir cevap yazın.';
+  static const String resultExhausted = 'Tüm cevaplar bitti!';
+  static const String remainingAnswersPrefix = 'Kalan cevap sayısı: ';
+  static const String givenAnswers = 'Söylenen Cevaplar';
+  static const String loadingQuestions = 'Sorular yükleniyor…';
+  static const String noQuestionsFound = 'Soru bulunamadı.';
+  static const String categoryPrefix = 'Kategori: ';
+  static const String send = 'Gönder';
 }
 

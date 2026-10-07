@@ -56,8 +56,9 @@ Doğrulama **yalnızca Cloud Functions içinde** yapılır. İstemci cevap liste
 
 1. Baştaki ve sondaki boşlukları sil, ardışık boşlukları tek boşluğa indir.
 2. Türkçe kurallarıyla küçük harfe çevir (`tr-TR`): `ISPANAK` → `ıspanak`, `İSTANBUL` → `istanbul`. Büyük/küçük harf kombinasyonu fark etmez.
-3. Aksan katlaması: `ç→c`, `ğ→g`, `ı→i`, `ö→o`, `ş→s`, `ü→u`. Böylece `turkiye` yazan oyuncu `türkiye` cevabını bulur.
-4. Karşılaştırma katlanmış (3. adım) hâller üzerinden yapılır. Kayıtlı alias'ların katlanmış hâli önceden hesaplanıp önbelleğe alınır.
+3. Aksan katlaması: `ç→c`, `ğ→g`, `ı→i`, `ö→o`, `ş→s`, `ü→u`; şapkalı harfler de sadeleşir (`â→a`, `î→i`, `û→u`). Böylece `turkiye` yazan oyuncu `türkiye` cevabını bulur.
+4. Harf, rakam ve boşluk dışındaki tüm karakterler (noktalama, tire, kesme işareti vb.) boşluğa çevrilir, ardışık boşluklar tek boşluğa indirilir.
+5. Karşılaştırma katlanmış (3. ve 4. adım) hâller üzerinden yapılır. Kayıtlı alias'ların katlanmış hâli önceden hesaplanıp önbelleğe alınır.
 
 ### 4.2 Eşleştirme
 
