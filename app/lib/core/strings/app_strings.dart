@@ -84,5 +84,18 @@ abstract final class AppStrings {
   static const String eventForfeit = 'Maçı terk etti';
   static const String eventTimeout = 'Süre doldu';
   static const String eventExhausted = 'Cevaplar tükendi';
+
+  // Maç Ekranı
+  static const String matchScreen = 'Maç Ekranı';
+  static const String leaveMatchPrompt = 'Maçtan çıkarsan maçı kaybedersin.';
+  static const String exit = 'Çık';
+  static const String turnOpponentHint = 'Sıra rakipte';
+  static const String wrongAnswer = 'Yanlış cevap';
+  static const String alreadySaid = 'Bu cevap söylendi';
+  static const String nearMiss = 'Çok yakın!';
+  static const String timeLeftLabel = 'Kalan süre';
+  static const String roundEndedTitle = 'Tur bitti';
+  static const String temporaryTodoNotice = 'TODO: sonraki adımda gerçek ekranla değişecek';
+  static const String close = 'Kapat';
 }
 

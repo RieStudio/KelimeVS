@@ -13,6 +13,22 @@ class MatchSummary {
   });
 }
 
+class AcceptedAnswerUiModel {
+  final String playerId;
+  final String display;
+
+  const AcceptedAnswerUiModel({
+    required this.playerId,
+    required this.display,
+  });
+}
+
+enum MatchFeedbackType {
+  wrong,
+  alreadySaid,
+  nearMiss,
+}
+
 class MatchUiState {
   final MatchState? matchState;
   final int remainingMs;
@@ -23,6 +39,9 @@ class MatchUiState {
   final MatchSummary? summary;
   final bool isLoading;
   final String? errorMessage;
+  final List<AcceptedAnswerUiModel> acceptedAnswers;
+  final MatchFeedbackType? lastFeedback;
+  final int feedbackCounter;
 
   const MatchUiState({
     this.matchState,
@@ -34,6 +53,9 @@ class MatchUiState {
     this.summary,
     this.isLoading = false,
     this.errorMessage,
+    this.acceptedAnswers = const [],
+    this.lastFeedback,
+    this.feedbackCounter = 0,
   });
 
   bool get isMyTurn =>
@@ -54,6 +76,9 @@ class MatchUiState {
     MatchSummary? summary,
     bool? isLoading,
     String? errorMessage,
+    List<AcceptedAnswerUiModel>? acceptedAnswers,
+    MatchFeedbackType? lastFeedback,
+    int? feedbackCounter,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -65,6 +90,9 @@ class MatchUiState {
       summary: summary ?? this.summary,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
+      acceptedAnswers: acceptedAnswers ?? this.acceptedAnswers,
+      lastFeedback: lastFeedback ?? this.lastFeedback,
+      feedbackCounter: feedbackCounter ?? this.feedbackCounter,
     );
   }
 }

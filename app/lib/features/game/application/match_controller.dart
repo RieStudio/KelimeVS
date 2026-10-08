@@ -9,6 +9,7 @@ import '../domain/bot/bot_decision.dart';
 import '../domain/bot/bot_player.dart';
 import '../domain/match/match_config.dart';
 import '../domain/match/match_engine.dart';
+import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
 import '../domain/models.dart';
 import 'match_providers.dart';
@@ -88,7 +89,13 @@ class MatchController extends Notifier<MatchUiState> {
     // TODO: arka plan davranışı
     _cancelAllTimers();
 
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+      acceptedAnswers: const [],
+      lastFeedback: null,
+      feedbackCounter: 0,
+    );
 
     final List<Question> pool;
     if (questions != null) {
@@ -218,6 +225,35 @@ class MatchController extends Notifier<MatchUiState> {
         ? state.eventCounter + events.length
         : state.eventCounter;
 
+    // Tur içi kabul edilen cevaplar
+    final isNewRound = nextState.currentRoundAttempts.isEmpty;
+    final updatedAcceptedAnswers = isNewRound
+        ? <AcceptedAnswerUiModel>[]
+        : List<AcceptedAnswerUiModel>.from(state.acceptedAnswers);
+
+    MatchFeedbackType? newFeedback;
+    for (final event in events) {
+      if (event is AnswerAccepted) {
+        updatedAcceptedAnswers.add(
+          AcceptedAnswerUiModel(
+            playerId: event.playerId,
+            display: event.answerDisplay,
+          ),
+        );
+      } else if (event is WrongAnswer && event.playerId == 'me') {
+        newFeedback = MatchFeedbackType.wrong;
+      } else if (event is AlreadySaid && event.playerId == 'me') {
+        newFeedback = MatchFeedbackType.alreadySaid;
+      } else if (event is NearMiss && event.playerId == 'me') {
+        newFeedback = MatchFeedbackType.nearMiss;
+      }
+    }
+
+    final updatedFeedback = newFeedback ?? state.lastFeedback;
+    final updatedFeedbackCounter = newFeedback != null
+        ? state.feedbackCounter + 1
+        : state.feedbackCounter;
+
     MatchSummary? summary;
     if (nextState.phase == MatchPhase.matchFinished) {
       _cancelAllTimers();
@@ -236,6 +272,9 @@ class MatchController extends Notifier<MatchUiState> {
       opponentName: opponentName ?? state.opponentName,
       summary: summary,
       isLoading: false,
+      acceptedAnswers: updatedAcceptedAnswers,
+      lastFeedback: updatedFeedback,
+      feedbackCounter: updatedFeedbackCounter,
     );
 
     if (nextState.phase == MatchPhase.roundEnded) {
