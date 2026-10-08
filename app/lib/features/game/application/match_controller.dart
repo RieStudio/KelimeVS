@@ -55,6 +55,7 @@ class MatchController extends Notifier<MatchUiState> {
   Timer? _tickTimer;
   Timer? _botTimer;
   Timer? _transitionTimer;
+  int? _transitionDeadlineMs;
   List<BotAction> _pendingBotActions = const [];
   int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
@@ -102,6 +103,9 @@ class MatchController extends Notifier<MatchUiState> {
       roundAttempts: const [],
       lastFeedback: null,
       feedbackCounter: 0,
+      isFinalReveal: false,
+      roundTransitionRemainingMs: 0,
+      roundTransitionTotalMs: roundTransitionDelayMs,
     );
 
     final List<Question> pool;
@@ -294,13 +298,50 @@ class MatchController extends Notifier<MatchUiState> {
         : state.feedbackCounter;
 
     MatchSummary? summary;
+    bool isFinal = false;
+    int transitionRemaining = 0;
+
     if (nextState.phase == MatchPhase.matchFinished) {
-      _cancelAllTimers();
       summary = MatchSummary(
         scores: nextState.scores,
         winnerId: nextState.winnerId!,
         roundHistory: nextState.roundHistory,
       );
+
+      if (nextState.endedBy == 'normal') {
+        isFinal = true;
+        _cancelBotTimer();
+        _cancelTransitionTimer();
+        final transitionDelay = roundTransitionDelayMs;
+        _transitionDeadlineMs = now + transitionDelay;
+        transitionRemaining = transitionDelay;
+        _transitionTimer = Timer(Duration(milliseconds: transitionDelay), () {
+          _cancelAllTimers();
+          state = state.copyWith(
+            isFinalReveal: false,
+            roundTransitionRemainingMs: 0,
+          );
+        });
+      } else {
+        // forfeit -> tur sonunu atla, hemen maç sonucu
+        _cancelAllTimers();
+      }
+    } else if (nextState.phase == MatchPhase.roundEnded) {
+      // Tur bitti: roundTransitionDelayMs sonra otomatik yeni tur başlat
+      _cancelBotTimer();
+      _cancelTransitionTimer();
+      final transitionDelay = roundTransitionDelayMs;
+      _transitionDeadlineMs = now + transitionDelay;
+      transitionRemaining = transitionDelay;
+      _transitionTimer = Timer(Duration(milliseconds: transitionDelay), () {
+        _startNextRound(clock, random);
+      });
+    } else if (nextState.phase == MatchPhase.roundActive) {
+      _cancelTransitionTimer();
+      // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur
+      if (!wasBotActive && nextState.turnPlayerId == 'bot') {
+        _scheduleBotTurn(nextState, clock, random);
+      }
     }
 
     state = state.copyWith(
@@ -315,21 +356,10 @@ class MatchController extends Notifier<MatchUiState> {
       roundAttempts: updatedRoundAttempts,
       lastFeedback: updatedFeedback,
       feedbackCounter: updatedFeedbackCounter,
+      isFinalReveal: isFinal,
+      roundTransitionRemainingMs: transitionRemaining,
+      roundTransitionTotalMs: roundTransitionDelayMs,
     );
-
-    if (nextState.phase == MatchPhase.roundEnded) {
-      // Tur bitti: 3000 ms sonra otomatik yeni tur başlat
-      _cancelBotTimer();
-      _cancelTransitionTimer();
-      _transitionTimer = Timer(Duration(milliseconds: roundTransitionDelayMs), () {
-        _startNextRound(clock, random);
-      });
-    } else if (nextState.phase == MatchPhase.roundActive) {
-      // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur
-      if (!wasBotActive && nextState.turnPlayerId == 'bot') {
-        _scheduleBotTurn(nextState, clock, random);
-      }
-    }
   }
 
   void _scheduleBotTurn(MatchState match, GameClock clock, math.Random random) {
@@ -411,21 +441,30 @@ class MatchController extends Notifier<MatchUiState> {
     _tickTimer?.cancel();
     _tickTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       final match = state.matchState;
-      if (match == null || match.phase != MatchPhase.roundActive) return;
+      if (match == null) return;
 
       final now = clock.nowMs();
-      final remaining = math.max(0, match.deadlineMs - now);
-      state = state.copyWith(remainingMs: remaining);
 
-      // Süre aşımı kontrolü
-      if (now > match.deadlineMs + match.config.graceMs) {
-        final res = MatchEngine.checkTimeout(state: match, nowMs: now);
-        if (res.events.isNotEmpty) {
-          _applyEngineResult(
-            engineResult: res,
-            clock: clock,
-            random: _random,
-          );
+      // Geçiş süresi (roundEnded veya isFinalReveal) sayacı
+      if (_transitionDeadlineMs != null) {
+        final transitionRemaining = math.max(0, _transitionDeadlineMs! - now);
+        state = state.copyWith(roundTransitionRemainingMs: transitionRemaining);
+      }
+
+      if (match.phase == MatchPhase.roundActive) {
+        final remaining = math.max(0, match.deadlineMs - now);
+        state = state.copyWith(remainingMs: remaining);
+
+        // Süre aşımı kontrolü
+        if (now > match.deadlineMs + match.config.graceMs) {
+          final res = MatchEngine.checkTimeout(state: match, nowMs: now);
+          if (res.events.isNotEmpty) {
+            _applyEngineResult(
+              engineResult: res,
+              clock: clock,
+              random: _random,
+            );
+          }
         }
       }
     });
@@ -448,6 +487,7 @@ class MatchController extends Notifier<MatchUiState> {
   void _cancelTransitionTimer() {
     _transitionTimer?.cancel();
     _transitionTimer = null;
+    _transitionDeadlineMs = null;
   }
 }
 

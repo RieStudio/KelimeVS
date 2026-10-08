@@ -55,6 +55,9 @@ class MatchUiState {
   final List<RoundAttemptUiModel> roundAttempts;
   final MatchFeedbackType? lastFeedback;
   final int feedbackCounter;
+  final bool isFinalReveal;
+  final int roundTransitionRemainingMs;
+  final int roundTransitionTotalMs;
 
   const MatchUiState({
     this.matchState,
@@ -70,15 +73,20 @@ class MatchUiState {
     this.roundAttempts = const [],
     this.lastFeedback,
     this.feedbackCounter = 0,
+    this.isFinalReveal = false,
+    this.roundTransitionRemainingMs = 0,
+    this.roundTransitionTotalMs = 3000,
   });
 
   bool get isMyTurn =>
       matchState?.phase == MatchPhase.roundActive &&
       matchState?.turnPlayerId == myPlayerId;
 
-  bool get isMatchFinished => matchState?.phase == MatchPhase.matchFinished;
+  bool get isMatchFinished =>
+      matchState?.phase == MatchPhase.matchFinished && !isFinalReveal;
   bool get isRoundActive => matchState?.phase == MatchPhase.roundActive;
-  bool get isRoundEnded => matchState?.phase == MatchPhase.roundEnded;
+  bool get isRoundEnded =>
+      (matchState?.phase == MatchPhase.roundEnded) || isFinalReveal;
 
   List<RoundAttemptUiModel> get displayAttempts {
     if (roundAttempts.isNotEmpty) {
@@ -107,6 +115,9 @@ class MatchUiState {
     List<RoundAttemptUiModel>? roundAttempts,
     MatchFeedbackType? lastFeedback,
     int? feedbackCounter,
+    bool? isFinalReveal,
+    int? roundTransitionRemainingMs,
+    int? roundTransitionTotalMs,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -122,6 +133,11 @@ class MatchUiState {
       roundAttempts: roundAttempts ?? this.roundAttempts,
       lastFeedback: lastFeedback ?? this.lastFeedback,
       feedbackCounter: feedbackCounter ?? this.feedbackCounter,
+      isFinalReveal: isFinalReveal ?? this.isFinalReveal,
+      roundTransitionRemainingMs:
+          roundTransitionRemainingMs ?? this.roundTransitionRemainingMs,
+      roundTransitionTotalMs:
+          roundTransitionTotalMs ?? this.roundTransitionTotalMs,
     );
   }
 }

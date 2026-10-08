@@ -10,6 +10,8 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../application/match_providers.dart';
 import '../domain/match/match_state.dart';
+import 'match_end_view.dart';
+import 'round_end_view.dart';
 
 /// DESIGN.md Bölüm 7: Maç Ekranı
 class MatchScreen extends ConsumerStatefulWidget {
@@ -97,18 +99,6 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
         ],
       ),
     );
-  }
-
-  String _getRoundResultText(MatchState? matchState) {
-    if (matchState == null || matchState.roundHistory.isEmpty) return '';
-    final lastRound = matchState.roundHistory.last;
-    if (lastRound.winnerId == null) {
-      return AppStrings.resultExhausted;
-    }
-    if (lastRound.winnerId == 'me') {
-      return AppStrings.roundWonExclamation;
-    }
-    return AppStrings.roundLostExclamation;
   }
 
   @override
@@ -263,119 +253,16 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
               ),
             ),
 
-            // Geçici Tur Sonu Kartı (GEÇİCİ)
+            // 6. Tur Sonu Ekranı
             if (uiState.isRoundEnded)
-              Positioned.fill(
-                child: Container(
-                  color: AppColors.ink.withValues(alpha: 0.15),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.screenPaddingHorizontal,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppDimens.space20),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusQuestionCard,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: AppDimens.borderThick,
-                      ),
-                      boxShadow: AppDimens.shadowQuestionCard,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          AppStrings.temporaryTodoNotice,
-                          style: AppTextStyles.secondaryText,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppDimens.space10),
-                        const Text(
-                          AppStrings.roundEndedTitle,
-                          style: AppTextStyles.roundResultTitle,
-                        ),
-                        const SizedBox(height: AppDimens.space8),
-                        Text(
-                          _getRoundResultText(matchState),
-                          style: AppTextStyles.questionText,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const Positioned.fill(
+                child: RoundEndView(),
               ),
 
-            // Geçici Maç Bitti Özet Kartı (GEÇİCİ)
+            // 7. Maç Sonucu Ekranı
             if (uiState.isMatchFinished)
-              Positioned.fill(
-                child: Container(
-                  color: AppColors.ink.withValues(alpha: 0.25),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.screenPaddingHorizontal,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppDimens.space20),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusQuestionCard,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: AppDimens.borderThick,
-                      ),
-                      boxShadow: AppDimens.shadowQuestionCard,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          AppStrings.temporaryTodoNotice,
-                          style: AppTextStyles.secondaryText,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppDimens.space10),
-                        Text(
-                          matchState?.winnerId == 'me'
-                              ? AppStrings.wonExclamation
-                              : AppStrings.lostExclamation,
-                          style: AppTextStyles.largeResult,
-                        ),
-                        const SizedBox(height: AppDimens.space8),
-                        Text(
-                          '${AppStrings.scorePrefix}${matchState?.scores['me'] ?? 0} - ${matchState?.scores['bot'] ?? 0}',
-                          style: AppTextStyles.scoreSmall,
-                        ),
-                        const SizedBox(height: AppDimens.space20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SecondaryButton(
-                                text: AppStrings.newMatch,
-                                onPressed: () {
-                                  ref
-                                      .read(matchControllerProvider.notifier)
-                                      .startMatch();
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: AppDimens.space10),
-                            Expanded(
-                              child: SecondaryButton(
-                                text: AppStrings.close,
-                                onPressed: () => Navigator.of(context).pop(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const Positioned.fill(
+                child: MatchEndView(),
               ),
           ],
         ),

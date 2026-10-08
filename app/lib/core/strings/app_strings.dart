@@ -18,9 +18,22 @@ abstract final class AppStrings {
   static const String lost = 'Kaybettin';
   static const String wonExclamation = 'Kazandın!';
   static const String lostExclamation = 'Kaybettin!';
+  static const String roundWonTitle = 'Turu kazandın!';
+  static const String roundLostTitle = 'Turu kaybettin';
+  static const String roundDrawTitle = 'Tur berabere';
   static const String roundWonExclamation = 'Turu kazandın!';
   static const String roundLostExclamation = 'Turu kaybettin!';
   static const String timeUp = 'Rakibin süresi doldu';
+  static const String reasonOpponentTimeout = 'Rakibin süresi doldu';
+  static const String reasonMyTimeout = 'Süren doldu';
+  static const String reasonExhausted = 'Tüm cevaplar söylendi';
+  static const String nextRoundStartingSoonSuffix = ' birazdan başlıyor';
+  static const String newRoundStartingSoon = 'Yeni tur birazdan başlıyor';
+  static const String matchResultStartingSoon = 'Maç sonucu birazdan';
+  static const String opponentLeftMatch = 'Rakip maçtan ayrıldı';
+  static const String youLeftMatch = 'Maçı terk ettin';
+  static const String coinSuffix = ' jeton';
+  static const String scoreDash = ' – ';
 
   // Butonlar ve Eylemler
   static const String playAgain = 'Tekrar Oyna';

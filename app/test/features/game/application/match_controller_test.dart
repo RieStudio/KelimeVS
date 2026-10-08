@@ -387,9 +387,19 @@ void main() {
         // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 3-0 kazanır
         async.elapse(const Duration(milliseconds: 15200));
 
-        // Artık 3 sonuçlanan tur bitti (bot: 3, me: 0) -> MatchFinished!
+        // Artık 3 sonuçlanan tur bitti (bot: 3, me: 0) -> Motor matchFinished yapar!
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.matchFinished);
+        // Son tur normal bittiğinde 3000 ms boyunca isFinalReveal ve isRoundEnded true olur:
+        expect(state.isFinalReveal, isTrue);
+        expect(state.isRoundEnded, isTrue);
+        expect(state.isMatchFinished, isFalse);
+
+        // 3000 ms sonra finalReveal biter ve maç sonucu ekranı açılır:
+        async.elapse(const Duration(milliseconds: 3000));
+        state = container.read(matchControllerProvider);
+        expect(state.isFinalReveal, isFalse);
+        expect(state.isRoundEnded, isFalse);
         expect(state.isMatchFinished, isTrue);
         expect(state.summary, isNotNull);
         expect(state.summary!.winnerId, 'bot');

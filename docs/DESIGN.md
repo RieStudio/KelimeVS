@@ -99,6 +99,8 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 | Sağ ok (gönder) | `M5 12h14M13 6l6 6-6 6` |
 | Sağ ok (liste) | `M9 6l6 6-6 6` |
 | Onay | `M5 12l5 5 9-10` |
+| Tekrar (yenile) | `M20 12a8 8 0 11-2.3-5.7M20 4v5h-5` |
+| Eşit (beraberlik) | `M5 9h14M5 15h14` |
 | Kupa | gövde `M8 4h8v5a4 4 0 01-8 0z` (dolgu `coin`) + `M8 6H5v2a3 3 0 003 3M16 6h3v2a3 3 0 01-3 3M12 13v4M9 20h6M10 17h4` |
 
 ## 6. Bileşenler
@@ -143,9 +145,17 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
 **3) Maç ekranı** – Üstte kapat ikonu + "Tur 2 / 3" hapı. İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
 
-**4) Tur sonu** – Üstte "Tur N / 3" hapı. Ortada 104 px yuvarlak ikon (`bright` zemin, 4 px `ink` kenarlık, gölge, içinde onay), "Turu kazandın!" ve nedeni ("Rakibin süresi doldu"). Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik), skor kartı (Sen – Rakip, Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa süreli geri sayım çubuğu. **[VARSAYIM]** Otomatik geçiş yaklaşık 3 sn. Turu kaybedince ikon `danger` tonlarıyla, onay yerine çarpı olur.
+**4) Tur sonu** – Üstte "Tur N / 3" hapı. Ortada 104 px yuvarlak ikon, başlık, neden ve skor kartı (Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa geri sayım çubuğu (**[VARSAYIM]** yaklaşık 3 sn, otomatik geçiş). Üç varyant:
+- **Kazandın:** daire `bright` zemin, 4 px `ink` kenarlık ve gölge, içinde onay. Başlık "Turu kazandın!" (`ink`). Neden: "Rakibin süresi doldu".
+- **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` çarpı. Başlık "Turu kaybettin" (`dangerText`). Neden: "Süren doldu".
+- **Beraberlik:** daire `mint` zemin, `ink` kenarlık, içinde eşit işareti. Başlık "Tur berabere" (`ink`). Neden: "Tüm cevaplar söylendi". Alt yazı "Yeni tur birazdan başlıyor" (berabere tur sayıya dahil olmadığı için tur numarası değişmez).
+- Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Maçın **son** sonuçlanan turundan sonra da bu ekran kısa süre gösterilir, alt yazı "Maç sonucu birazdan" olur; ardından maç sonucu ekranı açılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa bu ekran atlanır.
 
-**5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada 104 px yuvarlak ikon (tur sonuyla aynı stil) içinde **kupa**, "Kazandın!" (46), "Sen 2 – 1 Rakip", jeton ödülü kartı ("+N jeton"). Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Kayıpta başlık "Kaybettin" olur, ikon dairesi `dangerSoft` tonlarına döner ve kupa yerine sade bir "tekrar" oku kullanılır **[VARSAYIM – kayıp varyantı henüz çizilmedi]**.
+**5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada tur sonuyla aynı boyutta (104 px) ikon dairesi, başlık, skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı. Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Varyantlar:
+- **Kazandın:** daire `bright` zemin, içinde kupa (gövdesi `coin`). Başlık "Kazandın!" (46, `ink`).
+- **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` "tekrar" oku. Başlık "Kaybettin" (46, `dangerText`).
+- **Rakip maçı terk etti:** "Kazandın!" ve başlığın altında küçük "Rakip maçtan ayrıldı" notu. **Sen terk ettin:** "Kaybettin" ve "Maçı terk ettin" notu.
+- Jeton ödülü kartı geçici içerik: ekonomi kararı verilene kadar sabit örnek değer gösterilir ve veri kaydedilmez **[VARSAYIM]**.
 
 **6) Maç detayı** – Üstte geri ikon butonu + "Maç Detayı". Özet kartı (avatar – skor – avatar, altında sonuç etiketi). Altta tur kartları: "TUR N" etiketi, soru, sonuç etiketi, ok. Dokununca açılır; açık turda cevaplar balon olarak sırayla görünür. Reddedilen cevap varsa altında uyarı kutusu ve "İtiraz et" eylemi.
 

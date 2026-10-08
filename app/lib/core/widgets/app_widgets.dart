@@ -9,4 +9,5 @@ export 'answer_bubble.dart';
 export 'answer_input_bar.dart';
 export 'secondary_button.dart';
 export 'section_label.dart';
+export 'result_circle.dart';
 

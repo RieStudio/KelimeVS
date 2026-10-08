@@ -68,6 +68,12 @@ abstract final class AppIcons {
 
   // 11. Kupa
   static const AppIconData trophy = AppIconData._trophy('');
+
+  // 12. Tekrar (yenile)
+  static const AppIconData refresh = AppIconData('M20 12a8 8 0 11-2.3-5.7M20 4v5h-5');
+
+  // 13. Eşit (beraberlik)
+  static const AppIconData equal = AppIconData('M5 9h14M5 15h14');
 }
 
 /// DESIGN.md Bölüm 5 standartlarına uygun İkon Widget'ı

@@ -110,5 +110,25 @@ abstract final class AppDimens {
       spreadRadius: 0,
     ),
   ];
+
+  static const double borderResultCircle = 4.0;
+
+  static const List<BoxShadow> shadowResultCircleWin = [
+    BoxShadow(
+      color: AppColors.ink,
+      offset: Offset(0, 4),
+      blurRadius: 0,
+      spreadRadius: 0,
+    ),
+  ];
+
+  static const List<BoxShadow> shadowResultCircleLose = [
+    BoxShadow(
+      color: AppColors.dangerDark,
+      offset: Offset(0, 4),
+      blurRadius: 0,
+      spreadRadius: 0,
+    ),
+  ];
 }
 

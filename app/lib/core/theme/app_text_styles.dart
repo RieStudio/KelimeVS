@@ -23,12 +23,28 @@ abstract final class AppTextStyles {
     height: 1.15,
   );
 
+  static const TextStyle largeResultDanger = TextStyle(
+    fontFamily: fontFredoka,
+    fontSize: 46,
+    fontWeight: FontWeight.w700,
+    color: AppColors.dangerText,
+    height: 1.15,
+  );
+
   // Tur sonucu başlığı (Fredoka, 34, 700)
   static const TextStyle roundResultTitle = TextStyle(
     fontFamily: fontFredoka,
     fontSize: 34,
     fontWeight: FontWeight.w700,
     color: AppColors.ink,
+    height: 1.2,
+  );
+
+  static const TextStyle roundResultTitleDanger = TextStyle(
+    fontFamily: fontFredoka,
+    fontSize: 34,
+    fontWeight: FontWeight.w700,
+    color: AppColors.dangerText,
     height: 1.2,
   );
 
