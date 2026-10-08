@@ -317,4 +317,107 @@ void main() {
     );
     expect(dangerContainerFinder, findsOneWidget);
   });
+
+  testWidgets('7. Reddedilen cevaplar (rejected) kırmızı kenarlık ile gösterilir, kendi sağda rakip solda',
+      (tester) async {
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: const [
+        RoundAttemptUiModel(playerId: 'bot', text: 'YanlışCevap1', isCorrect: false),
+        RoundAttemptUiModel(playerId: 'me', text: 'YanlışCevap2', isCorrect: false),
+        RoundAttemptUiModel(playerId: 'me', text: 'Boğa', isCorrect: true),
+      ],
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    final bubbles = tester.widgetList<AnswerBubble>(find.byType(AnswerBubble)).toList();
+    expect(bubbles.length, 3);
+
+    // 1. Rakibin reddedilen cevabı: isMe: false, isRejected: true
+    expect(bubbles[0].text, 'YanlışCevap1');
+    expect(bubbles[0].isMe, isFalse);
+    expect(bubbles[0].isRejected, isTrue);
+
+    // 2. Kendi reddedilen cevabım: isMe: true, isRejected: true
+    expect(bubbles[1].text, 'YanlışCevap2');
+    expect(bubbles[1].isMe, isTrue);
+    expect(bubbles[1].isRejected, isTrue);
+
+    // 3. Kendi doğru cevabım: isMe: true, isRejected: false
+    expect(bubbles[2].text, 'Boğa');
+    expect(bubbles[2].isMe, isTrue);
+    expect(bubbles[2].isRejected, isFalse);
+  });
+
+  testWidgets('8. Giriş alanında en fazla 40 karakter girilebilir ve sayaç görünmez',
+      (tester) async {
+    final state = MatchUiState(
+      matchState: testMatchState.copyWith(turnPlayerId: 'me'),
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    // 50 karakterlik metin gir
+    final longInput = 'a' * 50;
+    await tester.enterText(find.byType(TextField), longInput);
+    await tester.pump();
+
+    // TextField controllerında en fazla 40 karakter olmalı
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.controller?.text.length, 40);
+    expect(textField.maxLength, 40);
+
+    // Sayaç metni ("/40") görünmemeli
+    expect(find.textContaining('/40'), findsNothing);
+  });
+
+  testWidgets('9. Çok yakın ipucu hapı sadece KENDİ denememizde görünür, rakipte görünmez',
+      (tester) async {
+    // A: Kendi denemem yakın -> lastFeedback nearMiss -> ipucu hapı görünür
+    final myNearMissState = MatchUiState(
+      matchState: testMatchState.copyWith(turnPlayerId: 'me'),
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      lastFeedback: MatchFeedbackType.nearMiss,
+      feedbackCounter: 1,
+    );
+    final myController = FakeMatchController(myNearMissState);
+
+    await tester.pumpWidget(_buildTestApp(myController));
+    await tester.pump();
+
+    expect(find.text(AppStrings.nearMiss), findsOneWidget);
+
+    // B: Rakibin denemesi yakın -> lastFeedback null (mevcut mantık) -> ipucu hapı görünmez
+    final opponentNearMissState = MatchUiState(
+      matchState: testMatchState.copyWith(turnPlayerId: 'bot'),
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: const [
+        RoundAttemptUiModel(playerId: 'bot', text: 'Boğ', isCorrect: false),
+      ],
+      lastFeedback: null,
+      feedbackCounter: 0,
+    );
+    final opponentController = FakeMatchController(opponentNearMissState);
+
+    await tester.pumpWidget(_buildTestApp(opponentController, key: const ValueKey('opponent')));
+    await tester.pump();
+
+    expect(find.text(AppStrings.nearMiss), findsNothing);
+    // Ama solda reddedilen balon görünür
+    final bubble = tester.widget<AnswerBubble>(find.byType(AnswerBubble));
+    expect(bubble.text, 'Boğ');
+    expect(bubble.isMe, isFalse);
+    expect(bubble.isRejected, isTrue);
+  });
 }

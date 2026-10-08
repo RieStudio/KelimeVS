@@ -114,7 +114,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(
-      matchControllerProvider.select((s) => s.acceptedAnswers.length),
+      matchControllerProvider.select((s) => s.displayAttempts.length),
       (prev, next) {
         if (next > (prev ?? 0)) {
           _scrollToBottom();
@@ -234,15 +234,16 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                       padding: const EdgeInsets.symmetric(
                         vertical: AppDimens.space8,
                       ),
-                      itemCount: uiState.acceptedAnswers.length,
+                      itemCount: uiState.displayAttempts.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: AppDimens.bubbleSpacing),
                       itemBuilder: (context, index) {
-                        final item = uiState.acceptedAnswers[index];
+                        final item = uiState.displayAttempts[index];
                         return _AnimatedBubble(
-                          key: ValueKey('${item.playerId}_${item.display}_$index'),
-                          text: item.display,
-                          isMe: item.playerId == 'me',
+                          key: ValueKey('${item.playerId}_${item.text}_$index'),
+                          text: item.text,
+                          isMe: item.playerId == uiState.myPlayerId,
+                          isRejected: !item.isCorrect,
                         );
                       },
                     ),
@@ -387,11 +388,13 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
 class _AnimatedBubble extends StatefulWidget {
   final String text;
   final bool isMe;
+  final bool isRejected;
 
   const _AnimatedBubble({
     super.key,
     required this.text,
     required this.isMe,
+    this.isRejected = false,
   });
 
   @override
@@ -433,6 +436,7 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
       child: AnswerBubble(
         text: widget.text,
         isMe: widget.isMe,
+        isRejected: widget.isRejected,
       ),
     );
   }

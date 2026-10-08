@@ -6,6 +6,7 @@ import '../data/local_question_repository.dart';
 import '../data/question_repository.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/match/match_config.dart';
+import '../domain/text_filter.dart';
 import 'match_controller.dart';
 import 'match_ui_state.dart';
 
@@ -27,6 +28,10 @@ final botConfigProvider = Provider<BotConfig>((ref) {
 
 final matchConfigProvider = Provider<MatchConfig>((ref) {
   return const MatchConfig();
+});
+
+final textFilterProvider = Provider<TextFilter>((ref) {
+  return const PassthroughTextFilter();
 });
 
 final matchControllerProvider =

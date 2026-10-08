@@ -8,6 +8,7 @@ import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import '../../features/game/domain/attempt_text_sanitizer.dart';
 
 /// DESIGN.md Bölüm 6 & 8: Giriş Alanı + Gönder Butonu
 ///
@@ -66,6 +67,22 @@ class _AnswerInputBarState extends State<AnswerInputBar>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
+    if (widget.feedback != null && widget.feedbackCounter > 0) {
+      _activeFeedback = widget.feedback;
+      if (widget.feedback == MatchFeedbackType.wrong ||
+          widget.feedback == MatchFeedbackType.alreadySaid) {
+        _showDangerBorder = true;
+        _shakeController.forward(from: 0.0);
+      }
+      _feedbackTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          setState(() {
+            _activeFeedback = null;
+            _showDangerBorder = false;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -115,7 +132,7 @@ class _AnswerInputBarState extends State<AnswerInputBar>
   }
 
   void _handleSend() {
-    final text = _controller.text.trim();
+    final text = AttemptTextSanitizer.sanitize(_controller.text);
     if (text.isEmpty || !widget.isMyTurn) return;
 
     _controller.clear();
@@ -221,6 +238,8 @@ class _AnswerInputBarState extends State<AnswerInputBar>
                       controller: _controller,
                       focusNode: _focusNode,
                       readOnly: !widget.isMyTurn,
+                      maxLength: AttemptTextSanitizer.maxLength,
+                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                       autocorrect: false,
                       enableSuggestions: false,
                       textCapitalization: TextCapitalization.none,
@@ -228,6 +247,7 @@ class _AnswerInputBarState extends State<AnswerInputBar>
                       onSubmitted: (_) => _handleSend(),
                       style: AppTextStyles.inputField,
                       decoration: InputDecoration(
+                        counterText: '',
                         hintText: widget.isMyTurn
                             ? AppStrings.inputPlaceholder
                             : AppStrings.turnOpponentHint,

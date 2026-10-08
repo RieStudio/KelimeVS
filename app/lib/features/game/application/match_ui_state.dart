@@ -23,6 +23,18 @@ class AcceptedAnswerUiModel {
   });
 }
 
+class RoundAttemptUiModel {
+  final String playerId;
+  final String text;
+  final bool isCorrect;
+
+  const RoundAttemptUiModel({
+    required this.playerId,
+    required this.text,
+    required this.isCorrect,
+  });
+}
+
 enum MatchFeedbackType {
   wrong,
   alreadySaid,
@@ -40,6 +52,7 @@ class MatchUiState {
   final bool isLoading;
   final String? errorMessage;
   final List<AcceptedAnswerUiModel> acceptedAnswers;
+  final List<RoundAttemptUiModel> roundAttempts;
   final MatchFeedbackType? lastFeedback;
   final int feedbackCounter;
 
@@ -54,6 +67,7 @@ class MatchUiState {
     this.isLoading = false,
     this.errorMessage,
     this.acceptedAnswers = const [],
+    this.roundAttempts = const [],
     this.lastFeedback,
     this.feedbackCounter = 0,
   });
@@ -66,6 +80,19 @@ class MatchUiState {
   bool get isRoundActive => matchState?.phase == MatchPhase.roundActive;
   bool get isRoundEnded => matchState?.phase == MatchPhase.roundEnded;
 
+  List<RoundAttemptUiModel> get displayAttempts {
+    if (roundAttempts.isNotEmpty) {
+      return roundAttempts;
+    }
+    return acceptedAnswers
+        .map((a) => RoundAttemptUiModel(
+              playerId: a.playerId,
+              text: a.display,
+              isCorrect: true,
+            ))
+        .toList();
+  }
+
   MatchUiState copyWith({
     MatchState? matchState,
     int? remainingMs,
@@ -77,6 +104,7 @@ class MatchUiState {
     bool? isLoading,
     String? errorMessage,
     List<AcceptedAnswerUiModel>? acceptedAnswers,
+    List<RoundAttemptUiModel>? roundAttempts,
     MatchFeedbackType? lastFeedback,
     int? feedbackCounter,
   }) {
@@ -91,6 +119,7 @@ class MatchUiState {
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       acceptedAnswers: acceptedAnswers ?? this.acceptedAnswers,
+      roundAttempts: roundAttempts ?? this.roundAttempts,
       lastFeedback: lastFeedback ?? this.lastFeedback,
       feedbackCounter: feedbackCounter ?? this.feedbackCounter,
     );

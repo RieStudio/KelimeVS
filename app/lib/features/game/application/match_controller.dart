@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/question_repository.dart';
+import '../domain/attempt_text_sanitizer.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/bot/bot_decision.dart';
 import '../domain/bot/bot_player.dart';
@@ -12,6 +13,7 @@ import '../domain/match/match_engine.dart';
 import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
 import '../domain/models.dart';
+import '../domain/text_filter.dart';
 import 'match_providers.dart';
 import 'match_ui_state.dart';
 
@@ -32,6 +34,7 @@ class MatchController extends Notifier<MatchUiState> {
   final QuestionRepository? _injectedRepo;
   final BotConfig? _injectedBotConfig;
   final MatchConfig? _injectedMatchConfig;
+  final TextFilter? _injectedTextFilter;
   final int roundTransitionDelayMs;
 
   MatchController({
@@ -40,12 +43,14 @@ class MatchController extends Notifier<MatchUiState> {
     QuestionRepository? repository,
     BotConfig? botConfig,
     MatchConfig? matchConfig,
+    TextFilter? textFilter,
     this.roundTransitionDelayMs = 3000,
   })  : _injectedClock = clock,
         _injectedRandom = random,
         _injectedRepo = repository,
         _injectedBotConfig = botConfig,
-        _injectedMatchConfig = matchConfig;
+        _injectedMatchConfig = matchConfig,
+        _injectedTextFilter = textFilter;
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -80,6 +85,7 @@ class MatchController extends Notifier<MatchUiState> {
   QuestionRepository get _repo => _injectedRepo ?? ref.read(questionRepositoryProvider);
   BotConfig get _botConfig => _injectedBotConfig ?? ref.read(botConfigProvider);
   MatchConfig get _matchConfig => _injectedMatchConfig ?? ref.read(matchConfigProvider);
+  TextFilter get _textFilter => _injectedTextFilter ?? ref.read(textFilterProvider);
 
   /// Yeni bir botlu maç başlatır.
   Future<void> startMatch({
@@ -93,6 +99,7 @@ class MatchController extends Notifier<MatchUiState> {
       isLoading: true,
       errorMessage: null,
       acceptedAnswers: const [],
+      roundAttempts: const [],
       lastFeedback: null,
       feedbackCounter: 0,
     );
@@ -149,6 +156,9 @@ class MatchController extends Notifier<MatchUiState> {
   /// Kullanıcının ('me') cevabını motora iletir.
   void submit(String text) {
     // TODO: arka plan davranışı
+    final sanitized = AttemptTextSanitizer.sanitize(text);
+    if (sanitized.isEmpty) return;
+
     final match = state.matchState;
     if (match == null || match.phase != MatchPhase.roundActive) return;
     if (match.turnPlayerId != 'me') return;
@@ -160,7 +170,7 @@ class MatchController extends Notifier<MatchUiState> {
     final res = MatchEngine.submit(
       state: match,
       playerId: 'me',
-      rawInput: text,
+      rawInput: sanitized,
       nowMs: now,
     );
 
@@ -231,6 +241,35 @@ class MatchController extends Notifier<MatchUiState> {
         ? <AcceptedAnswerUiModel>[]
         : List<AcceptedAnswerUiModel>.from(state.acceptedAnswers);
 
+    // Tur içi tüm denemeler (kronolojik, timeout hariç)
+    final List<RoundAttemptUiModel> updatedRoundAttempts;
+    if (isNewRound) {
+      updatedRoundAttempts = const [];
+    } else {
+      updatedRoundAttempts = nextState.currentRoundAttempts
+          .where((att) => att.resultType != AttemptResultType.timeout)
+          .map((att) {
+        String text;
+        if (att.resultType == AttemptResultType.correct && att.answerId != null) {
+          final matched = nextState.currentQuestion?.answers
+              .where((a) => a.id == att.answerId)
+              .firstOrNull;
+          text = matched?.display ?? att.rawInput;
+        } else {
+          text = att.rawInput;
+        }
+        text = AttemptTextSanitizer.sanitize(text);
+        if (att.playerId != state.myPlayerId) {
+          text = _textFilter.apply(text);
+        }
+        return RoundAttemptUiModel(
+          playerId: att.playerId,
+          text: text,
+          isCorrect: att.resultType == AttemptResultType.correct,
+        );
+      }).toList();
+    }
+
     MatchFeedbackType? newFeedback;
     for (final event in events) {
       if (event is AnswerAccepted) {
@@ -273,6 +312,7 @@ class MatchController extends Notifier<MatchUiState> {
       summary: summary,
       isLoading: false,
       acceptedAnswers: updatedAcceptedAnswers,
+      roundAttempts: updatedRoundAttempts,
       lastFeedback: updatedFeedback,
       feedbackCounter: updatedFeedbackCounter,
     );

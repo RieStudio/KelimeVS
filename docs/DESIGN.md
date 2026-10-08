@@ -117,7 +117,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Soru kartı** – `card` zemin, 3 px `ink` kenarlık, köşe 18, gölge `0 3px 0 ink`, ortalı Fredoka 18/600. İçerik tek satır olmak zorunda değildir; çok satıra uzar.
 
-**Cevap balonu** – Nunito 15/800, dolgu: kendi cevabın `bright`, rakip cevabı `card`; 2 px `ink` kenarlık, köşe 14, iç boşluk 7×14, en geniş %78. Kendi cevabın sağa, rakibinki sola hizalanır. Reddedilen cevabın kenarlığı `danger`, yazısı `dangerText`.
+**Cevap balonu** – Nunito 15/800, dolgu: kendi cevabın `bright`, rakip cevabı `card`; 2 px `ink` kenarlık, köşe 14, iç boşluk 7×14, en geniş %78. Kendi cevabın sağa, rakibinki sola hizalanır. Kabul edilmeyen cevaplar (yanlış, tekrar, "çok yakın" olsa bile) listede iki oyuncuya da gösterilir; balonun kenarlığı `danger`, yazısı `dangerText`, zemini `card` olur. Kendi reddedilen cevabın sağda, rakibinki solda durur. Metin en fazla 40 karakter. Yok sayılan (hız/sayı sınırına takılan) denemeler listede görünmez.
 
 **Giriş alanı** – Yükseklik 54, 3 px `ink` kenarlık, köşe 18, Nunito 16/700, ipucu: "Cevabını yaz…". Yanında 54×54 gönder butonu (`primary`, beyaz ok, gölge `0 4px 0 ink`). Otomatik düzeltme ve öneri kapalı; klavye "gönder" eylemiyle de gönderilir.
 
@@ -141,9 +141,9 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
 **2) Eşleşme bekleme** – Sol üstte kapat. Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı. "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz". Üç noktalı yükleme göstergesi (nokta renkleri `primary`/`bright`/`mint`, sırayla yanıp söner). Altta ipucu kartı ("Türkçe karakter kullanmasan da olur…") ve "Vazgeç" butonu.
 
-**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2 / 3" hapı. İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). En altta giriş alanı + gönder.
+**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2 / 3" hapı. İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
 
-**4) Tur sonu** – Üstte "Tur N / 3" hapı. Ortada 104 px yuvarlak ikon (`bright` zemin, 4 px `ink` kenarlık, gölge, içinde onay), "Turu kazandın!" ve nedeni ("Rakibin süresi doldu"), skor kartı (Sen – Rakip, Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa süreli geri sayım çubuğu. **[VARSAYIM]** Otomatik geçiş yaklaşık 3 sn. Turu kaybedince ikon `danger` tonlarıyla, onay yerine çarpı olur.
+**4) Tur sonu** – Üstte "Tur N / 3" hapı. Ortada 104 px yuvarlak ikon (`bright` zemin, 4 px `ink` kenarlık, gölge, içinde onay), "Turu kazandın!" ve nedeni ("Rakibin süresi doldu"). Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik), skor kartı (Sen – Rakip, Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa süreli geri sayım çubuğu. **[VARSAYIM]** Otomatik geçiş yaklaşık 3 sn. Turu kaybedince ikon `danger` tonlarıyla, onay yerine çarpı olur.
 
 **5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada 104 px yuvarlak ikon (tur sonuyla aynı stil) içinde **kupa**, "Kazandın!" (46), "Sen 2 – 1 Rakip", jeton ödülü kartı ("+N jeton"). Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Kayıpta başlık "Kaybettin" olur, ikon dairesi `dangerSoft` tonlarına döner ve kupa yerine sade bir "tekrar" oku kullanılır **[VARSAYIM – kayıp varyantı henüz çizilmedi]**.
 
@@ -155,7 +155,7 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 
 - Süreler kısa: dokunma geri bildirimi 80–100 ms, geçişler 200–250 ms, sonuç ekranı girişi 300–400 ms.
 - Süre dolgusu sunucu zamanına göre **ilerler** (telefon saati değil); küçük sapmalar yumuşakça düzeltilir.
-- Doğru cevap: balon aşağıdan yukarı kayarak girer (200 ms). Yanlış cevap: giriş alanı hafifçe sallanır (250 ms) ve kenarlık kısa süre `danger` olur.
+- Doğru cevap: balon aşağıdan yukarı kayarak girer (200 ms). Yanlış cevap: giriş alanı hafifçe sallanır (250 ms) ve kenarlık kısa süre `danger` olur. Yanlış ya da tekrar eden cevap turu kaybettirmez: süre akmaya devam eder, giriş alanı temizlenir ve odak korunur (klavye kapanmaz). "Çok yakın!" ipucu kısa bir geri bildirim olarak giriş alanının üstünde gösterilir (tasarımı maç ekranı adımında yapılacak).
 - Hareket azaltma ayarı açıksa animasyonlar sadeleşir (kaydırma/sallanma yok, sadece geçiş).
 - Ses ve titreşim: **[AÇIK]** henüz karar yok.
 

@@ -7,13 +7,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
+import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/data/question_repository.dart';
 import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
+import 'package:app/features/game/domain/text_filter.dart';
 import 'package:app/features/game/domain/text_normalizer.dart';
+
+class CustomMaskingTextFilter implements TextFilter {
+  final Set<String> blockedWords;
+  const CustomMaskingTextFilter(this.blockedWords);
+
+  @override
+  String apply(String text) {
+    var result = text;
+    for (final word in blockedWords) {
+      result = result.replaceAll(word, '***');
+    }
+    return result;
+  }
+}
 
 class FakeClock implements GameClock {
   final Object _asyncObject;
@@ -478,6 +494,158 @@ void main() {
         expect(state.remainingMs, 15000);
         expect(state.matchState!.scores['bot'], 0);
         expect(state.matchState!.scores['me'], 0);
+
+        container.dispose();
+      });
+    });
+
+    test('Tur içi tüm geçerli denemeler (doğru, yanlış) kronolojik olarak roundAttempts içinde tutulur', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+                minSubmitIntervalMs: 600,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        // 1. Yanlış cevap
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('kesinlikle_yanlis_cevap');
+        var state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 1);
+        expect(state.roundAttempts.last.text, 'kesinlikle_yanlis_cevap');
+        expect(state.roundAttempts.last.isCorrect, isFalse);
+        expect(state.lastFeedback, MatchFeedbackType.wrong);
+
+        // 2. Doğru cevap (mevcut sorunun ilk geçerli cevabı)
+        final validAnswer = state.matchState!.currentQuestion!.answers.first.display;
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit(validAnswer);
+        state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 2);
+        expect(state.roundAttempts.last.text, validAnswer);
+        expect(state.roundAttempts.last.isCorrect, isTrue);
+
+        container.dispose();
+      });
+    });
+
+    test('Rakibin denemeleri TextFilter filtresinden geçirilir', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        // Filtrede sesli harfleri maskeleyen filtre
+        final customFilter = CustomMaskingTextFilter({'a', 'e', 'i', 'o', 'u'});
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            textFilterProvider.overrideWithValue(customFilter),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1500,
+                thinkMaxMs: 1500,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        var state = container.read(matchControllerProvider);
+        final validAnswer = state.matchState!.currentQuestion!.answers.first.display;
+
+        // Me -> doğru cevap verir, sıra bota geçer
+        controller.submit(validAnswer);
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // Bot süresi geçene kadar bekle (bot düşünüp cevap versin)
+        async.elapse(const Duration(milliseconds: 2000));
+        state = container.read(matchControllerProvider);
+
+        // Bot cevap vermiş olmalı ve TextFilter uygulanmış olmalı
+        final botAttempts = state.roundAttempts.where((a) => a.playerId != 'me').toList();
+        expect(botAttempts.isNotEmpty, isTrue);
+        for (final attempt in botAttempts) {
+          expect(attempt.text.contains('***'), isTrue);
+        }
+
+        container.dispose();
+      });
+    });
+
+    test('submit() metni AttemptTextSanitizer ile temizler ve 40 karaktere kırpar', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        // Başı-sonu boşluklu ve ardışık boşluklu yanlış metin
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('   yanlış    deneme   ');
+        var state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 1);
+        expect(state.roundAttempts.first.text, 'yanlış deneme');
+
+        container.dispose();
+      });
+    });
+
+    test('Yok sayılan denemeler (ignored: tooFast) roundAttempts listesine eklenmez', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+                minSubmitIntervalMs: 600,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        // İlk deneme (yanlış)
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('yanlış1');
+        var state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 1);
+
+        // 100 ms sonra tekrar deneme (tooFast, 600 ms altında)
+        async.elapse(const Duration(milliseconds: 100));
+        controller.submit('yanlış2');
+        state = container.read(matchControllerProvider);
+        // Sayı artmamalı!
+        expect(state.roundAttempts.length, 1);
+        expect(state.roundAttempts.first.text, 'yanlış1');
 
         container.dispose();
       });

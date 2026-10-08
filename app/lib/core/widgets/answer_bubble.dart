@@ -22,12 +22,20 @@ class AnswerBubble extends StatelessWidget {
     this.isRejected = false,
   });
 
+  const AnswerBubble.rejected({
+    super.key,
+    required this.text,
+    required this.isMe,
+  }) : isRejected = true;
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final maxBubbleWidth = screenWidth > 0 ? screenWidth * 0.78 : 300.0;
 
-    final bgColor = isMe ? AppColors.bright : AppColors.card;
+    final bgColor = isRejected
+        ? AppColors.card
+        : (isMe ? AppColors.bright : AppColors.card);
     final borderColor = isRejected ? AppColors.danger : AppColors.ink;
     final textStyle = isRejected
         ? AppTextStyles.answerBubbleRejected
