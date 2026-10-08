@@ -46,6 +46,7 @@ abstract final class AppDimens {
   static final BorderRadius borderRadiusButtonLarge = BorderRadius.circular(radiusButtonLarge);
   static final BorderRadius borderRadiusListCard = BorderRadius.circular(radiusListCard);
   static final BorderRadius borderRadiusCardLarge = BorderRadius.circular(radiusCardLarge);
+  static final BorderRadius borderRadiusDialog = BorderRadius.circular(radiusQuestionCard);
   static final BorderRadius borderRadiusFull = BorderRadius.circular(radiusFull);
 
   // Border Widths (Bölüm 4: 2–3 px)

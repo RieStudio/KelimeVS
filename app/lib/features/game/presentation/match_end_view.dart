@@ -10,6 +10,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/result_circle.dart';
+import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../application/match_providers.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
@@ -102,7 +103,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                     icon: AppIcons.close,
                     semanticLabel: AppStrings.close,
                     onTap: () {
-                      Navigator.of(context).pop();
+                      Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                   ),
                   const Spacer(),
@@ -245,7 +246,11 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
               PrimaryButton(
                 text: AppStrings.playAgain,
                 onPressed: () {
-                  ref.read(matchControllerProvider.notifier).startMatch();
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => const MatchmakingScreen(),
+                    ),
+                  );
                 },
               ),
 

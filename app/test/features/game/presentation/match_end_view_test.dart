@@ -14,6 +14,7 @@ import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
+import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 
 class FakeMatchController extends MatchController {
   final MatchUiState _initialState;
@@ -207,7 +208,7 @@ void main() {
     );
   });
 
-  testWidgets('5. "Tekrar Oyna" butonuna tıklandığında controller.startMatch() çağrılır', (tester) async {
+  testWidgets('5. "Tekrar Oyna" butonuna tıklandığında MatchmakingScreen açılır', (tester) async {
     final matchState = createMatchState(
       scores: {'me': 2, 'bot': 1},
       winnerId: 'me',
@@ -221,12 +222,13 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    expect(controller.startMatchCalled, isFalse);
+    expect(find.byType(MatchmakingScreen), findsNothing);
 
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.playAgain));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-    expect(controller.startMatchCalled, isTrue);
+    expect(find.byType(MatchmakingScreen), findsOneWidget);
   });
 
   testWidgets('6. "Maç Detayı" butonu henüz ekranda bulunmaz (TODO doğrulaması)', (tester) async {

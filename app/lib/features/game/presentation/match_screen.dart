@@ -30,8 +30,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final current = ref.read(matchControllerProvider);
-        if (current.matchState == null ||
-            current.matchState?.phase == MatchPhase.matchFinished) {
+        if (!current.isLoading &&
+            (current.matchState == null ||
+                current.matchState?.phase == MatchPhase.matchFinished)) {
           ref.read(matchControllerProvider.notifier).startMatch();
         }
       }
@@ -124,9 +125,20 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
 
     final remainingSec = (uiState.remainingMs / 1000).ceil();
     final timeProgress = (uiState.remainingMs / 15000.0).clamp(0.0, 1.0);
+    final canLeaveWithoutPenalty = uiState.isMatchFinished;
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
+    return PopScope(
+      canPop: canLeaveWithoutPenalty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (canLeaveWithoutPenalty) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        } else {
+          _showLeaveConfirmDialog();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Stack(
@@ -267,8 +279,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 /// 200 ms aşağıdan yukarı kayarak giren cevap balonu

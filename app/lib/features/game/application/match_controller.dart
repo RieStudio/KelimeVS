@@ -12,8 +12,10 @@ import '../domain/match/match_config.dart';
 import '../domain/match/match_engine.dart';
 import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
+import '../domain/history/match_history_entry.dart';
 import '../domain/models.dart';
 import '../domain/text_filter.dart';
+import 'match_history_provider.dart';
 import 'match_providers.dart';
 import 'match_ui_state.dart';
 
@@ -59,6 +61,7 @@ class MatchController extends Notifier<MatchUiState> {
   List<BotAction> _pendingBotActions = const [];
   int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
+  bool _isMatchSaved = false;
 
   static const List<String> _opponentNames = [
     'Ahmet',
@@ -95,6 +98,7 @@ class MatchController extends Notifier<MatchUiState> {
   }) async {
     // TODO: arka plan davranışı
     _cancelAllTimers();
+    _isMatchSaved = false;
 
     state = state.copyWith(
       isLoading: true,
@@ -302,6 +306,10 @@ class MatchController extends Notifier<MatchUiState> {
     int transitionRemaining = 0;
 
     if (nextState.phase == MatchPhase.matchFinished) {
+      if (!_isMatchSaved) {
+        _isMatchSaved = true;
+        _saveMatchToHistory(nextState, clock, opponentName ?? state.opponentName);
+      }
       summary = MatchSummary(
         scores: nextState.scores,
         winnerId: nextState.winnerId!,
@@ -488,6 +496,40 @@ class MatchController extends Notifier<MatchUiState> {
     _transitionTimer?.cancel();
     _transitionTimer = null;
     _transitionDeadlineMs = null;
+  }
+
+  Future<void> _saveMatchToHistory(
+    MatchState finishedState,
+    GameClock clock,
+    String opponentName,
+  ) async {
+    try {
+      final myScore = finishedState.scores['me'] ?? 0;
+      final opponentScore = finishedState.scores['bot'] ?? 0;
+      final isWinner = finishedState.winnerId == 'me';
+      final isForfeit = finishedState.endedBy == 'forfeit';
+      final forfeitedPlayer = isForfeit
+          ? (isWinner ? 'bot' : 'me')
+          : null;
+
+      final entry = MatchHistoryEntry(
+        id: 'match_${clock.nowMs()}_${_random.nextInt(100000)}',
+        opponentName: opponentName.isNotEmpty ? opponentName : 'Rakip',
+        finishedAtMs: clock.nowMs(),
+        myScore: myScore,
+        opponentScore: opponentScore,
+        result: isWinner ? MatchResult.win : MatchResult.lose,
+        endType: isForfeit ? MatchEndType.forfeit : MatchEndType.normal,
+        forfeitedPlayerId: forfeitedPlayer,
+        roundRecords: finishedState.roundHistory,
+      );
+
+      final repo = ref.read(matchHistoryRepositoryProvider);
+      await repo.add(entry);
+      ref.invalidate(matchHistoryProvider);
+    } catch (_) {
+      // sessizce geç
+    }
   }
 }
 

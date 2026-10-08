@@ -420,4 +420,25 @@ void main() {
     expect(bubble.isMe, isFalse);
     expect(bubble.isRejected, isTrue);
   });
+
+  testWidgets('10. Android sistem geri tuşuna basıldığında terk onay penceresi açılır', (tester) async {
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    expect(find.text(AppStrings.leaveMatchConfirmTitle), findsNothing);
+
+    // Sistem geri tuşunu simüle et
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.leaveMatchConfirmTitle), findsOneWidget);
+    expect(find.text(AppStrings.leaveMatchPrompt), findsOneWidget);
+  });
 }

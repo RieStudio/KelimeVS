@@ -9,9 +9,22 @@ abstract final class AppStrings {
   static const String quickMatch = 'Hızlı Maç';
   static const String quickMatchSubtitle = 'Rastgele bir rakiple eşleş';
   static const String playWithFriend = 'Arkadaşınla Oyna';
+  static const String playWithFriendComingSoon = 'Arkadaşınla Oyna modu yakında eklenecek.';
+  static const String comingSoon = 'Yakında';
   static const String recentMatches = 'SON MAÇLARIM';
+  static const String noMatchesYet = 'Henüz maç oynamadın. İlk maçını oyna!';
   static const String slogan = 'Hızlı düşün, doğru yaz!';
   static const String defaultPlayerName = 'Oyuncu';
+  static const String settings = 'Ayarlar';
+  static const String ok = 'Tamam';
+
+  // Tarih Biçimlendirme
+  static const String dateToday = 'Bugün';
+  static const String dateYesterday = 'Dün';
+  static const String daysAgoSuffix = ' gün önce';
+  static const String oneWeekAgo = '1 hafta önce';
+  static const String twoWeeksAgo = '2 hafta önce';
+  static const String threeWeeksAgo = '3 hafta önce';
 
   // Sonuç ve Durumlar
   static const String won = 'Kazandın';
@@ -44,6 +57,9 @@ abstract final class AppStrings {
   // Eşleşme
   static const String searchingOpponent = 'Rakip aranıyor…';
   static const String startingSoon = 'Birazdan başlıyoruz';
+  static const String vs = 'VS';
+  static const String searchTipTitle = 'İPUCU';
+  static const String searchTipContent = 'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
 
   // Maç İçi
   static const String you = 'Sen';

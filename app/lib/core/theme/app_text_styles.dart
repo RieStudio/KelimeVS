@@ -207,6 +207,15 @@ abstract final class AppTextStyles {
     height: 1.2,
   );
 
+  // Gövde metni (Nunito, 14, 700)
+  static const TextStyle bodyText = TextStyle(
+    fontFamily: fontNunito,
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: AppColors.ink,
+    height: 1.3,
+  );
+
   // Bölüm etiketi (BÜYÜK HARF, Nunito 12, 800, harf aralığı 0.08em)
   static const TextStyle sectionLabel = TextStyle(
     fontFamily: fontNunito,

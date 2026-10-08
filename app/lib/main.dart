@@ -9,8 +9,8 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/app_widgets.dart';
+import 'features/home/presentation/home_screen.dart';
 import 'firebase_options.dart';
-import 'gallery/component_gallery.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -118,7 +118,7 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          ComponentGallery(authError: _authError),
+          const HomeScreen(),
           const _TabPlaceholder(title: AppStrings.navLeaderboard),
           const _TabPlaceholder(title: AppStrings.navShop),
           const _TabPlaceholder(title: AppStrings.navProfile),

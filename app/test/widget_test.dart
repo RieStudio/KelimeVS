@@ -9,8 +9,8 @@ void main() {
   ) async {
     await tester.pumpWidget(const ProviderScope(child: KelimeGoApp()));
 
-    // Galerideki başlık ve alt gezinme sekmelerinin varlığını doğrula
-    expect(find.text(AppStrings.componentGallery), findsOneWidget);
+    // Ana ekrandaki Hızlı Maç butonu ve alt gezinme sekmelerinin varlığını doğrula
+    expect(find.text(AppStrings.quickMatch), findsOneWidget);
     expect(find.text(AppStrings.navHome), findsOneWidget);
     expect(find.text(AppStrings.navLeaderboard), findsOneWidget);
     expect(find.text(AppStrings.navShop), findsOneWidget);
