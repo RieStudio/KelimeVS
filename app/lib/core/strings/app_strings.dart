@@ -93,6 +93,8 @@ abstract final class AppStrings {
   static const String matchTestTitle = 'Maç Test Sayfası';
   static const String matchTestNotice = 'Bu sayfa geçicidir, sonraki adımlarda gerçek ekranlarla değiştirilecek.';
   static const String roundPrefix = 'Tur ';
+  static const String roundTemplate = 'Tur {n}';
+  static String round(int n) => roundTemplate.replaceAll('{n}', '$n');
   static const String timeLeftPrefix = 'Kalan Süre: ';
   static const String secondsSuffix = ' sn';
   static const String turnPrefix = 'Sıra: ';

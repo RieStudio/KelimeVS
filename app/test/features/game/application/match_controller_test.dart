@@ -325,7 +325,7 @@ void main() {
       });
     });
 
-    test('3 sonuçlanan tur sonunda maç biter (matchFinished) ve summary üretilir', () {
+    test('2-0 durumunda 2. tur sonunda maç biter (matchFinished), isFinalReveal tetiklenir ve 3. tur oynanmaz', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
         final container = ProviderContainer(
@@ -347,7 +347,7 @@ void main() {
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
                 answerSeconds: 15,
-                totalDecisiveRounds: 3,
+                roundsToWin: 2,
               ),
             ),
           ],
@@ -373,24 +373,13 @@ void main() {
         state = container.read(matchControllerProvider);
         expect(state.matchState!.turnPlayerId, 'me');
 
-        // Me süre aşımına uğrar -> Bot 2-0 kazanır
+        // Me süre aşımına uğrar -> Bot 2-0 kazanır.
+        // Best of 3 kuralı: 2 galibiyete ulaşıldığı için motor matchFinished yapar, 3. tur oynanmaz!
         async.elapse(const Duration(milliseconds: 15200));
-        state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.roundEnded);
-        expect(state.matchState!.scores['bot'], 2);
-
-        // 3 saniye geçiş
-        async.elapse(const Duration(milliseconds: 3000));
-        state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.roundActive);
-        expect(state.matchState!.turnPlayerId, 'me');
-
-        // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 3-0 kazanır
-        async.elapse(const Duration(milliseconds: 15200));
-
-        // Artık 3 sonuçlanan tur bitti (bot: 3, me: 0) -> Motor matchFinished yapar!
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.matchFinished);
+        expect(state.matchState!.scores['bot'], 2);
+        expect(state.matchState!.scores['me'], 0);
         // Son tur normal bittiğinde 3000 ms boyunca isFinalReveal ve isRoundEnded true olur:
         expect(state.isFinalReveal, isTrue);
         expect(state.isRoundEnded, isTrue);
@@ -404,8 +393,92 @@ void main() {
         expect(state.isMatchFinished, isTrue);
         expect(state.summary, isNotNull);
         expect(state.summary!.winnerId, 'bot');
-        expect(state.summary!.scores['bot'], 3);
+        expect(state.summary!.scores['bot'], 2);
         expect(state.summary!.scores['me'], 0);
+        expect(state.summary!.roundHistory.length, 2);
+
+        container.dispose();
+      });
+    });
+
+    test('1-1 durumunda 3. tur oynanır ve 2-1 ile maç biter, isFinalReveal 3. tur sonunda tetiklenir', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(42)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1000,
+                thinkMaxMs: 1000,
+                baseKnowChance: 0.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
+              ),
+            ),
+            matchControllerProvider.overrideWith(
+              () => MatchController(roundTransitionDelayMs: 3000),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                roundsToWin: 2,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        // 1. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 1-0 kazanır
+        async.elapse(const Duration(milliseconds: 15200));
+        var state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundEnded);
+        expect(state.matchState!.scores['bot'], 1);
+        expect(state.isFinalReveal, isFalse);
+
+        // 3 saniye geçiş -> Tur 2 başlar
+        async.elapse(const Duration(milliseconds: 3000));
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundActive);
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // 2. Tur: Sıra botta. Bot bilmediği için cevap vermez, süre aşımına uğrar -> Me 1-1 yapar
+        async.elapse(const Duration(milliseconds: 15200));
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundEnded);
+        expect(state.matchState!.scores['bot'], 1);
+        expect(state.matchState!.scores['me'], 1);
+        expect(state.isFinalReveal, isFalse);
+
+        // 3 saniye geçiş -> 1-1 olduğu için 3. Tur başlar!
+        async.elapse(const Duration(milliseconds: 3000));
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundActive);
+        expect(state.matchState!.turnPlayerId, 'me');
+
+        // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 2-1 kazanır ve maç biter!
+        async.elapse(const Duration(milliseconds: 15200));
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.matchFinished);
+        expect(state.matchState!.scores['bot'], 2);
+        expect(state.matchState!.scores['me'], 1);
+        expect(state.isFinalReveal, isTrue);
+        expect(state.isRoundEnded, isTrue);
+        expect(state.isMatchFinished, isFalse);
+
+        // 3000 ms sonra finalReveal biter ve maç sonucu ekranı açılır:
+        async.elapse(const Duration(milliseconds: 3000));
+        state = container.read(matchControllerProvider);
+        expect(state.isFinalReveal, isFalse);
+        expect(state.isRoundEnded, isFalse);
+        expect(state.isMatchFinished, isTrue);
+        expect(state.summary, isNotNull);
+        expect(state.summary!.winnerId, 'bot');
+        expect(state.summary!.scores['bot'], 2);
+        expect(state.summary!.scores['me'], 1);
         expect(state.summary!.roundHistory.length, 3);
 
         container.dispose();

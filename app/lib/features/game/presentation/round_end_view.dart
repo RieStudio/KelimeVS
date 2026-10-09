@@ -13,7 +13,7 @@ import '../domain/match/match_events.dart';
 
 /// DESIGN.md Bölüm 7: 4) Tur Sonu Ekranı
 ///
-/// Üstte "Tur N / 3" hapı.
+/// Üstte "Tur N" hapı.
 /// Ortada 104 px ResultCircle, başlık, neden ve skor kartı (Fredoka 52).
 /// Altta "Tur N+1 birazdan başlıyor" (beraberlikte "Yeni tur birazdan başlıyor",
 /// son turda "Maç sonucu birazdan") ve geri sayım çubuğu.
@@ -128,7 +128,7 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
           ),
           child: Column(
             children: [
-              // 1. Üst "Tur N / 3" Hapı
+              // 1. Üst "Tur N" Hapı
               Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -144,7 +144,7 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                     ),
                   ),
                   child: Text(
-                    '${AppStrings.roundPrefix}$cappedRoundNumber / 3',
+                    AppStrings.round(cappedRoundNumber),
                     style: AppTextStyles.questionText.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

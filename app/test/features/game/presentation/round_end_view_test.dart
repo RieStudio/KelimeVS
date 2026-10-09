@@ -103,8 +103,8 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // Üst hap: Tur 1 / 3
-    expect(find.text('${AppStrings.roundPrefix}1 / 3'), findsOneWidget);
+    // Üst hap: Tur 1
+    expect(find.text(AppStrings.round(1)), findsOneWidget);
 
     // ResultCircle: win varyantı, check ikonu
     final circleFinder = find.byType(ResultCircle);
@@ -147,8 +147,8 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // Üst hap: Tur 2 / 3
-    expect(find.text('${AppStrings.roundPrefix}2 / 3'), findsOneWidget);
+    // Üst hap: Tur 2
+    expect(find.text(AppStrings.round(2)), findsOneWidget);
 
     // ResultCircle: lose varyantı, close ikonu
     final circleFinder = find.byType(ResultCircle);
@@ -184,8 +184,8 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // Üst hap: decisiveRounds + 1 = Tur 2 / 3
-    expect(find.text('${AppStrings.roundPrefix}2 / 3'), findsOneWidget);
+    // Üst hap: decisiveRounds + 1 = Tur 2
+    expect(find.text(AppStrings.round(2)), findsOneWidget);
 
     // ResultCircle: draw varyantı, equal ikonu
     final circleFinder = find.byType(ResultCircle);
@@ -222,8 +222,8 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // Üst hap: Tur 3 / 3
-    expect(find.text('${AppStrings.roundPrefix}3 / 3'), findsOneWidget);
+    // Üst hap: Tur 3
+    expect(find.text(AppStrings.round(3)), findsOneWidget);
 
     // Alt metin: Maç sonucu birazdan
     expect(find.text(AppStrings.matchResultStartingSoon), findsOneWidget);

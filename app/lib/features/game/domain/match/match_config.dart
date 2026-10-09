@@ -1,8 +1,14 @@
 // Saf Dart - Flutter veya Firebase bağımlılığı yoktur.
 
 class MatchConfig {
-  /// Maçın bitmesi için gereken toplam sonuçlanan (kazananı olan) tur sayısı
-  final int totalDecisiveRounds;
+  /// Bir oyuncunun maçı kazanması için gereken galibiyet sayısı (varsayılan 2)
+  final int roundsToWin;
+
+  /// Maksimum sonuçlanan (kazananı olan) tur sayısı: 2 * roundsToWin - 1
+  int get maxDecisiveRounds => 2 * roundsToWin - 1;
+
+  /// Geriye uyumluluk: eski totalDecisiveRounds alanı maksimum sonuçlanan tura denk gelir
+  int get totalDecisiveRounds => maxDecisiveRounds;
 
   /// Oyuncunun her cevap hakkı için süresi (saniye)
   final int answerSeconds;
@@ -23,13 +29,16 @@ class MatchConfig {
   final int maxAttemptsPerTurn;
 
   const MatchConfig({
-    this.totalDecisiveRounds = 3,
+    int roundsToWin = 2,
+    int? totalDecisiveRounds,
     this.answerSeconds = 15,
     this.graceMs = 0,
     this.nearMissPerRound = 1,
     this.minAnswersPerQuestion = 0,
     this.minSubmitIntervalMs = 600,
     this.maxAttemptsPerTurn = 25,
-  });
+  }) : roundsToWin = totalDecisiveRounds != null
+            ? (totalDecisiveRounds + 1) ~/ 2
+            : roundsToWin;
 }
 

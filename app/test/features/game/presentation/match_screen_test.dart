@@ -98,8 +98,8 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pump();
 
-    // Tur hapı (decisiveRounds = 1 -> Tur 2 / 3)
-    expect(find.text('${AppStrings.roundPrefix}2 / 3'), findsOneWidget);
+    // Tur hapı (decisiveRounds = 1 -> Tur 2)
+    expect(find.text(AppStrings.round(2)), findsOneWidget);
 
     // Kapat butonu
     expect(find.bySemanticsLabel(AppStrings.leaveMatch), findsOneWidget);

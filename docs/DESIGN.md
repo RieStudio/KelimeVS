@@ -119,7 +119,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Soru kartı** – `card` zemin, 3 px `ink` kenarlık, köşe 18, gölge `0 3px 0 ink`, ortalı Fredoka 18/600. İçerik tek satır olmak zorunda değildir; çok satıra uzar.
 
-**Cevap balonu** – Nunito 15/800, dolgu: kendi cevabın `bright`, rakip cevabı `card`; 2 px `ink` kenarlık, köşe 14, iç boşluk 7×14, en geniş %78. Kendi cevabın sağa, rakibinki sola hizalanır. Kabul edilmeyen cevaplar (yanlış, tekrar, "çok yakın" olsa bile) listede iki oyuncuya da gösterilir; balonun kenarlığı `danger`, yazısı `dangerText`, zemini `card` olur. Kendi reddedilen cevabın sağda, rakibinki solda durur. Metin en fazla 40 karakter. Yok sayılan (hız/sayı sınırına takılan) denemeler listede görünmez. Henüz söylenmemiş bir cevaba "çok yakın" olan denemeler tur bitene kadar yalnızca sahibine görünür (rakip görmez; kopya önleme). Tur bittikten sonra ve maç detayında herkese görünür.
+**Cevap balonu** – Nunito 15/800, dolgu: kendi cevabın `bright`, rakip cevabı `card`; 2 px `ink` kenarlık, köşe 14, iç boşluk 7×14, en geniş %78. Kendi cevabın sağa, rakibinki sola hizalanır. Kabul edilmeyen cevaplar (yanlış, tekrar, "çok yakın" olsa bile) listede iki oyuncuya da gösterilir; balonun kenarlığı `danger`, yazısı `dangerText`, zemini `card` olur. Kendi reddedilen cevabın sağda, rakibinki solda durur. Metin en fazla 40 karakter. Yok sayılan (hız/sayı sınırına takılan) denemeler listede görünmez. Henüz söylenmemiş bir cevaba "çok yakın" olan denemeler tur bitene kadar rakibe gösterilmez (kopya önleme). İpucu verilen yakın deneme sahibine de balon olarak gösterilmez, yalnızca "Çok yakın!" ipucu çıkar. İpucu hakkı bitmişse sahibi onu normal yanlış deneme gibi (kırmızı balon) görür. Tur bittikten sonra ve maç detayında bütün denemeler herkese görünür.
 
 **Giriş alanı** – Yükseklik 54, 3 px `ink` kenarlık, köşe 18, Nunito 16/700, ipucu: "Cevabını yaz…". Yanında 54×54 gönder butonu (`primary`, beyaz ok, gölge `0 4px 0 ink`). Otomatik düzeltme ve öneri kapalı; klavye "gönder" eylemiyle de gönderilir.
 
@@ -143,13 +143,13 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
 **2) Eşleşme bekleme** – Sol üstte kapat. Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı. "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz". Üç noktalı yükleme göstergesi (nokta renkleri `primary`/`bright`/`mint`, sırayla yanıp söner). Altta ipucu kartı ("Türkçe karakter kullanmasan da olur…") ve "Vazgeç" butonu.
 
-**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2 / 3" hapı. İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
+**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2" hapı (paydasız). İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
 
-**4) Tur sonu** – Üstte "Tur N / 3" hapı. Ortada 104 px yuvarlak ikon, başlık, neden ve skor kartı (Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa geri sayım çubuğu (**[VARSAYIM]** yaklaşık 3 sn, otomatik geçiş). Üç varyant:
+**4) Tur sonu** – Üstte "Tur N" hapı (paydasız). Ortada 104 px yuvarlak ikon, başlık, neden ve skor kartı (Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa geri sayım çubuğu (**[VARSAYIM]** yaklaşık 3 sn, otomatik geçiş). Üç varyant:
 - **Kazandın:** daire `bright` zemin, 4 px `ink` kenarlık ve gölge, içinde onay. Başlık "Turu kazandın!" (`ink`). Neden: "Rakibin süresi doldu".
 - **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` çarpı. Başlık "Turu kaybettin" (`dangerText`). Neden: "Süren doldu".
 - **Beraberlik:** daire `mint` zemin, `ink` kenarlık, içinde eşit işareti. Başlık "Tur berabere" (`ink`). Neden: "Tüm cevaplar söylendi". Alt yazı "Yeni tur birazdan başlıyor" (berabere tur sayıya dahil olmadığı için tur numarası değişmez).
-- Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Maçın **son** sonuçlanan turundan sonra da bu ekran kısa süre gösterilir, alt yazı "Maç sonucu birazdan" olur; ardından maç sonucu ekranı açılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa bu ekran atlanır.
+- Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Maçı belirleyen turdan sonra (bir oyuncu 2. galibiyetini alınca; 2–0 ya da 2–1) da bu ekran kısa süre gösterilir, alt yazı "Maç sonucu birazdan" olur; ardından maç sonucu ekranı açılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa bu ekran atlanır.
 
 **5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada tur sonuyla aynı boyutta (104 px) ikon dairesi, başlık, skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı. Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Varyantlar:
 - **Kazandın:** daire `bright` zemin, içinde kupa (gövdesi `coin`). Başlık "Kazandın!" (46, `ink`).

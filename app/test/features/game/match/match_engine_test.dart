@@ -79,11 +79,11 @@ void main() {
   });
 
   group('MatchEngine Testleri', () {
-    test('1. 3 sonuçlanan tur tamamlandığında maç biter (2-0 olsa bile 3. tur oynanır)', () {
-      final config = const MatchConfig(totalDecisiveRounds: 3);
+    test('1. Best of 3 kuralı: 2-0 olunca 3. tur oynanmaz, 1-1 olunca 3. tur maçı belirler', () {
+      final config = const MatchConfig(roundsToWin: 2);
       final random = math.Random(1);
 
-      // Başlangıç: Tur 1
+      // --- Senaryo A: 2-0'da maç 2. tur sonunda biter, 3. tur başlamaz ---
       var res = MatchEngine.start(
         config: config,
         playerIds: ['p1', 'p2'],
@@ -95,7 +95,7 @@ void main() {
       expect(state.phase, equals(MatchPhase.roundActive));
       expect(state.decisiveRounds, equals(0));
 
-      // 1. Tur: p1 doğru cevap verir, p2 süre aşımına uğrar -> p1 kazanır
+      // 1. Tur: p1 doğru cevap verir, p2 süre aşımına uğrar -> p1 kazanır (1 - 0)
       res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'audi', nowMs: 2000);
       state = res.state;
       expect(res.events.first, isA<AnswerAccepted>());
@@ -109,6 +109,7 @@ void main() {
       expect(state.scores['p1'], equals(1));
       expect(state.scores['p2'], equals(0));
       expect(state.decisiveRounds, equals(1));
+      expect(res.events.any((e) => e is MatchFinished), isFalse);
 
       // 2. Tur başlat: Skor 1 - 0
       res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 25000);
@@ -123,30 +124,68 @@ void main() {
       expect(state.scores['p2'], equals(0));
       expect(state.decisiveRounds, equals(2));
 
-      // 2 tur bitmesine rağmen maç bitmemelidir (3 sonuçlanan tur kuralı)
+      // 2-0 oldu: p1 2 galibiyete ulaştığı için 3. tur BAŞLAMAZ, maç burada biter!
+      expect(state.phase, equals(MatchPhase.matchFinished));
+      expect(res.events.any((e) => e is MatchFinished), isTrue);
+      final finishEvent = res.events.firstWhere((e) => e is MatchFinished) as MatchFinished;
+      expect(finishEvent.winnerId, equals('p1'));
+      expect(state.winnerId, equals('p1'));
+      expect(state.endedBy, equals('normal'));
+
+      // --- Senaryo B: 1-1 durumunda 3. tur oynanır ve maçı belirler ---
+      res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: sampleQuestions,
+        random: math.Random(2),
+        nowMs: 1000,
+      );
+      state = res.state;
+
+      final round1Starter = state.turnPlayerId!;
+      final round1Other = state.opponentOf(round1Starter);
+      // round1Starter süre aşımına uğrar -> round1Other kazanır (1 - 0)
+      res = MatchEngine.checkTimeout(state: state, nowMs: 1000 + config.answerSeconds * 1000 + 10);
+      state = res.state;
+      expect(state.scores[round1Other], equals(1));
+      expect(state.scores[round1Starter], equals(0));
+      expect(state.phase, equals(MatchPhase.roundEnded));
       expect(res.events.any((e) => e is MatchFinished), isFalse);
 
-      // 3. Tur başlat: Skor 1 - 1
+      // 2. Tur başlat
+      res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 25000);
+      state = res.state;
+
+      // 2. Tur: round1Other süre aşımına uğrar -> round1Starter kazanır (Skor: 1 - 1)
+      if (state.turnPlayerId == round1Starter) {
+        res = MatchEngine.submit(state: state, playerId: round1Starter, rawInput: 'audi', nowMs: 26000);
+        state = res.state;
+      }
+      res = MatchEngine.checkTimeout(state: state, nowMs: 26000 + config.answerSeconds * 1000 + 10);
+      state = res.state;
+      expect(state.scores[round1Other], equals(1));
+      expect(state.scores[round1Starter], equals(1));
+      expect(state.decisiveRounds, equals(2));
+      // 1-1 iken maç bitmez, 3. tura geçilir
+      expect(state.phase, equals(MatchPhase.roundEnded));
+      expect(res.events.any((e) => e is MatchFinished), isFalse);
+
+      // 3. Tur başlat
       res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 50000);
       state = res.state;
       expect(state.phase, equals(MatchPhase.roundActive));
 
-      // 3. Tur: Başlayan oyuncu p1 süre aşımına uğrar -> p2 kazanır (Skor: 2 - 1)
-      final activeStarter = state.turnPlayerId!;
-      final opponent = state.opponentOf(activeStarter);
+      // 3. Tur: aktif oyuncu süre aşımına uğrar -> diğeri maçı 2 - 1 kazanır
+      final round3Active = state.turnPlayerId!;
+      final matchWinner = state.opponentOf(round3Active);
       res = MatchEngine.checkTimeout(state: state, nowMs: 50000 + config.answerSeconds * 1000 + 10);
       state = res.state;
-      expect((res.events.first as RoundWon).winnerId, equals(opponent));
-      expect(state.scores['p1'], equals(2));
-      expect(state.scores['p2'], equals(1));
-
-      // 3 sonuçlanan tur bitti, maç bitmeli
-      expect(state.phase, equals(MatchPhase.matchFinished));
+      expect(state.scores[matchWinner], equals(2));
+      expect(state.scores[round3Active], equals(1));
       expect(state.decisiveRounds, equals(3));
+      expect(state.phase, equals(MatchPhase.matchFinished));
       expect(res.events.any((e) => e is MatchFinished), isTrue);
-      final finishEvent = res.events.firstWhere((e) => e is MatchFinished) as MatchFinished;
-      expect(finishEvent.winnerId, equals(activeStarter));
-      expect(state.winnerId, equals(activeStarter));
+      expect(state.winnerId, equals(matchWinner));
       expect(state.endedBy, equals('normal'));
     });
 
@@ -716,11 +755,10 @@ void main() {
       expect(state.currentRoundAttempts.last.hintShown, isTrue);
       expect(state.currentRoundAttempts.last.resultType, equals(AttemptResultType.nearMiss));
 
-      // Aktif turda p1 kendi denemesini görür
+      // Aktif turda hintShown=true olan deneme HERKESE gizlidir (ne p1 ne p2 balon olarak görür)
       var p1Visible = visibleAttempts(state.currentRoundRecord, 'p1', true);
-      expect(p1Visible.any((a) => a.rawInput == 'aude'), isTrue);
+      expect(p1Visible.any((a) => a.rawInput == 'aude'), isFalse);
 
-      // Aktif turda rakip p2 bu yakın denemeyi GÖRMEZ (kopya önleme)
       var p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
       expect(p2Visible.any((a) => a.rawInput == 'aude'), isFalse);
 
@@ -738,17 +776,21 @@ void main() {
       expect(state.currentRoundAttempts.last.hintShown, isFalse);
       expect(state.currentRoundAttempts.last.resultType, equals(AttemptResultType.wrong));
 
-      // Hak bitmiş olsa bile aktif turda p1 görür, p2 GÖRMEZ
+      // Hak bitmiş olsa bile aktif turda p1 (sahibi) görür, rakip p2 GÖRMEZ
       p1Visible = visibleAttempts(state.currentRoundRecord, 'p1', true);
       expect(p1Visible.any((a) => a.rawInput == 'ferari'), isTrue);
 
       p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
       expect(p2Visible.any((a) => a.rawInput == 'ferari'), isFalse);
 
-      // 12.3: Tur bitince (roundActive = false), her iki yakın deneme de p2'ye görünür
-      final roundEndedVisible = visibleAttempts(state.currentRoundRecord, 'p2', false);
-      expect(roundEndedVisible.any((a) => a.rawInput == 'aude'), isTrue);
-      expect(roundEndedVisible.any((a) => a.rawInput == 'ferari'), isTrue);
+      // 12.3: Tur bitince (roundActive = false), her iki deneme de hem p1 hem p2'ye görünür
+      final roundEndedVisibleP1 = visibleAttempts(state.currentRoundRecord, 'p1', false);
+      expect(roundEndedVisibleP1.any((a) => a.rawInput == 'aude'), isTrue);
+      expect(roundEndedVisibleP1.any((a) => a.rawInput == 'ferari'), isTrue);
+
+      final roundEndedVisibleP2 = visibleAttempts(state.currentRoundRecord, 'p2', false);
+      expect(roundEndedVisibleP2.any((a) => a.rawInput == 'aude'), isTrue);
+      expect(roundEndedVisibleP2.any((a) => a.rawInput == 'ferari'), isTrue);
     });
 
     test('13. Yakın olmayan yanlış deneme ve eşik dışı kelimeler isClose=false olur ve rakibe gizlenmez', () {

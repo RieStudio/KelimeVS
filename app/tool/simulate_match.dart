@@ -149,13 +149,16 @@ class SimulationStats {
   int maxRoundsPlayed = 0;
   int extendedMatchesCount = 0;
 
+  int sweepMatchesCount = 0; // 2-0 biten maçlar
+  int threeRoundMatchesCount = 0; // 2-1 biten maçlar
+
   int invariantViolations = 0;
 }
 
 List<String> _checkInvariants(MatchState state, int poolSize) {
   final errors = <String>[];
 
-  // 1. Maç terk edildiyse 3 karar turu kuralı aranmaz ama terk etmeyen kazanmış olmalı
+  // 1. Maç terk edildiyse terk eden kaybetmiş, terk etmeyen kazanmış olmalı
   if (state.endedBy == 'forfeit') {
     if (state.winnerId == null) {
       errors.add('Terk edilen maçta kazanan yok');
@@ -168,27 +171,35 @@ List<String> _checkInvariants(MatchState state, int poolSize) {
     }
   } else {
     // Normal biten maç:
-    // Sonuçlanan tur sayısı tam 3
-    if (state.decisiveRounds != 3) {
-      errors.add('Sonuçlanan tur sayısı 3 değil: ${state.decisiveRounds}');
+    // Sonuçlanan tur sayısı 2 ya da 3 olmalı
+    if (state.decisiveRounds != 2 && state.decisiveRounds != 3) {
+      errors.add('Sonuçlanan tur sayısı 2 ya da 3 değil: ${state.decisiveRounds}');
     }
     final wonRoundsCount = state.roundHistory.where((r) => r.winnerId != null).length;
-    if (wonRoundsCount != 3) {
-      errors.add('Kazanılan tur kaydı 3 değil: $wonRoundsCount');
+    if (wonRoundsCount != state.decisiveRounds) {
+      errors.add('Kazanılan tur kaydı ($wonRoundsCount) ile decisiveRounds (${state.decisiveRounds}) uyuşmuyor');
     }
 
-    // Skorların toplamı 3, skorlar eşit değil, kazanan yüksek skorlu oyuncu
+    // Skorların toplamı sonuçlanan tur sayısına eşit olmalı, kazanan 2 tur kazanmış oyuncu olmalı
     final p1Score = state.scores['p1'] ?? 0;
     final p2Score = state.scores['p2'] ?? 0;
-    if (p1Score + p2Score != 3) {
-      errors.add('Skorlar toplamı 3 değil: $p1Score + $p2Score');
-    }
-    if (p1Score == p2Score) {
-      errors.add('Skorlar eşit: $p1Score - $p2Score');
+    if (p1Score + p2Score != state.decisiveRounds) {
+      errors.add('Skorlar toplamı ($p1Score + $p2Score) sonuçlanan tur sayısına (${state.decisiveRounds}) eşit değil');
     }
     final expectedWinner = p1Score > p2Score ? 'p1' : 'p2';
     if (state.winnerId != expectedWinner) {
       errors.add('Kazanan hatalı: beklenen $expectedWinner, gerçek ${state.winnerId}');
+    }
+    final winnerScore = state.scores[state.winnerId] ?? 0;
+    final loserScore = state.scores[state.opponentOf(state.winnerId!)] ?? 0;
+    if (winnerScore != 2) {
+      errors.add('Kazanan oyuncunun skoru 2 değil: $winnerScore');
+    }
+    if (state.decisiveRounds == 2 && loserScore != 0) {
+      errors.add('2 sonuçlanan turlu maçta skor 2-0 değil: $winnerScore - $loserScore');
+    }
+    if (state.decisiveRounds == 3 && loserScore != 1) {
+      errors.add('3 sonuçlanan turlu maçta skor 2-1 değil: $winnerScore - $loserScore');
     }
   }
 
@@ -227,17 +238,23 @@ List<String> _checkInvariants(MatchState state, int poolSize) {
     }
   }
 
-  // 5. Aktif turda bir oyuncuya gösterilen listede rakibin isClose denemesi olamaz
+  // 5. Aktif turda hiçbir oyuncuya hintShown denemesi ve rakibin isClose denemesi gösterilemez
   for (int i = 0; i < state.roundHistory.length; i++) {
     final round = state.roundHistory[i];
     for (final p in state.playerIds) {
       final opp = state.opponentOf(p);
       final activeVisible = visibleAttempts(round, p, true);
-      final leaked =
-          activeVisible.where((a) => a.playerId == opp && a.isClose).toList();
-      if (leaked.isNotEmpty) {
+      final hintShownLeaked =
+          activeVisible.where((a) => a.hintShown).toList();
+      if (hintShownLeaked.isNotEmpty) {
         errors.add(
-            'Tur ${i + 1} aktifken $p oyuncusuna rakibin isClose denemesi (${leaked.length} adet) sızdırıldı!');
+            'Tur ${i + 1} aktifken $p oyuncusuna hintShown denemesi (${hintShownLeaked.length} adet) gösterildi!');
+      }
+      final opponentCloseLeaked =
+          activeVisible.where((a) => a.playerId == opp && a.isClose).toList();
+      if (opponentCloseLeaked.isNotEmpty) {
+        errors.add(
+            'Tur ${i + 1} aktifken $p oyuncusuna rakibin isClose denemesi (${opponentCloseLeaked.length} adet) gösterildi!');
       }
     }
   }
@@ -499,6 +516,13 @@ void _playMatch({
         for (final p in state.playerIds) {
           final opp = state.opponentOf(p);
           final liveVisible = visibleAttempts(state.currentRoundRecord, p, true);
+          final hintShownLeaked =
+              liveVisible.where((a) => a.hintShown).toList();
+          if (hintShownLeaked.isNotEmpty) {
+            liveViolations.add(
+              'Aktif turda $p oyuncusuna hintShown denemesi sızdı: ${hintShownLeaked.map((a) => a.rawInput).toList()}',
+            );
+          }
           final leaked =
               liveVisible.where((a) => a.playerId == opp && a.isClose).toList();
           if (leaked.isNotEmpty) {
@@ -543,8 +567,15 @@ void _playMatch({
   final roundsInMatch = state.roundHistory.length;
   stats.totalRoundsPlayed += roundsInMatch;
   stats.maxRoundsPlayed = math.max(stats.maxRoundsPlayed, roundsInMatch);
-  if (roundsInMatch > 3 && state.endedBy != 'forfeit') {
-    stats.extendedMatchesCount++;
+  if (state.endedBy != 'forfeit') {
+    if (state.decisiveRounds == 2) {
+      stats.sweepMatchesCount++;
+    } else if (state.decisiveRounds == 3) {
+      stats.threeRoundMatchesCount++;
+    }
+    if (roundsInMatch > state.decisiveRounds) {
+      stats.extendedMatchesCount++;
+    }
   }
 
   if (verbose) {
@@ -632,7 +663,7 @@ void main(List<String> args) {
   }
 
   final config = MatchConfig(
-    totalDecisiveRounds: 3,
+    roundsToWin: 2,
     answerSeconds: 15,
     graceMs: 0,
     nearMissPerRound: 1,
@@ -652,7 +683,7 @@ void main(List<String> args) {
     stdout.writeln('========================================');
     stdout.writeln('Havuz: ${isSmallPool ? "Küçük Havuz (60 soru)" : "Normal Havuz (140 soru)"}');
     stdout.writeln('Tohum: $matchSeed');
-    stdout.writeln('Kurallar: 3 Karar Turu, 15s Süre, 1 Çok Yakın Hakkı');
+    stdout.writeln('Kurallar: 2 Galibiyet (Best of 3), 15s Süre, 1 Çok Yakın Hakkı');
     stdout.writeln('----------------------------------------\n');
 
     _playMatch(
@@ -691,6 +722,8 @@ void main(List<String> args) {
         ? 'Küçük Havuz (60 yapay soru, 4-5 cevaplı)'
         : 'Normal Havuz (140 soru${minAnswers > 0 ? ", minAnswers: $minAnswers" : ""})';
     final avgRounds = (stats.totalRoundsPlayed / matchesCount).toStringAsFixed(2);
+    final sweepPercent = (stats.sweepMatchesCount / matchesCount * 100).toStringAsFixed(1);
+    final threeRoundPercent = (stats.threeRoundMatchesCount / matchesCount * 100).toStringAsFixed(1);
     final extPercent = (stats.extendedMatchesCount / matchesCount * 100).toStringAsFixed(1);
     final forfeitPercent = (stats.forfeitCount / matchesCount * 100).toStringAsFixed(1);
 
@@ -713,10 +746,12 @@ void main(List<String> args) {
     stdout.writeln('   - Yok Sayılan (Ignored)     : ${stats.ignoredAttemptsCount}');
     stdout.writeln('   - Terk Edilen Maç Sayısı    : ${stats.forfeitCount} (%$forfeitPercent)\n');
 
-    stdout.writeln('3. Tur Sayısı İstatistikleri:');
-    stdout.writeln('   - Maç Başına Ortalama Tur  : $avgRounds');
-    stdout.writeln('   - En Yüksek Tur Sayısı     : ${stats.maxRoundsPlayed}');
-    stdout.writeln('   - Beraberlik Yüzünden >3 Tur Süren Maç: ${stats.extendedMatchesCount} (%$extPercent)\n');
+    stdout.writeln('3. Maç Skoru ve Tur İstatistikleri:');
+    stdout.writeln('   - 2-0 Biten Maçlar          : ${stats.sweepMatchesCount} (%$sweepPercent)');
+    stdout.writeln('   - 2-1 Biten Maçlar          : ${stats.threeRoundMatchesCount} (%$threeRoundPercent)');
+    stdout.writeln('   - Beraberlik Yüzünden Uzayan: ${stats.extendedMatchesCount} (%$extPercent)');
+    stdout.writeln('   - Maç Başına Ortalama Tur   : $avgRounds');
+    stdout.writeln('   - En Yüksek Tur Sayısı      : ${stats.maxRoundsPlayed}\n');
 
     stdout.writeln('4. Değişmez (Invariant) Kontrolleri:');
     if (stats.invariantViolations == 0) {

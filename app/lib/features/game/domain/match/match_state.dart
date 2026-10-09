@@ -54,8 +54,10 @@ class RoundRecord {
   });
 }
 
-/// Saf fonksiyon: Tur aktifken (`roundActive == true`) izleyiciden farklı oyuncuların
-/// `isClose == true` denemelerini listeden çıkarır; oyuncunun kendi denemeleri her zaman görünür.
+/// Saf fonksiyon: Tur aktifken (`roundActive == true`):
+/// - İpucu verilen yakın deneme (`hintShown == true`): HERKESE gizlidir (ne rakip ne sahibi balon olarak görür).
+/// - İpucu verilmemiş yakın deneme (`isClose == true, hintShown == false`): rakibe gizlidir, sahibine normal kırmızı balon olarak görünür.
+/// - Yakın olmayan yanlış denemeler (`isClose == false`): herkese görünür.
 /// Tur bitince (`roundActive == false`) tüm denemeler herkese görünür.
 List<TurnAttempt> visibleAttempts(
   RoundRecord round,
@@ -66,10 +68,13 @@ List<TurnAttempt> visibleAttempts(
     return round.attempts;
   }
   return round.attempts.where((attempt) {
-    if (attempt.playerId == viewerId) {
-      return true;
+    if (attempt.hintShown) {
+      return false; // İpucu verilen yakın deneme aktif turda HERKESE gizli
     }
-    return !attempt.isClose;
+    if (attempt.playerId == viewerId) {
+      return true; // Sahibi görür (hintShown false olan yakın veya normal denemeler)
+    }
+    return !attempt.isClose; // Rakibe isClose denemeleri gizli
   }).toList();
 }
 

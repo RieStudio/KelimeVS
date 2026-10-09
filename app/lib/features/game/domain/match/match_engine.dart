@@ -417,14 +417,19 @@ abstract final class MatchEngine {
     final updatedTotalRoundsPlayed = state.totalRoundsPlayed + 1;
     final updatedRoundHistory = [...state.roundHistory, roundRecord];
 
-    // 3 sonuçlanan tur bitti mi?
-    if (updatedDecisiveRounds >= state.config.totalDecisiveRounds) {
+    // Bir oyuncu roundsToWin galibiyete ulaştı mı ya da maksimum karar turu doldu mu?
+    final hasWinner = winnerId != null &&
+        (updatedScores[winnerId] ?? 0) >= state.config.roundsToWin;
+    final isDecisiveLimitReached =
+        updatedDecisiveRounds >= state.config.maxDecisiveRounds;
+
+    if (hasWinner || isDecisiveLimitReached) {
       final p1 = state.playerIds[0];
       final p2 = state.playerIds[1];
       final s1 = updatedScores[p1] ?? 0;
       final s2 = updatedScores[p2] ?? 0;
 
-      final matchWinnerId = s1 > s2 ? p1 : p2;
+      final matchWinnerId = winnerId ?? (s1 > s2 ? p1 : p2);
 
       events.add(MatchFinished(matchWinnerId, 'normal'));
 

@@ -150,7 +150,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
               ),
               child: Column(
                 children: [
-                  // 1. Üst Çubuk (Kapat İkon Butonu + "Tur N / 3" Hapı)
+                  // 1. Üst Çubuk (Kapat İkon Butonu + "Tur N" Hapı)
                   Row(
                     children: [
                       AppIconButton(
@@ -174,7 +174,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               ),
                             ),
                             child: Text(
-                              '${AppStrings.roundPrefix}$roundNumber / 3',
+                              AppStrings.round(roundNumber),
                               style: AppTextStyles.questionText.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),

@@ -103,24 +103,19 @@ void main() {
 
       // 2. Tur: Sıra botta. Bot 1000 ms sonra cevap verir
       async.elapse(const Duration(milliseconds: 1000));
-      // Sıra me'ye geçer, me süre aşımına uğrar (bot: 2, me: 0)
-      async.elapse(const Duration(milliseconds: 15200));
-      // 3 sn geçiş
-      async.elapse(const Duration(milliseconds: 3000));
-
-      // 3. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 3, me: 0, maç biter!)
+      // Sıra me'ye geçer, me süre aşımına uğrar (bot: 2, me: 0, maç 2-0 ile biter!)
       async.elapse(const Duration(milliseconds: 15200));
 
-      // matchFinished tetiklendi, repo'ya tam 1 kayıt eklenmiş olmalı
+      // matchFinished tetiklendi (Best of 3 kuralı: 2 galibiyete ulaşıldı), repo'ya tam 1 kayıt eklenmiş olmalı
       expect(fakeRepo.entries.length, 1);
       final entry = fakeRepo.entries.first;
       expect(entry.opponentName, 'Ahmet');
       expect(entry.myScore, 0);
-      expect(entry.opponentScore, 3);
+      expect(entry.opponentScore, 2);
       expect(entry.result, MatchResult.lose);
       expect(entry.endType, MatchEndType.normal);
       expect(entry.forfeitedPlayerId, isNull);
-      expect(entry.roundRecords.length, 3);
+      expect(entry.roundRecords.length, 2);
 
       // 3 saniyelik final reveal geçtikten sonra da ek bir kayıt ATILMAMALI
       async.elapse(const Duration(milliseconds: 3000));
