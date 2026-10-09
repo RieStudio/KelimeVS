@@ -1,0 +1,4221 @@
+{
+  "version": 1,
+  "description": "MatchEngine complete step-by-step match scenarios for state and event verification",
+  "totalScenarios": 26,
+  "scenarios": [
+    {
+      "id": "scen_01_clean_win_p1",
+      "name": "2-0 Clean Win (P1 wins)",
+      "description": "P1 wins round 1 by opponent timeout, wins round 2, match finishes 2-0.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2",
+        "q3"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 18000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 18001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 18000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 20000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 35000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 22000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 37000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "armut",
+            "nowMs": 25000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Armut"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "armut",
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 40000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "tick",
+          "payload": {
+            "nowMs": 40001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            },
+            {
+              "type": "MatchFinished",
+              "winnerId": "p1",
+              "reason": "normal"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 2,
+              "p2": 0
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": "p1",
+            "endedBy": "normal",
+            "usedAnswerIds": [
+              "armut",
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 40000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_02_clean_win_p2",
+      "name": "0-2 Clean Win (P2 wins)",
+      "description": "P2 wins both rounds by P1 timeout, match finishes 0-2.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "tick",
+          "payload": {
+            "nowMs": 16001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 18000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 33000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 20000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 35000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "tick",
+          "payload": {
+            "nowMs": 35001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            },
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "normal"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 2
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": "p2",
+            "endedBy": "normal",
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 35000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_03_contested_match_2_1",
+      "name": "2-1 Contested Match",
+      "description": "P1 wins round 1, P2 wins round 2, P1 wins round 3 (decider).",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2",
+        "q3"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 21000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 36000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 36001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 36000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 38000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q3",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 53000
+          }
+        },
+        {
+          "stepIndex": 6,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "ankara",
+            "nowMs": 40000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Ankara"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q3",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "ankara"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 55000
+          }
+        },
+        {
+          "stepIndex": 7,
+          "action": "tick",
+          "payload": {
+            "nowMs": 55001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            },
+            {
+              "type": "MatchFinished",
+              "winnerId": "p1",
+              "reason": "normal"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 2,
+              "p2": 1
+            },
+            "decisiveRounds": 3,
+            "totalRoundsPlayed": 3,
+            "currentQuestionId": "q3",
+            "winnerId": "p1",
+            "endedBy": "normal",
+            "usedAnswerIds": [
+              "ankara"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 55000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_04_consecutive_exhausted_draws",
+      "name": "Consecutive Exhausted Draws",
+      "description": "Rounds draw when all question answers are exhausted.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q_small",
+        "q_small",
+        "q_small"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q_small",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "evet",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Evet"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "hayir",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Hayır"
+            },
+            {
+              "type": "RoundDrawn",
+              "reason": "exhausted"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet",
+              "hayir"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 5000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 20000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "evet",
+            "nowMs": 6000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Evet"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 21000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "hayir",
+            "nowMs": 7000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Hayır"
+            },
+            {
+              "type": "RoundDrawn",
+              "reason": "exhausted"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet",
+              "hayir"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 21000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_05_one_one_and_third_round_draw",
+      "name": "1-1 and 3rd Round Draw",
+      "description": "Score is 1-1, round 3 draws due to exhausted answers; match continues.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2",
+        "q_small",
+        "q3"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "bmw",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "BMW"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "bmw"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "bmw"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 21000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 36000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 36001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 36000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 38000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 53000
+          }
+        },
+        {
+          "stepIndex": 6,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "evet",
+            "nowMs": 39000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Evet"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 54000
+          }
+        },
+        {
+          "stepIndex": 7,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "hayir",
+            "nowMs": 40000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Hayır"
+            },
+            {
+              "type": "RoundDrawn",
+              "reason": "exhausted"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 3,
+            "currentQuestionId": "q_small",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "evet",
+              "hayir"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 54000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_06_timeout_starter",
+      "name": "Timeout Round End Starter",
+      "description": "Starter P1 makes no move and times out; P2 wins round.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "tick",
+          "payload": {
+            "nowMs": 16001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_07_timeout_non_starter",
+      "name": "Timeout Round End Non-Starter",
+      "description": "P1 answers correctly, P2 non-starter times out; P1 wins round.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_08_dual_timeout_across_rounds",
+      "name": "Dual Timeout Across Rounds",
+      "description": "P2 times out in round 1; P1 times out in round 2.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "tick",
+          "payload": {
+            "nowMs": 34001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            },
+            {
+              "type": "MatchFinished",
+              "winnerId": "p1",
+              "reason": "normal"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 2,
+              "p2": 0
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": "p1",
+            "endedBy": "normal",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_09_all_answers_exhausted_instant_draw",
+      "name": "All Answers Exhausted Instant Draw",
+      "description": "Both players guess all 6 answers of q1; round immediately draws.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "bmw",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "BMW"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi",
+              "bmw"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 18000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "mercedes",
+            "nowMs": 4000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Mercedes"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi",
+              "bmw",
+              "mercedes"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 3,
+            "deadlineMs": 19000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "toyota",
+            "nowMs": 5000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Toyota"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi",
+              "bmw",
+              "mercedes",
+              "toyota"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 4,
+            "deadlineMs": 20000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "honda",
+            "nowMs": 6000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Honda"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi",
+              "bmw",
+              "honda",
+              "mercedes",
+              "toyota"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 5,
+            "deadlineMs": 21000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "ford",
+            "nowMs": 7000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Ford"
+            },
+            {
+              "type": "RoundDrawn",
+              "reason": "exhausted"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi",
+              "bmw",
+              "ford",
+              "honda",
+              "mercedes",
+              "toyota"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 6,
+            "deadlineMs": 21000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_10_forfeit_in_active_round",
+      "name": "Forfeit in Active Round",
+      "description": "P1 leaves during active round; P2 wins match immediately.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p1",
+            "nowMs": 5000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_11_forfeit_between_rounds",
+      "name": "Forfeit Between Rounds",
+      "description": "P2 forfeits during roundEnded phase; P1 wins match.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p2",
+            "nowMs": 18000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p1",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": "p1",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_12_forfeit_after_match_finished",
+      "name": "Forfeit After Match Finished",
+      "description": "Calling forfeit after match is already finished is ignored.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p1",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p2",
+            "nowMs": 4000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "already_finished"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_13_forfeit_freezes_score",
+      "name": "Forfeit Freezes Score",
+      "description": "P1 led 1-0 in round 1, then P1 forfeits in round 2; score freezes at 1-0, P2 wins.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p1",
+            "nowMs": 21000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_14_double_forfeit",
+      "name": "Double Forfeit",
+      "description": "Two consecutive forfeit calls on the same tick; second is ignored.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p1",
+            "nowMs": 5000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p2",
+            "nowMs": 5000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "already_finished"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_15_near_miss_quota_depleted",
+      "name": "Near Miss Quota Depletion",
+      "description": "P1 uses 1 near miss (quota 1); next near miss yields WrongAnswer with hintShown=false.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "aude",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "bmwx",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "not_player_turn"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_16_near_miss_hidden_from_opponent",
+      "name": "Near Miss Hidden From Opponent",
+      "description": "Near miss attempts are hidden from opponent in visibleAttempts.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "aude",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_17_turn_alternation_correct_answer",
+      "name": "Turn Alternation on Correct Answer",
+      "description": "P1 answers correctly; turn passes to P2 and deadline resets to nowMs + 15s.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 4000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 19000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_18_wrong_answer_no_turn_change",
+      "name": "Wrong Answer Keeps Turn",
+      "description": "Wrong answer emits WrongAnswer event, turn stays with current player, deadline unchanged.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "portakal",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "WrongAnswer",
+              "playerId": "p1",
+              "rawInput": "portakal"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_19_empty_answer_rejected",
+      "name": "Empty Answer Rejected",
+      "description": "Empty or whitespace input emits Ignored(\"empty_input\"), turn does not change.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "   ",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "empty_input"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "empty_input"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_20_repeated_answer_rejected",
+      "name": "Repeated Answer Rejected",
+      "description": "Previously accepted answer emits AlreadySaid event; turn does not change.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "audi",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "AlreadySaid",
+              "playerId": "p2",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 17000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_21_round_starter_alternation",
+      "name": "Round Starter Alternation",
+      "description": "Round 1 starter is P1 (index 0); Round 2 starter is P2 (index 1); Round 3 starter is P1.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2",
+        "q3"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 17000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 20000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 35000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 35001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 35000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 37000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q3",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 52000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_22_time_bonus_calculation",
+      "name": "Time Bonus Calculation",
+      "description": "Remaining seconds bonus calculation from deadlineMs and submit time.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 5000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 20000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 20001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 20000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_23_round_starting_ticks",
+      "name": "Round Starting Ticks",
+      "description": "Ticks during active round advance time without ending round until deadline.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "tick",
+          "payload": {
+            "nowMs": 5000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 10000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "tick",
+          "payload": {
+            "nowMs": 15000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "tick",
+          "payload": {
+            "nowMs": 16000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 16001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_24_round_ending_wait_ticks",
+      "name": "Round Ending Wait Ticks",
+      "description": "Ticks during roundEnded phase are no-ops; startNextRound initiates next round.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "tick",
+          "payload": {
+            "nowMs": 16001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 17000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "tick",
+          "payload": {
+            "nowMs": 18000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 19000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 1
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 34000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_25_rate_limit_and_turn_attempts",
+      "name": "Rate Limit and Turn Attempts Limit",
+      "description": "Submitting too fast (< 600ms) emits tooFast Ignored event.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "yanlis1",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "WrongAnswer",
+              "playerId": "p1",
+              "rawInput": "yanlis1"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "yanlis2",
+            "nowMs": 2300
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "tooFast"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 16000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "yanlis3",
+            "nowMs": 3000
+          },
+          "expectedEvents": [
+            {
+              "type": "WrongAnswer",
+              "playerId": "p1",
+              "rawInput": "yanlis3"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 2,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_26_wrong_player_submit_ignored",
+      "name": "Wrong Player Submit Ignored",
+      "description": "Submitting when it is not player turn emits not_player_turn Ignored event.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 15,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 16000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "Ignored",
+              "reason": "not_player_turn"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 16000
+          }
+        }
+      ]
+    }
+  ]
+}

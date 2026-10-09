@@ -1,0 +1,447 @@
+{
+  "version": 1,
+  "description": "NearMissCalculator test vectors for Damerau-Levenshtein distances and thresholds",
+  "totalCases": 44,
+  "cases": [
+    {
+      "id": "nm_001",
+      "description": "exact match 3 chars",
+      "word1": "van",
+      "word2": "van",
+      "targetLength": 3,
+      "maxAllowedDistance": 0,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_002",
+      "description": "transposition 3 chars (threshold 0 -> false)",
+      "word1": "vna",
+      "word2": "van",
+      "targetLength": 3,
+      "maxAllowedDistance": 0,
+      "distance": 1,
+      "isClose": false
+    },
+    {
+      "id": "nm_003",
+      "description": "insertion 3 chars (threshold 0 -> false)",
+      "word1": "su",
+      "word2": "sur",
+      "targetLength": 3,
+      "maxAllowedDistance": 0,
+      "distance": 1,
+      "isClose": false
+    },
+    {
+      "id": "nm_004",
+      "description": "deletion from 2 chars (threshold 0 -> false)",
+      "word1": "sur",
+      "word2": "su",
+      "targetLength": 2,
+      "maxAllowedDistance": 0,
+      "distance": 1,
+      "isClose": false
+    },
+    {
+      "id": "nm_005",
+      "description": "substitution 3 chars (threshold 0 -> false)",
+      "word1": "cin",
+      "word2": "can",
+      "targetLength": 3,
+      "maxAllowedDistance": 0,
+      "distance": 1,
+      "isClose": false
+    },
+    {
+      "id": "nm_006",
+      "description": "substitution 1 char (threshold 0 -> false)",
+      "word1": "a",
+      "word2": "b",
+      "targetLength": 1,
+      "maxAllowedDistance": 0,
+      "distance": 1,
+      "isClose": false
+    },
+    {
+      "id": "nm_007",
+      "description": "distance 2 on 3 chars -> false",
+      "word1": "ali",
+      "word2": "elo",
+      "targetLength": 3,
+      "maxAllowedDistance": 0,
+      "distance": 2,
+      "isClose": false
+    },
+    {
+      "id": "nm_008",
+      "description": "exact match 5 chars -> dist 0, close false",
+      "word1": "armut",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_009",
+      "description": "substitution 5 chars -> dist 1, close true",
+      "word1": "armud",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_010",
+      "description": "deletion 5 chars -> dist 1, close true",
+      "word1": "armt",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_011",
+      "description": "insertion 5 chars -> dist 1, close true",
+      "word1": "armutt",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_012",
+      "description": "transposition 5 chars -> dist 1, close true",
+      "word1": "amrut",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_013",
+      "description": "transposition 4 chars -> dist 1, close true",
+      "word1": "elam",
+      "word2": "elma",
+      "targetLength": 4,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_014",
+      "description": "exact match 4 chars -> dist 0, close false",
+      "word1": "elma",
+      "word2": "elma",
+      "targetLength": 4,
+      "maxAllowedDistance": 1,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_015",
+      "description": "exact match 4 chars -> dist 0, close false",
+      "word1": "kedi",
+      "word2": "kedi",
+      "targetLength": 4,
+      "maxAllowedDistance": 1,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_016",
+      "description": "deletion 4 chars -> dist 1, close true",
+      "word1": "ked",
+      "word2": "kedi",
+      "targetLength": 4,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_017",
+      "description": "transposition 5 chars -> dist 1, close true",
+      "word1": "kitpa",
+      "word2": "kitap",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_018",
+      "description": "transposition reverse -> dist 1, close true",
+      "word1": "kitap",
+      "word2": "kitpa",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_019",
+      "description": "2 edits on 5 chars -> dist 2, close false",
+      "word1": "amt",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 2,
+      "isClose": false
+    },
+    {
+      "id": "nm_020",
+      "description": "3 edits on 5 chars -> dist 3, close false",
+      "word1": "arxyz",
+      "word2": "armut",
+      "targetLength": 5,
+      "maxAllowedDistance": 1,
+      "distance": 3,
+      "isClose": false
+    },
+    {
+      "id": "nm_021",
+      "description": "transposition 6 chars -> dist 1, close true",
+      "word1": "ankraa",
+      "word2": "ankara",
+      "targetLength": 6,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_022",
+      "description": "deletion 8 chars -> dist 1, close true",
+      "word1": "istanbl",
+      "word2": "istanbul",
+      "targetLength": 8,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_023",
+      "description": "2 deletions on 8 chars -> dist 2, close false",
+      "word1": "istanb",
+      "word2": "istanbul",
+      "targetLength": 8,
+      "maxAllowedDistance": 1,
+      "distance": 2,
+      "isClose": false
+    },
+    {
+      "id": "nm_024",
+      "description": "transposition 6 chars -> dist 1, close true",
+      "word1": "frnasa",
+      "word2": "fransa",
+      "targetLength": 6,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_025",
+      "description": "exact match 6 chars -> dist 0, close false",
+      "word1": "italya",
+      "word2": "italya",
+      "targetLength": 6,
+      "maxAllowedDistance": 1,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_026",
+      "description": "substitution 6 chars -> dist 1, close true",
+      "word1": "italyo",
+      "word2": "italya",
+      "targetLength": 6,
+      "maxAllowedDistance": 1,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_027",
+      "description": "insertion 10 chars -> dist 1, close true",
+      "word1": "avusturalya",
+      "word2": "avustralya",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_028",
+      "description": "2 edits 10 chars -> dist 2, close true",
+      "word1": "avusturalyo",
+      "word2": "avustralya",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 2,
+      "isClose": true
+    },
+    {
+      "id": "nm_029",
+      "description": "3 edits 10 chars -> dist 3, close false",
+      "word1": "avusturalyox",
+      "word2": "avustralya",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 3,
+      "isClose": false
+    },
+    {
+      "id": "nm_030",
+      "description": "transposition 10 chars -> dist 1, close true",
+      "word1": "madagaskra",
+      "word2": "madagaskar",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_031",
+      "description": "2 edits 10 chars -> dist 2, close true",
+      "word1": "madagsakra",
+      "word2": "madagaskar",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 2,
+      "isClose": true
+    },
+    {
+      "id": "nm_032",
+      "description": "2 edits 10 chars -> dist 2, close true",
+      "word1": "madgaskra",
+      "word2": "madagaskar",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 2,
+      "isClose": true
+    },
+    {
+      "id": "nm_033",
+      "description": "3 edits 10 chars -> dist 3, close false",
+      "word1": "madgaskr",
+      "word2": "madagaskar",
+      "targetLength": 10,
+      "maxAllowedDistance": 2,
+      "distance": 2,
+      "isClose": true
+    },
+    {
+      "id": "nm_034",
+      "description": "exact 12 chars -> dist 0, close false",
+      "word1": "guney afrika",
+      "word2": "guney afrika",
+      "targetLength": 12,
+      "maxAllowedDistance": 2,
+      "distance": 0,
+      "isClose": false
+    },
+    {
+      "id": "nm_035",
+      "description": "deletion 12 chars -> dist 1, close true",
+      "word1": "guney afrik",
+      "word2": "guney afrika",
+      "targetLength": 12,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_036",
+      "description": "2 edits 12 chars -> dist 2, close true",
+      "word1": "guney afrikx",
+      "word2": "guney afrika",
+      "targetLength": 12,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_037",
+      "description": "3 edits 12 chars -> dist 3, close false",
+      "word1": "guny afrk",
+      "word2": "guney afrika",
+      "targetLength": 12,
+      "maxAllowedDistance": 2,
+      "distance": 3,
+      "isClose": false
+    },
+    {
+      "id": "nm_038",
+      "description": "deletion 15 chars -> dist 1, close true",
+      "word1": "suudi arabistn",
+      "word2": "suudi arabistan",
+      "targetLength": 15,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_039",
+      "description": "2 deletions 15 chars -> dist 2, close true",
+      "word1": "suud arabistn",
+      "word2": "suudi arabistan",
+      "targetLength": 15,
+      "maxAllowedDistance": 2,
+      "distance": 2,
+      "isClose": true
+    },
+    {
+      "id": "nm_040",
+      "description": "3 deletions 15 chars -> dist 3, close false",
+      "word1": "suud arabstn",
+      "word2": "suudi arabistan",
+      "targetLength": 15,
+      "maxAllowedDistance": 2,
+      "distance": 3,
+      "isClose": false
+    },
+    {
+      "id": "nm_041",
+      "description": "transposition 15 chars -> dist 1, close true",
+      "word1": "kuzey makedoyna",
+      "word2": "kuzey makedonya",
+      "targetLength": 15,
+      "maxAllowedDistance": 2,
+      "distance": 1,
+      "isClose": true
+    },
+    {
+      "id": "nm_042",
+      "description": "empty input vs 4 chars -> dist 4, close false",
+      "word1": "",
+      "word2": "elma",
+      "targetLength": 4,
+      "maxAllowedDistance": 1,
+      "distance": 4,
+      "isClose": false
+    },
+    {
+      "id": "nm_043",
+      "description": "input vs empty target -> dist 4, close false",
+      "word1": "elma",
+      "word2": "",
+      "targetLength": 0,
+      "maxAllowedDistance": 0,
+      "distance": 4,
+      "isClose": false
+    },
+    {
+      "id": "nm_044",
+      "description": "empty vs empty -> dist 0, close false",
+      "word1": "",
+      "word2": "",
+      "targetLength": 0,
+      "maxAllowedDistance": 0,
+      "distance": 0,
+      "isClose": false
+    }
+  ]
+}

@@ -1,0 +1,3287 @@
+{
+  "version": 1,
+  "description": "AnswerMatcher test vectors for KelimeGo answer checking with alias indexing",
+  "totalCases": 50,
+  "cases": [
+    {
+      "id": "match_001",
+      "description": "exact display match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "Güney Kore",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_002",
+      "description": "normalized display match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "guney kore",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_003",
+      "description": "alias match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "kore",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_004",
+      "description": "uppercase alias match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "KORE",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_005",
+      "description": "multi-word exact match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "suudi arabistan",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "suudi arabistan",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_006",
+      "description": "multi-word alias match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "arabistan",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "suudi arabistan",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_007",
+      "description": "repeated answer when already used",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "Almanya",
+      "usedAnswerIds": [
+        "almanya"
+      ],
+      "expectedResult": "repeated",
+      "expectedAnswerId": "almanya",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_008",
+      "description": "repeated lowercase when used",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "almanya",
+      "usedAnswerIds": [
+        "almanya"
+      ],
+      "expectedResult": "repeated",
+      "expectedAnswerId": "almanya",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_009",
+      "description": "repeated alias when primary is used",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "kore",
+      "usedAnswerIds": [
+        "guney kore"
+      ],
+      "expectedResult": "repeated",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_010",
+      "description": "exact match fransa",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "fransa",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "fransa",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_011",
+      "description": "exact match italya",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "italya",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "italya",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_012",
+      "description": "accent folded cin match for Çin",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "cin",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "cin",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_013",
+      "description": "uppercase Çin match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "ÇİN",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "cin",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_014",
+      "description": "exact match japonya",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "japonya",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "japonya",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_015",
+      "description": "exact match kanada",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "kanada",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "kanada",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_016",
+      "description": "near miss to unused almanya (dist 1, len 7)",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "almany",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_017",
+      "description": "wrong but NOT close because almanya is already used",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "almany",
+      "usedAnswerIds": [
+        "almanya"
+      ],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_018",
+      "description": "near miss transposition for fransa (dist 1, len 6)",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "frnasa",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_019",
+      "description": "near miss for suudi arabistan (dist 2, len 15)",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "suud arabistn",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_020",
+      "description": "wrong 3-char word with typo (threshold <= 3 is 0, isClose false)",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "cna",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_021",
+      "description": "completely wrong fruit word on G20 countries",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "muz",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_022",
+      "description": "wrong country not in G20 list",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "ispanya",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_023",
+      "description": "empty string input",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "",
+      "usedAnswerIds": [],
+      "expectedResult": "empty",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_024",
+      "description": "whitespace only input",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "   ",
+      "usedAnswerIds": [],
+      "expectedResult": "empty",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_025",
+      "description": "punctuation only input",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "??!!",
+      "usedAnswerIds": [],
+      "expectedResult": "empty",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_026",
+      "description": "punctuation stripped alias match",
+      "question": {
+        "id": "q_g20",
+        "categoryId": "genel_kultur",
+        "title": "G20 Ülkeleri",
+        "answers": [
+          {
+            "id": "guney kore",
+            "display": "Güney Kore",
+            "aliases": [
+              "guney kore",
+              "kore"
+            ]
+          },
+          {
+            "id": "suudi arabistan",
+            "display": "Suudi Arabistan",
+            "aliases": [
+              "suudi arabistan",
+              "arabistan"
+            ]
+          },
+          {
+            "id": "almanya",
+            "display": "Almanya",
+            "aliases": [
+              "almanya"
+            ]
+          },
+          {
+            "id": "fransa",
+            "display": "Fransa",
+            "aliases": [
+              "fransa"
+            ]
+          },
+          {
+            "id": "italya",
+            "display": "İtalya",
+            "aliases": [
+              "italya"
+            ]
+          },
+          {
+            "id": "cin",
+            "display": "Çin",
+            "aliases": [
+              "cin"
+            ]
+          },
+          {
+            "id": "japonya",
+            "display": "Japonya",
+            "aliases": [
+              "japonya"
+            ]
+          },
+          {
+            "id": "kanada",
+            "display": "Kanada",
+            "aliases": [
+              "kanada"
+            ]
+          }
+        ]
+      },
+      "input": "kore!",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "guney kore",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_027",
+      "description": "exact c match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "c",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_028",
+      "description": "exact c++ match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c++",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "c++",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_029",
+      "description": "uppercase C++ match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "C++",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "c++",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_030",
+      "description": "exact c# match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c#",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "c#",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_031",
+      "description": "uppercase C# match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "C#",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "c#",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_032",
+      "description": "spaced c+ + is not c++",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c+ +",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_033",
+      "description": "exact python match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "python",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "python",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_034",
+      "description": "alias js match for JavaScript",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "js",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "javascript",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_035",
+      "description": "display match for JavaScript",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "javascript",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "javascript",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_036",
+      "description": "exact dart match",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "dart",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "dart",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_037",
+      "description": "near miss transposition for python (dist 1, len 6)",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "pythno",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_038",
+      "description": "near miss transposition for dart (dist 1, len 4)",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "drat",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_039",
+      "description": "c+ typo (len 2 <= 3, isClose false)",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c+",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_040",
+      "description": "repeated c",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c",
+      "usedAnswerIds": [
+        "c"
+      ],
+      "expectedResult": "repeated",
+      "expectedAnswerId": "c",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_041",
+      "description": "repeated c++",
+      "question": {
+        "id": "q_langs",
+        "categoryId": "bilim_teknoloji",
+        "title": "Programlama Dilleri",
+        "answers": [
+          {
+            "id": "c",
+            "display": "C",
+            "aliases": [
+              "c"
+            ]
+          },
+          {
+            "id": "c++",
+            "display": "C++",
+            "aliases": [
+              "c++"
+            ]
+          },
+          {
+            "id": "c#",
+            "display": "C#",
+            "aliases": [
+              "c#"
+            ]
+          },
+          {
+            "id": "python",
+            "display": "Python",
+            "aliases": [
+              "python"
+            ]
+          },
+          {
+            "id": "javascript",
+            "display": "JavaScript",
+            "aliases": [
+              "javascript",
+              "js"
+            ]
+          },
+          {
+            "id": "dart",
+            "display": "Dart",
+            "aliases": [
+              "dart"
+            ]
+          }
+        ]
+      },
+      "input": "c++",
+      "usedAnswerIds": [
+        "c++"
+      ],
+      "expectedResult": "repeated",
+      "expectedAnswerId": "c++",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_042",
+      "description": "exact elma match",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "elma",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "elma",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_043",
+      "description": "near miss transposition for elma (dist 1, len 4)",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "elam",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_044",
+      "description": "exact armut match",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "armut",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "armut",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_045",
+      "description": "near miss substitution for armut (dist 1, len 5)",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "armud",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    },
+    {
+      "id": "match_046",
+      "description": "exact muz match",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "muz",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "muz",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_047",
+      "description": "3-letter typo for muz (isClose false)",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "mzu",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_048",
+      "description": "accent folded cilek match for Çilek",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "cilek",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "cilek",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_049",
+      "description": "exact portakal match",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "portakal",
+      "usedAnswerIds": [],
+      "expectedResult": "correct",
+      "expectedAnswerId": "portakal",
+      "expectedIsClose": false
+    },
+    {
+      "id": "match_050",
+      "description": "near miss transposition for portakal (dist 1, len 8)",
+      "question": {
+        "id": "q_fruits",
+        "categoryId": "doga",
+        "title": "Meyveler",
+        "answers": [
+          {
+            "id": "elma",
+            "display": "Elma",
+            "aliases": [
+              "elma"
+            ]
+          },
+          {
+            "id": "armut",
+            "display": "Armut",
+            "aliases": [
+              "armut"
+            ]
+          },
+          {
+            "id": "muz",
+            "display": "Muz",
+            "aliases": [
+              "muz"
+            ]
+          },
+          {
+            "id": "cilek",
+            "display": "Çilek",
+            "aliases": [
+              "cilek"
+            ]
+          },
+          {
+            "id": "portakal",
+            "display": "Portakal",
+            "aliases": [
+              "portakal"
+            ]
+          }
+        ]
+      },
+      "input": "portakla",
+      "usedAnswerIds": [],
+      "expectedResult": "wrong",
+      "expectedAnswerId": null,
+      "expectedIsClose": true
+    }
+  ]
+}

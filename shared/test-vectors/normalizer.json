@@ -1,0 +1,517 @@
+{
+  "version": 1,
+  "description": "TextNormalizer test vectors for KelimeGo Turkish text normalization",
+  "totalCases": 102,
+  "cases": [
+    {
+      "id": "norm_001",
+      "input": "ISPANAK",
+      "expected": "ispanak"
+    },
+    {
+      "id": "norm_002",
+      "input": "ıspanak",
+      "expected": "ispanak"
+    },
+    {
+      "id": "norm_003",
+      "input": "İSTANBUL",
+      "expected": "istanbul"
+    },
+    {
+      "id": "norm_004",
+      "input": "istanbul",
+      "expected": "istanbul"
+    },
+    {
+      "id": "norm_005",
+      "input": "IĞDIR",
+      "expected": "igdir"
+    },
+    {
+      "id": "norm_006",
+      "input": "Irmak",
+      "expected": "irmak"
+    },
+    {
+      "id": "norm_007",
+      "input": "İZMİR",
+      "expected": "izmir"
+    },
+    {
+      "id": "norm_008",
+      "input": "DİYARBAKIR",
+      "expected": "diyarbakir"
+    },
+    {
+      "id": "norm_009",
+      "input": "ŞANLIURFA",
+      "expected": "sanliurfa"
+    },
+    {
+      "id": "norm_010",
+      "input": "ÇANAKKALE",
+      "expected": "canakkale"
+    },
+    {
+      "id": "norm_011",
+      "input": "GÜMÜŞHANE",
+      "expected": "gumushane"
+    },
+    {
+      "id": "norm_012",
+      "input": "KIRIKKALE",
+      "expected": "kirikkale"
+    },
+    {
+      "id": "norm_013",
+      "input": "AĞRI",
+      "expected": "agri"
+    },
+    {
+      "id": "norm_014",
+      "input": "ÖMER",
+      "expected": "omer"
+    },
+    {
+      "id": "norm_015",
+      "input": "ÜZÜM",
+      "expected": "uzum"
+    },
+    {
+      "id": "norm_016",
+      "input": "ığdır",
+      "expected": "igdir"
+    },
+    {
+      "id": "norm_017",
+      "input": "şeker",
+      "expected": "seker"
+    },
+    {
+      "id": "norm_018",
+      "input": "çiçek",
+      "expected": "cicek"
+    },
+    {
+      "id": "norm_019",
+      "input": "ağaç",
+      "expected": "agac"
+    },
+    {
+      "id": "norm_020",
+      "input": "öğretmen",
+      "expected": "ogretmen"
+    },
+    {
+      "id": "norm_021",
+      "input": "çarşamba",
+      "expected": "carsamba"
+    },
+    {
+      "id": "norm_022",
+      "input": "çiğdem",
+      "expected": "cigdem"
+    },
+    {
+      "id": "norm_023",
+      "input": "dağlık",
+      "expected": "daglik"
+    },
+    {
+      "id": "norm_024",
+      "input": "ılık",
+      "expected": "ilik"
+    },
+    {
+      "id": "norm_025",
+      "input": "ışık",
+      "expected": "isik"
+    },
+    {
+      "id": "norm_026",
+      "input": "kömür",
+      "expected": "komur"
+    },
+    {
+      "id": "norm_027",
+      "input": "gözlük",
+      "expected": "gozluk"
+    },
+    {
+      "id": "norm_028",
+      "input": "şömine",
+      "expected": "somine"
+    },
+    {
+      "id": "norm_029",
+      "input": "üçgen",
+      "expected": "ucgen"
+    },
+    {
+      "id": "norm_030",
+      "input": "üzüntü",
+      "expected": "uzuntu"
+    },
+    {
+      "id": "norm_031",
+      "input": "hâkîm",
+      "expected": "hakim"
+    },
+    {
+      "id": "norm_032",
+      "input": "kâğıt",
+      "expected": "kagit"
+    },
+    {
+      "id": "norm_033",
+      "input": "millî",
+      "expected": "milli"
+    },
+    {
+      "id": "norm_034",
+      "input": "sükût",
+      "expected": "sukut"
+    },
+    {
+      "id": "norm_035",
+      "input": "rüzgâr",
+      "expected": "ruzgar"
+    },
+    {
+      "id": "norm_036",
+      "input": "hâlâ",
+      "expected": "hala"
+    },
+    {
+      "id": "norm_037",
+      "input": "ÂŞIK",
+      "expected": "asik"
+    },
+    {
+      "id": "norm_038",
+      "input": "lâle",
+      "expected": "lale"
+    },
+    {
+      "id": "norm_039",
+      "input": "dâhil",
+      "expected": "dahil"
+    },
+    {
+      "id": "norm_040",
+      "input": "mahkûm",
+      "expected": "mahkum"
+    },
+    {
+      "id": "norm_041",
+      "input": "resmî",
+      "expected": "resmi"
+    },
+    {
+      "id": "norm_042",
+      "input": "hilâl",
+      "expected": "hilal"
+    },
+    {
+      "id": "norm_043",
+      "input": "sükûnet",
+      "expected": "sukunet"
+    },
+    {
+      "id": "norm_044",
+      "input": "müşfik",
+      "expected": "musfik"
+    },
+    {
+      "id": "norm_045",
+      "input": "elma, armut.",
+      "expected": "elma armut"
+    },
+    {
+      "id": "norm_046",
+      "input": "ankara!",
+      "expected": "ankara"
+    },
+    {
+      "id": "norm_047",
+      "input": "ankara-izmir",
+      "expected": "ankara izmir"
+    },
+    {
+      "id": "norm_048",
+      "input": "ali'nin",
+      "expected": "ali nin"
+    },
+    {
+      "id": "norm_049",
+      "input": "(parantez)",
+      "expected": "parantez"
+    },
+    {
+      "id": "norm_050",
+      "input": "\"tırnak\"",
+      "expected": "tirnak"
+    },
+    {
+      "id": "norm_051",
+      "input": "soru?",
+      "expected": "soru"
+    },
+    {
+      "id": "norm_052",
+      "input": "noktalı;virgül:",
+      "expected": "noktali virgul"
+    },
+    {
+      "id": "norm_053",
+      "input": "e-posta@test.com",
+      "expected": "e posta test com"
+    },
+    {
+      "id": "norm_054",
+      "input": "fiyat/adet",
+      "expected": "fiyat adet"
+    },
+    {
+      "id": "norm_055",
+      "input": "yüzde%yüz",
+      "expected": "yuzde yuz"
+    },
+    {
+      "id": "norm_056",
+      "input": "ve&veya",
+      "expected": "ve veya"
+    },
+    {
+      "id": "norm_057",
+      "input": "alt_tire",
+      "expected": "alt tire"
+    },
+    {
+      "id": "norm_058",
+      "input": "eşittir=değer",
+      "expected": "esittir deger"
+    },
+    {
+      "id": "norm_059",
+      "input": "dalga~işareti",
+      "expected": "dalga isareti"
+    },
+    {
+      "id": "norm_060",
+      "input": "c",
+      "expected": "c"
+    },
+    {
+      "id": "norm_061",
+      "input": "c++",
+      "expected": "c++"
+    },
+    {
+      "id": "norm_062",
+      "input": "C++",
+      "expected": "c++"
+    },
+    {
+      "id": "norm_063",
+      "input": "c#",
+      "expected": "c#"
+    },
+    {
+      "id": "norm_064",
+      "input": "C#",
+      "expected": "c#"
+    },
+    {
+      "id": "norm_065",
+      "input": "c + +",
+      "expected": "c + +"
+    },
+    {
+      "id": "norm_066",
+      "input": "c #",
+      "expected": "c #"
+    },
+    {
+      "id": "norm_067",
+      "input": "c++ ve c#",
+      "expected": "c++ ve c#"
+    },
+    {
+      "id": "norm_068",
+      "input": "+++c",
+      "expected": "+++c"
+    },
+    {
+      "id": "norm_069",
+      "input": "###",
+      "expected": "###"
+    },
+    {
+      "id": "norm_070",
+      "input": "dil: c++",
+      "expected": "dil c++"
+    },
+    {
+      "id": "norm_071",
+      "input": "programlama: c#",
+      "expected": "programlama c#"
+    },
+    {
+      "id": "norm_072",
+      "input": "   elma   ",
+      "expected": "elma"
+    },
+    {
+      "id": "norm_073",
+      "input": "   elma    armut   ",
+      "expected": "elma armut"
+    },
+    {
+      "id": "norm_074",
+      "input": "elma\t\narmut",
+      "expected": "elma armut"
+    },
+    {
+      "id": "norm_075",
+      "input": "  \t\r\n  ",
+      "expected": ""
+    },
+    {
+      "id": "norm_076",
+      "input": "bir   iki   uc",
+      "expected": "bir iki uc"
+    },
+    {
+      "id": "norm_077",
+      "input": "123",
+      "expected": "123"
+    },
+    {
+      "id": "norm_078",
+      "input": "kelime 2026",
+      "expected": "kelime 2026"
+    },
+    {
+      "id": "norm_079",
+      "input": "3.14",
+      "expected": "3 14"
+    },
+    {
+      "id": "norm_080",
+      "input": "99+1",
+      "expected": "99+1"
+    },
+    {
+      "id": "norm_081",
+      "input": "f16",
+      "expected": "f16"
+    },
+    {
+      "id": "norm_082",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "id": "norm_083",
+      "input": " ",
+      "expected": ""
+    },
+    {
+      "id": "norm_084",
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "id": "norm_085",
+      "input": "??!!",
+      "expected": ""
+    },
+    {
+      "id": "norm_086",
+      "input": "...",
+      "expected": ""
+    },
+    {
+      "id": "norm_087",
+      "input": "---___---",
+      "expected": ""
+    },
+    {
+      "id": "norm_088",
+      "input": "///\\\\\\",
+      "expected": ""
+    },
+    {
+      "id": "norm_089",
+      "input": "bu cok uzun bir cumledir ve normalizasyon testi icin ozenle hazirlanmistir",
+      "expected": "bu cok uzun bir cumledir ve normalizasyon testi icin ozenle hazirlanmistir"
+    },
+    {
+      "id": "norm_090",
+      "input": "PÖÇĞÜŞI öçğüşi İIÂÎÛ âîû",
+      "expected": "pocgusi ocgusi iiaiu aiu"
+    },
+    {
+      "id": "norm_091",
+      "input": "🍎 elma 🍌 muz",
+      "expected": "elma muz"
+    },
+    {
+      "id": "norm_092",
+      "input": "türkiye 🇹🇷",
+      "expected": "turkiye"
+    },
+    {
+      "id": "norm_093",
+      "input": "🎉🎊🥳",
+      "expected": ""
+    },
+    {
+      "id": "norm_094",
+      "input": "é",
+      "expected": "e"
+    },
+    {
+      "id": "norm_095",
+      "input": "ç",
+      "expected": "c"
+    },
+    {
+      "id": "norm_096",
+      "input": "ğ",
+      "expected": "g"
+    },
+    {
+      "id": "norm_097",
+      "input": "â",
+      "expected": "a"
+    },
+    {
+      "id": "norm_098",
+      "input": "ü",
+      "expected": "u"
+    },
+    {
+      "id": "norm_099",
+      "input": "ö",
+      "expected": "o"
+    },
+    {
+      "id": "norm_100",
+      "input": "ş",
+      "expected": "s"
+    },
+    {
+      "id": "norm_101",
+      "input": "i̇",
+      "expected": "i"
+    },
+    {
+      "id": "norm_102",
+      "input": "café",
+      "expected": "cafe"
+    }
+  ]
+}

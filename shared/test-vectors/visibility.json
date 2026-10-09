@@ -1,0 +1,738 @@
+{
+  "version": 1,
+  "description": "visibleAttempts test vectors for client-side attempt visibility filtering",
+  "totalCases": 25,
+  "cases": [
+    {
+      "id": "vis_001",
+      "description": "Empty attempts list during active round",
+      "attempts": [],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_002",
+      "description": "Empty attempts list during ended round",
+      "attempts": [],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_003",
+      "description": "Empty attempts list for p2",
+      "attempts": [],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_004",
+      "description": "Ended round: all visible to p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "kavun",
+          "resultType": "wrong",
+          "nowMs": 6000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "vis_005",
+      "description": "Ended round: all visible to p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "kavun",
+          "resultType": "wrong",
+          "nowMs": 6000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "vis_006",
+      "description": "Ended round: hintShown attempts are visible to p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "vis_007",
+      "description": "Ended round: isClose attempts are visible to opponent p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "vis_008",
+      "description": "Single correct attempt seen by author p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_009",
+      "description": "Single correct attempt seen by opponent p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_010",
+      "description": "Normal wrong attempt seen by author p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "kiraz",
+          "resultType": "wrong",
+          "nowMs": 2000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_011",
+      "description": "Normal wrong attempt seen by opponent p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "kiraz",
+          "resultType": "wrong",
+          "nowMs": 2000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_012",
+      "description": "HintShown near miss is hidden from author p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_013",
+      "description": "HintShown near miss is hidden from opponent p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_014",
+      "description": "Multiple HintShown near misses hidden from p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_015",
+      "description": "Multiple HintShown near misses hidden from p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_016",
+      "description": "NoHint near miss visible to author p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_017",
+      "description": "NoHint near miss hidden from opponent p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_018",
+      "description": "NoHint near miss visible to author p2",
+      "attempts": [
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_019",
+      "description": "NoHint near miss hidden from opponent p1",
+      "attempts": [
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": []
+    },
+    {
+      "id": "vis_020",
+      "description": "Mixed attempts: p1 view during active round",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "kiraz",
+          "resultType": "wrong",
+          "nowMs": 2000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "armut",
+          "resultType": "correct",
+          "answerId": "armut",
+          "nowMs": 5000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "kavun",
+          "resultType": "wrong",
+          "nowMs": 6000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0,
+        2,
+        3,
+        4,
+        7
+      ]
+    },
+    {
+      "id": "vis_021",
+      "description": "Mixed attempts: p2 view during active round",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "kiraz",
+          "resultType": "wrong",
+          "nowMs": 2000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "armut",
+          "resultType": "correct",
+          "answerId": "armut",
+          "nowMs": 5000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "kavun",
+          "resultType": "wrong",
+          "nowMs": 6000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0,
+        3,
+        4,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "vis_022",
+      "description": "Mixed attempts: p1 view after round ended",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "correct",
+          "answerId": "elma",
+          "nowMs": 1000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "elam",
+          "resultType": "nearMiss",
+          "nowMs": 3000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "kiraz",
+          "resultType": "wrong",
+          "nowMs": 2000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "armut",
+          "resultType": "correct",
+          "answerId": "armut",
+          "nowMs": 5000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "amrut",
+          "resultType": "nearMiss",
+          "nowMs": 7000,
+          "isClose": true,
+          "hintShown": true
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "kavun",
+          "resultType": "wrong",
+          "nowMs": 6000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "id": "vis_023",
+      "description": "Repeated answer visible to author p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "repeated",
+          "answerId": "elma",
+          "nowMs": 9000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_024",
+      "description": "Repeated answer visible to opponent p2",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "repeated",
+          "answerId": "elma",
+          "nowMs": 9000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_025",
+      "description": "Repeated and close mix for p1",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "repeated",
+          "answerId": "elma",
+          "nowMs": 9000,
+          "isClose": false,
+          "hintShown": false
+        },
+        {
+          "playerId": "p1",
+          "rawInput": "armud",
+          "resultType": "wrong",
+          "nowMs": 4000,
+          "isClose": true,
+          "hintShown": false
+        },
+        {
+          "playerId": "p2",
+          "rawInput": "mzu",
+          "resultType": "wrong",
+          "nowMs": 8000,
+          "isClose": true,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": true,
+      "expectedVisibleIndices": [
+        0,
+        1
+      ]
+    }
+  ]
+}

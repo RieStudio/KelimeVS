@@ -25,6 +25,7 @@ abstract final class MatchEngine {
     required List<Question> questions,
     required math.Random random,
     required int nowMs,
+    List<String>? questionOrder,
   }) {
     if (playerIds.length != 2) {
       throw ArgumentError('Maç tam olarak 2 oyuncu ile başlatılmalıdır.');
@@ -49,6 +50,8 @@ abstract final class MatchEngine {
       questions: eligibleQuestions,
       usedQuestionIds: {},
       random: random,
+      questionOrder: questionOrder,
+      roundIndex: 0,
     );
 
     final starterPlayerId = playerIds[0]; // Tur 0: ilk oyuncu başlar
@@ -75,6 +78,7 @@ abstract final class MatchEngine {
       lastSubmitTimes: const {},
       currentTurnAttempts: 0,
       endedBy: null,
+      questionOrder: questionOrder,
     );
 
     return EngineResult(state, const []);
@@ -327,6 +331,7 @@ abstract final class MatchEngine {
     required List<Question> questions,
     required math.Random random,
     required int nowMs,
+    List<String>? questionOrder,
   }) {
     if (state.phase != MatchPhase.roundEnded) {
       return EngineResult(state, [const Ignored('round_not_ended')]);
@@ -339,11 +344,14 @@ abstract final class MatchEngine {
       );
     }
 
+    final effectiveOrder = questionOrder ?? state.questionOrder;
     final nextQuestion = _pickNextQuestion(
       questions: eligibleQuestions,
       usedQuestionIds: state.usedQuestionIds,
       roundHistory: state.roundHistory,
       random: random,
+      questionOrder: effectiveOrder,
+      roundIndex: state.totalRoundsPlayed,
     );
 
     // Turu başlatan oyuncu toplam oynanan tur sayısına göre sırayla değişir
@@ -365,6 +373,7 @@ abstract final class MatchEngine {
       usedQuestionIds: {...state.usedQuestionIds, nextQuestion.id},
       currentRoundAttempts: const [],
       currentTurnAttempts: 0,
+      questionOrder: effectiveOrder,
     );
 
     return EngineResult(nextState, const []);
@@ -465,7 +474,19 @@ abstract final class MatchEngine {
     required Set<String> usedQuestionIds,
     List<RoundRecord> roundHistory = const [],
     required math.Random random,
+    List<String>? questionOrder,
+    int roundIndex = 0,
   }) {
+    if (questionOrder != null && questionOrder.isNotEmpty) {
+      final targetId = roundIndex < questionOrder.length
+          ? questionOrder[roundIndex]
+          : questionOrder[roundIndex % questionOrder.length];
+      for (final q in questions) {
+        if (q.id == targetId) {
+          return q;
+        }
+      }
+    }
     final unused = questions.where((q) => !usedQuestionIds.contains(q.id)).toList();
     if (unused.isNotEmpty) {
       return unused[random.nextInt(unused.length)];

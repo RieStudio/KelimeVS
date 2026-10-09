@@ -117,7 +117,10 @@ class MatchState {
     this.lastSubmitTimes = const {},
     this.currentTurnAttempts = 0,
     this.endedBy,
+    this.questionOrder,
   });
+
+  final List<String>? questionOrder;
 
   String opponentOf(String playerId) {
     if (playerIds.length != 2) {
@@ -154,6 +157,7 @@ class MatchState {
     Map<String, int>? lastSubmitTimes,
     int? currentTurnAttempts,
     String? endedBy,
+    List<String>? questionOrder,
   }) {
     return MatchState(
       config: config ?? this.config,
@@ -174,6 +178,7 @@ class MatchState {
       lastSubmitTimes: lastSubmitTimes ?? this.lastSubmitTimes,
       currentTurnAttempts: currentTurnAttempts ?? this.currentTurnAttempts,
       endedBy: endedBy ?? this.endedBy,
+      questionOrder: questionOrder ?? this.questionOrder,
     );
   }
 }
