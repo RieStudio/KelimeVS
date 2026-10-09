@@ -35,12 +35,23 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
 
     try {
       final List<dynamic> decodedList = jsonDecode(jsonString);
-      final entries = decodedList
-          .map((item) => _MatchHistoryMapper.fromJson(item as Map<String, dynamic>))
+      final entriesWithIndex = decodedList
+          .asMap()
+          .entries
+          .map((item) => (
+                index: item.key,
+                entry: _MatchHistoryMapper.fromJson(item.value as Map<String, dynamic>),
+              ))
           .toList();
 
-      // En yeni başta sırala ve en fazla 10 kayıt döndür
-      entries.sort((a, b) => b.finishedAtMs.compareTo(a.finishedAtMs));
+      // En yeni başta sırala: finishedAtMs azalan; eşitlikte sonradan eklenen üstte (depodaki index'i küçük olan)
+      entriesWithIndex.sort((a, b) {
+        final cmp = b.entry.finishedAtMs.compareTo(a.entry.finishedAtMs);
+        if (cmp != 0) return cmp;
+        return a.index.compareTo(b.index);
+      });
+
+      final entries = entriesWithIndex.map((e) => e.entry).toList();
       if (entries.length > maxEntries) {
         return entries.sublist(0, maxEntries);
       }
@@ -55,17 +66,26 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
     final prefs = await _getPrefs();
     final currentEntries = await loadRecent();
 
-    // Aynı id varsa önce çıkar, başa ekle
-    final updatedList = [
+    // Aynı id varsa önce çıkar; yeni eklenen başa (index 0) gelir (en son eklenen)
+    final rawList = [
       entry,
       ...currentEntries.where((e) => e.id != entry.id),
     ];
 
-    // En yeni başta sırala ve en fazla 10 kayıt tut
-    updatedList.sort((a, b) => b.finishedAtMs.compareTo(a.finishedAtMs));
-    final trimmedList = updatedList.length > maxEntries
-        ? updatedList.sublist(0, maxEntries)
-        : updatedList;
+    // finishedAtMs azalan; eşitlikte sonradan eklenen üstte (rawList'te index'i küçük olan)
+    final rawWithIndex = rawList.asMap().entries.toList();
+    rawWithIndex.sort((a, b) {
+      final cmp = b.value.finishedAtMs.compareTo(a.value.finishedAtMs);
+      if (cmp != 0) return cmp;
+      return a.key.compareTo(b.key);
+    });
+
+    final sortedList = rawWithIndex.map((e) => e.value).toList();
+
+    // En fazla 10 kayıt tut: 11. maçta listenin sonundaki EN ESKİ kayıt silinir
+    final trimmedList = sortedList.length > maxEntries
+        ? sortedList.sublist(0, maxEntries)
+        : sortedList;
 
     final encodedString = jsonEncode(
       trimmedList.map((e) => _MatchHistoryMapper.toJson(e)).toList(),

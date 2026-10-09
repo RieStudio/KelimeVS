@@ -28,12 +28,7 @@ import '../../matchmaking/presentation/matchmaking_screen.dart';
 /// Butonlar: "Hızlı Maç" (ana, alt yazılı) ve "Arkadaşınla Oyna" (ikincil).
 /// Altında "SON MAÇLARIM" etiketi ve son 10 maçın kaydırılabilir listesi.
 class HomeScreen extends ConsumerWidget {
-  final DateTime? now; // Testler için zaman enjeksiyonu
-
-  const HomeScreen({
-    super.key,
-    this.now,
-  });
+  const HomeScreen({super.key});
 
   void _showComingSoonDialog(BuildContext context) {
     showDialog<void>(
@@ -186,21 +181,29 @@ class HomeScreen extends ConsumerWidget {
                       return _buildEmptyState();
                     }
 
-                    final count = math.min(10, entries.length);
+                    // Sıralama: finishedAtMs azalan; eşitlikte sonradan eklenen üstte (gelen listedeki index küçük olan üstte)
+                    final indexedEntries = entries.asMap().entries.toList();
+                    indexedEntries.sort((a, b) {
+                      final cmp = b.value.finishedAtMs.compareTo(a.value.finishedAtMs);
+                      if (cmp != 0) return cmp;
+                      return a.key.compareTo(b.key);
+                    });
+                    final sortedEntries = indexedEntries.map((e) => e.value).toList();
+
+                    final count = math.min(10, sortedEntries.length);
 
                     return ScrollConfiguration(
                       behavior: const ScrollBehavior().copyWith(scrollbars: false),
                       child: ListView.builder(
                         itemCount: count,
                         itemBuilder: (context, index) {
-                          final entry = entries[index];
+                          final entry = sortedEntries[index];
                           return Padding(
                             padding: const EdgeInsets.only(
                               bottom: AppDimens.space10,
                             ),
                             child: MatchCard(
                               entry: entry,
-                              now: now,
                               onTap: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(

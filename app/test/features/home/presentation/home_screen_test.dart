@@ -29,13 +29,13 @@ class FakeMatchHistoryRepository implements MatchHistoryRepository {
   }
 }
 
-Widget _buildTestApp(MatchHistoryRepository repo, {DateTime? now}) {
+Widget _buildTestApp(MatchHistoryRepository repo) {
   return ProviderScope(
     overrides: [
       matchHistoryRepositoryProvider.overrideWithValue(repo),
     ],
-    child: MaterialApp(
-      home: HomeScreen(now: now),
+    child: const MaterialApp(
+      home: HomeScreen(),
     ),
   );
 }
@@ -68,7 +68,7 @@ void main() {
   testWidgets('1. Ana ekran üst çubuk, logo, butonlar ve boş durum doğru çizilir', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
 
-    await tester.pumpWidget(_buildTestApp(repo, now: testNow));
+    await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
     // Üst çubuk: "Oyuncu" adı, CoinPill (250)
@@ -88,25 +88,27 @@ void main() {
     expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
   });
 
-  testWidgets('2. Maç geçmişi listelenir: kartlar, rozetler ve kayıp maç kenarlığı doğru', (tester) async {
+  testWidgets('2. Maç geçmişi listelenir: kartta tarih yok, rakip adı dikey ortalı, rozetler ve kenarlık doğru', (tester) async {
     final repo = FakeMatchHistoryRepository([wonEntry, lostEntry]);
 
-    await tester.pumpWidget(_buildTestApp(repo, now: testNow));
+    await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
     expect(find.byType(MatchCard), findsNWidgets(2));
 
-    // Zeynep kartı (Kazandın, Bugün, 2 – 1)
+    // Zeynep kartı (Kazandın, 2 – 1, tarih YOK)
     expect(find.text('Zeynep'), findsOneWidget);
-    expect(find.text('Bugün'), findsOneWidget);
     expect(find.text('2 – 1'), findsOneWidget);
     expect(find.widgetWithText(ResultBadge, AppStrings.won), findsOneWidget);
 
-    // Elif kartı (Kaybettin, Dün, 1 – 2)
+    // Elif kartı (Kaybettin, 1 – 2, tarih YOK)
     expect(find.text('Elif'), findsOneWidget);
-    expect(find.text('Dün'), findsOneWidget);
     expect(find.text('1 – 2'), findsOneWidget);
     expect(find.widgetWithText(ResultBadge, AppStrings.lost), findsOneWidget);
+
+    // Kartta hiçbir tarih metni olmamalı
+    expect(find.text('Bugün'), findsNothing);
+    expect(find.text('Dün'), findsNothing);
 
     // Elif kartının kenarlık rengi dangerSoft olmalı
     final matchCards = tester.widgetList<MatchCard>(find.byType(MatchCard)).toList();
@@ -128,7 +130,7 @@ void main() {
   testWidgets('3. "Hızlı Maç" butonuna basıldığında MatchmakingScreen açılır', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
 
-    await tester.pumpWidget(_buildTestApp(repo, now: testNow));
+    await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
     expect(find.byType(MatchmakingScreen), findsNothing);
@@ -143,7 +145,7 @@ void main() {
   testWidgets('4. "Arkadaşınla Oyna" butonuna basıldığında "Yakında" bilgi penceresi açılır', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
 
-    await tester.pumpWidget(_buildTestApp(repo, now: testNow));
+    await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.comingSoon), findsNothing);
@@ -159,5 +161,81 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.comingSoon), findsNothing);
+  });
+
+  testWidgets('5. Ana ekran listesi finishedAtMs azalan sırayla ve eşitlikte son eklenen üstte olacak şekilde çizilir', (tester) async {
+    final olderEntry = MatchHistoryEntry(
+      id: 'm_old',
+      opponentName: 'Eski Rakip',
+      finishedAtMs: 1000,
+      myScore: 2,
+      opponentScore: 0,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+    );
+
+    final newerEntry = MatchHistoryEntry(
+      id: 'm_new',
+      opponentName: 'Yeni Rakip',
+      finishedAtMs: 5000,
+      myScore: 1,
+      opponentScore: 2,
+      result: MatchResult.lose,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+    );
+
+    final sameTimeEntryFirst = MatchHistoryEntry(
+      id: 'm_same1',
+      opponentName: 'İlk Eklenen Aynı Zaman',
+      finishedAtMs: 3000,
+      myScore: 2,
+      opponentScore: 1,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+    );
+
+    final sameTimeEntryLater = MatchHistoryEntry(
+      id: 'm_same2',
+      opponentName: 'Son Eklenen Aynı Zaman',
+      finishedAtMs: 3000,
+      myScore: 0,
+      opponentScore: 2,
+      result: MatchResult.lose,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+    );
+
+    // Depodan karışık sırada dönen liste: [olderEntry, sameTimeEntryLater, sameTimeEntryFirst, newerEntry]
+    // Beklenen sıralama:
+    // 1. newerEntry (5000)
+    // 2. sameTimeEntryLater (3000, depoda daha önce/üstte olan)
+    // 3. sameTimeEntryFirst (3000)
+    // 4. olderEntry (1000)
+    final repo = FakeMatchHistoryRepository([
+      olderEntry,
+      sameTimeEntryLater,
+      sameTimeEntryFirst,
+      newerEntry,
+    ]);
+
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(_buildTestApp(repo));
+    await tester.pumpAndSettle();
+
+    final renderedCards = tester.widgetList<MatchCard>(find.byType(MatchCard)).toList();
+    expect(renderedCards.length, 4);
+    expect(renderedCards[0].entry.id, 'm_new');
+    expect(renderedCards[1].entry.id, 'm_same2');
+    expect(renderedCards[2].entry.id, 'm_same1');
+    expect(renderedCards[3].entry.id, 'm_old');
   });
 }

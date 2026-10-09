@@ -18,14 +18,6 @@ abstract final class AppStrings {
   static const String settings = 'Ayarlar';
   static const String ok = 'Tamam';
 
-  // Tarih Biçimlendirme
-  static const String dateToday = 'Bugün';
-  static const String dateYesterday = 'Dün';
-  static const String daysAgoSuffix = ' gün önce';
-  static const String oneWeekAgo = '1 hafta önce';
-  static const String twoWeeksAgo = '2 hafta önce';
-  static const String threeWeeksAgo = '3 hafta önce';
-
   // Sonuç ve Durumlar
   static const String won = 'Kazandın';
   static const String lost = 'Kaybettin';

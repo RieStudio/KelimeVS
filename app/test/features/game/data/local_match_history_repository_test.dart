@@ -237,5 +237,130 @@ void main() {
     expect(attempt.isClose, isFalse);
     expect(attempt.hintShown, isFalse);
   });
+
+  test('Depo karışık sırayla yazılmış kayıtları en yeni başta döndürür', () async {
+    // SharedPreferences içine karışık finishedAtMs sırasıyla JSON yaz
+    const mixedJson = '[{'
+        '"id":"match_old",'
+        '"opponentName":"Eski",'
+        '"finishedAtMs":1000,'
+        '"myScore":2,'
+        '"opponentScore":0,'
+        '"result":"win",'
+        '"endType":"normal",'
+        '"roundRecords":[],'
+        '"roundQuestionTexts":[]'
+        '},{'
+        '"id":"match_newest",'
+        '"opponentName":"En Yeni",'
+        '"finishedAtMs":5000,'
+        '"myScore":2,'
+        '"opponentScore":1,'
+        '"result":"win",'
+        '"endType":"normal",'
+        '"roundRecords":[],'
+        '"roundQuestionTexts":[]'
+        '},{'
+        '"id":"match_mid",'
+        '"opponentName":"Orta",'
+        '"finishedAtMs":3000,'
+        '"myScore":1,'
+        '"opponentScore":2,'
+        '"result":"lose",'
+        '"endType":"normal",'
+        '"roundRecords":[],'
+        '"roundQuestionTexts":[]'
+        '}]';
+
+    SharedPreferences.setMockInitialValues({
+      'kelimego_match_history': mixedJson,
+    });
+
+    final repo = LocalMatchHistoryRepository();
+    final loaded = await repo.loadRecent();
+
+    expect(loaded.length, 3);
+    expect(loaded[0].id, 'match_newest');
+    expect(loaded[1].id, 'match_mid');
+    expect(loaded[2].id, 'match_old');
+  });
+
+  test('11. kayıtta EN ESKİ kayıt silinir (en yeni değil, toplam 10 kayıt kalır)', () async {
+    final repo = LocalMatchHistoryRepository();
+
+    // 10 kayıt ekle: finishedAtMs 2000, 3000, ..., 11000
+    for (int i = 1; i <= 10; i++) {
+      await repo.add(createTestEntry(
+        id: 'match_$i',
+        opponentName: 'Oyuncu $i',
+        finishedAtMs: 1000 + i * 1000,
+      ));
+    }
+
+    var loaded = await repo.loadRecent();
+    expect(loaded.length, 10);
+    expect(loaded.first.id, 'match_10'); // 11000 ms
+    expect(loaded.last.id, 'match_1'); // 2000 ms (en eski)
+
+    // 11. kaydı ekle (finishedAtMs: 15000 - en yeni)
+    await repo.add(createTestEntry(
+      id: 'match_11',
+      opponentName: 'Oyuncu 11',
+      finishedAtMs: 15000,
+    ));
+
+    loaded = await repo.loadRecent();
+    expect(loaded.length, 10);
+    // En yeni en başta olmalı
+    expect(loaded.first.id, 'match_11');
+    // En eski olan match_1 (2000 ms) silinmiş olmalı, sondaki match_2 (3000 ms) olmalı
+    expect(loaded.any((m) => m.id == 'match_1'), isFalse);
+    expect(loaded.last.id, 'match_2');
+
+    // Şimdi 12. kaydı daha eski bir tarihle ekleyelim (finishedAtMs: 1000)
+    // Bu durumda 1000 ms mevcut tüm kayıtlardan (3000-15000) daha eski olduğu için kendisi silinmeli
+    await repo.add(createTestEntry(
+      id: 'match_very_old',
+      opponentName: 'Çok Eski',
+      finishedAtMs: 1000,
+    ));
+
+    loaded = await repo.loadRecent();
+    expect(loaded.length, 10);
+    // match_very_old en eski olduğu için listede yer almamalı, 3000-15000 arası 10 kayıt korunmalı
+    expect(loaded.any((m) => m.id == 'match_very_old'), isFalse);
+    expect(loaded.first.id, 'match_11');
+    expect(loaded.last.id, 'match_2');
+  });
+
+  test('Aynı bitiş zamanına sahip kayıtlarda sonradan eklenen üstte yer alır', () async {
+    final repo = LocalMatchHistoryRepository();
+
+    // finishedAtMs değeri aynı (5000) olan 3 kayıt sırayla eklenir
+    await repo.add(createTestEntry(
+      id: 'match_first',
+      opponentName: 'İlk Eklenen',
+      finishedAtMs: 5000,
+    ));
+
+    await repo.add(createTestEntry(
+      id: 'match_second',
+      opponentName: 'İkinci Eklenen',
+      finishedAtMs: 5000,
+    ));
+
+    await repo.add(createTestEntry(
+      id: 'match_third',
+      opponentName: 'Üçüncü Eklenen',
+      finishedAtMs: 5000,
+    ));
+
+    final loaded = await repo.loadRecent();
+    expect(loaded.length, 3);
+    // Eşitlikte sonradan eklenen en üstte olmalı: match_third, match_second, match_first
+    expect(loaded[0].id, 'match_third');
+    expect(loaded[1].id, 'match_second');
+    expect(loaded[2].id, 'match_first');
+  });
 }
 

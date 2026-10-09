@@ -125,7 +125,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Sonuç etiketi (`ResultBadge`)** – Genişlik **88 (sabit)**, yazı ortalı, Nunito 12/800, köşe 12, 2 px kenarlık. "Kazandın": `primary` zemin + beyaz yazı + `ink` kenarlık. "Kaybettin": `danger` zemin + beyaz yazı + `dangerDark` kenarlık. Sabit genişlik, listedeki skor sütununun hizalı kalması içindir; etiket metni uzarsa (başka dil) genişlik gözden geçirilir.
 
-**Maç kartı (ana ekran listesi)** – Tüm kart tek dokunma alanı (maç detayını açar). Soldan sağa: avatar 40 · ad (Nunito 16/800) ve altında tarih (12, `muted`) · skor (Fredoka 22, sabit 56 genişlik, ortalı) · sonuç etiketi · sağ ok 16. Kenarlık: kazanılan maç `mint`, kaybedilen maç `dangerSoft`. Kartlar arası 10.
+**Maç kartı (ana ekran listesi)** – Tüm kart tek dokunma alanı (maç detayını açar). Soldan sağa: avatar 40 · ad (Nunito 16/800, tek satır, dikey ortalı; tarih yazılmaz) · skor (Fredoka 22, sabit 56 genişlik, ortalı) · sonuç etiketi · sağ ok 16. Kenarlık: kazanılan maç `mint`, kaybedilen maç `dangerSoft`. Kartlar arası 10.
 
 **Alt gezinme** – Beyaz, üstte 2 px `mint` çizgi, yükseklik 76 (+ güvenli alan). 4 öğe: Ana Sayfa, Sıralama, Mağaza, Profil. Etkin öğe `mint` zeminli yuvarlak dikdörtgen (köşe 16), ikon + Nunito 12/800 etiket.
 
@@ -139,11 +139,11 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
-**1) Ana ekran** – Üstte: avatar (44) + oyuncu adı + jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık) + ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. En altta alt gezinme.
+**1) Ana ekran** – Üstte: avatar (44) + oyuncu adı + jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık) + ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. **Sıralama mutlaka en yeni maç en üstte, yukarıdan aşağıya eskiye doğrudur** (maçın bitiş zamanına göre azalan); kartlarda tarih gösterilmez. En altta alt gezinme.
 
 **2) Eşleşme bekleme** – Sol üstte kapat. Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı. "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz". Üç noktalı yükleme göstergesi (nokta renkleri `primary`/`bright`/`mint`, sırayla yanıp söner). Altta ipucu kartı ("Türkçe karakter kullanmasan da olur…") ve "Vazgeç" butonu.
 
-**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2" hapı (paydasız). İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
+**3) Maç ekranı** – Üstte kapat ikonu + "Tur 2" hapı (paydasız: maç 2 ya da 3 tur sürebildiği için "/ 3" yazılmaz). İki oyuncu kartı (bkz. oyuncu kartı; sırası olan kart süre çubuğudur). Soru kartı. Cevap geçmişi (balonlar aşağıdan yukarı birikir, en yeni en altta). Doğru olmayan denemeler de aynı listede kırmızı balonla görünür. En altta giriş alanı + gönder.
 
 **4) Tur sonu** – Üstte "Tur N" hapı (paydasız). Ortada 104 px yuvarlak ikon, başlık, neden ve skor kartı (Fredoka 52). Altta "Tur N+1 birazdan başlıyor" ve kısa geri sayım çubuğu (**[VARSAYIM]** yaklaşık 3 sn, otomatik geçiş). Üç varyant:
 - **Kazandın:** daire `bright` zemin, 4 px `ink` kenarlık ve gölge, içinde onay. Başlık "Turu kazandın!" (`ink`). Neden: "Rakibin süresi doldu".
