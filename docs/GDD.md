@@ -31,7 +31,7 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 2. **[KARAR]** Oyuncular sırayla cevap yazar. Her cevap için süre **15 saniyedir**.
 3. **[KARAR]** Sırası gelen oyuncu, süresi dolmadan doğru ve daha önce söylenmemiş bir cevap veremezse o turu kaybeder; rakip o turun puanını alır. **Turu kaybetmenin tek koşulu süre dolmasıdır.** Yanlış ya da daha önce söylenmiş cevap turu kaybettirmez: cevap kabul edilmez, süre akmaya devam eder ve oyuncu istediği kadar yeniden deneyebilir (bölüm 4.5'teki kötüye kullanım sınırları hariç).
 3b. **[KARAR]** Maçı terk eden oyuncu maçı kaybeder; rakip maçı kazanır (mevcut skordan bağımsız).
-3c. **[KARAR]** Oyuncunun yaptığı her deneme (doğru, yanlış ya da tekrar eden) maç sırasında iki oyuncuya da gösterilir; rakip, oyuncunun yazdığı yanlış cevabı da görür. Yok sayılan denemeler (bölüm 4.5) gösterilmez. Kabul edilmeyen denemeler listede kırmızı balonla ayırt edilir.
+3c. **[KARAR]** Oyuncunun yaptığı her deneme (doğru, yanlış ya da tekrar eden) maç sırasında iki oyuncuya da gösterilir; rakip, oyuncunun yazdığı yanlış cevabı da görür. Yok sayılan denemeler (bölüm 4.5) gösterilmez. Kabul edilmeyen denemeler listede kırmızı balonla ayırt edilir. **İstisna:** henüz söylenmemiş bir cevaba "çok yakın" olan denemeler (ipucu hakkı bitmiş olsa bile) tur bitene kadar rakibe gösterilmez; aksi halde rakip, düzeltilmiş hâlini yazarak kopya çekebilir. Online maçta sunucu bu denemeleri rakibe hiç iletmez. Tur bitince ve maç detayında herkese görünür (bölüm 4.3).
 4. **[KARAR]** Bir turda sorunun tüm cevapları tükenirse o tur berabere sayılır, kimseye puan yazılmaz ve maç bir tur uzar. (Çok nadir bir durum, kuralın tutarlılığı için tanımlı.)
 5. **[KARAR]** Sonuçlanan 3 turun sonunda skoru fazla olan maçı kazanır. Maç 2–0 olsa bile 3. tur oynanır.
 6. **[VARSAYIM]** Aynı cevap bir turda iki kez söylenemez.
@@ -75,6 +75,7 @@ Doğrulama **yalnızca Cloud Functions içinde** yapılır. İstemci cevap liste
 - Eşik cevap uzunluğuna göre değişir: çok kısa kelimelerde (3 harf ve altı) kapalı; 4+ harfte 1, 9+ harfte 2 düzenleme. Değerler Remote Config'ten ayarlanır, oyun testleriyle belirlenir.
 - Yakın cevap **doğru sayılmaz**; oyuncuya yalnızca "Çok yakın!" ipucu gösterilir. Yanlış cevaplar zaten turu kaybettirmediği için bu bir ceza değil, bir yardımdır; süre akmaya devam eder.
 - Cevap listesini yoklayarak öğrenmeyi önlemek için turda oyuncu başına en fazla **1** "çok yakın" ipucu verilir; sonrasında yakın cevaplar da normal yanlış cevap gibi (ipucu vermeden) reddedilir. Hangi cevaba yakın olunduğu asla söylenmez.
+- **Yakın denemeler rakibe gösterilmez** (tur bitene kadar). Bu, ipucu hakkı bitmiş olsa bile geçerlidir: yakınlık her yanlış denemede ayrıca hesaplanır ve kayda "yakın" işareti düşülür. İşaret yalnızca gösterimi etkiler; ipucu hakkı ve cevabın kabulü değişmez. Oyuncu kendi yakın denemesini her zaman görür.
 - Hesaplama yalnızca sunucuda yapılır.
 - Sık yapılan yazım hataları (örn. "maydonoz", "çedar") CMS'te alternatif cevap olarak eklenmeye devam eder ve **doğru** sayılır; "çok yakın" yalnızca listede olmayan hatalar içindir.
 

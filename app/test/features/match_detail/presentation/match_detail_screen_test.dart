@@ -413,6 +413,45 @@ void main() {
       expect(find.text(AppStrings.appeal), findsNothing);
     });
 
+    testWidgets('8c. Maç Detayı ekranında hem kendi hem rakibin yakın denemeleri (isClose=true) görünür', (tester) async {
+      final closeAttemptMatch = createSampleMatch(
+        rounds: [
+          const RoundRecord(
+            questionId: 'q1',
+            starterPlayerId: 'me',
+            winnerId: 'me',
+            reason: RoundEndReason.timeout,
+            attempts: [
+              TurnAttempt(
+                playerId: 'me',
+                rawInput: 'aude',
+                resultType: AttemptResultType.nearMiss,
+                nowMs: 1000,
+                isClose: true,
+                hintShown: true,
+              ),
+              TurnAttempt(
+                playerId: 'bot',
+                rawInput: 'ferari',
+                resultType: AttemptResultType.wrong,
+                nowMs: 2000,
+                isClose: true,
+                hintShown: false,
+              ),
+            ],
+          ),
+        ],
+        questionTexts: ['Soru 1'],
+      );
+
+      await tester.pumpWidget(createDetailTestWidget(match: closeAttemptMatch));
+      await tester.pumpAndSettle();
+
+      // İki deneme de görünür olmalı
+      expect(find.text('aude'), findsOneWidget);
+      expect(find.text('ferari'), findsOneWidget);
+    });
+
     testWidgets('9. Rakibin denemeleri TextFilter filtresinden geçer', (tester) async {
       final filteredMatch = createSampleMatch(
         rounds: [

@@ -28,11 +28,13 @@ class RoundAttemptUiModel {
   final String playerId;
   final String text;
   final bool isCorrect;
+  final bool isClose;
 
   const RoundAttemptUiModel({
     required this.playerId,
     required this.text,
     required this.isCorrect,
+    this.isClose = false,
   });
 }
 

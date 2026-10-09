@@ -204,48 +204,51 @@ abstract final class MatchEngine {
         ]);
 
       case MatchResultWrong():
-        // Önce "Çok Yakın" kontrolü yapılır (tur başına oyuncu başına en fazla 1 ipucu)
+        final unusedAliases = question.answers
+            .where((a) => !state.usedAnswerIds.contains(a.id))
+            .map((a) => a.aliases);
+
+        final isClose = NearMissCalculator.isNearMiss(
+          normalizedInput: normalized,
+          unusedAnswerAliases: unusedAliases,
+        );
+
         final playerQuota = state.remainingNearMisses[playerId] ?? 0;
 
-        if (playerQuota > 0) {
-          final unusedAliases = question.answers
-              .where((a) => !state.usedAnswerIds.contains(a.id))
-              .map((a) => a.aliases);
+        if (isClose && playerQuota > 0) {
+          // İpucu hakkı var: hak düşer, nearMiss kaydedilir, event NearMiss
+          final updatedNearMisses =
+              Map<String, int>.from(state.remainingNearMisses);
+          updatedNearMisses[playerId] = playerQuota - 1;
 
-          final nearMissFound = NearMissCalculator.isNearMiss(
-            normalizedInput: normalized,
-            unusedAnswerAliases: unusedAliases,
+          final attempt = TurnAttempt(
+            playerId: playerId,
+            rawInput: rawInput,
+            resultType: AttemptResultType.nearMiss,
+            nowMs: nowMs,
+            isClose: true,
+            hintShown: true,
           );
 
-          if (nearMissFound) {
-            // Sonuç NearMiss: hak düşer, tur kaybedilmez, sıra ve süre DEĞİŞMEZ
-            final updatedNearMisses = Map<String, int>.from(state.remainingNearMisses);
-            updatedNearMisses[playerId] = playerQuota - 1;
+          final nextState = state.copyWith(
+            remainingNearMisses: updatedNearMisses,
+            currentRoundAttempts: [...state.currentRoundAttempts, attempt],
+            currentTurnAttempts: updatedTurnAttempts,
+            lastSubmitTimes: updatedLastSubmitTimes,
+          );
 
-            final attempt = TurnAttempt(
-              playerId: playerId,
-              rawInput: rawInput,
-              resultType: AttemptResultType.nearMiss,
-              nowMs: nowMs,
-            );
-
-            final nextState = state.copyWith(
-              remainingNearMisses: updatedNearMisses,
-              currentRoundAttempts: [...state.currentRoundAttempts, attempt],
-              currentTurnAttempts: updatedTurnAttempts,
-              lastSubmitTimes: updatedLastSubmitTimes,
-            );
-
-            return EngineResult(nextState, [NearMiss(playerId)]);
-          }
+          return EngineResult(nextState, [NearMiss(playerId)]);
         }
 
-        // Çok yakın değil veya hakkı bitti -> Yanlış cevap turu kaybettirmez, sıra ve süre DEĞİŞMEZ
+        // İpucu hakkı bitti ya da yakın değil: wrong kaydedilir, event WrongAnswer
+        // Ancak isClose değeri hesaplandığı gibi (yakınsa true) saklanır
         final attempt = TurnAttempt(
           playerId: playerId,
           rawInput: rawInput,
           resultType: AttemptResultType.wrong,
           nowMs: nowMs,
+          isClose: isClose,
+          hintShown: false,
         );
 
         final nextState = state.copyWith(

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/question_repository.dart';
@@ -213,6 +214,15 @@ class MatchController extends Notifier<MatchUiState> {
     );
   }
 
+  @visibleForTesting
+  void applyEngineResultForTesting(EngineResult result) {
+    _applyEngineResult(
+      engineResult: result,
+      clock: _clock,
+      random: _random,
+    );
+  }
+
   void _applyEngineResult({
     required EngineResult engineResult,
     required GameClock clock,
@@ -249,12 +259,18 @@ class MatchController extends Notifier<MatchUiState> {
         ? <AcceptedAnswerUiModel>[]
         : List<AcceptedAnswerUiModel>.from(state.acceptedAnswers);
 
-    // Tur içi tüm denemeler (kronolojik, timeout hariç)
+    // Tur içi tüm denemeler (kronolojik, timeout hariç, aktif turda rakibin yakın denemeleri gizli)
     final List<RoundAttemptUiModel> updatedRoundAttempts;
     if (isNewRound) {
       updatedRoundAttempts = const [];
     } else {
-      updatedRoundAttempts = nextState.currentRoundAttempts
+      final isRoundActive = nextState.phase == MatchPhase.roundActive;
+      final visible = visibleAttempts(
+        nextState.currentRoundRecord,
+        state.myPlayerId,
+        isRoundActive,
+      );
+      updatedRoundAttempts = visible
           .where((att) => att.resultType != AttemptResultType.timeout)
           .map((att) {
         String text;
@@ -274,6 +290,7 @@ class MatchController extends Notifier<MatchUiState> {
           playerId: att.playerId,
           text: text,
           isCorrect: att.resultType == AttemptResultType.correct,
+          isClose: att.isClose,
         );
       }).toList();
     }

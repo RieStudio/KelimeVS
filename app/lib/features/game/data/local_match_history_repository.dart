@@ -146,6 +146,8 @@ abstract final class _MatchHistoryMapper {
       'resultType': attempt.resultType.name,
       'answerId': attempt.answerId,
       'nowMs': attempt.nowMs,
+      'isClose': attempt.isClose,
+      'hintShown': attempt.hintShown,
     };
   }
 
@@ -156,6 +158,8 @@ abstract final class _MatchHistoryMapper {
       resultType: AttemptResultType.values.byName(json['resultType'] as String),
       answerId: json['answerId'] as String?,
       nowMs: json['nowMs'] as int,
+      isClose: json['isClose'] as bool? ?? false,
+      hintShown: json['hintShown'] as bool? ?? false,
     );
   }
 }

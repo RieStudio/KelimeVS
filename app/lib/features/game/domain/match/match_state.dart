@@ -24,6 +24,8 @@ class TurnAttempt {
   final AttemptResultType resultType;
   final String? answerId;
   final int nowMs;
+  final bool isClose;
+  final bool hintShown;
 
   const TurnAttempt({
     required this.playerId,
@@ -31,6 +33,8 @@ class TurnAttempt {
     required this.resultType,
     this.answerId,
     required this.nowMs,
+    this.isClose = false,
+    this.hintShown = false,
   });
 }
 
@@ -48,6 +52,25 @@ class RoundRecord {
     required this.winnerId,
     required this.reason,
   });
+}
+
+/// Saf fonksiyon: Tur aktifken (`roundActive == true`) izleyiciden farklı oyuncuların
+/// `isClose == true` denemelerini listeden çıkarır; oyuncunun kendi denemeleri her zaman görünür.
+/// Tur bitince (`roundActive == false`) tüm denemeler herkese görünür.
+List<TurnAttempt> visibleAttempts(
+  RoundRecord round,
+  String viewerId,
+  bool roundActive,
+) {
+  if (!roundActive) {
+    return round.attempts;
+  }
+  return round.attempts.where((attempt) {
+    if (attempt.playerId == viewerId) {
+      return true;
+    }
+    return !attempt.isClose;
+  }).toList();
 }
 
 class MatchState {
@@ -97,6 +120,15 @@ class MatchState {
     }
     return playerIds[0] == playerId ? playerIds[1] : playerIds[0];
   }
+
+  RoundRecord get currentRoundRecord => RoundRecord(
+        questionId: currentQuestion?.id ?? '',
+        starterPlayerId:
+            playerIds.isNotEmpty ? playerIds[totalRoundsPlayed % 2] : '',
+        attempts: currentRoundAttempts,
+        winnerId: winnerId,
+        reason: RoundEndReason.timeout,
+      );
 
   MatchState copyWith({
     MatchConfig? config,

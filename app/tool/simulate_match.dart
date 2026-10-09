@@ -227,6 +227,21 @@ List<String> _checkInvariants(MatchState state, int poolSize) {
     }
   }
 
+  // 5. Aktif turda bir oyuncuya gösterilen listede rakibin isClose denemesi olamaz
+  for (int i = 0; i < state.roundHistory.length; i++) {
+    final round = state.roundHistory[i];
+    for (final p in state.playerIds) {
+      final opp = state.opponentOf(p);
+      final activeVisible = visibleAttempts(round, p, true);
+      final leaked =
+          activeVisible.where((a) => a.playerId == opp && a.isClose).toList();
+      if (leaked.isNotEmpty) {
+        errors.add(
+            'Tur ${i + 1} aktifken $p oyuncusuna rakibin isClose denemesi (${leaked.length} adet) sızdırıldı!');
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -256,6 +271,7 @@ void _playMatch({
   final forfeitingPlayer = random.nextBool() ? 'p1' : 'p2';
   final forfeitTurn = 1 + random.nextInt(2); // tur içindeki 1. veya 2. sırada
   bool forfeited = false;
+  final liveViolations = <String>[];
 
   while (state.phase != MatchPhase.matchFinished) {
     if (state.phase == MatchPhase.roundEnded) {
@@ -478,6 +494,20 @@ void _playMatch({
         state = engineResult.state;
         break;
       }
+
+      if (state.phase == MatchPhase.roundActive) {
+        for (final p in state.playerIds) {
+          final opp = state.opponentOf(p);
+          final liveVisible = visibleAttempts(state.currentRoundRecord, p, true);
+          final leaked =
+              liveVisible.where((a) => a.playerId == opp && a.isClose).toList();
+          if (leaked.isNotEmpty) {
+            liveViolations.add(
+              'Aktif turda $p oyuncusuna rakibin isClose denemesi sızdı: ${leaked.map((a) => a.rawInput).toList()}',
+            );
+          }
+        }
+      }
     }
 
     // Tur bittiği andaki istatistikler
@@ -529,7 +559,10 @@ void _playMatch({
   }
 
   // Değişmezleri kontrol et
-  final violations = _checkInvariants(state, questions.length);
+  final violations = [
+    ..._checkInvariants(state, questions.length),
+    ...liveViolations,
+  ];
   if (violations.isNotEmpty) {
     stats.invariantViolations++;
     stdout.writeln('[İHLAL] Maç #$matchNumber (Tohum: $matchSeed):');

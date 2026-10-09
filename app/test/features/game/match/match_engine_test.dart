@@ -679,5 +679,176 @@ void main() {
       );
       expect(res.state.currentQuestion!.id, equals('q_few'));
     });
+
+    test('12. Yakın deneme ipucu hakkı varken ve bittiğinde isClose=true olur, rakipten gizlenir, sahibine görünür', () {
+      final config = const MatchConfig(nearMissPerRound: 1, answerSeconds: 15);
+      final random = math.Random(1);
+
+      final testQ = _createQuestion(
+        id: 'q_near_test',
+        text: 'Araba Markaları',
+        answersMap: {
+          'Audi': [], // 4 harf, 1 hata toleransı
+          'Ferrari': [], // 7 harf, 1 hata toleransı
+        },
+      );
+
+      var res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: [testQ],
+        random: random,
+        nowMs: 1000,
+      );
+      var state = res.state;
+
+      // 12.1: p1 ilk yakın denemesini yapar: "aude" -> "Audi"
+      // İpucu hakkı var: isClose=true, hintShown=true, resultType=nearMiss
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'aude',
+        nowMs: 2000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<NearMiss>());
+      expect(state.currentRoundAttempts.last.isClose, isTrue);
+      expect(state.currentRoundAttempts.last.hintShown, isTrue);
+      expect(state.currentRoundAttempts.last.resultType, equals(AttemptResultType.nearMiss));
+
+      // Aktif turda p1 kendi denemesini görür
+      var p1Visible = visibleAttempts(state.currentRoundRecord, 'p1', true);
+      expect(p1Visible.any((a) => a.rawInput == 'aude'), isTrue);
+
+      // Aktif turda rakip p2 bu yakın denemeyi GÖRMEZ (kopya önleme)
+      var p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
+      expect(p2Visible.any((a) => a.rawInput == 'aude'), isFalse);
+
+      // 12.2: p1 ikinci yakın denemesini yapar: "ferari" -> "Ferrari"
+      // İpucu hakkı bitti (quota=0): isClose=true, hintShown=false, resultType=wrong
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'ferari',
+        nowMs: 3000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.currentRoundAttempts.last.isClose, isTrue);
+      expect(state.currentRoundAttempts.last.hintShown, isFalse);
+      expect(state.currentRoundAttempts.last.resultType, equals(AttemptResultType.wrong));
+
+      // Hak bitmiş olsa bile aktif turda p1 görür, p2 GÖRMEZ
+      p1Visible = visibleAttempts(state.currentRoundRecord, 'p1', true);
+      expect(p1Visible.any((a) => a.rawInput == 'ferari'), isTrue);
+
+      p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
+      expect(p2Visible.any((a) => a.rawInput == 'ferari'), isFalse);
+
+      // 12.3: Tur bitince (roundActive = false), her iki yakın deneme de p2'ye görünür
+      final roundEndedVisible = visibleAttempts(state.currentRoundRecord, 'p2', false);
+      expect(roundEndedVisible.any((a) => a.rawInput == 'aude'), isTrue);
+      expect(roundEndedVisible.any((a) => a.rawInput == 'ferari'), isTrue);
+    });
+
+    test('13. Yakın olmayan yanlış deneme ve eşik dışı kelimeler isClose=false olur ve rakibe gizlenmez', () {
+      final config = const MatchConfig(nearMissPerRound: 1, answerSeconds: 15);
+      final random = math.Random(1);
+
+      final testQ = _createQuestion(
+        id: 'q_far_test',
+        text: 'Araba Markaları',
+        answersMap: {
+          'Audi': [],
+          'Bmw': [], // 3 harf -> tolerans 0
+        },
+      );
+
+      var res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: [testQ],
+        random: random,
+        nowMs: 1000,
+      );
+      var state = res.state;
+
+      // 13.1: Tamamen alakasız yanlış kelime
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'karpuz',
+        nowMs: 2000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<WrongAnswer>());
+      expect(state.currentRoundAttempts.last.isClose, isFalse);
+      expect(state.currentRoundAttempts.last.hintShown, isFalse);
+
+      // Rakip p2 bu yanlış denemeyi görür (gizlenmez)
+      var p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
+      expect(p2Visible.any((a) => a.rawInput == 'karpuz'), isTrue);
+
+      // 13.2: 3 harfli eşik dışı kelime ("bmv" -> "Bmw", 3 harf tolerans 0)
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'bmv',
+        nowMs: 3000,
+      );
+      state = res.state;
+      expect(state.currentRoundAttempts.last.isClose, isFalse);
+
+      // Rakip p2 bunu da görür
+      p2Visible = visibleAttempts(state.currentRoundRecord, 'p2', true);
+      expect(p2Visible.any((a) => a.rawInput == 'bmv'), isTrue);
+    });
+
+    test('14. Doğru ve tekrar cevapların isClose ve hintShown değerleri false olur, kurallar değişmez', () {
+      final config = const MatchConfig(answerSeconds: 15);
+      final random = math.Random(1);
+
+      final testQ = _createQuestion(
+        id: 'q_std',
+        text: 'Test',
+        answersMap: {
+          'Audi': [],
+          'Bmw': [],
+        },
+      );
+
+      var res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: [testQ],
+        random: random,
+        nowMs: 1000,
+      );
+      var state = res.state;
+
+      // Doğru cevap
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'Audi',
+        nowMs: 2000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<AnswerAccepted>());
+      expect(state.currentRoundAttempts.last.isClose, isFalse);
+      expect(state.currentRoundAttempts.last.hintShown, isFalse);
+
+      // Tekrar cevap (sıra p2'de iken Audi tekrar söyler)
+      res = MatchEngine.submit(
+        state: state,
+        playerId: 'p2',
+        rawInput: 'Audi',
+        nowMs: 3000,
+      );
+      state = res.state;
+      expect(res.events.first, isA<AlreadySaid>());
+      expect(state.currentRoundAttempts.last.isClose, isFalse);
+      expect(state.currentRoundAttempts.last.hintShown, isFalse);
+    });
   });
 }

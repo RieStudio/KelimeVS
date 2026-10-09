@@ -148,5 +148,94 @@ void main() {
     final loaded = await repo.loadRecent();
     expect(loaded, isEmpty);
   });
+
+  test('isClose ve hintShown alanları serileştirmede korunur', () async {
+    final repo = LocalMatchHistoryRepository();
+    final entry = MatchHistoryEntry(
+      id: 'match_close',
+      opponentName: 'Ali',
+      finishedAtMs: 1700000000000,
+      myScore: 2,
+      opponentScore: 1,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      roundRecords: [
+        RoundRecord(
+          questionId: 'q_1',
+          starterPlayerId: 'me',
+          attempts: const [
+            TurnAttempt(
+              playerId: 'me',
+              rawInput: 'aude',
+              resultType: AttemptResultType.nearMiss,
+              nowMs: 1000,
+              isClose: true,
+              hintShown: true,
+            ),
+            TurnAttempt(
+              playerId: 'bot',
+              rawInput: 'parsi',
+              resultType: AttemptResultType.wrong,
+              nowMs: 2000,
+              isClose: true,
+              hintShown: false,
+            ),
+          ],
+          winnerId: 'me',
+          reason: RoundEndReason.timeout,
+        ),
+      ],
+    );
+
+    await repo.add(entry);
+    final loaded = await repo.loadRecent();
+    expect(loaded.length, 1);
+    final attempts = loaded.first.roundRecords.first.attempts;
+    expect(attempts[0].isClose, isTrue);
+    expect(attempts[0].hintShown, isTrue);
+    expect(attempts[1].isClose, isTrue);
+    expect(attempts[1].hintShown, isFalse);
+  });
+
+  test('Eski kayıtlarda isClose ve hintShown yoksa varsayılan false olarak yüklenir (geriye uyumluluk)', () async {
+    // Eski JSON yapısını doğrudan SharedPreferences'a yaz
+    const oldJson = '[{'
+        '"id":"old_match",'
+        '"opponentName":"Eski Rakip",'
+        '"finishedAtMs":1690000000000,'
+        '"myScore":2,'
+        '"opponentScore":1,'
+        '"result":"win",'
+        '"endType":"normal",'
+        '"forfeitedPlayerId":null,'
+        '"roundRecords":[{'
+        '"questionId":"q_old",'
+        '"starterPlayerId":"me",'
+        '"winnerId":"me",'
+        '"reason":"timeout",'
+        '"attempts":[{'
+        '"playerId":"me",'
+        '"rawInput":"ankara",'
+        '"resultType":"correct",'
+        '"answerId":"ankara",'
+        '"nowMs":1000'
+        '}]'
+        '}],'
+        '"roundQuestionTexts":[]'
+        '}]';
+
+    SharedPreferences.setMockInitialValues({
+      'kelimego_match_history': oldJson,
+    });
+
+    final repo = LocalMatchHistoryRepository();
+    final loaded = await repo.loadRecent();
+
+    expect(loaded.length, 1);
+    expect(loaded.first.id, 'old_match');
+    final attempt = loaded.first.roundRecords.first.attempts.first;
+    expect(attempt.isClose, isFalse);
+    expect(attempt.hintShown, isFalse);
+  });
 }
 

@@ -11,6 +11,7 @@ import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/data/question_repository.dart';
 import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
+import 'package:app/features/game/domain/match/match_engine.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
@@ -656,6 +657,70 @@ void main() {
         // Sayı artmamalı!
         expect(state.roundAttempts.length, 1);
         expect(state.roundAttempts.first.text, 'yanlış1');
+
+        container.dispose();
+      });
+    });
+
+    test('Botun yakın denemesi aktif turda roundAttempts listesinde gizlenir, tur bitince açılır', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+                nearMissPerRound: 1,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        final customQ = Question(
+          id: 'q_custom',
+          categoryId: 'araba',
+          text: 'Araba Markaları',
+          answers: const [
+            Answer(id: 'audi', display: 'Audi', aliases: ['audi']),
+            Answer(id: 'ferrari', display: 'Ferrari', aliases: ['ferrari']),
+          ],
+        );
+        controller.startMatch(questions: [customQ], opponentName: 'TestBot');
+
+        var state = container.read(matchControllerProvider);
+
+        // Kendi doğru cevabımı verip sırayı bota geçir
+        controller.submit('Audi');
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // Botun 'ferari' yakın denemesi (Ferrari'ye 1 mesafe, isClose = true) yapıldığını simüle et
+        final engineRes = MatchEngine.submit(
+          state: state.matchState!,
+          playerId: 'bot',
+          rawInput: 'ferari',
+          nowMs: fakeClock.nowMs(),
+        );
+        controller.applyEngineResultForTesting(engineRes);
+        state = container.read(matchControllerProvider);
+
+        // Aktif turdayken botun yakın denemesi kullanıcının (me) roundAttempts listesinde GİZLİ OLMALIDIR!
+        expect(state.roundAttempts.any((a) => a.text == 'ferari'), isFalse);
+
+        // Turu süre aşımıyla bitir
+        final timeoutRes = MatchEngine.checkTimeout(
+          state: state.matchState!,
+          nowMs: state.matchState!.deadlineMs + 100,
+        );
+        controller.applyEngineResultForTesting(timeoutRes);
+        state = container.read(matchControllerProvider);
+
+        // Tur bittiğinde (roundEnded) botun yakın denemesi artık listede GÖRÜNÜR OLMALIDIR!
+        expect(state.roundAttempts.any((a) => a.text == 'ferari'), isTrue);
 
         container.dispose();
       });
