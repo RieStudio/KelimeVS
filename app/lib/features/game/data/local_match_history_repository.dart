@@ -7,14 +7,19 @@ import '../domain/history/match_history_entry.dart';
 import '../domain/history/match_history_repository.dart';
 import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
+import '../domain/objection/objection_repository.dart';
 
 class LocalMatchHistoryRepository implements MatchHistoryRepository {
   static const String _storageKey = 'kelimego_match_history';
   static const int maxEntries = 10;
 
   final SharedPreferences? prefs;
+  final ObjectionRepository? objectionRepository;
 
-  const LocalMatchHistoryRepository({this.prefs});
+  const LocalMatchHistoryRepository({
+    this.prefs,
+    this.objectionRepository,
+  });
 
   Future<SharedPreferences> _getPrefs() async {
     return prefs ?? await SharedPreferences.getInstance();
@@ -66,6 +71,12 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
       trimmedList.map((e) => _MatchHistoryMapper.toJson(e)).toList(),
     );
     await prefs.setString(_storageKey, encodedString);
+
+    // 10 maç sınırından düşen maçların itirazlarını temizle
+    if (objectionRepository != null) {
+      final validIds = trimmedList.map((e) => e.id).toSet();
+      await objectionRepository!.cleanupOrphaned(validIds);
+    }
   }
 }
 
@@ -82,6 +93,7 @@ abstract final class _MatchHistoryMapper {
       'endType': entry.endType.name,
       'forfeitedPlayerId': entry.forfeitedPlayerId,
       'roundRecords': entry.roundRecords.map(_roundRecordToJson).toList(),
+      'roundQuestionTexts': entry.roundQuestionTexts,
     };
   }
 
@@ -98,6 +110,10 @@ abstract final class _MatchHistoryMapper {
       roundRecords: (json['roundRecords'] as List<dynamic>)
           .map((r) => _roundRecordFromJson(r as Map<String, dynamic>))
           .toList(),
+      roundQuestionTexts: (json['roundQuestionTexts'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
   }
 

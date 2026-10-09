@@ -512,6 +512,11 @@ class MatchController extends Notifier<MatchUiState> {
           ? (isWinner ? 'bot' : 'me')
           : null;
 
+      final questionTexts = finishedState.roundHistory.map((r) {
+        final q = _loadedQuestions.where((item) => item.id == r.questionId).firstOrNull;
+        return q?.text ?? 'Soru';
+      }).toList();
+
       final entry = MatchHistoryEntry(
         id: 'match_${clock.nowMs()}_${_random.nextInt(100000)}',
         opponentName: opponentName.isNotEmpty ? opponentName : 'Rakip',
@@ -522,11 +527,13 @@ class MatchController extends Notifier<MatchUiState> {
         endType: isForfeit ? MatchEndType.forfeit : MatchEndType.normal,
         forfeitedPlayerId: forfeitedPlayer,
         roundRecords: finishedState.roundHistory,
+        roundQuestionTexts: questionTexts,
       );
 
       final repo = ref.read(matchHistoryRepositoryProvider);
       await repo.add(entry);
       ref.invalidate(matchHistoryProvider);
+      state = state.copyWith(lastSavedMatch: entry);
     } catch (_) {
       // sessizce geç
     }

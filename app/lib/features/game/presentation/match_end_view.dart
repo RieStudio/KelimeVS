@@ -10,7 +10,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/result_circle.dart';
+import '../../../core/widgets/secondary_button.dart';
+import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
+import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
@@ -254,7 +257,37 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 },
               ),
 
-              // TODO: Sonraki adımda "Maç Detayı" butonu eklenecek.
+              const SizedBox(height: AppDimens.space12),
+
+              SecondaryButton(
+                text: AppStrings.matchDetail,
+                onPressed: () async {
+                  final lastMatch =
+                      ref.read(matchControllerProvider).lastSavedMatch;
+                  if (lastMatch != null) {
+                    if (context.mounted) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MatchDetailScreen(match: lastMatch),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  // Fallback: geçmişten en son maçı al
+                  final recent =
+                      await ref.read(matchHistoryRepositoryProvider).loadRecent();
+                  if (recent.isNotEmpty && context.mounted) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => MatchDetailScreen(match: recent.first),
+                      ),
+                    );
+                  }
+                },
+              ),
+
               const SizedBox(height: AppDimens.space12),
             ],
           ),

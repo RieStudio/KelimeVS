@@ -7,6 +7,7 @@ import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/result_circle.dart';
+import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
@@ -231,7 +232,7 @@ void main() {
     expect(find.byType(MatchmakingScreen), findsOneWidget);
   });
 
-  testWidgets('6. "Maç Detayı" butonu henüz ekranda bulunmaz (TODO doğrulaması)', (tester) async {
+  testWidgets('6. "Maç Detayı" butonu ekranda ikincil buton olarak bulunur', (tester) async {
     final matchState = createMatchState(
       scores: {'me': 2, 'bot': 1},
       winnerId: 'me',
@@ -245,8 +246,7 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('Maç Detayı'), findsNothing);
-    expect(find.textContaining('Detay'), findsNothing);
+    expect(find.widgetWithText(SecondaryButton, AppStrings.matchDetail), findsOneWidget);
   });
 
   testWidgets('7. Kapat ikonu tıklandığında Navigator.pop çalışır', (tester) async {

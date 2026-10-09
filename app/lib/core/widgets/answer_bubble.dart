@@ -14,18 +14,24 @@ class AnswerBubble extends StatelessWidget {
   final String text;
   final bool isMe;
   final bool isRejected;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   const AnswerBubble({
     super.key,
     required this.text,
     required this.isMe,
     this.isRejected = false,
+    this.isSelected = false,
+    this.onTap,
   });
 
   const AnswerBubble.rejected({
     super.key,
     required this.text,
     required this.isMe,
+    this.isSelected = false,
+    this.onTap,
   }) : isRejected = true;
 
   @override
@@ -41,30 +47,50 @@ class AnswerBubble extends StatelessWidget {
         ? AppTextStyles.answerBubbleRejected
         : AppTextStyles.answerBubble;
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14.0,
-            vertical: 7.0,
+    final bubble = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14.0,
+          vertical: 7.0,
+        ),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: AppDimens.borderRadiusBubble,
+          border: Border.all(
+            color: borderColor,
+            width: isSelected ? AppDimens.borderThick : AppDimens.borderThin,
           ),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: AppDimens.borderRadiusBubble,
-            border: Border.all(
-              color: borderColor,
-              width: AppDimens.borderThin,
-            ),
-          ),
-          child: Text(
-            text,
-            style: textStyle,
-            softWrap: true,
-          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isRejected ? AppColors.danger : AppColors.ink)
+                        .withAlpha(51),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          text,
+          style: textStyle,
+          softWrap: true,
         ),
       ),
+    );
+
+    final clickableBubble = onTap != null
+        ? GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: bubble,
+          )
+        : bubble;
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: clickableBubble,
     );
   }
 }

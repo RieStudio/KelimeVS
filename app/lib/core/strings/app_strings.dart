@@ -126,5 +126,21 @@ abstract final class AppStrings {
   static const String roundEndedTitle = 'Tur bitti';
   static const String temporaryTodoNotice = 'TODO: sonraki adımda gerçek ekranla değişecek';
   static const String close = 'Kapat';
+
+  // Maç Detayı ve İtiraz
+  static const String back = 'Geri';
+  static const String draw = 'Berabere';
+  static const String incomplete = 'Yarım kaldı';
+  static const String noAttemptsInRound = 'Bu turda deneme yok';
+  static const String defaultQuestionText = 'Soru';
+  static const String objectionSent = 'İtiraz gönderildi';
+  static const String alreadySaidNotice = 'Bu cevap daha önce söylenmişti';
+  static const String roundUpperPrefix = 'TUR ';
+  static const String roundLabelWon = 'KAZANDIN';
+  static const String roundLabelLost = 'KAYBETTİN';
+  static const String roundLabelDraw = 'BERABERE';
+  static const String roundLabelIncomplete = 'YARIM KALDI';
+  static const String dotSeparator = ' · ';
+  static String objectionPrompt(String text) => '“$text” kabul edilmedi. Sence doğru muydu?';
 }
 

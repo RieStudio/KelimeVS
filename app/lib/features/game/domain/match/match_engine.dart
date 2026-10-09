@@ -102,17 +102,10 @@ abstract final class MatchEngine {
     if (_isTimedOut(state, nowMs)) {
       final timedOutPlayerId = state.turnPlayerId!;
       final winnerId = state.opponentOf(timedOutPlayerId);
-      final attempt = TurnAttempt(
-        playerId: timedOutPlayerId,
-        rawInput: rawInput,
-        resultType: AttemptResultType.timeout,
-        nowMs: nowMs,
-      );
       return _endRound(
         state: state,
         winnerId: winnerId,
         reason: RoundEndReason.timeout,
-        attempt: attempt,
       );
     }
 
@@ -280,17 +273,10 @@ abstract final class MatchEngine {
     if (_isTimedOut(state, nowMs)) {
       final timedOutPlayerId = state.turnPlayerId!;
       final winnerId = state.opponentOf(timedOutPlayerId);
-      final attempt = TurnAttempt(
-        playerId: timedOutPlayerId,
-        rawInput: '',
-        resultType: AttemptResultType.timeout,
-        nowMs: nowMs,
-      );
       return _endRound(
         state: state,
         winnerId: winnerId,
         reason: RoundEndReason.timeout,
-        attempt: attempt,
       );
     }
 
@@ -391,13 +377,15 @@ abstract final class MatchEngine {
     required MatchState state,
     required String? winnerId,
     required RoundEndReason reason,
-    required TurnAttempt attempt,
+    TurnAttempt? attempt,
     bool alreadyAppendedAttempt = false,
     List<MatchEvent> prefixEvents = const [],
   }) {
     final attempts = alreadyAppendedAttempt
         ? state.currentRoundAttempts
-        : [...state.currentRoundAttempts, attempt];
+        : (attempt != null
+            ? [...state.currentRoundAttempts, attempt]
+            : state.currentRoundAttempts);
 
     final starterIndex = state.totalRoundsPlayed % 2;
     final starterPlayerId = state.playerIds[starterIndex];

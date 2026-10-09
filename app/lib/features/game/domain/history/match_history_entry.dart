@@ -22,6 +22,7 @@ class MatchHistoryEntry {
   final MatchEndType endType;
   final String? forfeitedPlayerId;
   final List<RoundRecord> roundRecords;
+  final List<String> roundQuestionTexts;
 
   const MatchHistoryEntry({
     required this.id,
@@ -33,6 +34,15 @@ class MatchHistoryEntry {
     required this.endType,
     this.forfeitedPlayerId,
     required this.roundRecords,
+    this.roundQuestionTexts = const [],
   });
+
+  String questionTextForRound(int index, {String fallback = 'Soru'}) {
+    if (index >= 0 && index < roundQuestionTexts.length) {
+      final text = roundQuestionTexts[index].trim();
+      if (text.isNotEmpty) return text;
+    }
+    return fallback;
+  }
 }
 

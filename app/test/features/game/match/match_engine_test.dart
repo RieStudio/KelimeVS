@@ -560,12 +560,48 @@ void main() {
       expect(record.winnerId, equals('p2'));
       expect(record.reason, equals(RoundEndReason.timeout));
 
-      expect(record.attempts.length, equals(5));
+      expect(record.attempts.length, equals(4));
       expect(record.attempts[0].resultType, equals(AttemptResultType.correct));
       expect(record.attempts[1].resultType, equals(AttemptResultType.nearMiss));
       expect(record.attempts[2].resultType, equals(AttemptResultType.correct));
       expect(record.attempts[3].resultType, equals(AttemptResultType.wrong));
-      expect(record.attempts[4].resultType, equals(AttemptResultType.timeout));
+    });
+
+    test('8b. Terk ve süre aşımı sonrası RoundRecord\'da boş veya sahte deneme bulunmaz', () {
+      final config = const MatchConfig(answerSeconds: 5, graceMs: 0);
+      final random = math.Random(1);
+
+      // Süre aşımı durumu
+      var res = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: sampleQuestions,
+        random: random,
+        nowMs: 1000,
+      );
+      var state = res.state;
+
+      // p1 bir cevap yazsın
+      res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'ankara', nowMs: 2000);
+      state = res.state;
+
+      // Süre aşımı olsun
+      res = MatchEngine.checkTimeout(state: state, nowMs: 10000);
+      state = res.state;
+
+      expect(state.roundHistory.first.attempts.length, equals(1));
+      expect(state.roundHistory.first.attempts.every((a) => a.rawInput.trim().isNotEmpty), isTrue);
+
+      // Terk durumu
+      res = MatchEngine.startNextRound(state: state, questions: sampleQuestions, random: random, nowMs: 11000);
+      state = res.state;
+
+      res = MatchEngine.forfeit(state: state, playerId: 'p1', nowMs: 12000);
+      state = res.state;
+
+      final forfeitRecord = state.roundHistory.last;
+      expect(forfeitRecord.attempts, isEmpty);
+      expect(forfeitRecord.reason, equals(RoundEndReason.forfeit));
     });
 
     test('9. minAnswersPerQuestion eşiğinin altındaki soru hiç seçilmez', () {

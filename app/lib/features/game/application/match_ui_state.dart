@@ -1,3 +1,4 @@
+import '../domain/history/match_history_entry.dart';
 import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
 
@@ -58,6 +59,7 @@ class MatchUiState {
   final bool isFinalReveal;
   final int roundTransitionRemainingMs;
   final int roundTransitionTotalMs;
+  final MatchHistoryEntry? lastSavedMatch;
 
   const MatchUiState({
     this.matchState,
@@ -76,6 +78,7 @@ class MatchUiState {
     this.isFinalReveal = false,
     this.roundTransitionRemainingMs = 0,
     this.roundTransitionTotalMs = 3000,
+    this.lastSavedMatch,
   });
 
   bool get isMyTurn =>
@@ -118,6 +121,7 @@ class MatchUiState {
     bool? isFinalReveal,
     int? roundTransitionRemainingMs,
     int? roundTransitionTotalMs,
+    MatchHistoryEntry? lastSavedMatch,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -138,6 +142,7 @@ class MatchUiState {
           roundTransitionRemainingMs ?? this.roundTransitionRemainingMs,
       roundTransitionTotalMs:
           roundTransitionTotalMs ?? this.roundTransitionTotalMs,
+      lastSavedMatch: lastSavedMatch ?? this.lastSavedMatch,
     );
   }
 }

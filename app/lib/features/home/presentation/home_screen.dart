@@ -18,6 +18,7 @@ import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/section_label.dart';
 import '../../../gallery/component_gallery.dart';
 import '../../game/application/match_history_provider.dart';
+import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 
 /// DESIGN.md Bölüm 7: 1) Ana Ekran
@@ -201,7 +202,11 @@ class HomeScreen extends ConsumerWidget {
                               entry: entry,
                               now: now,
                               onTap: () {
-                                // TODO: Sonraki adımda Maç Detayı ekranı açılacak.
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => MatchDetailScreen(match: entry),
+                                  ),
+                                );
                               },
                             ),
                           );
