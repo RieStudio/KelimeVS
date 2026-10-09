@@ -17,11 +17,14 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 | Konu | Karar |
 |---|---|
 | İstemci | **[KARAR]** Flutter (Dart). Önce Android; iOS yaklaşık 3–4 ay sonra, bulut derlemesiyle |
-| Backend | **[KARAR]** Firebase (yeni proje) |
-| Canlı maç durumu | **[KARAR]** Realtime Database |
-| Profil, jeton, envanter, görev, liderlik | **[KARAR]** Firestore |
-| Sunucu mantığı | **[KARAR]** Cloud Functions (TypeScript) |
-| İçerik (sorular) | **[KARAR]** Realtime Database, mevcut CMS paneli ile yönetilir |
+| Ücret ilkesi | **[KARAR]** Ücretli plana geçilmez; yalnızca ücretsiz planlar (Firebase Spark, Cloudflare Workers Free). Kota dolarsa online eşleşme geçici durur, botlu maç cihazda çalışmaya devam eder |
+| Giriş (Auth), Remote Config, bildirim (FCM), çökme takibi | **[KARAR]** Firebase (yeni proje, Spark planı) |
+| Oyun sunucusu | **[KARAR]** Cloudflare Workers + Durable Objects (TypeScript, WebSocket). Cloud Functions kullanılmaz (Blaze planı ve kart gerektirir) |
+| Canlı maç durumu | **[KARAR]** Maç başına bir Durable Object; durum sunucuda tutulur, istemciler WebSocket ile bağlanır |
+| Profil, jeton, envanter, görev, liderlik | **[KARAR]** Firestore (Spark kotaları içinde, yalnızca gerekli veri). Jeton yazımı sunucudan yapılır (Faz 5) |
+| Maç geçmişi | **[KARAR]** Telefonda yerel saklanır; sunucu maç bitince tur kayıtlarını iki oyuncuya gönderir. Firestore'a yazılmaz |
+| İçerik (sorular) | **[KARAR]** Realtime Database, mevcut CMS paneli ile yönetilir; oyun sunucusu okur |
+| Profil fotoğrafı | **[KARAR]** İlk sürümde yok (harf avatar). Cloud Storage for Firebase ücretsiz planda kullanılamaz; ileride hazır avatar seti ya da Cloudinary değerlendirilir |
 | IDE | **[KARAR]** VS Code + Antigravity (eklenti) |
 | iOS derleme | **[KARAR]** Bulut CI (Codemagic veya GitHub Actions macOS). Mac yok. Başlangıç: Android yayını sonrası |
 
@@ -49,11 +52,11 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 
 - **[KARAR]** Maçı bilerek terk eden (çıkış butonu) maçı kaybeder.
 - **[KARAR]** Bağlantı kopması: oyuncunun sırası geldiğinde süre normal işlemeye devam eder; süre dolarsa turu kaybeder. Kopan oyuncu belirli bir süre (**[VARSAYIM]** 30 sn, Remote Config'ten ayarlanır) geri dönmezse maçı terk etmiş sayılır ve rakip kazanır. Geri dönen oyuncu güncel maç durumunu sunucudan alır.
-- Realtime Database `onDisconnect` ile çevrimdışı durumu algılanır.
+- Bağlantı kopması sunucu tarafından algılanır (WebSocket kapanışı ve periyodik ping); 30 sn'lik bekleme süresi Durable Object alarmıyla sayılır.
 
 ## 4. Cevap doğrulama
 
-Doğrulama **yalnızca Cloud Functions içinde** yapılır. İstemci cevap listesini hiçbir zaman indirmez.
+Doğrulama **yalnızca oyun sunucusunda** (Cloudflare Worker / Durable Object) yapılır. İstemci cevap listesini hiçbir zaman indirmez.
 
 ### 4.1 Normalizasyon (hem oyuncu girdisi hem kayıtlı cevaplar için)
 
@@ -120,16 +123,18 @@ questions_pool: {
 ```
 
 - Anahtar ana cevaptır; dizideki değerler o cevabın kabul edilen varyantlarıdır (alias).
-- Dönüşüm **sunucuda** yapılır: Cloud Functions bu yapıyı okuyup normalleştirilmiş dahili bir dizin üretir (bölüm 4.1) ve önbelleğe alır. Her cevaba kararlı bir dahili kimlik atanır. Böylece panelin biçimi değişmeden doğrulama yapılabilir.
+- Dönüşüm **sunucuda** yapılır: Oyun sunucusu bu yapıyı Realtime Database'ten (REST, servis hesabıyla) okuyup normalleştirilmiş dahili bir dizin üretir (bölüm 4.1) ve önbelleğe alır. Her cevaba kararlı bir dahili kimlik atanır. Böylece panelin biçimi değişmeden doğrulama yapılabilir.
 - Soru metnindeki fazla boşluklar da sunucu tarafında temizlenir.
 - Kategori kimlikleri şimdilik mevcut haliyle kalır (`film_diz`, `bilim_teknoloji` gibi). Etiketler panelde tutulur.
 - **[AÇIK]** Realtime Database anahtarlarında `. $ # [ ] /` karakterleri yasaktır. Ana cevap anahtar olduğundan bu karakterleri içeren bir cevap (örn. "dr. pepper") panelde hata verebilir. Şimdilik bu karakterlerden kaçınılır; ileride gerekirse panel kodu Antigravity ile güncellenir.
 - Sunucu, içerik yüklenirken **uyarı raporu** üretir: bir cevabın varyantı başka bir cevapla çakışıyorsa ya da bir ana cevap diğerinin parçasıysa (örn. "kore" ve "güney kore") bu, içerik yöneticisine (sana) listelenir. Düzeltme gerekiyorsa soru panelden silinip doğru yapıyla yeniden eklenir ya da dışa aktarılan JSON düzenlenip içe aktarılır.
 
-### 5.2 Canlı maç (Realtime Database)
+### 5.2 Canlı maç (Durable Object)
+
+Maç durumu, maç başına bir Durable Object'in belleğinde ve SQLite deposunda tutulur:
 
 ```json
-matches/{matchId}: {
+{
   "status": "waiting | active | finished",
   "players": { "uidA": {...}, "uidB": {...} },
   "round": 1,
@@ -138,20 +143,22 @@ matches/{matchId}: {
   "turnUid": "uidA",
   "turnDeadline": 1790000000000,
   "usedAnswerIds": ["a01"],
-  "history": [ ... ]
+  "attempts": [ ... ]
 }
 ```
 
-- İstemciler `matches` altını **okuyabilir**, ama **doğrudan yazamaz**. Tüm hamleler `submitAnswer` adlı çağrılabilir Cloud Function üzerinden geçer.
+- İstemciler maça WebSocket ile bağlanır. Her istemci yalnızca **kendisine gösterilmesine izin verilen** durumu alır (yakın denemeler rakibe iletilmez, bölüm 4.3). Hamleler istemciden mesaj olarak sunucuya gönderilir; durumu yalnızca sunucu değiştirir.
+- Bağlantı, Firebase kimlik jetonuyla (ID token) doğrulanır.
+- Tur süresi sunucu alarmıyla (Durable Object alarm) izlenir.
 
 ### 5.3 Kullanıcı verisi (Firestore)
 
-`users/{uid}`: ad, avatar, jeton, istatistikler, ayarlar. `inventory`, `quests`, `leaderboards` ayrı koleksiyonlardır. Jeton değişiklikleri yalnızca sunucudan yapılır. Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) `users/{uid}/matches/{matchId}` altında saklanır; "Maç Detayı" ekranı bunu okur.
+`users/{uid}`: ad, avatar, jeton, istatistikler, ayarlar. `inventory`, `quests`, `leaderboards` ayrı koleksiyonlardır. Jeton değişiklikleri yalnızca sunucudan yapılır. Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
 
 ## 6. Eşleştirme ve bot
 
-- Oyuncu "Hızlı Maç" seçince eşleştirme havuzuna girer; sunucu iki oyuncuyu eşler.
-- **[VARSAYIM]** Belirli bir süre (örn. 8–10 sn) eşleşme bulunamazsa bot rakip devreye girer. Başlangıçta oyuncu sayısı az olacağından bu kritiktir.
+- Oyuncu "Hızlı Maç" seçince sunucudaki eşleştirme havuzuna (Durable Object) girer; sunucu iki oyuncuyu eşler.
+- **[VARSAYIM]** Belirli bir süre (örn. 8–10 sn) eşleşme bulunamazsa bot rakip devreye girer. Bot **cihazda** çalışır (sunucuya hiç gitmez), böylece sunucu kotası harcanmaz. Başlangıçta oyuncu sayısı az olacağından bu kritiktir.
 - Bot, sorunun cevap listesinden rastgele gecikmeyle (örn. 3–12 sn) ve ayarlanabilir hata olasılığıyla cevap verir.
 - **[AÇIK]** Botla oynanan maçlarda kazanılan ödül normal maçtan düşük olsun mu? Bot rakip oyuncuya belirtilsin mi?
 
@@ -174,11 +181,11 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 
 ## 9. Güvenlik ilkeleri
 
-- Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca Cloud Functions okur.
+- Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.
 - Oyun durumu ve jeton yazma yetkisi yalnızca sunucudadır.
 - Hesap silme özelliği, raporlama/engelleme mekanizması ve gizlilik politikası (KVKK/GDPR) yayın için zorunludur.
 - iOS'ta başka sosyal giriş sunulursa Sign in with Apple zorunludur.
-- Servis hesabı anahtarları ve gizli bilgiler asla repoya konmaz.
+- Servis hesabı anahtarları ve gizli bilgiler asla repoya konmaz; sunucu tarafında Cloudflare gizli değişkenleri (`wrangler secret`) kullanılır.
 
 ## 10. Platform ve yayın riskleri
 
@@ -188,7 +195,8 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 | iPhone yok | **[KARAR]** iOS aşaması ertelendi (~3–4 ay). iOS aşamasından önce bir iPhone'a erişim sağlanmalı (ödünç, ikinci el ya da TestFlight ile test edecek tanıdıklar) |
 | iOS'a geç başlamanın riski: sürprizler geç görülür | Android geliştirmesi sırasında iOS ile uyumlu paketler seçilir (Android'e özel paket kullanılmaz). Hesap gerektirmeyen imzasız derleme kontrolü bulut CI'da arada çalıştırılabilir. Apple Developer hesabı iOS aşamasının başında açılır |
 | Google Play yeni hesaplarda kapalı test şartı olabilir | Kuralları şimdiden kontrol et, planı buna göre kur |
-| Cloud Functions ödeme planı gerektirebilir | Güncel Firebase fiyat/kota şartlarını kontrol et |
+| Ücretsiz plan kotaları dolabilir (Firebase Spark, Cloudflare Free) | Kullanım izlenir. Kota aşımı otomatik ücret doğurmaz; online eşleşme geçici durur, botlu maç çalışmaya devam eder |
+| Cloudflare ücretsiz plan koşulları değişebilir | Maç motoru taşınabilir TypeScript, protokol sade tutulur; gerekirse başka bir sunucuya taşınır |
 | İçerik yetersizliği (150 soru ile başlangıç) | Yayın öncesi 30–50 sağlam kategori, sonra CMS ile büyüt |
 
 ## 11. Çalışma kuralları (Antigravity ile)
