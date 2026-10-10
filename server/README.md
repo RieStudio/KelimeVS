@@ -18,7 +18,7 @@ npm install
 
 ---
 
-## ⚙️ Yapılandırma (`.dev.vars`)
+## ⚙️ Yapılandırma (`.dev.vars` & `wrangler.jsonc`)
 
 Yerel geliştirme ortamında gizli anahtarlar ve geliştirme bayrakları `.dev.vars` dosyasında tutulur (`.gitignore` ile versiyon kontrolü dışındadır).
 
@@ -26,10 +26,16 @@ Yerel geliştirme ortamında gizli anahtarlar ve geliştirme bayrakları `.dev.v
 ```env
 ALLOW_DEV_AUTH=true
 FAST_TIMERS=true
+FIREBASE_PROJECT_ID=kelimego-dev
 ```
 
-- **`ALLOW_DEV_AUTH=true`**: Geliştirme ortamında `dev:<uid>` biçimindeki test token'larının kabul edilmesini sağlar (Örn: `dev:alice`). Üretim yapılandırmasında (`wrangler.jsonc`) asla yer almaz.
+- **`ALLOW_DEV_AUTH=true`**: Geliştirme ortamında `dev:<uid>` biçimindeki test token'larının kabul edilmesini sağlar (Örn: `dev:alice` veya `?token=dev:alice`). Üretim yapılandırmasında (`wrangler.jsonc`) asla yer almaz.
 - **`FAST_TIMERS=true`**: Testleri ve E2E akışlarını saniyeler içinde tamamlamak üzere hamle süresini (15s -> 3s), tur geçişini (2s -> 500ms) ve bağlantı kopma süresini (30s -> 3s) hızlandırır.
+- **`FIREBASE_PROJECT_ID`**: Firebase ID token doğrulaması için proje kimliği (`aud` ve `iss` eşleşmesi için zorunludur). `wrangler.jsonc` içinde varsayılan olarak `"REPLACE_WITH_FIREBASE_PROJECT_ID"` yer tutucusu bulunur. Bu değer değiştirilmeden bırakılırsa sunucu Firebase doğrulamalarını güvenli şekilde 401 ile reddeder.
+
+### 🔒 Kimlik Doğrulama ve Güvenlik (Adım 4.3b)
+- **Üretim:** İstemciler WebSocket bağlantısını başlatırken `Authorization: Bearer <firebase-id-token>` başlığını göndermelidir. URL sorgu parametresi (`?token=`) günlük güvenliği nedeniyle üretimde kesinlikle engellenir.
+- **Doğrulama:** Web Crypto (`crypto.subtle`) ile harici bağımlılık olmadan Google SecureToken JWK anahtarları üzerinden RS256 imza doğrulaması yapılır. Bellek içi anahtar önbelleği ve saldırılara karşı dakikada en fazla 1 kez anahtar yenileme hız sınırı mevcuttur.
 
 ---
 

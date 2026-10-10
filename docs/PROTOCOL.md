@@ -10,18 +10,30 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 
 ### Uç Noktalar (Endpoints)
 - **Sağlık Kontrolü (HTTP GET):** `GET /health` -> `200 OK` (`"ok"`)
-- **Eşleştirme (Matchmaking WebSocket):** `/ws/matchmaking?token=<token>`
-- **Canlı Maç Odası (Match Room WebSocket):** `/ws/match/:matchId?token=<token>`
+- **Eşleştirme (Matchmaking WebSocket):** `/ws/matchmaking`
+- **Canlı Maç Odası (Match Room WebSocket):** `/ws/match/:matchId`
 
-### Kimlik Doğrulama (Authentication)
-- Bağlantı sırasında WebSocket URL'inde `token` sorgu parametresi (`?token=...`) zorunludur.
-- **Geliştirme Modu (`ALLOW_DEV_AUTH=true`):**
+### Kimlik Doğrulama ve Jeton Taşıma (Authentication & Transport)
+- **Tercih Edilen Taşıma Yöntemi (Üretim & Standart):**
+  WebSocket yükseltme isteğinde (handshake) `Authorization: Bearer <jeton>` HTTP başlığı kullanılır.
+- **Geliştirme Modu Kolaylığı (`ALLOW_DEV_AUTH=true`):**
   - Yalnızca yerel ortamda (`.dev.vars`) tanımlıysa geçerlidir; üretimde (`wrangler.jsonc`) asla yer almaz.
-  - Token `dev:<uid>` biçimindeyse (ör. `dev:alice`), `<uid>` doğrudan kullanıcı kimliği olarak kabul edilir.
-- **Üretim Modu (Adım 4.3b):**
-  - Firebase Auth ID Token doğrulaması yapılır.
+  - Test ve geliştirme kolaylığı için URL sorgu parametresi (`?token=dev:<uid>`) kabul edilir.
+  - Geliştirme modunda olsa dahi gerçek Firebase jetonları `?token=` ile taşınamaz; başlıkla gönderilmelidir.
+- **Üretim Modu Güvenlik Kuralı:**
+  - URL'ler ara sunucu ve erişim günlüklerine (access logs) yazılabileceğinden, üretim modunda `?token=` sorgu parametresi KESİNLİKLE reddedilir (HTTP 401).
+  - Kimlik doğrulama yalnızca `Authorization: Bearer <firebase-id-token>` başlığıyla yapılır.
+- **Firebase ID Token Doğrulama Kuralları (Adım 4.3b):**
+  - **Algoritma:** Yalnızca `RS256` kabul edilir (`"none"`, `"HS256"` vb. saldırı denemeleri derhal reddedilir).
+  - **İmza:** Google'ın açık anahtarları (JWK: `https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com`) ile Web Crypto (`crypto.subtle`) kullanılarak doğrulanır.
+  - **Talepler (Claims):**
+    - `aud === env.FIREBASE_PROJECT_ID`
+    - `iss === https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`
+    - `sub`: Boş olmayan kullanıcı kimliği (1-128 karakter `uid`)
+    - `exp`: Gelecekte, `iat`: Geçmişte, `auth_time`: Geçmişte (60 saniye saat sapması toleransı).
+  - **Anahtar Önbelleği:** Bellek içi önbellek (`Cache-Control: max-age` süresince geçerli). Bilinmeyen `kid` geldiğinde dakikada en fazla 1 kez dış istek tetikleyen hız sınırı koruması mevcuttur.
 - **Hata Durumları:**
-  - Geçersiz veya eksik token: HTTP `401 Unauthorized`.
+  - Geçersiz, süresi dolmuş veya eksik token: HTTP `401 Unauthorized`.
   - Maç odasına eşleşmemiş yabancı bir kullanıcının bağlanması: HTTP `403 Forbidden`.
   - İptal edilmiş (voided) maça bağlanma: HTTP `410 Gone`.
   - Bulunamayan maç: HTTP `404 Not Found`.

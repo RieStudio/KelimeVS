@@ -1,13 +1,12 @@
-import { verifyToken } from './auth';
+import { authenticateRequest, type AuthEnv } from './auth';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 
 export { Matchmaker, MatchRoom };
 
-export interface Env {
+export interface Env extends AuthEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
-  readonly ALLOW_DEV_AUTH?: string;
   readonly FAST_TIMERS?: string;
 }
 
@@ -30,8 +29,7 @@ export default {
         return new Response('Expected WebSocket Upgrade', { status: 400 });
       }
 
-      const token = url.searchParams.get('token');
-      const uid = verifyToken(token, env);
+      const uid = await authenticateRequest(request, env);
       if (!uid) {
         return new Response('Unauthorized', { status: 401 });
       }
@@ -50,8 +48,7 @@ export default {
         return new Response('Expected WebSocket Upgrade', { status: 400 });
       }
 
-      const token = url.searchParams.get('token');
-      const uid = verifyToken(token, env);
+      const uid = await authenticateRequest(request, env);
       if (!uid) {
         return new Response('Unauthorized', { status: 401 });
       }
