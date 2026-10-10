@@ -10,7 +10,8 @@
 	"migrations": [
 		{
 			"new_sqlite_classes": [
-				"MyDurableObject"
+				"Matchmaker",
+				"MatchRoom"
 			],
 			"tag": "v1"
 		}
@@ -18,8 +19,12 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"class_name": "MyDurableObject",
-				"name": "MY_DURABLE_OBJECT"
+				"class_name": "Matchmaker",
+				"name": "MATCHMAKER"
+			},
+			{
+				"class_name": "MatchRoom",
+				"name": "MATCH_ROOM"
 			}
 		]
 	},

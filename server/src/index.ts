@@ -1,64 +1,67 @@
-import { DurableObject } from "cloudflare:workers";
+import { verifyToken } from './auth';
+import { Matchmaker } from './matchmaker';
+import { MatchRoom } from './matchRoom';
 
-/**
- * Welcome to Cloudflare Workers! This is your first Durable Objects application.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your Durable Object in action
- * - Run `npm run deploy` to publish your application
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/durable-objects
- */
+export { Matchmaker, MatchRoom };
 
-/** A Durable Object's behavior is defined in an exported Javascript class */
-export class MyDurableObject extends DurableObject<Env> {
-	/**
-	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
-	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)
-	 *
-	 * @param ctx - The interface for interacting with Durable Object state
-	 * @param env - The interface to reference bindings declared in wrangler.jsonc
-	 */
-	constructor(ctx: DurableObjectState, env: Env) {
-		super(ctx, env);
-	}
-
-	/**
-	 * The Durable Object exposes an RPC method sayHello which will be invoked when a Durable
-	 *  Object instance receives a request from a Worker via the same method invocation on the stub
-	 *
-	 * @param name - The name provided to a Durable Object instance from a Worker
-	 * @returns The greeting to be sent back to the Worker
-	 */
-	async sayHello(name: string): Promise<string> {
-		return `Hello, ${name}!`;
-	}
+export interface Env {
+  readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
+  readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
+  readonly ALLOW_DEV_AUTH?: string;
+  readonly FAST_TIMERS?: string;
 }
 
 export default {
-	/**
-	 * This is the standard fetch handler for a Cloudflare Worker
-	 *
-	 * @param request - The request submitted to the Worker from the client
-	 * @param env - The interface to reference bindings declared in wrangler.jsonc
-	 * @param ctx - The execution context of the Worker
-	 * @returns The response to be sent back to the client
-	 */
-	async fetch(request, env, ctx): Promise<Response> {
-		// Create a stub to open a communication channel with the Durable Object
-		// instance named "foo".
-		//
-		// Requests from all Workers to the Durable Object instance named "foo"
-		// will go to a single remote Durable Object instance.
-		const stub = env.MY_DURABLE_OBJECT.getByName("foo");
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
 
-		// Call the `sayHello()` RPC method on the stub to invoke the method on
-		// the remote Durable Object instance.
-		const greeting = await stub.sayHello("world");
+    // Sağlık kontrolü rotası
+    if (request.method === 'GET' && pathname === '/health') {
+      return new Response('ok', {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
 
-		return new Response(greeting);
-	},
+    // Eşleştirme WebSocket yükseltmesi: /ws/matchmaking
+    if (pathname === '/ws/matchmaking') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket Upgrade', { status: 400 });
+      }
+
+      const token = url.searchParams.get('token');
+      const uid = verifyToken(token, env);
+      if (!uid) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+
+      const matchmaker = env.MATCHMAKER.get(env.MATCHMAKER.idFromName('global'));
+      const forwardReq = new Request(request.url, request);
+      forwardReq.headers.set('X-User-Id', uid);
+      return matchmaker.fetch(forwardReq);
+    }
+
+    // Maç odası WebSocket yükseltmesi: /ws/match/:matchId
+    const matchMatch = pathname.match(/^\/ws\/match\/([a-zA-Z0-9_-]+)$/);
+    if (matchMatch) {
+      const matchId = matchMatch[1];
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket Upgrade', { status: 400 });
+      }
+
+      const token = url.searchParams.get('token');
+      const uid = verifyToken(token, env);
+      if (!uid) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+
+      const room = env.MATCH_ROOM.get(env.MATCH_ROOM.idFromName(matchId));
+      const forwardReq = new Request(request.url, request);
+      forwardReq.headers.set('X-User-Id', uid);
+      return room.fetch(forwardReq);
+    }
+
+    return new Response('Not Found', { status: 404 });
+  },
 } satisfies ExportedHandler<Env>;
