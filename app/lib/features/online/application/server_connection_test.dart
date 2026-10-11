@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../core/config/server_config.dart';
 import '../data/auth_token_provider.dart';
 import '../data/http_health_checker.dart';
@@ -85,11 +87,18 @@ class ServerConnectionTest {
 
     // 1. Aşama: GET /health kontrolü (10 sn zaman aşımı)
     final healthWatch = Stopwatch()..start();
-    try {
-      final healthUrl = ServerConfig.joinUrl(
-        _serverUrl,
-        ServerConfig.healthPath,
+    final healthUrl = ServerConfig.joinUrl(
+      _serverUrl,
+      ServerConfig.healthPath,
+    );
+    final healthUri = Uri.parse(healthUrl);
+    if (kDebugMode) {
+      debugPrint(
+        '[server-test] hedef=${healthUri.scheme}://${healthUri.host}${healthUri.path}',
       );
+    }
+
+    try {
       final body = await _healthChecker.checkHealth(
         healthUrl,
         timeout: _healthTimeout,
@@ -97,7 +106,12 @@ class ServerConnectionTest {
       healthWatch.stop();
 
       if (body != 'ok') {
-        final err = 'Beklenmeyen yanıt (beklenen: ok)';
+        const err = 'Beklenmeyen yanıt (beklenen: ok)';
+        if (kDebugMode) {
+          debugPrint(
+            '[server-test] aşama=Sağlık Kontrolü (/health) hata=HttpException mesaj=$err',
+          );
+        }
         steps.add(
           ConnectionTestStepResult(
             stepId: ConnectionTestStepId.health,
@@ -126,6 +140,11 @@ class ServerConnectionTest {
       );
     } catch (e) {
       healthWatch.stop();
+      if (kDebugMode) {
+        debugPrint(
+          '[server-test] aşama=Sağlık Kontrolü (/health) hata=${e.runtimeType} mesaj=${_safeLogMessage(e)}',
+        );
+      }
       final err = _sanitizeError(e);
       steps.add(
         ConnectionTestStepResult(
@@ -154,6 +173,11 @@ class ServerConnectionTest {
 
       if (token == null || token.isEmpty) {
         const err = 'Jeton alınamadı (oturum yok)';
+        if (kDebugMode) {
+          debugPrint(
+            '[server-test] aşama=Kimlik Jetonu Alma hata=AuthException mesaj=$err',
+          );
+        }
         steps.add(
           ConnectionTestStepResult(
             stepId: ConnectionTestStepId.token,
@@ -182,6 +206,11 @@ class ServerConnectionTest {
       );
     } catch (e) {
       tokenWatch.stop();
+      if (kDebugMode) {
+        debugPrint(
+          '[server-test] aşama=Kimlik Jetonu Alma hata=${e.runtimeType} mesaj=${_safeLogMessage(e)}',
+        );
+      }
       final err = _sanitizeError(e);
       steps.add(
         ConnectionTestStepResult(
@@ -213,6 +242,12 @@ class ServerConnectionTest {
         wsBaseUrl,
         ServerConfig.matchmakingWsPath,
       );
+      final wsUri = Uri.parse(matchmakingWsUrl);
+      if (kDebugMode) {
+        debugPrint(
+          '[server-test] hedef=${wsUri.scheme}://${wsUri.host}${wsUri.path}',
+        );
+      }
 
       try {
         connection = await _wsConnector.connect(
@@ -231,6 +266,11 @@ class ServerConnectionTest {
         );
       } catch (e) {
         wsWatch.stop();
+        if (kDebugMode) {
+          debugPrint(
+            '[server-test] aşama=WebSocket Bağlantısı hata=${e.runtimeType} mesaj=${_safeLogMessage(e)}',
+          );
+        }
         final err = _sanitizeError(e);
         steps.add(
           ConnectionTestStepResult(
@@ -298,8 +338,14 @@ class ServerConnectionTest {
             ),
           );
         } else {
-          final tVal = parsed is Map<String, dynamic> ? parsed['t'] : 'geçersiz';
+          final tVal =
+              parsed is Map<String, dynamic> ? parsed['t'] : 'geçersiz';
           final err = 'Beklenmeyen yanıt (beklenen: queued, gelen: $tVal)';
+          if (kDebugMode) {
+            debugPrint(
+              '[server-test] aşama=Kuyruğa Girme (queue) hata=FormatException mesaj=$err',
+            );
+          }
           steps.add(
             ConnectionTestStepResult(
               stepId: ConnectionTestStepId.queue,
@@ -319,6 +365,11 @@ class ServerConnectionTest {
         }
       } catch (e) {
         queueWatch.stop();
+        if (kDebugMode) {
+          debugPrint(
+            '[server-test] aşama=Kuyruğa Girme (queue) hata=${e.runtimeType} mesaj=${_safeLogMessage(e)}',
+          );
+        }
         final err = _sanitizeError(e);
         steps.add(
           ConnectionTestStepResult(
@@ -363,6 +414,11 @@ class ServerConnectionTest {
           final tVal =
               parsed is Map<String, dynamic> ? parsed['t'] : 'geçersiz';
           final err = 'Beklenmeyen yanıt (beklenen: cancelled, gelen: $tVal)';
+          if (kDebugMode) {
+            debugPrint(
+              '[server-test] aşama=Kuyruktan Çıkma (cancel) hata=FormatException mesaj=$err',
+            );
+          }
           steps.add(
             ConnectionTestStepResult(
               stepId: ConnectionTestStepId.cancel,
@@ -382,6 +438,11 @@ class ServerConnectionTest {
         }
       } catch (e) {
         cancelWatch.stop();
+        if (kDebugMode) {
+          debugPrint(
+            '[server-test] aşama=Kuyruktan Çıkma (cancel) hata=${e.runtimeType} mesaj=${_safeLogMessage(e)}',
+          );
+        }
         final err = _sanitizeError(e);
         steps.add(
           ConnectionTestStepResult(
@@ -417,6 +478,25 @@ class ServerConnectionTest {
     );
   }
 
+  /// Loglama için hassas bilgileri (jeton, sorgu parametresi) temizler.
+  static String _safeLogMessage(Object error) {
+    var msg = error.toString();
+    msg = msg.replaceAll(
+      RegExp(r'Bearer\s+[A-Za-z0-9_\-\.]+', caseSensitive: false),
+      'Bearer [REDACTED]',
+    );
+    msg = msg.replaceAll(
+      RegExp(r'token[:=]\s*[A-Za-z0-9_\-\.]+', caseSensitive: false),
+      'token=[REDACTED]',
+    );
+    msg = msg.replaceAll(
+      RegExp(r'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'),
+      '[REDACTED_JWT]',
+    );
+    msg = msg.replaceAll(RegExp(r'\?[^#\s\)]*'), '');
+    return msg;
+  }
+
   /// Hataları güvenli, jeton ve hassas bilgi içermeyen net kategorilere dönüştürür.
   static String _sanitizeError(Object error) {
     if (error is TimeoutException) {
@@ -425,6 +505,7 @@ class ServerConnectionTest {
     if (error is SocketException) {
       final msg = error.message.toLowerCase();
       final osMsg = error.osError?.message.toLowerCase() ?? '';
+      final osCode = error.osError?.errorCode;
       if (msg.contains('failed host lookup') ||
           osMsg.contains('failed host lookup') ||
           msg.contains('nodename nor servname')) {
@@ -435,7 +516,25 @@ class ServerConnectionTest {
           osMsg.contains('connection refused')) {
         return 'Ağ yok / bağlantı kurulamadı';
       }
+      if (msg.contains('connection reset') ||
+          osMsg.contains('connection reset') ||
+          osCode == 104 ||
+          osCode == 10054) {
+        return 'Bağlantı sıfırlandı (engellendi / reset)';
+      }
       return 'Ağ hatası';
+    }
+    if (error is HandshakeException ||
+        error is TlsException ||
+        error is CertificateException) {
+      final msg = error.toString().toLowerCase();
+      if (msg.contains('connection reset') || msg.contains('closed')) {
+        return 'TLS bağlantısı sıfırlandı (engellendi)';
+      }
+      if (msg.contains('cert') || msg.contains('verify_failed')) {
+        return 'TLS / Sertifika doğrulama hatası';
+      }
+      return 'TLS el sıkışma hatası';
     }
     if (error is HttpException) {
       if (error.message.contains('401')) {
@@ -449,6 +548,15 @@ class ServerConnectionTest {
       }
       return 'WebSocket bağlantı hatası';
     }
+    if (error is FormatException) {
+      return 'Geçersiz veri biçimi';
+    }
+    if (error is StateError) {
+      return 'Geçersiz durum hatası';
+    }
+    if (error is TypeError) {
+      return 'Veri tipi uyuşmazlığı';
+    }
 
     final str = error.toString().toLowerCase();
     if (str.contains('401') || str.contains('unauthorized')) {
@@ -459,6 +567,12 @@ class ServerConnectionTest {
     }
     if (str.contains('failed host lookup')) {
       return 'DNS / sunucu erişilemiyor';
+    }
+    if (str.contains('connection reset')) {
+      return 'Bağlantı sıfırlandı (engellendi / reset)';
+    }
+    if (str.contains('handshake') || str.contains('certificate')) {
+      return 'TLS el sıkışma hatası';
     }
     if (str.contains('socket') || str.contains('network')) {
       return 'Ağ hatası';

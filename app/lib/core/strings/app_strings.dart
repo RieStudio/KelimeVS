@@ -143,5 +143,10 @@ abstract final class AppStrings {
   static const String serverTestTitle = 'Sunucu Bağlantı Testi';
   static const String serverTestSuccessSummary = 'Tüm testler başarılı!';
   static const String serverTestFailedSummary = 'Bağlantı testi başarısız oldu';
+
+  // Ağ Tanılama (Debug)
+  static const String networkDiagnosticsButton = 'Ağ Tanılama';
+  static const String networkDiagnosticsRunning = 'Ağ test ediliyor…';
+  static const String networkDiagnosticsTitle = 'Ağ Tanılama Sonuçları';
 }
 

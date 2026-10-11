@@ -12,6 +12,7 @@ import '../features/dev/match_test_page.dart';
 import '../features/dev/question_test_page.dart';
 import '../features/game/application/match_providers.dart';
 import '../features/game/presentation/match_screen.dart';
+import '../features/online/application/network_diagnostics.dart';
 import '../features/online/application/server_connection_test.dart';
 
 /// Geliştirme sürecinde tasarım altyapısını ve tüm bileşenleri
@@ -19,11 +20,13 @@ import '../features/online/application/server_connection_test.dart';
 class ComponentGallery extends StatelessWidget {
   final String? authError;
   final ServerConnectionTest? serverConnectionTest;
+  final NetworkDiagnostics? networkDiagnostics;
 
   const ComponentGallery({
     super.key,
     this.authError,
     this.serverConnectionTest,
+    this.networkDiagnostics,
   });
 
   String get _currentUid {
@@ -339,6 +342,10 @@ class ComponentGallery extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.space10),
               ServerTestDebugWidget(testService: serverConnectionTest),
+              const SizedBox(height: AppDimens.space10),
+              NetworkDiagnosticsDebugWidget(
+                diagnosticsService: networkDiagnostics,
+              ),
               const SizedBox(height: AppDimens.space24),
             ],
           ],
@@ -525,6 +532,120 @@ class _ServerTestDebugWidgetState extends State<ServerTestDebugWidget> {
                         ? AppColors.ink
                         : AppColors.dangerDark,
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Geliştirici modu için ağ tanılama testini çalıştıran ve
+/// hedef sonuçlarını gösteren bileşen.
+class NetworkDiagnosticsDebugWidget extends StatefulWidget {
+  final NetworkDiagnostics? diagnosticsService;
+
+  const NetworkDiagnosticsDebugWidget({
+    super.key,
+    this.diagnosticsService,
+  });
+
+  @override
+  State<NetworkDiagnosticsDebugWidget> createState() =>
+      _NetworkDiagnosticsDebugWidgetState();
+}
+
+class _NetworkDiagnosticsDebugWidgetState
+    extends State<NetworkDiagnosticsDebugWidget> {
+  bool _isRunning = false;
+  NetworkDiagnosticsReport? _report;
+
+  Future<void> _runDiagnostics() async {
+    if (_isRunning) return;
+    setState(() {
+      _isRunning = true;
+      _report = null;
+    });
+
+    try {
+      final service = widget.diagnosticsService ?? const NetworkDiagnostics();
+      final report = await service.run();
+      if (mounted) {
+        setState(() {
+          _report = report;
+          _isRunning = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isRunning = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SecondaryButton(
+          text: _isRunning
+              ? AppStrings.networkDiagnosticsRunning
+              : AppStrings.networkDiagnosticsButton,
+          onPressed: _isRunning ? null : _runDiagnostics,
+        ),
+        if (_report != null) ...[
+          const SizedBox(height: AppDimens.space10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppDimens.space12),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppDimens.borderRadiusCardLarge,
+              border: Border.all(
+                color: AppColors.ink,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppStrings.networkDiagnosticsTitle,
+                  style: AppTextStyles.secondaryText.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: AppDimens.space8),
+                for (final result in _report!.results)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppDimens.space4,
+                    ),
+                    child: Text(
+                      result.summaryLine,
+                      style: AppTextStyles.secondaryText.copyWith(
+                        color: result.isSuccess
+                            ? AppColors.ink
+                            : AppColors.dangerDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  'Toplam süre: ${_report!.totalDurationMs} ms',
+                  style: AppTextStyles.secondaryText.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],

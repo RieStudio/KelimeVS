@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// Sunucu sağlık kontrolünü (GET /health) yürüten soyut arayüz.
 abstract interface class HttpHealthChecker {
   /// [url] adresine GET isteği atarak gövdeyi metin olarak döndürür.
@@ -20,13 +22,46 @@ class IoHttpHealthChecker implements HttpHealthChecker {
     String url, {
     Duration timeout = const Duration(seconds: 10),
   }) async {
-    final client = HttpClient();
+    final uri = Uri.parse(url);
+
+    if (kDebugMode) {
+      try {
+        final addresses = await InternetAddress.lookup(uri.host);
+        final ipv4 = addresses
+            .where((a) => a.type == InternetAddressType.IPv4)
+            .length;
+        final ipv6 = addresses
+            .where((a) => a.type == InternetAddressType.IPv6)
+            .length;
+        debugPrint(
+          '[server-test] dns: host=${uri.host} ipv4=$ipv4 ipv6=$ipv6',
+        );
+      } catch (e) {
+        debugPrint(
+          '[server-test] dns: host=${uri.host} hata=${e.runtimeType} mesaj=$e',
+        );
+      }
+    }
+
+    final client = HttpClient()..connectionTimeout = timeout;
+    if (kDebugMode) {
+      debugPrint(
+        '[server-test] http_client: connectionTimeout=${client.connectionTimeout}',
+      );
+    }
+
     try {
-      final uri = Uri.parse(url);
       final request = await client.getUrl(uri).timeout(timeout);
       final response = await request.close().timeout(timeout);
       final responseBody =
           await response.transform(utf8.decoder).join().timeout(timeout);
+
+      if (kDebugMode) {
+        debugPrint(
+          '[server-test] yanıt: status=${response.statusCode} len=${responseBody.length}',
+        );
+      }
+
       if (response.statusCode != 200) {
         throw HttpException('HTTP ${response.statusCode}');
       }

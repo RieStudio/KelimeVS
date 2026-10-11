@@ -237,6 +237,81 @@ void main() {
       expect(fakeConn.isClosed, isTrue);
     });
 
+    test('GET /health bağlantı sıfırlandığında (TCP reset/errno 104) net hata bildirir', () async {
+      final fakeHealth = FakeHttpHealthChecker(
+        errorToThrow: const SocketException(
+          'Connection reset by peer',
+          osError: OSError('Connection reset by peer', 104),
+        ),
+      );
+      final service = ServerConnectionTest(
+        healthChecker: fakeHealth,
+        tokenProvider: FakeAuthTokenProvider(token: sensitiveToken),
+        wsConnector: FakeWebSocketConnector(),
+        serverUrl: serverUrl,
+      );
+
+      final report = await service.run();
+
+      expect(report.isOverallSuccess, isFalse);
+      expect(report.steps[0].errorMessage, 'Bağlantı sıfırlandı (engellendi / reset)');
+    });
+
+    test('GET /health TLS el sıkışma / handshake hatasında net hata bildirir', () async {
+      final fakeHealth = FakeHttpHealthChecker(
+        errorToThrow: const HandshakeException(
+          'Handshake error in client (OS Error: Connection reset by peer)',
+        ),
+      );
+      final service = ServerConnectionTest(
+        healthChecker: fakeHealth,
+        tokenProvider: FakeAuthTokenProvider(token: sensitiveToken),
+        wsConnector: FakeWebSocketConnector(),
+        serverUrl: serverUrl,
+      );
+
+      final report = await service.run();
+
+      expect(report.isOverallSuccess, isFalse);
+      expect(report.steps[0].errorMessage, 'TLS bağlantısı sıfırlandı (engellendi)');
+    });
+
+    test('GET /health sertifika doğrulama hatasında açık hata bildirir', () async {
+      final fakeHealth = FakeHttpHealthChecker(
+        errorToThrow: const HandshakeException(
+          'Handshake error in client (CERTIFICATE_VERIFY_FAILED: self signed certificate)',
+        ),
+      );
+      final service = ServerConnectionTest(
+        healthChecker: fakeHealth,
+        tokenProvider: FakeAuthTokenProvider(token: sensitiveToken),
+        wsConnector: FakeWebSocketConnector(),
+        serverUrl: serverUrl,
+      );
+
+      final report = await service.run();
+
+      expect(report.isOverallSuccess, isFalse);
+      expect(report.steps[0].errorMessage, 'TLS / Sertifika doğrulama hatası');
+    });
+
+    test('GET /health geçersiz veri biçimi / FormatException hatasında net hata bildirir', () async {
+      final fakeHealth = FakeHttpHealthChecker(
+        errorToThrow: const FormatException('Invalid UTF-8 encoding'),
+      );
+      final service = ServerConnectionTest(
+        healthChecker: fakeHealth,
+        tokenProvider: FakeAuthTokenProvider(token: sensitiveToken),
+        wsConnector: FakeWebSocketConnector(),
+        serverUrl: serverUrl,
+      );
+
+      final report = await service.run();
+
+      expect(report.isOverallSuccess, isFalse);
+      expect(report.steps[0].errorMessage, 'Geçersiz veri biçimi');
+    });
+
     test('GÜVENLİK KURALI: sonuç ve hata metinlerinde jeton, sorgu parametresi ve hassas bilgi bulunamaz', () async {
       // Birkaç hata durumu ve başarılı durumu döngüyle sına
       final scenarios = <Future<ServerConnectionTestReport>>[
