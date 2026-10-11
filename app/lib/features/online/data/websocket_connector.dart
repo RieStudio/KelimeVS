@@ -11,6 +11,12 @@ abstract interface class WebSocketConnection {
 
   /// WebSocket bağlantısını kapatır.
   Future<void> close([int? code, String? reason]);
+
+  /// Bağlantı kapandığında sunucu veya istemci tarafından belirlenen kapanış kodu.
+  int? get closeCode;
+
+  /// Bağlantı kapandığında sunucu veya istemci tarafından belirlenen kapanış gerekçesi.
+  String? get closeReason;
 }
 
 /// WebSocket bağlantısı kuran fabrika / bağlayıcı arayüzü.
@@ -41,6 +47,12 @@ class IoWebSocketConnection implements WebSocketConnection {
   Future<void> close([int? code, String? reason]) {
     return _socket.close(code, reason);
   }
+
+  @override
+  int? get closeCode => _socket.closeCode;
+
+  @override
+  String? get closeReason => _socket.closeReason;
 }
 
 /// Gerçek `dart:io` WebSocket kütüphanesini kullanan [WebSocketConnector].
@@ -69,7 +81,10 @@ class FakeWebSocketConnection implements WebSocketConnection {
       StreamController<dynamic>.broadcast(sync: true);
   final List<String> sentMessages = [];
   bool isClosed = false;
+  @override
   int? closeCode;
+
+  @override
   String? closeReason;
 
   void Function(String message)? onSend;
@@ -97,6 +112,16 @@ class FakeWebSocketConnection implements WebSocketConnection {
   void emitError(Object error) {
     if (!_controller.isClosed) {
       _controller.addError(error);
+    }
+  }
+
+  /// Sunucu tarafından bağlantının kapatıldığını simüle eder.
+  void simulateServerClose([int? code, String? reason]) {
+    isClosed = true;
+    closeCode = code;
+    closeReason = reason;
+    if (!_controller.isClosed) {
+      unawaited(_controller.close());
     }
   }
 

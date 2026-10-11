@@ -9,6 +9,7 @@ import '../core/theme/app_dimens.dart';
 import '../core/theme/app_text_styles.dart';
 import '../core/widgets/app_widgets.dart';
 import '../features/dev/match_test_page.dart';
+import '../features/dev/online_test_page.dart';
 import '../features/dev/question_test_page.dart';
 import '../features/game/application/match_providers.dart';
 import '../features/game/presentation/match_screen.dart';
@@ -339,6 +340,17 @@ class ComponentGallery extends StatelessWidget {
                     );
                   },
                 ),
+              ),
+              const SizedBox(height: AppDimens.space10),
+              SecondaryButton(
+                text: AppStrings.onlineTestButton,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const OnlineTestPage(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: AppDimens.space10),
               ServerTestDebugWidget(testService: serverConnectionTest),

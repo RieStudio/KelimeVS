@@ -148,5 +148,8 @@ abstract final class AppStrings {
   static const String networkDiagnosticsButton = 'Ağ Tanılama';
   static const String networkDiagnosticsRunning = 'Ağ test ediliyor…';
   static const String networkDiagnosticsTitle = 'Ağ Tanılama Sonuçları';
+
+  // Online Protokol Testi (Debug)
+  static const String onlineTestButton = 'Online test';
 }
 
