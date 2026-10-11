@@ -5,6 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "e2e": "tsx tools/e2e.ts",
+    "check:content": "tsx tools/check-content.ts",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",

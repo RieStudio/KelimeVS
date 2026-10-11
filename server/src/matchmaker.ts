@@ -1,5 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DevContentProvider } from './content/devContentProvider';
+import {
+  type ContentProvider,
+  DevContentProvider,
+  RealtimeDbContentProvider,
+} from './content';
 import type { Question } from './engine';
 import { parseMatchmakerMessage, type MatchmakerServerMessage } from './protocol';
 import type { Env } from './index';
@@ -10,9 +14,9 @@ export interface QueueEntry {
   readonly joinedAt: number;
 }
 
-function shuffleQuestions(questions: readonly Question[]): string[] {
+export function selectAndShuffleEightQuestions(questions: readonly Question[]): Question[] {
   const arr = [...questions];
-  if (arr.length <= 1) return arr.map((q) => q.id);
+  if (arr.length <= 1) return arr;
 
   const randomBuffer = new Uint32Array(arr.length);
   crypto.getRandomValues(randomBuffer);
@@ -22,15 +26,44 @@ function shuffleQuestions(questions: readonly Question[]): string[] {
     arr[i] = arr[j];
     arr[j] = tmp;
   }
-  return arr.slice(0, 8).map((q) => q.id);
+  return arr.slice(0, 8);
+}
+
+export function createContentProvider(env: Env): ContentProvider {
+  // CONTENT_SOURCE yalnızca "dev" olabilir ve YALNIZCA ALLOW_DEV_AUTH === "true" iken dikkate alınır
+  if (env.ALLOW_DEV_AUTH === 'true' && env.CONTENT_SOURCE === 'dev') {
+    return new DevContentProvider();
+  }
+
+  const dbUrl = env.FIREBASE_DATABASE_URL?.trim();
+  if (!dbUrl || dbUrl === 'REPLACE_WITH_FIREBASE_DATABASE_URL') {
+    throw new Error(
+      'RealtimeDbContentProvider configuration error: FIREBASE_DATABASE_URL is missing or placeholder.'
+    );
+  }
+
+  const serviceAccountB64 = env.FIREBASE_SERVICE_ACCOUNT_B64?.trim();
+  if (!serviceAccountB64) {
+    throw new Error(
+      'RealtimeDbContentProvider configuration error: FIREBASE_SERVICE_ACCOUNT_B64 is missing.'
+    );
+  }
+
+  const ttlSeconds = parseInt(env.CONTENT_TTL_SECONDS ?? '3600', 10);
+  return new RealtimeDbContentProvider({
+    databaseUrl: dbUrl,
+    serviceAccountB64,
+    ttlSeconds: Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : 3600,
+  });
 }
 
 export class Matchmaker extends DurableObject<Env> {
   private queue: QueueEntry[] = [];
-  private contentProvider = new DevContentProvider();
+  private contentProvider: ContentProvider;
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState, env: Env, customProvider?: ContentProvider) {
     super(ctx, env);
+    this.contentProvider = customProvider ?? createContentProvider(env);
     this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<QueueEntry[]>('queue');
       if (stored) {
@@ -158,16 +191,47 @@ export class Matchmaker extends DurableObject<Env> {
       this.queue.splice(0, 2);
       await this.ctx.storage.put('queue', this.queue);
 
-      const matchId = crypto.randomUUID();
-      const allQuestions = await this.contentProvider.getQuestions();
-      const questionOrder = shuffleQuestions(allQuestions);
+      let allQuestions: Question[];
+      try {
+        allQuestions = await this.contentProvider.getQuestions();
+      } catch {
+        allQuestions = [];
+      }
 
-      // MatchRoom'u başlat
+      if (!allQuestions || allQuestions.length < 8) {
+        // İçerik alınamazsa veya 8'den az soru varsa:
+        // Kuyruktaki iki oyuncuya {"t":"error","code":"content_unavailable"} gönder,
+        // kuyruktan çıkar, bağlantıyı kapat.
+        const p1Sockets = this.ctx.getWebSockets(p1.uid);
+        const p2Sockets = this.ctx.getWebSockets(p2.uid);
+        const errMsg: MatchmakerServerMessage = {
+          t: 'error',
+          code: 'content_unavailable',
+        };
+        const errJson = JSON.stringify(errMsg);
+
+        for (const s of [...p1Sockets, ...p2Sockets]) {
+          try {
+            s.send(errJson);
+            s.close(1008, 'content_unavailable');
+          } catch {
+            // yoksay
+          }
+        }
+        continue;
+      }
+
+      const matchId = crypto.randomUUID();
+      const selectedQuestions = selectAndShuffleEightQuestions(allQuestions);
+      const questionOrder = selectedQuestions.map((q) => q.id);
+
+      // MatchRoom'u başlat (yalnızca seçilen 8 soru tam verisiyle aktarılır)
       const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
       await roomStub.initMatch({
         matchId,
         p1: { uid: p1.uid, name: p1.name },
         p2: { uid: p2.uid, name: p2.name },
+        questions: selectedQuestions,
         questionOrder,
       });
 

@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import type { QueueEntry } from '../src/matchmaker';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class {},
+}));
+
+import {
+  selectAndShuffleEightQuestions,
+  createContentProvider,
+  type QueueEntry,
+} from '../src/matchmaker';
+import { DevContentProvider } from '../src/content';
+import type { Question } from '../src/engine';
+import type { Env } from '../src/index';
 
 describe('Matchmaker Queue Logic (FIFO, Dedup, Cancel)', () => {
   it('FIFO sırasıyla oyuncuları eşleştirir', () => {
@@ -70,4 +82,63 @@ describe('Matchmaker Queue Logic (FIFO, Dedup, Cancel)', () => {
     expect(queue[1].uid).toBe('u2');
   });
 });
+
+describe('Matchmaker Question Selection & Content Source Rules', () => {
+  it('selectAndShuffleEightQuestions: havuzdan 8 soru seçer', () => {
+    const mockQuestions: Question[] = Array.from({ length: 15 }, (_, i) => ({
+      id: `q_${i}`,
+      categoryId: 'cat_1',
+      text: `Soru ${i}`,
+      answers: [{ id: `a_${i}`, display: `Cevap ${i}`, aliases: [`a_${i}`] }],
+    }));
+
+    const selected = selectAndShuffleEightQuestions(mockQuestions);
+    expect(selected.length).toBe(8);
+    // Seçilenlerin hepsi benzersiz olmalı
+    const ids = new Set(selected.map((q) => q.id));
+    expect(ids.size).toBe(8);
+  });
+
+  it('createContentProvider: ALLOW_DEV_AUTH=true ve CONTENT_SOURCE=dev iken DevContentProvider döner', () => {
+    const env = {
+      ALLOW_DEV_AUTH: 'true',
+      CONTENT_SOURCE: 'dev',
+    } as unknown as Env;
+
+    const provider = createContentProvider(env);
+    expect(provider).toBeInstanceOf(DevContentProvider);
+  });
+
+  it('createContentProvider: ALLOW_DEV_AUTH yoksa veya false ise CONTENT_SOURCE=dev olsa bile dev kaynak kabul edilmez (RealtimeDb aranır)', () => {
+    const env = {
+      CONTENT_SOURCE: 'dev',
+    } as unknown as Env;
+
+    // RealtimeDb config olmadığı için hata fırlatmalı
+    expect(() => createContentProvider(env)).toThrow(
+      'RealtimeDbContentProvider configuration error: FIREBASE_DATABASE_URL is missing or placeholder.'
+    );
+  });
+
+  it('createContentProvider: FIREBASE_DATABASE_URL eksik veya yer tutucu ise açık hata verir', () => {
+    const envMissing = {
+      FIREBASE_SERVICE_ACCOUNT_B64: 'fake_sa',
+    } as unknown as Env;
+    expect(() => createContentProvider(envMissing)).toThrow('FIREBASE_DATABASE_URL is missing');
+
+    const envPlaceholder = {
+      FIREBASE_DATABASE_URL: 'REPLACE_WITH_FIREBASE_DATABASE_URL',
+      FIREBASE_SERVICE_ACCOUNT_B64: 'fake_sa',
+    } as unknown as Env;
+    expect(() => createContentProvider(envPlaceholder)).toThrow('FIREBASE_DATABASE_URL is missing or placeholder');
+  });
+
+  it('createContentProvider: FIREBASE_SERVICE_ACCOUNT_B64 eksikse açık hata verir', () => {
+    const env = {
+      FIREBASE_DATABASE_URL: 'https://test-db.firebaseio.com',
+    } as unknown as Env;
+    expect(() => createContentProvider(env)).toThrow('FIREBASE_SERVICE_ACCOUNT_B64 is missing');
+  });
+});
+
 

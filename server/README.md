@@ -26,16 +26,30 @@ Yerel geliştirme ortamında gizli anahtarlar ve geliştirme bayrakları `.dev.v
 ```env
 ALLOW_DEV_AUTH=true
 FAST_TIMERS=true
-FIREBASE_PROJECT_ID=kelimego-dev
+FIREBASE_PROJECT_ID=kelimegov2
+CONTENT_SOURCE=dev
+FIREBASE_DATABASE_URL=https://kelimegov2-default-rtdb.europe-west1.firebasedatabase.app
+CONTENT_TTL_SECONDS=3600
+FIREBASE_SERVICE_ACCOUNT_B64=<base64-encoded-service-account-json>
 ```
 
 - **`ALLOW_DEV_AUTH=true`**: Geliştirme ortamında `dev:<uid>` biçimindeki test token'larının kabul edilmesini sağlar (Örn: `dev:alice` veya `?token=dev:alice`). Üretim yapılandırmasında (`wrangler.jsonc`) asla yer almaz.
 - **`FAST_TIMERS=true`**: Testleri ve E2E akışlarını saniyeler içinde tamamlamak üzere hamle süresini (15s -> 3s), tur geçişini (2s -> 500ms) ve bağlantı kopma süresini (30s -> 3s) hızlandırır.
-- **`FIREBASE_PROJECT_ID`**: Firebase ID token doğrulaması için proje kimliği (`aud` ve `iss` eşleşmesi için zorunludur). `wrangler.jsonc` içinde varsayılan olarak `"REPLACE_WITH_FIREBASE_PROJECT_ID"` yer tutucusu bulunur. Bu değer değiştirilmeden bırakılırsa sunucu Firebase doğrulamalarını güvenli şekilde 401 ile reddeder.
+- **`CONTENT_SOURCE`**: Yalnızca `"dev"` değeri alabilir ve YALNIZCA `ALLOW_DEV_AUTH=true` iken dikkate alınır (bu durumda yerel `DevContentProvider` çalışır, E2E testleri internetsiz çalışabilir). Aksi halde veya üretimde her zaman `RealtimeDbContentProvider` kullanılır.
+- **`FIREBASE_DATABASE_URL`**: Firebase Realtime Database kök adresi.
+- **`CONTENT_TTL_SECONDS`**: Bellek içi soru havuzu önbellek süresi (saniye cinsinden, varsayılan 3600).
+- **`FIREBASE_SERVICE_ACCOUNT_B64`**: Sunucunun Realtime Database REST API'sine erişmek için kullandığı Google servis hesabı JSON dosyasının Base64 hali.
 
-### 🔒 Kimlik Doğrulama ve Güvenlik (Adım 4.3b)
-- **Üretim:** İstemciler WebSocket bağlantısını başlatırken `Authorization: Bearer <firebase-id-token>` başlığını göndermelidir. URL sorgu parametresi (`?token=`) günlük güvenliği nedeniyle üretimde kesinlikle engellenir.
-- **Doğrulama:** Web Crypto (`crypto.subtle`) ile harici bağımlılık olmadan Google SecureToken JWK anahtarları üzerinden RS256 imza doğrulaması yapılır. Bellek içi anahtar önbelleği ve saldırılara karşı dakikada en fazla 1 kez anahtar yenileme hız sınırı mevcuttur.
+### 🔒 Güvenlik İlkeleri ve IAM Rolleri (Adım 4.4)
+- **Loglama Güvenliği:** Servis hesabı içeriği, access token'lar, JWT assertion'lar ve soru/cevap metinleri ASLA loglara yazılmaz.
+- **En Az Yetki İlkesi (Least Privilege):** İleride Google Cloud IAM üzerinde üretim için yalnızca **"Firebase Realtime Database Viewer"** rolüne sahip, yazma yetkisi olmayan ayrı ve kısıtlı bir servis hesabına geçilecektir.
+
+### 🔍 Canlı Veritabanı İçerik Kontrolü
+Yerel `.dev.vars` dosyasındaki servis hesabı ve veritabanı ayarlarını canlıda test etmek için:
+```bash
+npm run check:content
+```
+Bu araç, gerçek veritabanına bağlanır, yetkilendirme yöntemini (`Authorization: Bearer` başlığı), kategori sayısını, geçerli soru ve cevap sayılarını özetler (soru/cevap içeriklerini yazdırmaz).
 
 ---
 

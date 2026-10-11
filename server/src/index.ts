@@ -8,6 +8,10 @@ export interface Env extends AuthEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly FAST_TIMERS?: string;
+  readonly CONTENT_SOURCE?: string;
+  readonly FIREBASE_DATABASE_URL?: string;
+  readonly FIREBASE_SERVICE_ACCOUNT_B64?: string;
+  readonly CONTENT_TTL_SECONDS?: string;
 }
 
 export default {

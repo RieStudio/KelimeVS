@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
-import { DevContentProvider } from './content/devContentProvider';
 import {
   MatchEngine,
   type MatchConfig,
+  type Question,
 } from './engine';
 import {
   parseMatchRoomMessage,
@@ -34,6 +34,7 @@ export interface MatchRoomInitParams {
   readonly matchId: string;
   readonly p1: PlayerInfo;
   readonly p2: PlayerInfo;
+  readonly questions: readonly Question[];
   readonly questionOrder: readonly string[];
 }
 
@@ -41,6 +42,7 @@ interface StoredRoomData {
   readonly matchId: string;
   readonly p1: PlayerInfo;
   readonly p2: PlayerInfo;
+  readonly questions: Question[];
   readonly questionOrder: string[];
   readonly status: 'waiting_for_players' | 'active' | 'finished' | 'voided';
   readonly engineState?: SerializedMatchState;
@@ -50,7 +52,6 @@ interface StoredRoomData {
 
 export class MatchRoom extends DurableObject<Env> {
   private data: StoredRoomData | null = null;
-  private contentProvider = new DevContentProvider();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -76,6 +77,7 @@ export class MatchRoom extends DurableObject<Env> {
       matchId: params.matchId,
       p1: params.p1,
       p2: params.p2,
+      questions: [...params.questions],
       questionOrder: [...params.questionOrder],
       status: 'waiting_for_players',
       schedule: { connectTimeoutAtMs },
@@ -183,7 +185,7 @@ export class MatchRoom extends DurableObject<Env> {
 
     if (parsed.t === 'submit') {
       const state = deserializeMatchState(this.data.engineState);
-      const questions = await this.contentProvider.getQuestions();
+      const questions = this.data.questions;
       const res = MatchEngine.submit({
         state,
         playerId: uid,
@@ -344,7 +346,7 @@ export class MatchRoom extends DurableObject<Env> {
       } else if (action === 'startNextRound') {
         if (this.data.status === 'active' && this.data.engineState) {
           const state = deserializeMatchState(this.data.engineState);
-          const questions = await this.contentProvider.getQuestions();
+          const questions = this.data.questions;
           const res = MatchEngine.startNextRound({
             state,
             questions,
@@ -395,7 +397,7 @@ export class MatchRoom extends DurableObject<Env> {
         };
 
         const nowMs = Date.now();
-        const questions = await this.contentProvider.getQuestions();
+        const questions = this.data.questions;
         const res = MatchEngine.start({
           config,
           playerIds: [this.data.p1.uid, this.data.p2.uid],

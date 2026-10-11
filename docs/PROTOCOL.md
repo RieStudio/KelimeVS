@@ -90,9 +90,12 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 ```json
 {
   "t": "error",
-  "code": "already_queued"
+  "code": "content_unavailable"
 }
 ```
+- Olası `code` değerleri:
+  - `"content_unavailable"`: Veritabanından soru havuzu alınamadığında veya maç başlatmak için en az 8 uygun soru bulunamadığında her iki oyuncuya gönderilir. Sunucu oyuncuları kuyruktan çıkarır ve bağlantıyı kapatır. İstemci bu hatayı aldığında kullanıcıya uyarı gösterip botlu maça yönlendirebilir.
+  - `"already_queued"`: Oyuncunun halihazırda aktif bir kuyruk kaydı varken mükerrer kuyruk isteği geldiğinde gönderilir.
 
 ---
 
