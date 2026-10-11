@@ -12,15 +12,18 @@ import '../features/dev/match_test_page.dart';
 import '../features/dev/question_test_page.dart';
 import '../features/game/application/match_providers.dart';
 import '../features/game/presentation/match_screen.dart';
+import '../features/online/application/server_connection_test.dart';
 
 /// Geliştirme sürecinde tasarım altyapısını ve tüm bileşenleri
 /// canlı olarak incelemek için kullanılan galeri ekranı.
 class ComponentGallery extends StatelessWidget {
   final String? authError;
+  final ServerConnectionTest? serverConnectionTest;
 
   const ComponentGallery({
     super.key,
     this.authError,
+    this.serverConnectionTest,
   });
 
   String get _currentUid {
@@ -334,6 +337,8 @@ class ComponentGallery extends StatelessWidget {
                   },
                 ),
               ),
+              const SizedBox(height: AppDimens.space10),
+              ServerTestDebugWidget(testService: serverConnectionTest),
               const SizedBox(height: AppDimens.space24),
             ],
           ],
@@ -415,6 +420,118 @@ class _IconItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Geliştirici modu için sunucu bağlantı testini çalıştıran ve
+/// aşama sonuçlarını gösteren bileşen.
+class ServerTestDebugWidget extends StatefulWidget {
+  final ServerConnectionTest? testService;
+
+  const ServerTestDebugWidget({
+    super.key,
+    this.testService,
+  });
+
+  @override
+  State<ServerTestDebugWidget> createState() => _ServerTestDebugWidgetState();
+}
+
+class _ServerTestDebugWidgetState extends State<ServerTestDebugWidget> {
+  bool _isRunning = false;
+  ServerConnectionTestReport? _report;
+
+  Future<void> _runTest() async {
+    if (_isRunning) return;
+    setState(() {
+      _isRunning = true;
+      _report = null;
+    });
+
+    try {
+      final service = widget.testService ?? ServerConnectionTest();
+      final report = await service.run();
+      if (mounted) {
+        setState(() {
+          _report = report;
+          _isRunning = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isRunning = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SecondaryButton(
+          text: _isRunning
+              ? AppStrings.serverTestRunning
+              : AppStrings.serverTestButton,
+          onPressed: _isRunning ? null : _runTest,
+        ),
+        if (_report != null) ...[
+          const SizedBox(height: AppDimens.space10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppDimens.space12),
+            decoration: BoxDecoration(
+              color: _report!.isOverallSuccess
+                  ? AppColors.card
+                  : AppColors.dangerSurface,
+              borderRadius: AppDimens.borderRadiusCardLarge,
+              border: Border.all(
+                color: _report!.isOverallSuccess
+                  ? AppColors.ink
+                  : AppColors.dangerDark,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final step in _report!.steps)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppDimens.space4,
+                    ),
+                    child: Text(
+                      '${step.stepName}: ${step.isSuccess ? 'Tamam' : 'HATA (${step.errorMessage})'} (${step.durationMs} ms)',
+                      style: AppTextStyles.secondaryText.copyWith(
+                        color: step.isSuccess
+                            ? AppColors.ink
+                            : AppColors.dangerDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: AppDimens.space8),
+                Text(
+                  _report!.isOverallSuccess
+                      ? '${AppStrings.serverTestSuccessSummary} (${_report!.totalDurationMs} ms)'
+                      : '${AppStrings.serverTestFailedSummary}: ${_report!.failureMessage ?? ''}',
+                  style: AppTextStyles.secondaryText.copyWith(
+                    color: _report!.isOverallSuccess
+                        ? AppColors.ink
+                        : AppColors.dangerDark,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -136,5 +136,12 @@ abstract final class AppStrings {
   static const String roundLabelIncomplete = 'YARIM KALDI';
   static const String dotSeparator = ' · ';
   static String objectionPrompt(String text) => '“$text” kabul edilmedi. Sence doğru muydu?';
+
+  // Sunucu Bağlantı Testi (Debug)
+  static const String serverTestButton = 'Sunucu Testi';
+  static const String serverTestRunning = 'Sunucu test ediliyor…';
+  static const String serverTestTitle = 'Sunucu Bağlantı Testi';
+  static const String serverTestSuccessSummary = 'Tüm testler başarılı!';
+  static const String serverTestFailedSummary = 'Bağlantı testi başarısız oldu';
 }
 

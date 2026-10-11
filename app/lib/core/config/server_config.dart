@@ -1,0 +1,62 @@
+/// Sunucu adresi, WebSocket URL dönüşümü ve uç nokta yapılandırması.
+///
+/// Varsayılan sunucu adresi [defaultServerUrl]'dir.
+/// `--dart-define=SERVER_URL=...` derleme bayrağı ile dinamik olarak ezilebilir.
+abstract final class ServerConfig {
+  /// Varsayılan Cloudflare Workers sunucu adresi.
+  static const String defaultServerUrl = 'https://server.riestudio.workers.dev';
+
+  /// Ortam değişkeninden (`--dart-define=SERVER_URL=...`) alınan veya varsayılan sunucu adresi.
+  static const String serverUrl = String.fromEnvironment(
+    'SERVER_URL',
+    defaultValue: defaultServerUrl,
+  );
+
+  /// HTTP(S) adresini WebSocket (WS/WSS) adresine dönüştürür.
+  ///
+  /// - `https://example.com` -> `wss://example.com`
+  /// - `http://localhost:8787` -> `ws://localhost:8787`
+  /// - Zaten `wss://` veya `ws://` ile başlıyorsa aynen döner.
+  static String toWebSocketUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('https://')) {
+      return 'wss://${trimmed.substring('https://'.length)}';
+    } else if (trimmed.startsWith('http://')) {
+      return 'ws://${trimmed.substring('http://'.length)}';
+    } else if (trimmed.startsWith('wss://') || trimmed.startsWith('ws://')) {
+      return trimmed;
+    }
+    return 'wss://$trimmed';
+  }
+
+  /// Sunucunun WebSocket ana adresi.
+  static String get wsUrl => toWebSocketUrl(serverUrl);
+
+  /// Sağlık kontrolü yolu.
+  static const String healthPath = '/health';
+
+  /// Eşleştirme WebSocket yolu.
+  static const String matchmakingWsPath = '/ws/matchmaking';
+
+  /// Maç WebSocket yolu şablonu.
+  static String matchWsPath(String matchId) => '/ws/match/$matchId';
+
+  /// Tam Sağlık Kontrolü HTTP URL'si.
+  static String get healthUrl => joinUrl(serverUrl, healthPath);
+
+  /// Tam Eşleştirme WebSocket URL'si.
+  static String get matchmakingWsUrl => joinUrl(wsUrl, matchmakingWsPath);
+
+  /// Tam Maç WebSocket URL'si.
+  static String matchWsUrl(String matchId) =>
+      joinUrl(wsUrl, matchWsPath(matchId));
+
+  /// İki URL parçasını güvenle birleştirir.
+  static String joinUrl(String base, String path) {
+    final cleanBase =
+        base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$cleanBase$cleanPath';
+  }
+}
+
