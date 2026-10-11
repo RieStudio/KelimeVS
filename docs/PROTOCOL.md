@@ -9,9 +9,10 @@ Bu belge, KelimeGo istemcisi (Flutter) ile eşleştirme ve maç sunucusu (Cloudf
 Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 
 ### Uç Noktalar (Endpoints)
-- **Sağlık Kontrolü (HTTP GET):** `GET /health` -> `200 OK` (`"ok"`)
-- **Eşleştirme (Matchmaking WebSocket):** `/ws/matchmaking`
-- **Canlı Maç Odası (Match Room WebSocket):** `/ws/match/:matchId`
+- **Canlı Sunucu Adresi:** `https://api.riestudio.com.tr` (WebSocket: `wss://api.riestudio.com.tr`)
+- **Sağlık Kontrolü (HTTP GET):** `GET /health` -> `200 OK` (`"ok"`) (Örn: `https://api.riestudio.com.tr/health`)
+- **Eşleştirme (Matchmaking WebSocket):** `/ws/matchmaking` (Örn: `wss://api.riestudio.com.tr/ws/matchmaking`)
+- **Canlı Maç Odası (Match Room WebSocket):** `/ws/match/:matchId` (Örn: `wss://api.riestudio.com.tr/ws/match/:matchId`)
 
 ### Kimlik Doğrulama ve Jeton Taşıma (Authentication & Transport)
 - **Tercih Edilen Taşıma Yöntemi (Üretim & Standart):**

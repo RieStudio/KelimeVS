@@ -79,7 +79,7 @@ class NetworkDiagnostics {
     'https://cloudflare.com/cdn-cgi/trace',
     'https://1.1.1.1/cdn-cgi/trace',
     'https://riestudio.com.tr',
-    'https://server.riestudio.workers.dev/health',
+    'https://api.riestudio.com.tr/health',
   ];
 
   final List<String> targets;

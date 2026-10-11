@@ -6,16 +6,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ServerConfig', () {
-    test('varsayılan sunucu adresi https://server.riestudio.workers.dev olmalıdır', () {
-      expect(ServerConfig.defaultServerUrl, 'https://server.riestudio.workers.dev');
+    test('varsayılan sunucu adresi https://api.riestudio.com.tr olmalıdır', () {
+      expect(ServerConfig.defaultServerUrl, 'https://api.riestudio.com.tr');
       // dart-define verilmemişse serverUrl varsayılana eşittir
-      expect(ServerConfig.serverUrl, 'https://server.riestudio.workers.dev');
+      expect(ServerConfig.serverUrl, 'https://api.riestudio.com.tr');
     });
 
     test('toWebSocketUrl https adresini wss adresine dönüştürür', () {
       expect(
-        ServerConfig.toWebSocketUrl('https://server.riestudio.workers.dev'),
-        'wss://server.riestudio.workers.dev',
+        ServerConfig.toWebSocketUrl('https://api.riestudio.com.tr'),
+        'wss://api.riestudio.com.tr',
       );
       expect(
         ServerConfig.toWebSocketUrl('https://api.example.com/'),
@@ -36,8 +36,8 @@ void main() {
 
     test('toWebSocketUrl zaten ws veya wss olan adresleri korur', () {
       expect(
-        ServerConfig.toWebSocketUrl('wss://server.riestudio.workers.dev'),
-        'wss://server.riestudio.workers.dev',
+        ServerConfig.toWebSocketUrl('wss://api.riestudio.com.tr'),
+        'wss://api.riestudio.com.tr',
       );
       expect(
         ServerConfig.toWebSocketUrl('ws://127.0.0.1:8787'),
@@ -47,8 +47,8 @@ void main() {
 
     test('toWebSocketUrl şema verilmemişse wss varsayar', () {
       expect(
-        ServerConfig.toWebSocketUrl('server.riestudio.workers.dev'),
-        'wss://server.riestudio.workers.dev',
+        ServerConfig.toWebSocketUrl('api.riestudio.com.tr'),
+        'wss://api.riestudio.com.tr',
       );
     });
 

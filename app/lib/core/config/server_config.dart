@@ -3,8 +3,8 @@
 /// Varsayılan sunucu adresi [defaultServerUrl]'dir.
 /// `--dart-define=SERVER_URL=...` derleme bayrağı ile dinamik olarak ezilebilir.
 abstract final class ServerConfig {
-  /// Varsayılan Cloudflare Workers sunucu adresi.
-  static const String defaultServerUrl = 'https://server.riestudio.workers.dev';
+  /// Varsayılan sunucu adresi.
+  static const String defaultServerUrl = 'https://api.riestudio.com.tr';
 
   /// Ortam değişkeninden (`--dart-define=SERVER_URL=...`) alınan veya varsayılan sunucu adresi.
   static const String serverUrl = String.fromEnvironment(

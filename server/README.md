@@ -64,7 +64,10 @@ Sunucu varsayılan olarak `http://127.0.0.1:8787` üzerinde çalışır.
 
 Sağlık kontrolü testi:
 ```bash
+# Yerel geliştirme ortamı:
 curl http://127.0.0.1:8787/health
+# Canlı sunucu (Custom Domain):
+curl https://api.riestudio.com.tr/health
 # Çıktı: ok
 ```
 

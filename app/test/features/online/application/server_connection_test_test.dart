@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('ServerConnectionTest (Sıralı Bağlantı Testi)', () {
     const sensitiveToken = 'super_secret_jwt_firebase_id_token_12345';
-    const serverUrl = 'https://server.riestudio.workers.dev';
+    const serverUrl = 'https://api.riestudio.com.tr';
 
     test('tam başarılı akış: health -> token -> connect -> queue -> cancel -> close', () async {
       final fakeHealth = FakeHttpHealthChecker(responseToReturn: 'ok');
@@ -47,7 +47,7 @@ void main() {
       // Aşama 1: Health
       expect(report.steps[0].stepId, ConnectionTestStepId.health);
       expect(report.steps[0].isSuccess, isTrue);
-      expect(fakeHealth.lastCheckedUrl, 'https://server.riestudio.workers.dev/health');
+      expect(fakeHealth.lastCheckedUrl, 'https://api.riestudio.com.tr/health');
 
       // Aşama 2: Token
       expect(report.steps[1].stepId, ConnectionTestStepId.token);
@@ -58,7 +58,7 @@ void main() {
       expect(report.steps[2].isSuccess, isTrue);
       expect(
         fakeConnector.lastConnectedUrl,
-        'wss://server.riestudio.workers.dev/ws/matchmaking',
+        'wss://api.riestudio.com.tr/ws/matchmaking',
       );
       expect(
         fakeConnector.lastHeaders?['Authorization'],
@@ -106,7 +106,7 @@ void main() {
 
     test('GET /health DNS hatasında açık hata bildirir', () async {
       final fakeHealth = FakeHttpHealthChecker(
-        errorToThrow: const SocketException('Failed host lookup: server.riestudio.workers.dev'),
+        errorToThrow: const SocketException('Failed host lookup: api.riestudio.com.tr'),
       );
       final service = ServerConnectionTest(
         healthChecker: fakeHealth,

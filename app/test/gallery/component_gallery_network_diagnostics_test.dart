@@ -16,7 +16,7 @@ void main() {
         final fakeService = NetworkDiagnostics(
           targets: const [
             'https://www.google.com/generate_204',
-            'https://server.riestudio.workers.dev/health',
+            'https://api.riestudio.com.tr/health',
           ],
           probeFunction: (url, timeout) async {
             if (url.contains('generate_204')) {
@@ -74,7 +74,7 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.textContaining('https://server.riestudio.workers.dev/health'),
+          find.textContaining('https://api.riestudio.com.tr/health'),
           findsOneWidget,
         );
         expect(

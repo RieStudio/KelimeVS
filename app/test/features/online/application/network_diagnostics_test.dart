@@ -37,10 +37,10 @@ void main() {
       expect(report.results[0].ipv6Count, 1);
       expect(report.results[0].summaryLine, contains('Tamam (HTTP 204)'));
 
-      // Son hedef workers health
+      // Son hedef health
       expect(
         report.results[4].url,
-        'https://server.riestudio.workers.dev/health',
+        'https://api.riestudio.com.tr/health',
       );
       expect(report.results[4].isSuccess, isTrue);
       expect(report.results[4].statusCode, 200);
@@ -49,10 +49,10 @@ void main() {
 
     test('SocketException (errno 104 / Connection reset) durumunda hata kodu ve türü kaydedilir', () async {
       final diagnostics = NetworkDiagnostics(
-        targets: const ['https://server.riestudio.workers.dev/health'],
+        targets: const ['https://api.riestudio.com.tr/health'],
         probeFunction: (url, timeout) async {
           return const DiagnosticTargetResult(
-            url: 'https://server.riestudio.workers.dev/health',
+            url: 'https://api.riestudio.com.tr/health',
             isSuccess: false,
             durationMs: 267,
             errorType: 'SocketException',
