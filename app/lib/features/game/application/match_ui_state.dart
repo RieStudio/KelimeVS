@@ -62,6 +62,9 @@ class MatchUiState {
   final int roundTransitionRemainingMs;
   final int roundTransitionTotalMs;
   final MatchHistoryEntry? lastSavedMatch;
+  final bool opponentConnected;
+  final bool isVoided;
+  final bool isDisconnectedPermanent;
 
   const MatchUiState({
     this.matchState,
@@ -81,6 +84,9 @@ class MatchUiState {
     this.roundTransitionRemainingMs = 0,
     this.roundTransitionTotalMs = 3000,
     this.lastSavedMatch,
+    this.opponentConnected = true,
+    this.isVoided = false,
+    this.isDisconnectedPermanent = false,
   });
 
   bool get isMyTurn =>
@@ -124,6 +130,9 @@ class MatchUiState {
     int? roundTransitionRemainingMs,
     int? roundTransitionTotalMs,
     MatchHistoryEntry? lastSavedMatch,
+    bool? opponentConnected,
+    bool? isVoided,
+    bool? isDisconnectedPermanent,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -145,6 +154,10 @@ class MatchUiState {
       roundTransitionTotalMs:
           roundTransitionTotalMs ?? this.roundTransitionTotalMs,
       lastSavedMatch: lastSavedMatch ?? this.lastSavedMatch,
+      opponentConnected: opponentConnected ?? this.opponentConnected,
+      isVoided: isVoided ?? this.isVoided,
+      isDisconnectedPermanent:
+          isDisconnectedPermanent ?? this.isDisconnectedPermanent,
     );
   }
 }

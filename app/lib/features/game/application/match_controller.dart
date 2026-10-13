@@ -18,6 +18,7 @@ import '../domain/models.dart';
 import '../domain/text_filter.dart';
 import 'match_history_provider.dart';
 import 'match_providers.dart';
+import 'match_session.dart';
 import 'match_ui_state.dart';
 
 abstract interface class GameClock {
@@ -31,7 +32,7 @@ class StopwatchClock implements GameClock {
   int nowMs() => _stopwatch.elapsedMilliseconds;
 }
 
-class MatchController extends Notifier<MatchUiState> {
+class MatchController extends Notifier<MatchUiState> implements MatchSession {
   final GameClock? _injectedClock;
   final math.Random? _injectedRandom;
   final QuestionRepository? _injectedRepo;
@@ -80,7 +81,7 @@ class MatchController extends Notifier<MatchUiState> {
   @override
   MatchUiState build() {
     ref.onDispose(() {
-      _cancelAllTimers();
+      dispose();
     });
     return const MatchUiState();
   }
@@ -111,6 +112,9 @@ class MatchController extends Notifier<MatchUiState> {
       isFinalReveal: false,
       roundTransitionRemainingMs: 0,
       roundTransitionTotalMs: roundTransitionDelayMs,
+      opponentConnected: true,
+      isVoided: false,
+      isDisconnectedPermanent: false,
     );
 
     final List<Question> pool;
@@ -163,6 +167,7 @@ class MatchController extends Notifier<MatchUiState> {
   }
 
   /// Kullanıcının ('me') cevabını motora iletir.
+  @override
   void submit(String text) {
     // TODO: arka plan davranışı
     final sanitized = AttemptTextSanitizer.sanitize(text);
@@ -191,6 +196,7 @@ class MatchController extends Notifier<MatchUiState> {
   }
 
   /// Kullanıcının maçı terk etmesini sağlar.
+  @override
   void leaveMatch() {
     // TODO: arka plan davranışı
     final match = state.matchState;
@@ -495,6 +501,11 @@ class MatchController extends Notifier<MatchUiState> {
     });
   }
 
+  @override
+  void dispose() {
+    _cancelAllTimers();
+  }
+
   void _cancelAllTimers() {
     _tickTimer?.cancel();
     _tickTimer = null;
@@ -545,6 +556,7 @@ class MatchController extends Notifier<MatchUiState> {
         forfeitedPlayerId: forfeitedPlayer,
         roundRecords: finishedState.roundHistory,
         roundQuestionTexts: questionTexts,
+        botlaOynandi: true,
       );
 
       final repo = ref.read(matchHistoryRepositoryProvider);

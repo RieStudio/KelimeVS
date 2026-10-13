@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,10 +8,51 @@ import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
+import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/online/application/online_match_session.dart';
+import 'package:app/features/online/data/matchmaking_client.dart';
+import 'package:app/features/online/data/online_match_client.dart';
+
+class FakeMatchmakingClient extends MatchmakingClient {
+  final StreamController<MatchmakingEvent> controller =
+      StreamController<MatchmakingEvent>.broadcast(sync: true);
+
+  bool startCalled = false;
+  String? startedWithName;
+  bool cancelCalled = false;
+
+  @override
+  Stream<MatchmakingEvent> get events => controller.stream;
+
+  @override
+  Future<void> start(String name) async {
+    startCalled = true;
+    startedWithName = name;
+    controller.add(const MatchmakingConnecting());
+  }
+
+  @override
+  Future<void> cancel() async {
+    cancelCalled = true;
+    if (!controller.isClosed) {
+      controller.add(const MatchmakingCancelled());
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    await cancel();
+    await controller.close();
+  }
+
+  void emit(MatchmakingEvent event) {
+    controller.add(event);
+  }
+}
 
 class FakeMatchController extends MatchController {
   String? startedWithOpponentName;
@@ -32,14 +75,44 @@ class FakeMatchController extends MatchController {
   }
 }
 
-Widget _buildTestApp(
-  FakeMatchController controller, {
+class FakeOnlineMatchSession extends OnlineMatchSession {
+  String? startedWithMatchId;
+  String? startedWithOpponentName;
+  bool startOnlineMatchCalled = false;
+
+  @override
+  MatchUiState build() => const MatchUiState();
+
+  @override
+  Future<void> startOnlineMatch({
+    required String matchId,
+    required String opponentName,
+    OnlineMatchClient? client,
+  }) async {
+    startOnlineMatchCalled = true;
+    startedWithMatchId = matchId;
+    startedWithOpponentName = opponentName;
+    state = state.copyWith(
+      opponentName: opponentName,
+      isLoading: true,
+    );
+  }
+}
+
+Widget _buildTestApp({
+  required FakeMatchController botController,
+  required FakeOnlineMatchSession onlineSession,
+  required FakeMatchmakingClient matchmakingClient,
+  bool onlineEnabled = true,
   Duration? searchDuration,
   String? initialOpponentName,
 }) {
   return ProviderScope(
     overrides: [
-      matchControllerProvider.overrideWith(() => controller),
+      matchControllerProvider.overrideWith(() => botController),
+      onlineMatchSessionProvider.overrideWith(() => onlineSession),
+      matchmakingClientFactoryProvider.overrideWithValue(() => matchmakingClient),
+      onlineMatchmakingEnabledProvider.overrideWithValue(onlineEnabled),
     ],
     child: MaterialApp(
       home: MatchmakingScreen(
@@ -51,109 +124,249 @@ Widget _buildTestApp(
 }
 
 void main() {
-  testWidgets('1. Eşleşme ekranı başlangıç durumu: avatarlar, başlık, ipucu ve vazgeç butonu', (tester) async {
-    final controller = FakeMatchController();
+  testWidgets(
+    '1. Eşleşme ekranı başlangıç durumu: avatarlar, başlık, ipucu, vazgeç butonu ve MatchmakingClient.start çağrısı',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
 
-    await tester.pumpWidget(
-      _buildTestApp(
-        controller,
-        searchDuration: const Duration(seconds: 10),
-        initialOpponentName: 'Deniz',
-      ),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
 
-    // Kendi avatarı ve bilinmeyen rakip avatarı
-    expect(find.text('S'), findsOneWidget);
-    expect(find.text(AppStrings.vs), findsOneWidget);
-    expect(find.text(AppStrings.questionMark), findsOneWidget);
+      expect(mmClient.startCalled, isTrue);
+      expect(mmClient.startedWithName, AppStrings.defaultPlayerName);
 
-    // Başlık ve alt yazı
-    expect(find.text(AppStrings.searchingOpponent), findsOneWidget);
-    expect(find.text(AppStrings.startingSoon), findsOneWidget);
+      // Kendi avatarı ve bilinmeyen rakip avatarı
+      expect(find.text('S'), findsOneWidget);
+      expect(find.text(AppStrings.vs), findsOneWidget);
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
 
-    // İpucu kartı
-    expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
-    expect(find.text(AppStrings.searchTipContent), findsOneWidget);
+      // Başlık ve alt yazı
+      expect(find.text(AppStrings.searchingOpponent), findsOneWidget);
+      expect(find.text(AppStrings.startingSoon), findsOneWidget);
 
-    // Vazgeç butonu
-    expect(find.widgetWithText(SecondaryButton, AppStrings.cancel), findsOneWidget);
-  });
+      // İpucu kartı
+      expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
+      expect(find.text(AppStrings.searchTipContent), findsOneWidget);
 
-  testWidgets('2. Vazgeç butonuna basıldığında ekran kapanır ve zamanlayıcılar iptal edilir', (tester) async {
-    final controller = FakeMatchController();
+      // Vazgeç butonu
+      expect(
+        find.widgetWithText(SecondaryButton, AppStrings.cancel),
+        findsOneWidget,
+      );
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          matchControllerProvider.overrideWith(() => controller),
-        ],
-        child: MaterialApp(
-          home: Builder(
-            builder: (ctx) => ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).push(
-                  MaterialPageRoute(
-                    builder: (_) => const MatchmakingScreen(
-                      searchDuration: Duration(seconds: 5),
-                      initialOpponentName: 'Deniz',
+  testWidgets(
+    '2. Vazgeç butonuna basıldığında MatchmakingClient.cancel çağrılır, zamanlayıcılar iptal edilir ve ekran kapanır',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MatchmakingScreen(
+                        initialOpponentName: 'Deniz',
+                      ),
                     ),
-                  ),
-                );
-              },
-              child: const Text('Go'),
+                  );
+                },
+                child: const Text('Go'),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    // Ekranı aç
-    await tester.tap(find.text('Go'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      // Ekranı aç
+      await tester.tap(find.text('Go'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byType(MatchmakingScreen), findsOneWidget);
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+      expect(mmClient.startCalled, isTrue);
 
-    // Vazgeç butonuna bas
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+      // Vazgeç butonuna bas
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
-    // MatchmakingScreen kapanmış olmalı
-    expect(find.byType(MatchmakingScreen), findsNothing);
-    expect(find.text('Go'), findsOneWidget);
-  });
+      expect(mmClient.cancelCalled, isTrue);
+      expect(find.byType(MatchmakingScreen), findsNothing);
+      expect(find.text('Go'), findsOneWidget);
+      expect(botController.startMatchCalled, isFalse);
+      expect(onlineSession.startOnlineMatchCalled, isFalse);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
-  testWidgets('3. Süre dolunca rakip avatarı/adı görünür, sonra maça geçer ve ad aktarılır', (tester) async {
-    final controller = FakeMatchController();
+  testWidgets(
+    '3. MatchmakingMatched gelince rakip avatarı/adı görünür, 800 ms sonra OnlineMatchSession ile maça geçer',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
 
-    await tester.pumpWidget(
-      _buildTestApp(
-        controller,
-        searchDuration: const Duration(milliseconds: 1000),
-        initialOpponentName: 'Deniz',
-      ),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
 
-    // Başlangıçta soru işareti var, Deniz adı henüz ekranda görünmüyor
-    expect(find.text(AppStrings.questionMark), findsOneWidget);
-    expect(find.text('Deniz'), findsNothing);
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
+      expect(find.text('Gerçek Rakip'), findsNothing);
 
-    // 1000 ms arama süresini ilerlet -> Rakip bulundu!
-    await tester.pump(const Duration(milliseconds: 1050));
+      // Sunucu eşleşme buldu
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_online_42',
+          opponentName: 'Gerçek Rakip',
+        ),
+      );
+      await tester.pump();
 
-    // Rakip bulundu: Deniz adı ve avatarı ekranda
-    expect(find.text('Deniz'), findsOneWidget);
-    expect(find.text(AppStrings.questionMark), findsNothing);
+      // Rakip adı ve avatarı ekranda
+      expect(find.text('Gerçek Rakip'), findsOneWidget);
+      expect(find.text(AppStrings.questionMark), findsNothing);
 
-    // 800 ms geçiş süresini ilerlet -> MatchScreen açılır ve maça aktarılır
-    await tester.pump(const Duration(milliseconds: 850));
-    await tester.pump(const Duration(milliseconds: 300));
+      // 800 ms geçiş süresini ilerlet -> MatchScreen açılır ve OnlineMatchSession başlatılır
+      await tester.pump(const Duration(milliseconds: 850));
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.byType(MatchScreen), findsOneWidget);
-    expect(controller.startMatchCalled, isTrue);
-    expect(controller.startedWithOpponentName, 'Deniz');
-  });
+      expect(find.byType(MatchScreen), findsOneWidget);
+      expect(onlineSession.startOnlineMatchCalled, isTrue);
+      expect(onlineSession.startedWithMatchId, 'match_online_42');
+      expect(onlineSession.startedWithOpponentName, 'Gerçek Rakip');
+      expect(botController.startMatchCalled, isFalse);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MatchScreen)),
+      );
+      expect(
+        container.read(activeMatchSessionModeProvider),
+        MatchSessionMode.online,
+      );
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '4. MatchmakingNoOpponent / Unavailable / Failed gelince hata göstermeden sessizce botlu maça düşer',
+    (tester) async {
+      for (final fallbackEvent in <MatchmakingEvent>[
+        const MatchmakingNoOpponent(),
+        const MatchmakingUnavailable('content_unavailable'),
+        const MatchmakingFailed('network_error'),
+      ]) {
+        final botController = FakeMatchController();
+        final onlineSession = FakeOnlineMatchSession();
+        final mmClient = FakeMatchmakingClient();
+
+        await tester.pumpWidget(
+          ProviderScope(
+            key: ValueKey(fallbackEvent.runtimeType),
+            overrides: [
+              matchControllerProvider.overrideWith(() => botController),
+              onlineMatchSessionProvider.overrideWith(() => onlineSession),
+              matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            ],
+            child: const MaterialApp(
+              home: MatchmakingScreen(
+                initialOpponentName: 'Deniz',
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Olayı tetikle
+        mmClient.emit(fallbackEvent);
+        await tester.pump();
+
+        // Rakip adı görünür (bot ibaresi yok)
+        expect(find.text('Deniz'), findsOneWidget);
+        expect(find.textContaining('Bot'), findsNothing);
+        expect(find.text(AppStrings.questionMark), findsNothing);
+
+        // 800 ms sonra yerel bot MatchController ile MatchScreen açılır
+        await tester.pump(const Duration(milliseconds: 850));
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.byType(MatchScreen), findsOneWidget);
+        expect(botController.startMatchCalled, isTrue);
+        expect(botController.startedWithOpponentName, 'Deniz');
+        expect(onlineSession.startOnlineMatchCalled, isFalse);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(MatchScreen)),
+        );
+        expect(
+          container.read(activeMatchSessionModeProvider),
+          MatchSessionMode.bot,
+        );
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '5. ONLINE_MATCHMAKING=false (devre kesici) iken sunucuya hiç gitmeden doğrudan botlu maça geçer',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          onlineEnabled: false,
+          searchDuration: const Duration(milliseconds: 200),
+          initialOpponentName: 'Zeynep',
+        ),
+      );
+      await tester.pump();
+
+      // Sunucu istemcisi hiç başlatılmamalı
+      expect(mmClient.startCalled, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.text('Zeynep'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 850));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(MatchScreen), findsOneWidget);
+      expect(botController.startMatchCalled, isTrue);
+      expect(botController.startedWithOpponentName, 'Zeynep');
+      expect(onlineSession.startOnlineMatchCalled, isFalse);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 }

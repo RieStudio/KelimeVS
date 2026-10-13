@@ -233,9 +233,46 @@ void main() {
 
     expect(loaded.length, 1);
     expect(loaded.first.id, 'old_match');
+    expect(loaded.first.botlaOynandi, isFalse);
     final attempt = loaded.first.roundRecords.first.attempts.first;
     expect(attempt.isClose, isFalse);
     expect(attempt.hintShown, isFalse);
+  });
+
+  test('botlaOynandi alanı serileştirmede korunur', () async {
+    final repo = LocalMatchHistoryRepository();
+    final botEntry = MatchHistoryEntry(
+      id: 'bot_match_1',
+      opponentName: 'Deniz',
+      finishedAtMs: 1700000001000,
+      myScore: 2,
+      opponentScore: 0,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+      botlaOynandi: true,
+    );
+    final onlineEntry = MatchHistoryEntry(
+      id: 'online_match_1',
+      opponentName: 'Mert',
+      finishedAtMs: 1700000002000,
+      myScore: 1,
+      opponentScore: 2,
+      result: MatchResult.lose,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+      botlaOynandi: false,
+    );
+
+    await repo.add(botEntry);
+    await repo.add(onlineEntry);
+
+    final loaded = await repo.loadRecent();
+    expect(loaded.length, 2);
+    expect(loaded[0].id, 'online_match_1');
+    expect(loaded[0].botlaOynandi, isFalse);
+    expect(loaded[1].id, 'bot_match_1');
+    expect(loaded[1].botlaOynandi, isTrue);
   });
 
   test('Depo karışık sırayla yazılmış kayıtları en yeni başta döndürür', () async {

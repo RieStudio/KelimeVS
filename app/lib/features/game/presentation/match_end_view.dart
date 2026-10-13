@@ -57,7 +57,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
   @override
   Widget build(BuildContext context) {
-    final uiState = ref.watch(matchControllerProvider);
+    final uiState = ref.watch(activeMatchUiStateProvider);
     final matchState = uiState.matchState;
 
     final isWinner = matchState?.winnerId == 'me';
@@ -263,7 +263,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 text: AppStrings.matchDetail,
                 onPressed: () async {
                   final lastMatch =
-                      ref.read(matchControllerProvider).lastSavedMatch;
+                      ref.read(activeMatchUiStateProvider).lastSavedMatch;
                   if (lastMatch != null) {
                     if (context.mounted) {
                       Navigator.of(context).push(

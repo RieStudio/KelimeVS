@@ -23,6 +23,7 @@ class MatchHistoryEntry {
   final String? forfeitedPlayerId;
   final List<RoundRecord> roundRecords;
   final List<String> roundQuestionTexts;
+  final bool botlaOynandi;
 
   const MatchHistoryEntry({
     required this.id,
@@ -35,6 +36,7 @@ class MatchHistoryEntry {
     this.forfeitedPlayerId,
     required this.roundRecords,
     this.roundQuestionTexts = const [],
+    this.botlaOynandi = false,
   });
 
   String questionTextForRound(int index, {String fallback = 'Soru'}) {

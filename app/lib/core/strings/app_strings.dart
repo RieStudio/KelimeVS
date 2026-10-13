@@ -151,5 +151,8 @@ abstract final class AppStrings {
 
   // Online Protokol Testi (Debug)
   static const String onlineTestButton = 'Online test';
+
+  // Çevrimiçi Maç Bağlantı Durumu
+  static const String connectionLostNotice = 'Bağlantı koptu. Ana ekrana dönülüyor.';
 }
 

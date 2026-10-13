@@ -13,7 +13,9 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/section_label.dart';
 import '../../game/application/match_providers.dart';
+import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
+import '../../online/data/matchmaking_client.dart';
 
 /// DESIGN.md Bölüm 7: 2) Eşleşme Bekleme Ekranı
 ///
@@ -26,12 +28,16 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
   final Duration? searchDuration;
   final String? initialOpponentName;
   final math.Random? random;
+  final bool forceBotFallback;
+  final MatchmakingClient? matchmakingClient;
 
   const MatchmakingScreen({
     super.key,
     this.searchDuration,
     this.initialOpponentName,
     this.random,
+    this.forceBotFallback = false,
+    this.matchmakingClient,
   });
 
   static const List<String> opponentNames = [
@@ -52,9 +58,15 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
 }
 
 class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
-  late final String _opponentName;
+  late final String _fallbackOpponentName;
+  String _opponentName = '';
+  String? _matchedMatchId;
+  bool _isOnlineMatch = false;
   bool _isOpponentFound = false;
+  bool _isCancelled = false;
 
+  MatchmakingClient? _client;
+  StreamSubscription<MatchmakingEvent>? _subscription;
   Timer? _searchTimer;
   Timer? _transitionTimer;
   Timer? _dotsTimer;
@@ -64,11 +76,10 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   void initState() {
     super.initState();
     final rng = widget.random ?? math.Random();
-    _opponentName = widget.initialOpponentName ??
-        MatchmakingScreen.opponentNames[rng.nextInt(MatchmakingScreen.opponentNames.length)];
-
-    final duration = widget.searchDuration ??
-        Duration(milliseconds: 2500 + rng.nextInt(2000));
+    _fallbackOpponentName = widget.initialOpponentName ??
+        MatchmakingScreen
+            .opponentNames[rng.nextInt(MatchmakingScreen.opponentNames.length)];
+    _opponentName = _fallbackOpponentName;
 
     // Üç noktanın periyodik animasyonu
     _dotsTimer = Timer.periodic(const Duration(milliseconds: 350), (_) {
@@ -79,12 +90,51 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       }
     });
 
-    // Sahte arama süresi
-    _searchTimer = Timer(duration, _handleOpponentFound);
+    final onlineEnabled = ref.read(onlineMatchmakingEnabledProvider);
+    if (!onlineEnabled || widget.forceBotFallback) {
+      // Devre kesici kapalıysa veya voided sonrası doğrudan botlu maça düşülüyorsa
+      _isOnlineMatch = false;
+      _matchedMatchId = null;
+      _searchTimer = Timer(
+        widget.searchDuration ?? Duration.zero,
+        _handleOpponentFound,
+      );
+    } else {
+      _startOnlineMatchmaking();
+    }
+  }
+
+  void _startOnlineMatchmaking() {
+    final client =
+        widget.matchmakingClient ?? ref.read(matchmakingClientFactoryProvider)();
+    _client = client;
+
+    _subscription = client.events.listen((event) {
+      if (!mounted || _isCancelled || _isOpponentFound) return;
+
+      if (event is MatchmakingMatched) {
+        _isOnlineMatch = true;
+        _matchedMatchId = event.matchId;
+        _opponentName = event.opponentName.isNotEmpty
+            ? event.opponentName
+            : _fallbackOpponentName;
+        _handleOpponentFound();
+      } else if (event is MatchmakingNoOpponent ||
+          event is MatchmakingUnavailable ||
+          event is MatchmakingFailed) {
+        // Sessizce yerel botlu maça düş (hata gösterilmez, bot ibaresi yok)
+        _isOnlineMatch = false;
+        _matchedMatchId = null;
+        _opponentName = _fallbackOpponentName;
+        _handleOpponentFound();
+      }
+    });
+
+    unawaited(client.start(AppStrings.defaultPlayerName));
   }
 
   void _handleOpponentFound() {
-    if (!mounted) return;
+    if (!mounted || _isCancelled || _isOpponentFound) return;
     _dotsTimer?.cancel();
     _dotsTimer = null;
 
@@ -93,28 +143,74 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     });
 
     // 800 ms sonra maç ekranına geç ve maçı başlat
-    _transitionTimer = Timer(const Duration(milliseconds: 800), _navigateToMatch);
+    _transitionTimer =
+        Timer(const Duration(milliseconds: 800), _navigateToMatch);
   }
 
   void _navigateToMatch() {
-    if (!mounted) return;
+    if (!mounted || _isCancelled) return;
     _cancelAllTimers();
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => const MatchScreen(),
-      ),
-    );
+    final isOnline = _isOnlineMatch && _matchedMatchId != null;
+    final matchId = _matchedMatchId;
+    final oppName = _opponentName;
 
-    ref.read(matchControllerProvider.notifier).startMatch(
-      opponentName: _opponentName,
-    );
+    if (isOnline && matchId != null) {
+      ref
+          .read(activeMatchSessionModeProvider.notifier)
+          .setMode(MatchSessionMode.online);
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const MatchScreen(),
+        ),
+      );
+
+      unawaited(
+        ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
+              matchId: matchId,
+              opponentName: oppName,
+            ),
+      );
+    } else {
+      ref
+          .read(activeMatchSessionModeProvider.notifier)
+          .setMode(MatchSessionMode.bot);
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const MatchScreen(),
+        ),
+      );
+
+      unawaited(
+        ref.read(matchControllerProvider.notifier).startMatch(
+              opponentName: oppName,
+            ),
+      );
+    }
   }
 
   void _cancelAndExit() {
+    if (_isCancelled) return;
+    _isCancelled = true;
     _cancelAllTimers();
+    _cancelMatchmakingClient();
     if (mounted) {
       Navigator.of(context).pop();
+    }
+  }
+
+  void _cancelMatchmakingClient() {
+    final sub = _subscription;
+    _subscription = null;
+    if (sub != null) {
+      unawaited(sub.cancel());
+    }
+    final client = _client;
+    _client = null;
+    if (client != null) {
+      unawaited(client.cancel());
     }
   }
 
@@ -130,6 +226,15 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   @override
   void dispose() {
     _cancelAllTimers();
+    if (!_isOpponentFound) {
+      _cancelMatchmakingClient();
+    } else {
+      final sub = _subscription;
+      _subscription = null;
+      if (sub != null) {
+        unawaited(sub.cancel());
+      }
+    }
     super.dispose();
   }
 

@@ -116,6 +116,7 @@ void main() {
       expect(entry.endType, MatchEndType.normal);
       expect(entry.forfeitedPlayerId, isNull);
       expect(entry.roundRecords.length, 2);
+      expect(entry.botlaOynandi, isTrue);
 
       // 3 saniyelik final reveal geçtikten sonra da ek bir kayıt ATILMAMALI
       async.elapse(const Duration(milliseconds: 3000));
@@ -161,6 +162,7 @@ void main() {
       expect(entry.result, MatchResult.lose);
       expect(entry.endType, MatchEndType.forfeit);
       expect(entry.forfeitedPlayerId, 'me');
+      expect(entry.botlaOynandi, isTrue);
 
       // Ekstra beklemede ikinci kayıt atılmaz
       async.elapse(const Duration(milliseconds: 5000));

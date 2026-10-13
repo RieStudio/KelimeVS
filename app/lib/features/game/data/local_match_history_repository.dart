@@ -114,6 +114,7 @@ abstract final class _MatchHistoryMapper {
       'forfeitedPlayerId': entry.forfeitedPlayerId,
       'roundRecords': entry.roundRecords.map(_roundRecordToJson).toList(),
       'roundQuestionTexts': entry.roundQuestionTexts,
+      'botlaOynandi': entry.botlaOynandi,
     };
   }
 
@@ -134,6 +135,7 @@ abstract final class _MatchHistoryMapper {
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      botlaOynandi: json['botlaOynandi'] as bool? ?? false,
     );
   }
 

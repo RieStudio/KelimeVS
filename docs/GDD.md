@@ -160,7 +160,7 @@ Maç durumu, maç başına bir Durable Object'in belleğinde ve SQLite deposunda
 - Oyuncu "Hızlı Maç" seçince sunucudaki eşleştirme havuzuna (Durable Object) girer; sunucu iki oyuncuyu eşler.
 - **[VARSAYIM]** Belirli bir süre (örn. 8–10 sn) eşleşme bulunamazsa bot rakip devreye girer. Bot **cihazda** çalışır (sunucuya hiç gitmez), böylece sunucu kotası harcanmaz. Başlangıçta oyuncu sayısı az olacağından bu kritiktir.
 - Bot, sorunun cevap listesinden rastgele gecikmeyle (örn. 3–12 sn) ve ayarlanabilir hata olasılığıyla cevap verir.
-- **[AÇIK]** Botla oynanan maçlarda kazanılan ödül normal maçtan düşük olsun mu? Bot rakip oyuncuya belirtilsin mi?
+- **[KARAR]** Bot rakip için ayrı bir etiket gösterilmez; bot adı normal bir oyuncu adı gibi görünür. Maç geçmişi kaydına iç bilgi olarak "botla oynandı" işareti düşülür (arayüzde gösterilmez; ileride ekonomi ve istatistik kararları için). **[AÇIK]** Botla oynanan maçlarda jeton ödülünün normalden düşük olup olmayacağı (ekonomi kararı).
 
 ## 7. Modlar
 

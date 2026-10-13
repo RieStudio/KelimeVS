@@ -9,6 +9,8 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_widgets.dart';
 import '../application/match_providers.dart';
+import '../application/match_session.dart';
+import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../domain/match/match_state.dart';
 import 'match_end_view.dart';
 import 'round_end_view.dart';
@@ -29,11 +31,14 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final current = ref.read(matchControllerProvider);
-        if (!current.isLoading &&
-            (current.matchState == null ||
-                current.matchState?.phase == MatchPhase.matchFinished)) {
-          ref.read(matchControllerProvider.notifier).startMatch();
+        final mode = ref.read(activeMatchSessionModeProvider);
+        if (mode == MatchSessionMode.bot) {
+          final current = ref.read(matchControllerProvider);
+          if (!current.isLoading &&
+              (current.matchState == null ||
+                  current.matchState?.phase == MatchPhase.matchFinished)) {
+            ref.read(matchControllerProvider.notifier).startMatch();
+          }
         }
       }
     });
@@ -88,7 +93,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop(true);
-              ref.read(matchControllerProvider.notifier).leaveMatch();
+              ref.read(activeMatchSessionProvider).leaveMatch();
             },
             child: Text(
               AppStrings.exit,
@@ -105,7 +110,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(
-      matchControllerProvider.select((s) => s.displayAttempts.length),
+      activeMatchUiStateProvider.select((s) => s.displayAttempts.length),
       (prev, next) {
         if (next > (prev ?? 0)) {
           _scrollToBottom();
@@ -113,7 +118,36 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
       },
     );
 
-    final uiState = ref.watch(matchControllerProvider);
+    ref.listen<bool>(
+      activeMatchUiStateProvider.select((s) => s.isVoided),
+      (prev, next) {
+        if (next && !(prev ?? false) && mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const MatchmakingScreen(forceBotFallback: true),
+            ),
+          );
+        }
+      },
+    );
+
+    ref.listen<bool>(
+      activeMatchUiStateProvider.select((s) => s.isDisconnectedPermanent),
+      (prev, next) {
+        if (next && !(prev ?? false) && mounted) {
+          // TODO: 4.5d'de ayrıntılı bağlantı kopma deneyimi
+          final messenger = ScaffoldMessenger.maybeOf(context);
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          messenger?.showSnackBar(
+            const SnackBar(
+              content: Text(AppStrings.connectionLostNotice),
+            ),
+          );
+        }
+      },
+    );
+
+    final uiState = ref.watch(activeMatchUiStateProvider);
     final matchState = uiState.matchState;
 
     final decisiveRounds = matchState?.decisiveRounds ?? 0;
@@ -258,7 +292,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                     feedback: uiState.lastFeedback,
                     feedbackCounter: uiState.feedbackCounter,
                     onSubmitted: (text) {
-                      ref.read(matchControllerProvider.notifier).submit(text);
+                      ref.read(activeMatchSessionProvider).submit(text);
                     },
                   ),
                 ],

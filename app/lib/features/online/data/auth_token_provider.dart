@@ -14,10 +14,12 @@ abstract interface class AuthTokenProvider {
 
 /// [FirebaseAuth] üzerinden gerçek ID token sağlayan uygulama.
 class FirebaseAuthTokenProvider implements AuthTokenProvider {
-  final FirebaseAuth _auth;
+  final FirebaseAuth? _injectedAuth;
 
-  FirebaseAuthTokenProvider({FirebaseAuth? auth})
-      : _auth = auth ?? FirebaseAuth.instance;
+  const FirebaseAuthTokenProvider({FirebaseAuth? auth})
+      : _injectedAuth = auth;
+
+  FirebaseAuth get _auth => _injectedAuth ?? FirebaseAuth.instance;
 
   @override
   Future<String?> getIdToken({bool forceRefresh = false}) async {

@@ -51,7 +51,7 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
 
   @override
   Widget build(BuildContext context) {
-    final uiState = ref.watch(matchControllerProvider);
+    final uiState = ref.watch(activeMatchUiStateProvider);
     final matchState = uiState.matchState;
 
     final roundHistory = matchState?.roundHistory ?? const [];
