@@ -3,6 +3,8 @@ import {
   type ContentProvider,
   DevContentProvider,
   RealtimeDbContentProvider,
+  inspectSecretB64,
+  logContentError,
 } from './content';
 import type { Question } from './engine';
 import { parseMatchmakerMessage, type MatchmakerServerMessage } from './protocol';
@@ -36,14 +38,30 @@ export function createContentProvider(env: Env): ContentProvider {
   }
 
   const dbUrl = env.FIREBASE_DATABASE_URL?.trim();
+  const serviceAccountB64 = env.FIREBASE_SERVICE_ACCOUNT_B64?.trim();
+  const diag = inspectSecretB64(serviceAccountB64);
+
   if (!dbUrl || dbUrl === 'REPLACE_WITH_FIREBASE_DATABASE_URL') {
+    logContentError({
+      event: 'content_error',
+      stage: 'secret_missing',
+      errorName: 'ConfigError',
+      detail: 'FIREBASE_DATABASE_URL is missing or placeholder',
+      ...diag,
+    });
     throw new Error(
       'RealtimeDbContentProvider configuration error: FIREBASE_DATABASE_URL is missing or placeholder.'
     );
   }
 
-  const serviceAccountB64 = env.FIREBASE_SERVICE_ACCOUNT_B64?.trim();
   if (!serviceAccountB64) {
+    logContentError({
+      event: 'content_error',
+      stage: 'secret_missing',
+      errorName: 'ConfigError',
+      detail: 'FIREBASE_SERVICE_ACCOUNT_B64 is missing',
+      ...diag,
+    });
     throw new Error(
       'RealtimeDbContentProvider configuration error: FIREBASE_SERVICE_ACCOUNT_B64 is missing.'
     );
@@ -111,6 +129,9 @@ export class Matchmaker extends DurableObject<Env> {
     if (!parsed) return;
 
     if (parsed.t === 'queue') {
+      // İçerik önbelleği geçerli değilse arka planda yüklemeye başla (önden ısıt)
+      this.prewarmContent();
+
       // Aynı uid varsa güncelle, yoksa ekle (FIFO)
       const existingIdx = this.queue.findIndex((e) => e.uid === uid);
       const newEntry: QueueEntry = {
@@ -175,6 +196,19 @@ export class Matchmaker extends DurableObject<Env> {
     await this.ctx.storage.put('queue', this.queue);
   }
 
+  private prewarmContent(): void {
+    try {
+      const prewarmPromise = this.contentProvider.getQuestions().catch(() => {
+        // Hata istemciye iletilmez, yalnızca içerik sağlayıcının logContentError'ı ile günlüğe düşer
+      });
+      if (this.ctx && typeof this.ctx.waitUntil === 'function') {
+        this.ctx.waitUntil(prewarmPromise);
+      }
+    } catch {
+      // yoksay
+    }
+  }
+
   private async tryMatch(): Promise<void> {
     while (this.queue.length >= 2) {
       const p1 = this.queue[0];
@@ -192,13 +226,23 @@ export class Matchmaker extends DurableObject<Env> {
       await this.ctx.storage.put('queue', this.queue);
 
       let allQuestions: Question[];
+      let fetchFailed = false;
       try {
         allQuestions = await this.contentProvider.getQuestions();
       } catch {
         allQuestions = [];
+        fetchFailed = true;
       }
 
       if (!allQuestions || allQuestions.length < 8) {
+        if (!fetchFailed) {
+          logContentError({
+            event: 'content_error',
+            stage: 'parse',
+            errorName: 'InsufficientQuestionsError',
+            detail: `Matchmaker received fewer than 8 questions (found: ${allQuestions ? allQuestions.length : 0})`,
+          });
+        }
         // İçerik alınamazsa veya 8'den az soru varsa:
         // Kuyruktaki iki oyuncuya {"t":"error","code":"content_unavailable"} gönder,
         // kuyruktan çıkar, bağlantıyı kapat.

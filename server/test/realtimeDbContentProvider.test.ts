@@ -4,7 +4,6 @@ import {
   RealtimeDbContentProvider,
   ServiceAccountTokenProvider,
   type FetchFunction,
-  type JwkKey,
 } from '../src/content';
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -27,7 +26,7 @@ async function generateTestServiceAccount() {
     ['sign', 'verify']
   )) as CryptoKeyPair;
 
-  const pkcs8Der = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+  const pkcs8Der = (await crypto.subtle.exportKey('pkcs8', keyPair.privateKey)) as ArrayBuffer;
   const pkcs8B64 = uint8ArrayToBase64(new Uint8Array(pkcs8Der));
   const pem = `-----BEGIN PRIVATE KEY-----\n${pkcs8B64}\n-----END PRIVATE KEY-----`;
 

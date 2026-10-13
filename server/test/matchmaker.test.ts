@@ -1,15 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
-  DurableObject: class {},
+  DurableObject: class {
+    ctx: unknown;
+    env: unknown;
+    constructor(ctx: unknown, env: unknown) {
+      this.ctx = ctx;
+      this.env = env;
+    }
+  },
 }));
 
 import {
   selectAndShuffleEightQuestions,
   createContentProvider,
   type QueueEntry,
+  Matchmaker,
 } from '../src/matchmaker';
-import { DevContentProvider } from '../src/content';
+import { DevContentProvider, RealtimeDbContentProvider } from '../src/content';
 import type { Question } from '../src/engine';
 import type { Env } from '../src/index';
 
@@ -140,5 +148,142 @@ describe('Matchmaker Question Selection & Content Source Rules', () => {
     expect(() => createContentProvider(env)).toThrow('FIREBASE_SERVICE_ACCOUNT_B64 is missing');
   });
 });
+
+describe('Matchmaker Content Pre-warming (İçeriği Önden Isıtma)', () => {
+  function createMockDOState() {
+    const storageMap = new Map<string, unknown>();
+    const waitUntils: Promise<unknown>[] = [];
+    const state = {
+      blockConcurrencyWhile: vi.fn(async (fn: () => Promise<void>) => fn()),
+      storage: {
+        get: vi.fn(async (key: string) => storageMap.get(key)),
+        put: vi.fn(async (key: string, val: unknown) => {
+          storageMap.set(key, val);
+        }),
+      },
+      getTags: vi.fn((_ws: unknown) => ['user-1']),
+      waitUntil: vi.fn((p: Promise<unknown>) => {
+        waitUntils.push(p);
+      }),
+      getWebSockets: vi.fn(() => []),
+      acceptWebSocket: vi.fn(),
+      waitUntils,
+    };
+    return state;
+  }
+
+  it('queue mesajı geldiğinde arka planda prewarmContent çalışır ve ctx.waitUntil çağrılır', async () => {
+    const mockState = createMockDOState();
+    let getQuestionsCalled = false;
+    const mockProvider = {
+      source: 'test' as const,
+      getQuestions: vi.fn(async () => {
+        getQuestionsCalled = true;
+        return [];
+      }),
+    };
+
+    const mm = new Matchmaker(
+      mockState as unknown as DurableObjectState,
+      {} as unknown as Env,
+      mockProvider
+    );
+
+    const sentMessages: string[] = [];
+    const mockWs = {
+      send: vi.fn((msg: string) => sentMessages.push(msg)),
+      close: vi.fn(),
+    } as unknown as WebSocket;
+
+    await mm.webSocketMessage(mockWs, JSON.stringify({ t: 'queue', name: 'Alice' }));
+
+    expect(getQuestionsCalled).toBe(true);
+    expect(mockState.waitUntil).toHaveBeenCalledTimes(1);
+    expect(mockState.waitUntils.length).toBe(1);
+    expect(sentMessages).toContain(JSON.stringify({ t: 'queued' }));
+  });
+
+  it('prewarm sırasında getQuestions hata fırlatırsa hata yutulur ve istemci yine queued mesajı alır', async () => {
+    const mockState = createMockDOState();
+    const mockProvider = {
+      source: 'test' as const,
+      getQuestions: vi.fn(async () => {
+        throw new Error('Database unreachable during pre-warm');
+      }),
+    };
+
+    const mm = new Matchmaker(
+      mockState as unknown as DurableObjectState,
+      {} as unknown as Env,
+      mockProvider
+    );
+
+    const sentMessages: string[] = [];
+    const mockWs = {
+      send: vi.fn((msg: string) => sentMessages.push(msg)),
+      close: vi.fn(),
+    } as unknown as WebSocket;
+
+    // Hata fırlatmamalı
+    await expect(
+      mm.webSocketMessage(mockWs, JSON.stringify({ t: 'queue', name: 'Bob' }))
+    ).resolves.toBeUndefined();
+
+    // ctx.waitUntil promise'ı da hata patlatmamalı (catch ile yutulmuş olmalı)
+    await expect(Promise.all(mockState.waitUntils)).resolves.toBeDefined();
+
+    expect(sentMessages).toContain(JSON.stringify({ t: 'queued' }));
+  });
+
+  it('arka arkaya gelen birden fazla queue çağrısı tek bir in-flight isteği paylaşır', async () => {
+    const mockState = createMockDOState();
+    let fetchCount = 0;
+    const mockFetch = vi.fn(async () => {
+      fetchCount++;
+      await new Promise((r) => setTimeout(r, 20));
+      return new Response(
+        JSON.stringify({
+          q1: {
+            category: 'Tarih',
+            question: 'Soru 1',
+            answers: { a1: 'Cevap 1' },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const realProvider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+    });
+
+    const mm = new Matchmaker(
+      mockState as unknown as DurableObjectState,
+      {} as unknown as Env,
+      realProvider
+    );
+
+    const mockWs1 = { send: vi.fn(), close: vi.fn() } as unknown as WebSocket;
+    const mockWs2 = { send: vi.fn(), close: vi.fn() } as unknown as WebSocket;
+
+    mockState.getTags
+      .mockReturnValueOnce(['user-1'])
+      .mockReturnValueOnce(['user-2']);
+
+    // İki oyuncu neredeyse eşzamanlı sıraya girer
+    await Promise.all([
+      mm.webSocketMessage(mockWs1, JSON.stringify({ t: 'queue', name: 'User1' })),
+      mm.webSocketMessage(mockWs2, JSON.stringify({ t: 'queue', name: 'User2' })),
+    ]);
+
+    // Arka plan waitUntils tamamlanır
+    await Promise.all(mockState.waitUntils);
+
+    // Tek bir fetch yapılmış olmalı (single-flight)
+    expect(fetchCount).toBe(1);
+  });
+});
+
 
 

@@ -1,3 +1,5 @@
 server/.wrangler/
 .dev.vars
+server/.ghost-session.json
+.ghost-session.json
 

@@ -1,4 +1,10 @@
 // Firebase Servis Hesabı OAuth2 Token Sağlayıcısı (Web Crypto)
+import {
+  inspectSecretB64,
+  logContentError,
+  extractCauseCode,
+  extractErrorMessage,
+} from './contentDiagnostics';
 
 export type FetchFunction = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -15,6 +21,7 @@ export interface CachedToken {
 export interface ServiceAccountAuthOptions {
   readonly fetchFn?: FetchFunction;
   readonly nowFn?: () => number;
+  readonly sleepFn?: (ms: number) => Promise<void>;
 }
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -62,9 +69,35 @@ function utf8ToBase64Url(str: string): string {
  * Base64 ile kodlanmış servis hesabı JSON dizesini ayrıştırır.
  */
 export function parseServiceAccountB64(serviceAccountB64: string): ServiceAccountCredentials {
+  const diag = inspectSecretB64(serviceAccountB64);
   try {
-    const jsonStr = base64ToUtf8(serviceAccountB64);
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    let jsonStr: string;
+    try {
+      jsonStr = base64ToUtf8(serviceAccountB64);
+    } catch {
+      logContentError({
+        event: 'content_error',
+        stage: 'secret_decode',
+        errorName: 'DecodeError',
+        detail: 'Base64 decoding failed for service account secret',
+        ...diag,
+      });
+      throw new Error('Failed to parse service account credentials: Base64 decoding failed');
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    } catch {
+      logContentError({
+        event: 'content_error',
+        stage: 'secret_decode',
+        errorName: 'SyntaxError',
+        detail: 'JSON parsing failed for service account secret',
+        ...diag,
+      });
+      throw new Error('Failed to parse service account credentials: JSON parsing failed');
+    }
 
     if (
       typeof parsed.client_email !== 'string' ||
@@ -72,6 +105,13 @@ export function parseServiceAccountB64(serviceAccountB64: string): ServiceAccoun
       typeof parsed.private_key !== 'string' ||
       parsed.private_key.trim().length === 0
     ) {
+      logContentError({
+        event: 'content_error',
+        stage: 'secret_decode',
+        errorName: 'ValidationError',
+        detail: 'Missing client_email or private_key in service account credentials',
+        ...diag,
+      });
       throw new Error('Missing client_email or private_key in service account credentials.');
     }
 
@@ -80,8 +120,10 @@ export function parseServiceAccountB64(serviceAccountB64: string): ServiceAccoun
       private_key: parsed.private_key.trim(),
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Invalid format';
-    throw new Error(`Failed to parse service account credentials: ${msg}`);
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error('Failed to parse service account credentials');
   }
 }
 
@@ -89,15 +131,44 @@ export class ServiceAccountTokenProvider {
   private readonly credentials: ServiceAccountCredentials;
   private readonly fetchFn: FetchFunction;
   private readonly nowFn: () => number;
+  private readonly sleepFn: (ms: number) => Promise<void>;
+  private readonly diagnosticFlags: {
+    readonly hasSecret: boolean;
+    readonly hasClientEmail: boolean;
+    readonly hasPrivateKey: boolean;
+    readonly isPemFormatValid: boolean;
+  };
 
   private cachedToken: CachedToken | null = null;
   private inFlightPromise: Promise<string> | null = null;
   private privateKeyPromise: Promise<CryptoKey> | null = null;
 
   constructor(serviceAccountB64: string, options?: ServiceAccountAuthOptions) {
+    this.diagnosticFlags = inspectSecretB64(serviceAccountB64);
     this.credentials = parseServiceAccountB64(serviceAccountB64);
-    this.fetchFn = options?.fetchFn ?? fetch;
-    this.nowFn = options?.nowFn ?? Date.now;
+    const injectedFetch = options?.fetchFn;
+    this.fetchFn = injectedFetch
+      ? ((url: string, init?: RequestInit) => injectedFetch(url, init))
+      : ((url: string, init?: RequestInit) => fetch(url, init));
+
+    const injectedNow = options?.nowFn;
+    this.nowFn = injectedNow
+      ? (() => injectedNow())
+      : (() => Date.now());
+
+    const injectedSleep = options?.sleepFn;
+    this.sleepFn = injectedSleep
+      ? ((ms: number) => injectedSleep(ms))
+      : ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  }
+
+  get diagnostics(): {
+    readonly hasSecret: boolean;
+    readonly hasClientEmail: boolean;
+    readonly hasPrivateKey: boolean;
+    readonly isPemFormatValid: boolean;
+  } {
+    return this.diagnosticFlags;
   }
 
   /**
@@ -106,17 +177,28 @@ export class ServiceAccountTokenProvider {
   private async getCryptoKey(): Promise<CryptoKey> {
     if (!this.privateKeyPromise) {
       this.privateKeyPromise = (async () => {
-        const pkcs8Bytes = pemToPkcs8Bytes(this.credentials.private_key);
-        return crypto.subtle.importKey(
-          'pkcs8',
-          pkcs8Bytes,
-          {
-            name: 'RSASSA-PKCS1-v1_5',
-            hash: 'SHA-256',
-          },
-          false,
-          ['sign']
-        );
+        try {
+          const pkcs8Bytes = pemToPkcs8Bytes(this.credentials.private_key);
+          return await crypto.subtle.importKey(
+            'pkcs8',
+            pkcs8Bytes,
+            {
+              name: 'RSASSA-PKCS1-v1_5',
+              hash: 'SHA-256',
+            },
+            false,
+            ['sign']
+          );
+        } catch (err: unknown) {
+          logContentError({
+            event: 'content_error',
+            stage: 'jwt_sign',
+            errorName: err instanceof Error ? err.name : 'CryptoKeyImportError',
+            detail: 'Web Crypto PKCS8 private key import failed',
+            ...this.diagnosticFlags,
+          });
+          throw err;
+        }
       })();
     }
     return this.privateKeyPromise;
@@ -143,7 +225,19 @@ export class ServiceAccountTokenProvider {
     const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
 
     const privateKey = await this.getCryptoKey();
-    const signatureBytes = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, signedData);
+    let signatureBytes: ArrayBuffer;
+    try {
+      signatureBytes = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, signedData);
+    } catch (err: unknown) {
+      logContentError({
+        event: 'content_error',
+        stage: 'jwt_sign',
+        errorName: err instanceof Error ? err.name : 'CryptoSignError',
+        detail: 'Web Crypto RSASSA-PKCS1-v1_5 signature generation failed',
+        ...this.diagnosticFlags,
+      });
+      throw err;
+    }
     const signatureB64 = uint8ArrayToBase64Url(new Uint8Array(signatureBytes));
 
     return `${headerB64}.${payloadB64}.${signatureB64}`;
@@ -170,28 +264,110 @@ export class ServiceAccountTokenProvider {
     this.inFlightPromise = (async () => {
       try {
         const assertion = await this.createAssertionJwt();
-        const body = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${encodeURIComponent(
-          assertion
-        )}`;
+        const params = new URLSearchParams();
+        params.set('grant_type', 'urn:ietf:params:oauth:grant-type:jwt-bearer');
+        params.set('assertion', assertion);
+        const body = params.toString();
 
-        const res = await this.fetchFn(GOOGLE_TOKEN_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body,
-        });
+        let lastFetchErr: unknown = null;
+        let res: Response | null = null;
+
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            res = await this.fetchFn(GOOGLE_TOKEN_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Accept: 'application/json',
+              },
+              body,
+            });
+
+            // 5xx ise ve ilk deneme ise 300 ms bekle ve yeniden dene
+            if (res.status >= 500 && attempt === 1) {
+              await this.sleepFn(300);
+              continue;
+            }
+
+            // Başarılı (2xx), 4xx (yeniden denenmez) veya 2. denemedeki 5xx -> çık
+            break;
+          } catch (fetchErr: unknown) {
+            lastFetchErr = fetchErr;
+            if (attempt === 1) {
+              await this.sleepFn(300);
+              continue;
+            }
+          }
+        }
+
+        if (!res) {
+          logContentError({
+            event: 'content_error',
+            stage: 'token_exchange',
+            errorName: lastFetchErr instanceof Error ? lastFetchErr.name : 'NetworkError',
+            detail: 'Network failure during OAuth2 token exchange request',
+            causeCode: extractCauseCode(lastFetchErr),
+            message: extractErrorMessage(lastFetchErr),
+            ...this.diagnosticFlags,
+          });
+          throw lastFetchErr;
+        }
 
         if (!res.ok) {
+          let googleErrorCode: string | undefined;
+          let googleErrorDesc: string | undefined;
+          try {
+            const errData = (await res.json()) as Record<string, unknown>;
+            if (typeof errData.error === 'string') {
+              googleErrorCode = errData.error;
+            }
+            if (typeof errData.error_description === 'string') {
+              googleErrorDesc = errData.error_description;
+            }
+          } catch {
+            // Yanıt JSON değilse hata kodunu okumayı atla
+          }
+
+          logContentError({
+            event: 'content_error',
+            stage: 'token_exchange',
+            status: res.status,
+            errorName: 'OAuthTokenError',
+            code: googleErrorCode,
+            detail:
+              googleErrorDesc ||
+              googleErrorCode ||
+              `OAuth2 token exchange failed with HTTP status ${res.status}`,
+            ...this.diagnosticFlags,
+          });
+
           throw new Error(`OAuth2 token exchange failed with HTTP status ${res.status}`);
         }
 
-        const data = (await res.json()) as {
-          access_token?: string;
-          expires_in?: number;
-        };
+        let data: { access_token?: string; expires_in?: number };
+        try {
+          data = (await res.json()) as { access_token?: string; expires_in?: number };
+        } catch (jsonErr: unknown) {
+          logContentError({
+            event: 'content_error',
+            stage: 'token_exchange',
+            status: res.status,
+            errorName: jsonErr instanceof Error ? jsonErr.name : 'SyntaxError',
+            detail: 'Failed to parse OAuth2 token exchange response as JSON',
+            ...this.diagnosticFlags,
+          });
+          throw jsonErr;
+        }
 
         if (typeof data.access_token !== 'string' || !data.access_token) {
+          logContentError({
+            event: 'content_error',
+            stage: 'token_exchange',
+            status: res.status,
+            errorName: 'OAuthTokenError',
+            detail: 'OAuth2 response did not contain access_token',
+            ...this.diagnosticFlags,
+          });
           throw new Error('OAuth2 response did not contain access_token.');
         }
 

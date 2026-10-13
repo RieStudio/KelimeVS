@@ -259,9 +259,11 @@ export async function verifyToken(
     return null; // auth_time gelecekte
   }
 
-  // İmza doğrulaması
   const keyCache = options?.keyCache ?? defaultKeyCache;
-  const fetchFn = options?.fetchFn ?? fetch;
+  const injectedFetch = options?.fetchFn;
+  const fetchFn: FetchFunction = injectedFetch
+    ? ((url: string) => injectedFetch(url))
+    : ((url: string) => fetch(url));
 
   const cryptoKey = await getOrFetchKey(header.kid, keyCache, fetchFn, nowMs);
   if (!cryptoKey) {

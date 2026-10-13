@@ -3,19 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "tsx tools/e2e.ts",
+    "ghost": "tsx tools/ghost-opponent.ts",
     "check:content": "tsx tools/check-content.ts",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "dev:real": "wrangler dev --var CONTENT_SOURCE:realtime",
     "start": "wrangler dev",
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^5.5.2",
     "vitest": "^5.0.3",
-    "wrangler": "^4.149.0"
+    "wrangler": "^4.149.0",
+    "ws": "^8.22.0"
   }
 }

@@ -62,6 +62,38 @@ npx wrangler dev
 ```
 Sunucu varsayılan olarak `http://127.0.0.1:8787` üzerinde çalışır.
 
+### 🌐 Gerçek Realtime Database ile Yerel Test (`npm run dev:real`)
+Yerel workerd ortamında gerçek Firebase Realtime Database bağlantısını ve servis hesabı doğrulamasını test etmek için:
+```bash
+npm run dev:real
+```
+Bu komut, `CONTENT_SOURCE:realtime` değişkenini ileterek `.dev.vars` dosyasındaki gerçek `FIREBASE_DATABASE_URL` ve `FIREBASE_SERVICE_ACCOUNT_B64` yapılandırmasını kullanır.
+
+### 🔍 Canlı Günlük İzleme (Cloudflare Workers Tail) ve İçerik Tanılama
+Yayındaki sunucuda içerik hatası (`content_unavailable`) oluştuğunda günlüğü canlı izlemek için:
+```bash
+npx wrangler tail
+```
+İçerik hattındaki olası hatalar tek satırlık yapılandırılmış JSON olarak `console.warn` ile günlüğe düşer (`event: "content_error"`).
+
+Örnek çıktı:
+```json
+{"event":"content_error","stage":"token_exchange","status":400,"errorName":"OAuthTokenError","code":"invalid_grant","detail":"Invalid JWT Signature.","hasSecret":true,"hasClientEmail":true,"hasPrivateKey":true,"isPemFormatValid":true}
+```
+
+#### Tail çıktısında aranacak aşamalar (`stage`):
+1. **`secret_missing`**: Ortam değişkenleri (`FIREBASE_DATABASE_URL` veya `FIREBASE_SERVICE_ACCOUNT_B64`) eksik ya da yer tutucu.
+2. **`secret_decode`**: Servis hesabı Base64 dizesi bozuk, JSON biçimi geçersiz ya da `client_email` / `private_key` alanları eksik.
+3. **`jwt_sign`**: Web Crypto PKCS8 özel anahtarını içe aktaramadı (`importKey`) ya da JWT assertion imzalanamadı (`sign`).
+4. **`token_exchange`**: Google OAuth2 uç noktasına erişilemedi (ağ hatası) ya da Google `invalid_grant` / `invalid_client` gibi bir HTTP hatası döndürdü.
+5. **`rtdb_fetch`**: Firebase Realtime Database'e bağlanılamadı ya da RTDB HTTP 401/403 (yetki reddi) döndürdü.
+6. **`parse`**: RTDB yanıtı geçerli JSON değil ya da soru havuzunda oynanabilir 8 soru bulunamadı.
+
+#### Güvenlik Güvencesi:
+- Base64 secret, private key, client email, access token, JWT assertion ve URL sorgu parametreleri (`?access_token=...`) ASLA loglanmaz.
+- `hasSecret`, `hasClientEmail`, `hasPrivateKey`, `isPemFormatValid` alanları YALNIZCA boolean (`true`/`false`) değer içerir; anahtar boyutu veya içeriği yazılmaz.
+- Tekrarlanan aynı hata 10 saniye boyunca log spam'i oluşturmayacak şekilde filtrelenir.
+
 Sağlık kontrolü testi:
 ```bash
 # Yerel geliştirme ortamı:
@@ -105,6 +137,45 @@ npm run e2e
 - **(f)** Bağlantı kopması, 1 sn içinde geri dönüş ve kopup geri dönmeme sonucu forfeit.
 - **(g)** Rakip bağlanmadığında maçın iptali (`voided` - opponent_absent).
 - **(h)** Yetkisiz 3. oyuncunun odaya sızmasının engellenmesi (HTTP 403 Forbidden).
+
+### 4. Canlı Sunucu "Hayalet Rakip" Test Aracı (Ghost Opponent)
+Gerçek sunucuya karşı telefonunuzla ya da başka bir istemciyle eşleşip maç oynamak, bağlantı kopmasını ve süre aşımlarını test etmek için kullanılan otomatik rakip betiği:
+
+#### Firebase Web API Anahtarının Temini:
+Anonim Firebase girişi yapabilmek için Firebase Web API anahtarı gereklidir:
+- Flutter projesindeki `app/lib/firebase_options.dart` dosyasındaki `apiKey` değerinden veya Firebase Console -> Proje Ayarları -> Web API Anahtarı bölümünden alınabilir.
+- `server/.dev.vars` içine şu satır eklenebilir:
+  ```env
+  FIREBASE_WEB_API_KEY=AIzaSy...
+  ```
+  *(Bu dosya `.gitignore` kapsamındadır ve versiyon kontrolüne girmez.)*
+- Alternatif olarak `FIREBASE_WEB_API_KEY` ortam değişkeniyle veya `--api-key=...` komut satırı argümanıyla verilebilir.
+
+#### Kullanım ve Örnek Komutlar:
+
+```bash
+# 1. Normal oyun modu (play - varsayılan):
+# 2-6 sn bekleyip geçerli cevap gönderir (%20 ihtimalle önce yanlış dener)
+npm run ghost -- --mode=play
+
+# 2. Hareketsiz mod (idle):
+# Kuyruğa girer, eşleşir ama hiç cevap göndermez (süre aşımı testleri için)
+npm run ghost -- --mode=idle
+
+# 3. Maçı terk etme modu (leave):
+# 15 sn sonra (veya --leave-after=<sn>) maçı terk eder (forfeit testi için)
+npm run ghost -- --mode=leave --leave-after=10
+
+# 4. Bağlantı koparma modu (drop):
+# 15 sn sonra (veya --drop-after=<sn>) soketi kapatır ve 5 sn sonra geri dönüp sync ister
+npm run ghost -- --mode=drop --drop-after=15 --back-after=5
+
+# 5. Ardışık birden fazla maç oynama:
+npm run ghost -- --mode=play --rounds=3
+
+# 6. Farklı sunucu adresi ve doğrudan API anahtarı verme:
+npm run ghost -- --url=wss://api.riestudio.com.tr --api-key=AIzaSy... --mode=play
+```
 
 ---
 
