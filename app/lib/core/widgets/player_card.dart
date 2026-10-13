@@ -20,6 +20,7 @@ class PlayerCard extends StatelessWidget {
   final bool isActive;
   final int? remainingSeconds;
   final double? timeProgress;
+  final String? statusNote;
 
   const PlayerCard({
     super.key,
@@ -29,6 +30,7 @@ class PlayerCard extends StatelessWidget {
     this.isActive = false,
     this.remainingSeconds,
     this.timeProgress,
+    this.statusNote,
   });
 
   @override
@@ -79,7 +81,7 @@ class PlayerCard extends StatelessWidget {
                 ),
               ),
 
-            // İçerik: Avatar, Ad (+ opsiyonel Kalan Süre) ve Skor
+            // İçerik: Avatar, Ad (+ opsiyonel Durum Notu / Kalan Süre) ve Skor
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimens.space10,
@@ -100,6 +102,13 @@ class PlayerCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (statusNote != null)
+                          Text(
+                            statusNote!,
+                            style: AppTextStyles.opponentConnectionNote,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         if (isActive && remainingSeconds != null)
                           Text(
                             '$remainingSeconds${AppStrings.secondsSuffix}',

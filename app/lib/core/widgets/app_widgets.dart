@@ -13,4 +13,5 @@ export 'result_circle.dart';
 export 'coin_pill.dart';
 export 'kelime_go_logo.dart';
 export 'match_card.dart';
+export 'connection_banner.dart';
 

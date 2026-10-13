@@ -154,5 +154,9 @@ abstract final class AppStrings {
 
   // Çevrimiçi Maç Bağlantı Durumu
   static const String connectionLostNotice = 'Bağlantı koptu. Ana ekrana dönülüyor.';
+  static const String connectionReconnecting = 'Bağlantı koptu, yeniden bağlanılıyor…';
+  static const String connectionRestored = 'Bağlandı';
+  static const String opponentDisconnectedNote = 'Bağlantı koptu';
+  static const String matchReplacedNotice = 'Maçı başka bir cihazda açtın';
 }
 

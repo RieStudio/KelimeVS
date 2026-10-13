@@ -252,5 +252,32 @@ abstract final class AppTextStyles {
     color: AppColors.ink,
     height: 1.2,
   );
+
+  // Bağlantı uyarısı (Nunito, 13, 800)
+  static const TextStyle connectionBanner = TextStyle(
+    fontFamily: fontNunito,
+    fontSize: 13,
+    fontWeight: FontWeight.w800,
+    color: AppColors.dangerText,
+    height: 1.2,
+  );
+
+  // Bağlantı geri geldi hapı (Nunito, 13, 800)
+  static const TextStyle connectionRestored = TextStyle(
+    fontFamily: fontNunito,
+    fontSize: 13,
+    fontWeight: FontWeight.w800,
+    color: AppColors.ink,
+    height: 1.2,
+  );
+
+  // Rakip bağlantı koptu notu (Nunito, 12, 800)
+  static const TextStyle opponentConnectionNote = TextStyle(
+    fontFamily: fontNunito,
+    fontSize: 12,
+    fontWeight: FontWeight.w800,
+    color: AppColors.dangerText,
+    height: 1.2,
+  );
 }
 

@@ -52,6 +52,8 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 
 - **[KARAR]** Maçı bilerek terk eden (çıkış butonu) maçı kaybeder.
 - **[KARAR]** Bağlantı kopması: oyuncunun sırası geldiğinde süre normal işlemeye devam eder; süre dolarsa turu kaybeder. Kopan oyuncu belirli bir süre (**[VARSAYIM]** 30 sn, Remote Config'ten ayarlanır) geri dönmezse maçı terk etmiş sayılır ve rakip kazanır. Geri dönen oyuncu güncel maç durumunu sunucudan alır.
+- **[KARAR]** Uygulama arka plana alınır ya da ekran kilitlenirse maç durmaz: süre sunucuda akmaya devam eder ve bağlantı kopmuş sayılır (yukarıdaki kural). Uygulama öne dönünce istemci hemen yeniden bağlanır ve güncel durumu sunucudan alır.
+- Bağlantısı kopan oyuncu kendi ekranında bir bağlantı uyarısı görür; rakibi de karşı tarafın bağlantısının koptuğunu görür (rakip kartında küçük bir not). Geri sayım süresi gösterilmez.
 - Bağlantı kopması sunucu tarafından algılanır (WebSocket kapanışı ve periyodik ping); 30 sn'lik bekleme süresi Durable Object alarmıyla sayılır.
 
 ## 4. Cevap doğrulama

@@ -44,6 +44,12 @@ enum MatchFeedbackType {
   nearMiss,
 }
 
+enum ConnectionStatus {
+  connected,
+  reconnecting,
+  permanentDisconnected,
+}
+
 class MatchUiState {
   final MatchState? matchState;
   final int remainingMs;
@@ -62,9 +68,11 @@ class MatchUiState {
   final int roundTransitionRemainingMs;
   final int roundTransitionTotalMs;
   final MatchHistoryEntry? lastSavedMatch;
+  final ConnectionStatus connectionStatus;
   final bool opponentConnected;
   final bool isVoided;
   final bool isDisconnectedPermanent;
+  final bool isDisconnectedReplaced;
 
   const MatchUiState({
     this.matchState,
@@ -84,10 +92,15 @@ class MatchUiState {
     this.roundTransitionRemainingMs = 0,
     this.roundTransitionTotalMs = 3000,
     this.lastSavedMatch,
+    this.connectionStatus = ConnectionStatus.connected,
     this.opponentConnected = true,
     this.isVoided = false,
     this.isDisconnectedPermanent = false,
+    this.isDisconnectedReplaced = false,
   });
+
+  ConnectionStatus get kendiBaglanti => connectionStatus;
+  bool get rakipBagli => opponentConnected;
 
   bool get isMyTurn =>
       matchState?.phase == MatchPhase.roundActive &&
@@ -130,9 +143,11 @@ class MatchUiState {
     int? roundTransitionRemainingMs,
     int? roundTransitionTotalMs,
     MatchHistoryEntry? lastSavedMatch,
+    ConnectionStatus? connectionStatus,
     bool? opponentConnected,
     bool? isVoided,
     bool? isDisconnectedPermanent,
+    bool? isDisconnectedReplaced,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -154,10 +169,13 @@ class MatchUiState {
       roundTransitionTotalMs:
           roundTransitionTotalMs ?? this.roundTransitionTotalMs,
       lastSavedMatch: lastSavedMatch ?? this.lastSavedMatch,
+      connectionStatus: connectionStatus ?? this.connectionStatus,
       opponentConnected: opponentConnected ?? this.opponentConnected,
       isVoided: isVoided ?? this.isVoided,
       isDisconnectedPermanent:
           isDisconnectedPermanent ?? this.isDisconnectedPermanent,
+      isDisconnectedReplaced:
+          isDisconnectedReplaced ?? this.isDisconnectedReplaced,
     );
   }
 }

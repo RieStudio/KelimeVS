@@ -140,8 +140,9 @@ void main() {
       // Yeniden bağlanmasını bekle
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(events.length, 2);
-      expect(events[1], isA<OnlineMatchConnected>());
+      expect(events.length, 3);
+      expect(events[1], isA<OnlineMatchReconnecting>());
+      expect(events[2], isA<OnlineMatchConnected>());
 
       // Yeniden bağlanınca "sync" mesajı gitmeli
       expect(

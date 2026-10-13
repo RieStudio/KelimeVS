@@ -176,6 +176,8 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
     switch (event) {
       case OnlineMatchConnected():
         _addLog('connected: Maç odasına bağlanıldı.');
+      case OnlineMatchReconnecting():
+        _addLog('reconnecting: Yeniden bağlanılıyor...');
       case OnlineMatchStateUpdate(:final state):
         setState(() {
           _currentState = state;

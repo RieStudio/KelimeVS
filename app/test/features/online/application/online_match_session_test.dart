@@ -80,6 +80,19 @@ class FakeOnlineMatchClient extends OnlineMatchClient {
     closeCalled = true;
   }
 
+  bool pausedCalled = false;
+  bool resumedCalled = false;
+
+  @override
+  void handleAppPaused() {
+    pausedCalled = true;
+  }
+
+  @override
+  Future<void> handleAppResumed() async {
+    resumedCalled = true;
+  }
+
   @override
   Future<void> dispose() async {
     await close();
@@ -740,6 +753,190 @@ void main() {
       expect(repo.entries.first.id, 'm_leave_state_only');
       expect(repo.entries.first.endType, MatchEndType.forfeit);
       expect(repo.entries.first.botlaOynandi, isFalse);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '10. OnlineMatchReconnecting ve OnlineMatchConnected kendiBağlantı durumunu günceller',
+    () async {
+      final client = FakeOnlineMatchClient();
+      final repo = FakeHistoryRepo();
+
+      final container = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_conn_status',
+        opponentName: 'Zeynep',
+        client: client,
+      );
+
+      expect(session.state.kendiBaglanti, ConnectionStatus.connected);
+
+      client.emit(const OnlineMatchReconnecting());
+      expect(session.state.kendiBaglanti, ConnectionStatus.reconnecting);
+
+      client.emit(const OnlineMatchConnected());
+      expect(session.state.kendiBaglanti, ConnectionStatus.connected);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '11. opponentConnected false olunca rakipBağlı false olur, true gelince düzelir',
+    () async {
+      final client = FakeOnlineMatchClient();
+      final repo = FakeHistoryRepo();
+
+      final container = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_opp_status',
+        opponentName: 'Zeynep',
+        client: client,
+      );
+
+      expect(session.state.rakipBagli, isTrue);
+
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 10000,
+            receivedLocalMs: 10000,
+            phase: OnlineMatchPhase.roundActive,
+            roundNumber: 1,
+            myScore: 0,
+            opponentScore: 0,
+            turnIsMine: true,
+            deadlineMs: 25000,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Zeynep',
+            opponentConnected: false,
+          ),
+        ),
+      );
+
+      expect(session.state.rakipBagli, isFalse);
+      expect(session.state.opponentConnected, isFalse);
+
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 12000,
+            receivedLocalMs: 12000,
+            phase: OnlineMatchPhase.roundActive,
+            roundNumber: 1,
+            myScore: 0,
+            opponentScore: 0,
+            turnIsMine: true,
+            deadlineMs: 25000,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Zeynep',
+            opponentConnected: true,
+          ),
+        ),
+      );
+
+      expect(session.state.rakipBagli, isTrue);
+      expect(session.state.opponentConnected, isTrue);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '12. DisconnectReason.replaced durumunda isDisconnectedReplaced: true olur, kalıcı kopmada false kalır',
+    () async {
+      final client1 = FakeOnlineMatchClient();
+      final repo1 = FakeHistoryRepo();
+
+      final container1 = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo1),
+        ],
+      );
+      addTearDown(container1.dispose);
+
+      final session1 = container1.read(onlineMatchSessionProvider.notifier);
+      await session1.startOnlineMatch(
+        matchId: 'm_replaced',
+        opponentName: 'Ayşe',
+        client: client1,
+      );
+
+      client1.emit(const OnlineMatchDisconnected(DisconnectReason.replaced));
+
+      expect(session1.state.isDisconnectedPermanent, isTrue);
+      expect(session1.state.isDisconnectedReplaced, isTrue);
+      expect(repo1.entries, isEmpty); // Geçmişe kayıt yazılmaz!
+
+      final client2 = FakeOnlineMatchClient();
+      final repo2 = FakeHistoryRepo();
+
+      final container2 = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo2),
+        ],
+      );
+      addTearDown(container2.dispose);
+
+      final session2 = container2.read(onlineMatchSessionProvider.notifier);
+      await session2.startOnlineMatch(
+        matchId: 'm_permanent',
+        opponentName: 'Mehmet',
+        client: client2,
+      );
+
+      client2.emit(const OnlineMatchDisconnected(DisconnectReason.permanent));
+
+      expect(session2.state.isDisconnectedPermanent, isTrue);
+      expect(session2.state.isDisconnectedReplaced, isFalse);
+      expect(repo2.entries, isEmpty); // Geçmişe kayıt yazılmaz!
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '13. OnlineMatchSession yaşam döngüsü çağrılarını client\'a aktarır',
+    () async {
+      final client = FakeOnlineMatchClient();
+      final repo = FakeHistoryRepo();
+
+      final container = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_lifecycle',
+        opponentName: 'Burak',
+        client: client,
+      );
+
+      expect(client.pausedCalled, isFalse);
+      expect(client.resumedCalled, isFalse);
+
+      session.didChangeAppLifecycleState(AppLifecycleState.paused);
+      expect(client.pausedCalled, isTrue);
+
+      session.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      expect(client.resumedCalled, isTrue);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

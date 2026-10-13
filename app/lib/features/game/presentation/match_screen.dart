@@ -132,15 +132,22 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     );
 
     ref.listen<bool>(
-      activeMatchUiStateProvider.select((s) => s.isDisconnectedPermanent),
+      activeMatchUiStateProvider.select(
+        (s) => s.isDisconnectedPermanent || s.isDisconnectedReplaced,
+      ),
       (prev, next) {
         if (next && !(prev ?? false) && mounted) {
-          // TODO: 4.5d'de ayrıntılı bağlantı kopma deneyimi
+          final isReplaced =
+              ref.read(activeMatchUiStateProvider).isDisconnectedReplaced;
           final messenger = ScaffoldMessenger.maybeOf(context);
           Navigator.of(context).popUntil((route) => route.isFirst);
           messenger?.showSnackBar(
-            const SnackBar(
-              content: Text(AppStrings.connectionLostNotice),
+            SnackBar(
+              content: Text(
+                isReplaced
+                    ? AppStrings.matchReplacedNotice
+                    : AppStrings.connectionLostNotice,
+              ),
             ),
           );
         }
@@ -251,6 +258,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           isActive: isBotTurn,
                           remainingSeconds: isBotTurn ? remainingSec : null,
                           timeProgress: isBotTurn ? timeProgress : null,
+                          statusNote: !uiState.opponentConnected
+                              ? AppStrings.opponentDisconnectedNote
+                              : null,
                         ),
                       ),
                     ],
@@ -298,6 +308,17 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                 ],
               ),
             ),
+
+            // 1.5 Bağlantı Uyarısı Şeridi (üst çubuğun hemen altında, içeriğin üstüne biner)
+            if (!uiState.isMatchFinished && matchState != null)
+              Positioned(
+                top: AppDimens.space8 + AppDimens.iconButtonSize + 2,
+                left: 0,
+                right: 0,
+                child: ConnectionBanner(
+                  status: uiState.kendiBaglanti,
+                ),
+              ),
 
             // 6. Tur Sonu Ekranı
             if (uiState.isRoundEnded)

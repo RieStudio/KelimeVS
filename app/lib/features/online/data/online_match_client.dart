@@ -35,6 +35,14 @@ class OnlineMatchConnected extends OnlineMatchEvent {
   String toString() => 'OnlineMatchConnected()';
 }
 
+/// Bağlantı koptu ve yeniden bağlanmaya çalışılıyor.
+class OnlineMatchReconnecting extends OnlineMatchEvent {
+  const OnlineMatchReconnecting();
+
+  @override
+  String toString() => 'OnlineMatchReconnecting()';
+}
+
 /// Canlı maç durumu güncellendi (`state`).
 class OnlineMatchStateUpdate extends OnlineMatchEvent {
   final OnlineMatchState state;
@@ -119,9 +127,18 @@ class OnlineMatchClient {
 
   bool _isClosed = false;
   bool _isReconnecting = false;
+  bool _isPaused = false;
+  Completer<void>? _delayCompleter;
+  Completer<void>? _resumeCompleter;
   int _lastSubmitTimeMs = 0;
   int? _reconnectStartTimeMs;
   int _reconnectAttempt = 0;
+
+  /// İstemcinin şu anda yeniden bağlanma sürecinde olup olmadığı.
+  bool get isReconnecting => _isReconnecting;
+
+  /// WebSocket bağlantısının aktif olup olmadığı.
+  bool get isConnected => _connection != null;
 
   OnlineMatchClient({
     WebSocketConnector? connector,
@@ -257,13 +274,26 @@ class OnlineMatchClient {
   }
 
   Future<void> _scheduleReconnection() async {
+    if (_isClosed) return;
     _isReconnecting = true;
+    _emit(const OnlineMatchReconnecting());
     await _cleanupConnection();
 
     final now = _clock();
     _reconnectStartTimeMs ??= now;
 
     while (!_isClosed) {
+      if (_isPaused) {
+        final resumeCompleter = Completer<void>();
+        _resumeCompleter = resumeCompleter;
+        await resumeCompleter.future;
+        _resumeCompleter = null;
+        if (_isClosed) {
+          _isReconnecting = false;
+          return;
+        }
+      }
+
       final currentNow = _clock();
       final elapsed = currentNow - _reconnectStartTimeMs!;
 
@@ -291,12 +321,22 @@ class OnlineMatchClient {
           : delay;
 
       if (actualDelay.inMilliseconds > 0) {
-        await _delayFunction(actualDelay);
+        final delayCompleter = Completer<void>();
+        _delayCompleter = delayCompleter;
+        await Future.any([
+          _delayFunction(actualDelay),
+          delayCompleter.future,
+        ]);
+        _delayCompleter = null;
       }
 
       if (_isClosed) {
         _isReconnecting = false;
         return;
+      }
+
+      if (_isPaused) {
+        continue;
       }
 
       final success = await _performConnect();
@@ -311,6 +351,40 @@ class OnlineMatchClient {
     }
 
     _isReconnecting = false;
+  }
+
+  /// Uygulama arka plana geçtiğinde (paused/inactive) çağrılır.
+  ///
+  /// Maç terk edilmez (leave gönderilmez), sunucu maçı odada yürütmeye devam eder.
+  /// Arka planda geçen süre 25 saniyelik yerel yeniden bağlanma penceresini tüketmez.
+  void handleAppPaused() {
+    if (_isClosed) return;
+    _isPaused = true;
+  }
+
+  /// Uygulama öne geldiğinde (resumed) çağrılır.
+  ///
+  /// - Bağlantı hâlâ açıksa: hemen bir `sync` isteği gönderilir.
+  /// - Bağlantı kopmuşsa: backoff beklemesini beklemeden DERHAL yeniden bağlanma tetiklenir
+  ///   (backoff sayacı sıfırlanır, 25 sn pencere resumed anından itibaren sıfırdan başlar).
+  Future<void> handleAppResumed() async {
+    if (_isClosed) return;
+    _isPaused = false;
+    _resumeCompleter?.complete();
+    _resumeCompleter = null;
+
+    if (_connection != null && !_isReconnecting) {
+      await sync();
+    } else {
+      _reconnectAttempt = 0;
+      _reconnectStartTimeMs = _clock();
+      _delayCompleter?.complete();
+      _delayCompleter = null;
+
+      if (!_isReconnecting) {
+        unawaited(_scheduleReconnection());
+      }
+    }
   }
 
   /// Cevap gönderir.
@@ -358,6 +432,11 @@ class OnlineMatchClient {
     if (_isClosed) return;
     _isClosed = true;
     _isReconnecting = false;
+    _isPaused = false;
+    _delayCompleter?.complete();
+    _delayCompleter = null;
+    _resumeCompleter?.complete();
+    _resumeCompleter = null;
 
     await _cleanupConnection();
     _emit(const OnlineMatchDisconnected(DisconnectReason.closed));

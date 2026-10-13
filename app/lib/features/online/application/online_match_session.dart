@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
@@ -128,7 +129,9 @@ abstract final class OnlineMatchHistoryMapper {
 }
 
 /// Çevrimiçi sunucu maçını yöneten ve [MatchUiState] üreten oturum sınıfı.
-class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession {
+class OnlineMatchSession extends Notifier<MatchUiState>
+    with WidgetsBindingObserver
+    implements MatchSession {
   final GameClock? _injectedClock;
   final math.Random? _injectedRandom;
   final TextFilter? _injectedTextFilter;
@@ -156,6 +159,7 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
   String? _currentMatchId;
   bool _isMatchSaved = false;
   bool _isLeaving = false;
+  bool _isObserverRegistered = false;
 
   /// Maç boyunca `state` mesajlarından gelen soru metinlerinin önbelleği (`questionId -> text`).
   final Map<String, String> _questionTextCache = {};
@@ -177,6 +181,26 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
   TextFilter get _textFilter =>
       _injectedTextFilter ?? ref.read(textFilterProvider);
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      handleAppPaused();
+    } else if (state == AppLifecycleState.resumed) {
+      handleAppResumed();
+    }
+  }
+
+  /// Yaşam döngüsü: uygulama arka plana geçtiğinde (paused/inactive) maçı terk etmez.
+  void handleAppPaused() {
+    _client?.handleAppPaused();
+  }
+
+  /// Yaşam döngüsü: uygulama öne geldiğinde (resumed) sync gönderir veya derhal bağlanır.
+  void handleAppResumed() {
+    _client?.handleAppResumed();
+  }
+
   /// Yeni bir çevrimiçi maç oturumu başlatır ve [matchId] odasına bağlanır.
   Future<void> startOnlineMatch({
     required String matchId,
@@ -184,6 +208,11 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
     OnlineMatchClient? client,
   }) async {
     _cleanupSession();
+
+    if (!_isObserverRegistered) {
+      WidgetsBinding.instance.addObserver(this);
+      _isObserverRegistered = true;
+    }
 
     _currentMatchId = matchId;
     _isMatchSaved = false;
@@ -196,9 +225,11 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
     state = MatchUiState(
       isLoading: true,
       opponentName: opponentName,
+      connectionStatus: ConnectionStatus.connected,
       opponentConnected: true,
       isVoided: false,
       isDisconnectedPermanent: false,
+      isDisconnectedReplaced: false,
     );
 
     final activeClient =
@@ -212,7 +243,11 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
   }
 
   void _handleEvent(OnlineMatchEvent event) {
-    if (event is OnlineMatchStateUpdate) {
+    if (event is OnlineMatchReconnecting) {
+      state = state.copyWith(connectionStatus: ConnectionStatus.reconnecting);
+    } else if (event is OnlineMatchConnected) {
+      state = state.copyWith(connectionStatus: ConnectionStatus.connected);
+    } else if (event is OnlineMatchStateUpdate) {
       _handleStateUpdate(event.state);
     } else if (event is OnlineMatchFeedback) {
       _handleFeedback(event);
@@ -399,6 +434,7 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
       matchState: mappedMatchState,
       remainingMs: remainingMs,
       opponentName: updatedOpponentName,
+      connectionStatus: ConnectionStatus.connected,
       opponentConnected: onlineState.opponentConnected,
       isLoading: false,
       acceptedAnswers: acceptedAnswers,
@@ -567,10 +603,14 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
         unawaited(client.close());
       }
 
+      final isReplaced = reason == DisconnectReason.replaced;
+
       // Yenilgi yazılmaz; bağlantı koptu durumuyla sonlandırılır
       state = state.copyWith(
         isLoading: false,
+        connectionStatus: ConnectionStatus.permanentDisconnected,
         isDisconnectedPermanent: true,
+        isDisconnectedReplaced: isReplaced,
       );
     }
   }
@@ -701,6 +741,10 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
 
   void _cleanupSession() {
     _cancelAllTimers();
+    if (_isObserverRegistered) {
+      WidgetsBinding.instance.removeObserver(this);
+      _isObserverRegistered = false;
+    }
     final sub = _subscription;
     _subscription = null;
     if (sub != null) {

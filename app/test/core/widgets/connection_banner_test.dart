@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/connection_banner.dart';
+import 'package:app/features/game/application/match_ui_state.dart';
+
+void main() {
+  Widget buildTestWidget({
+    required ConnectionStatus status,
+    Duration debounceDuration = const Duration(milliseconds: 700),
+    Duration fadeDuration = const Duration(milliseconds: 200),
+    Duration pillDuration = const Duration(milliseconds: 1500),
+    bool disableAnimations = false,
+  }) {
+    return MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: Scaffold(
+          body: ConnectionBanner(
+            status: status,
+            debounceDuration: debounceDuration,
+            fadeDuration: fadeDuration,
+            pillDuration: pillDuration,
+          ),
+        ),
+      ),
+    );
+  }
+
+  group('ConnectionBanner Widget Tests', () {
+    testWidgets(
+      'Kopma 700 ms\'den kısa sürerse (örn. 400 ms) şerit HİÇ görünmez ve titreme olmaz',
+      (tester) async {
+        var currentStatus = ConnectionStatus.connected;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // Başlangıçta görünmez
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+
+        // 1. Durum reconnecting'e geçer
+        currentStatus = ConnectionStatus.reconnecting;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // 400 ms sonra henüz debounce dolmadı, şerit görünmemeli
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+
+        // 2. 400 ms'de bağlantı geri geldi
+        currentStatus = ConnectionStatus.connected;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // Bir süre daha ilerlet; şerit ve "Bağlandı" hapı hiç çıkmamış olmalı
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Kopma 700 ms\'den uzun sürerse şerit görünür; bağlanınca 1.5 sn "Bağlandı" hapı çıkıp kaybolur',
+      (tester) async {
+        var currentStatus = ConnectionStatus.connected;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // 1. Kopma başlar
+        currentStatus = ConnectionStatus.reconnecting;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // 699 ms'de hala yok
+        await tester.pump(const Duration(milliseconds: 699));
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+
+        // 701 ms'de (debounce doldu) şerit görünür
+        await tester.pump(const Duration(milliseconds: 2));
+        expect(find.text(AppStrings.connectionReconnecting), findsOneWidget);
+
+        // 2. Bağlantı geri gelir
+        currentStatus = ConnectionStatus.connected;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        // 200 ms içinde şerit solup yerini "Bağlandı" hapına bırakır
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(find.text(AppStrings.connectionRestored), findsOneWidget);
+
+        // 1400 ms sonra "Bağlandı" hapı hala ekranda
+        await tester.pump(const Duration(milliseconds: 1400));
+        expect(find.text(AppStrings.connectionRestored), findsOneWidget);
+
+        // Toplam 1.5 sn dolunca (100 ms + fade 200 ms) hap kaybolur
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'disableAnimations açıkken geçişler animasyonsuz ve anında yapılır',
+      (tester) async {
+        var currentStatus = ConnectionStatus.connected;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: currentStatus,
+                disableAnimations: true,
+              );
+            },
+          ),
+        );
+
+        currentStatus = ConnectionStatus.reconnecting;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: currentStatus,
+                disableAnimations: true,
+              );
+            },
+          ),
+        );
+
+        // 700 ms debounce dolunca şerit anında görünür
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.text(AppStrings.connectionReconnecting), findsOneWidget);
+
+        currentStatus = ConnectionStatus.connected;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: currentStatus,
+                disableAnimations: true,
+              );
+            },
+          ),
+        );
+
+        // Animasyonsuz anında hap görünür
+        await tester.pump();
+        expect(find.text(AppStrings.connectionRestored), findsOneWidget);
+
+        // 1.5 sn dolunca anında kaybolur
+        await tester.pump(const Duration(milliseconds: 1500));
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Kalıcı kopma durumunda (permanentDisconnected) şerit hemen kapanır',
+      (tester) async {
+        var currentStatus = ConnectionStatus.reconnecting;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.text(AppStrings.connectionReconnecting), findsOneWidget);
+
+        currentStatus = ConnectionStatus.permanentDisconnected;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(status: currentStatus);
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+      },
+    );
+  });
+}
