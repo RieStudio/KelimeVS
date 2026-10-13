@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
@@ -429,20 +430,33 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
     );
   }
 
+  static String _shortErrorMessage(Object error) {
+    final sanitized = error
+        .toString()
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
+        .replaceAll(RegExp(r'[A-Za-z0-9_-]{32,}'), '[redacted]')
+        .trim();
+    if (sanitized.length <= 80) return sanitized;
+    return '${sanitized.substring(0, 80)}...';
+  }
+
   void _handleFinal(FinalServerMessage finalMsg) {
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
     _isLeaving = false;
     _cancelTickTimer();
 
-    final nowMs = _clock.nowMs();
+    final finishedAtMs = math.max(
+      _clock.nowMs(),
+      DateTime.now().millisecondsSinceEpoch,
+    );
     final matchId =
-        _currentMatchId ?? 'online_${nowMs}_${_random.nextInt(100000)}';
+        _currentMatchId ?? 'online_${finishedAtMs}_${_random.nextInt(100000)}';
     final entry = OnlineMatchHistoryMapper.toHistoryEntry(
       finalMessage: finalMsg,
       matchId: matchId,
       opponentName: state.opponentName,
-      finishedAtMs: nowMs,
+      finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
     );
 
@@ -495,11 +509,24 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
 
   Future<void> _persistHistoryEntry(MatchHistoryEntry entry) async {
     try {
+      final isForfeit = entry.endType == MatchEndType.forfeit;
+      if (kDebugMode) {
+        debugPrint(
+          '[history] kayıt istendi (kaynak: ${isForfeit ? 'forfeit' : 'online'})',
+        );
+      }
       final repo = ref.read(matchHistoryRepositoryProvider);
       await repo.add(entry);
       ref.invalidate(matchHistoryProvider);
-    } catch (_) {
-      // sessizce geç
+      if (kDebugMode) {
+        debugPrint('[history] liste yenilendi');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[history] yazma HATASI: ${e.runtimeType}: ${_shortErrorMessage(e)}',
+        );
+      }
     }
   }
 
@@ -573,8 +600,7 @@ class OnlineMatchSession extends Notifier<MatchUiState> implements MatchSession 
 
     _leaveTimeoutTimer?.cancel();
     void onLeaveTimeout() {
-      if (_isMatchSaved ||
-          state.matchState?.phase == MatchPhase.matchFinished) {
+      if (_isMatchSaved) {
         return;
       }
       _synthesizeLocalForfeit();

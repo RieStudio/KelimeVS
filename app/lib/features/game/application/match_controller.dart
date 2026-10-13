@@ -26,10 +26,11 @@ abstract interface class GameClock {
 }
 
 class StopwatchClock implements GameClock {
+  final int _initialEpochMs = DateTime.now().millisecondsSinceEpoch;
   final Stopwatch _stopwatch = Stopwatch()..start();
 
   @override
-  int nowMs() => _stopwatch.elapsedMilliseconds;
+  int nowMs() => _initialEpochMs + _stopwatch.elapsedMilliseconds;
 }
 
 class MatchController extends Notifier<MatchUiState> implements MatchSession {
@@ -526,6 +527,16 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     _transitionDeadlineMs = null;
   }
 
+  static String _shortErrorMessage(Object error) {
+    final sanitized = error
+        .toString()
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
+        .replaceAll(RegExp(r'[A-Za-z0-9_-]{32,}'), '[redacted]')
+        .trim();
+    if (sanitized.length <= 80) return sanitized;
+    return '${sanitized.substring(0, 80)}...';
+  }
+
   Future<void> _saveMatchToHistory(
     MatchState finishedState,
     GameClock clock,
@@ -540,15 +551,26 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
           ? (isWinner ? 'bot' : 'me')
           : null;
 
+      if (kDebugMode) {
+        debugPrint(
+          '[history] kayıt istendi (kaynak: ${isForfeit ? 'forfeit' : 'bot'})',
+        );
+      }
+
       final questionTexts = finishedState.roundHistory.map((r) {
         final q = _loadedQuestions.where((item) => item.id == r.questionId).firstOrNull;
         return q?.text ?? 'Soru';
       }).toList();
 
+      final finishedAtMs = math.max(
+        clock.nowMs(),
+        DateTime.now().millisecondsSinceEpoch,
+      );
+
       final entry = MatchHistoryEntry(
-        id: 'match_${clock.nowMs()}_${_random.nextInt(100000)}',
+        id: 'match_${finishedAtMs}_${_random.nextInt(100000)}',
         opponentName: opponentName.isNotEmpty ? opponentName : 'Rakip',
-        finishedAtMs: clock.nowMs(),
+        finishedAtMs: finishedAtMs,
         myScore: myScore,
         opponentScore: opponentScore,
         result: isWinner ? MatchResult.win : MatchResult.lose,
@@ -559,12 +581,21 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
         botlaOynandi: true,
       );
 
+      state = state.copyWith(lastSavedMatch: entry);
+
       final repo = ref.read(matchHistoryRepositoryProvider);
       await repo.add(entry);
       ref.invalidate(matchHistoryProvider);
+      if (kDebugMode) {
+        debugPrint('[history] liste yenilendi');
+      }
       state = state.copyWith(lastSavedMatch: entry);
-    } catch (_) {
-      // sessizce geç
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[history] yazma HATASI: ${e.runtimeType}: ${_shortErrorMessage(e)}',
+        );
+      }
     }
   }
 }

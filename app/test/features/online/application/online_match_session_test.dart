@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/features/game/application/match_controller.dart';
@@ -10,6 +12,7 @@ import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
+import 'package:app/features/game/data/local_match_history_repository.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
@@ -586,5 +589,160 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
+
+  test(
+    '8. Uygulama yeniden başlatıldıktan sonra (StopwatchClock sıfırlansa bile) biten online maç gerçek depoya yazılır ve yeni depo örneğinde en başta okunur',
+    () async {
+      // Önceki daha uzun oturumdan kalmış 10 kayıt (500.000 ms - 1.400.000 ms arası zaman damgaları,
+      // botlaOynandi alanı olan ve olmayan eski kayıtlar birlikte)
+      final existingJsonList = List.generate(10, (i) {
+        final map = <String, dynamic>{
+          'id': 'prev_online_$i',
+          'opponentName': 'Eski Oyuncu $i',
+          'finishedAtMs': 500000 + i * 100000,
+          'myScore': 1,
+          'opponentScore': 2,
+          'result': 'lose',
+          'endType': 'normal',
+          'forfeitedPlayerId': null,
+          'roundRecords': <Map<String, dynamic>>[],
+          'roundQuestionTexts': <String>[],
+        };
+        if (i.isOdd) {
+          map['botlaOynandi'] = true;
+        }
+        return map;
+      });
+
+      SharedPreferences.setMockInitialValues({
+        'kelimego_match_history': jsonEncode(existingJsonList),
+      });
+
+      final client = FakeOnlineMatchClient();
+      final container = ProviderContainer(
+        overrides: [
+          // Varsayılan gameClockProvider (StopwatchClock) ve gerçek LocalMatchHistoryRepository kullanılır!
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_restart_online_1',
+        opponentName: 'Gerçek Rakip',
+      );
+
+      client.emit(
+        const OnlineMatchFinal(
+          FinalServerMessage(
+            rounds: [
+              OnlineRoundRecord(
+                questionId: 'q_1',
+                attempts: [
+                  OnlineAttempt(mine: true, text: 'ankara', result: 'correct'),
+                ],
+                winnerIsMe: true,
+                reason: 'timeout',
+              ),
+            ],
+            myScore: 2,
+            opponentScore: 0,
+            winnerIsMe: true,
+            endedBy: 'normal',
+          ),
+        ),
+      );
+
+      // Asenkron SharedPreferences yazımının tamamlanmasını bekle
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Uygulama yeniden başlatılmış gibi YENİ bir LocalMatchHistoryRepository örneğiyle oku
+      final freshRepo = LocalMatchHistoryRepository();
+      final loaded = await freshRepo.loadRecent();
+
+      expect(loaded.length, 10);
+      expect(loaded.first.id, 'm_restart_online_1');
+      expect(loaded.first.opponentName, 'Gerçek Rakip');
+      expect(loaded.first.botlaOynandi, isFalse);
+      expect(loaded.first.result, MatchResult.win);
+
+      // Sağlayıcı üzerinden de güncel listenin döndüğünü doğrula
+      final providerList = await container.read(matchHistoryProvider.future);
+      expect(providerList.first.id, 'm_restart_online_1');
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '9. leaveMatch sonrası state(phase: matchFinished) gelip final düşerse zaman aşımında kayıt kaybolmaz',
+    () async {
+      final clock = FakeManualClock(45000);
+      final repo = FakeHistoryRepo();
+      final client = FakeOnlineMatchClient();
+      void Function()? capturedTimeoutCallback;
+
+      final container = ProviderContainer(
+        overrides: [
+          gameClockProvider.overrideWithValue(clock),
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+          onlineMatchSessionProvider.overrideWith(
+            () => OnlineMatchSession(
+              clock: clock,
+              timerFactory: (duration, callback) {
+                capturedTimeoutCallback = callback;
+                return Timer(const Duration(days: 1), () {});
+              },
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_leave_state_only',
+        opponentName: 'Deniz',
+      );
+
+      session.leaveMatch();
+      expect(capturedTimeoutCallback, isNotNull);
+
+      // Sunucudan state(phase: matchFinished) gelir ama final mesajı ağda düşer
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 45000,
+            receivedLocalMs: 45000,
+            phase: OnlineMatchPhase.matchFinished,
+            roundNumber: 1,
+            myScore: 0,
+            opponentScore: 2,
+            question: OnlineQuestion(id: 'q_1', text: 'Renkler'),
+            turnIsMine: false,
+            deadlineMs: 0,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Deniz',
+            opponentConnected: true,
+            endedBy: 'forfeit',
+            winnerIsMe: false,
+          ),
+        ),
+      );
+
+      // 3 sn zaman aşımı tetiklenir -> final gelmediği için yerel kayıt üretilmeli
+      capturedTimeoutCallback!();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repo.entries.length, 1);
+      expect(repo.entries.first.id, 'm_leave_state_only');
+      expect(repo.entries.first.endType, MatchEndType.forfeit);
+      expect(repo.entries.first.botlaOynandi, isFalse);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 }
+
 

@@ -399,5 +399,74 @@ void main() {
     expect(loaded[1].id, 'match_second');
     expect(loaded[2].id, 'match_first');
   });
+
+  test(
+    'botlaOynandi alanı olan (yeni), olmayan (eski) ve bozuk bir kayıt birlikte bulunduğunda geçerli kayıtlar yeni depo örneğinde birlikte okunur',
+    () async {
+      const mixedOldNewAndCorruptJson = '['
+          '{'
+          '"id":"legacy_match_no_bot_field",'
+          '"opponentName":"Eski Sürüm Rakip",'
+          '"finishedAtMs":1700000001000,'
+          '"myScore":2,'
+          '"opponentScore":1,'
+          '"result":"win",'
+          '"endType":"normal",'
+          '"forfeitedPlayerId":null,'
+          '"roundRecords":[]'
+          '},'
+          '{'
+          '"id":"corrupt_entry",'
+          '"opponentName":12345'
+          '},'
+          '{'
+          '"id":"new_bot_match",'
+          '"opponentName":"Yeni Bot",'
+          '"finishedAtMs":1700000002000,'
+          '"myScore":2,'
+          '"opponentScore":0,'
+          '"result":"win",'
+          '"endType":"normal",'
+          '"forfeitedPlayerId":null,'
+          '"roundRecords":[],'
+          '"roundQuestionTexts":["Meyveler"],'
+          '"botlaOynandi":true'
+          '},'
+          '{'
+          '"id":"new_online_match",'
+          '"opponentName":"Yeni Online",'
+          '"finishedAtMs":1700000003000,'
+          '"myScore":1,'
+          '"opponentScore":2,'
+          '"result":"lose",'
+          '"endType":"forfeit",'
+          '"forfeitedPlayerId":"me",'
+          '"roundRecords":[],'
+          '"roundQuestionTexts":["Sebzeler"],'
+          '"botlaOynandi":false'
+          '}'
+          ']';
+
+      SharedPreferences.setMockInitialValues({
+        'kelimego_match_history': mixedOldNewAndCorruptJson,
+      });
+
+      // Yeni depo örneği (uygulama yeniden başlatılmış gibi)
+      final freshRepo = LocalMatchHistoryRepository();
+      final loaded = await freshRepo.loadRecent();
+
+      expect(loaded.length, 3);
+      expect(loaded[0].id, 'new_online_match');
+      expect(loaded[0].botlaOynandi, isFalse);
+      expect(loaded[0].endType, MatchEndType.forfeit);
+
+      expect(loaded[1].id, 'new_bot_match');
+      expect(loaded[1].botlaOynandi, isTrue);
+
+      expect(loaded[2].id, 'legacy_match_no_bot_field');
+      expect(loaded[2].botlaOynandi, isFalse);
+    },
+  );
 }
+
 

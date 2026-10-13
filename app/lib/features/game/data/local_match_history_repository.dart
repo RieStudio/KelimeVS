@@ -1,6 +1,7 @@
 // Faz 4'te Firestore (users/{uid}/matches) ile değiştirilecek
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/history/match_history_entry.dart';
@@ -25,24 +26,47 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
     return prefs ?? await SharedPreferences.getInstance();
   }
 
+  static String _shortErrorMessage(Object error) {
+    final sanitized = error
+        .toString()
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
+        .replaceAll(RegExp(r'[A-Za-z0-9_-]{32,}'), '[redacted]')
+        .trim();
+    if (sanitized.length <= 80) return sanitized;
+    return '${sanitized.substring(0, 80)}...';
+  }
+
   @override
   Future<List<MatchHistoryEntry>> loadRecent() async {
-    final prefs = await _getPrefs();
-    final jsonString = prefs.getString(_storageKey);
-    if (jsonString == null || jsonString.isEmpty) {
-      return [];
-    }
-
     try {
-      final List<dynamic> decodedList = jsonDecode(jsonString);
-      final entriesWithIndex = decodedList
-          .asMap()
-          .entries
-          .map((item) => (
-                index: item.key,
-                entry: _MatchHistoryMapper.fromJson(item.value as Map<String, dynamic>),
-              ))
-          .toList();
+      final prefs = await _getPrefs();
+      final jsonString = prefs.getString(_storageKey);
+      if (jsonString == null || jsonString.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('[history] okundu: 0 kayıt');
+        }
+        return [];
+      }
+
+      final List<dynamic> decodedList = jsonDecode(jsonString) as List<dynamic>;
+      final entriesWithIndex = <({int index, MatchHistoryEntry entry})>[];
+
+      for (var i = 0; i < decodedList.length; i++) {
+        try {
+          final rawItem = decodedList[i];
+          if (rawItem is! Map<String, dynamic>) {
+            throw const FormatException('Kayıt nesnesi Map değil');
+          }
+          final parsed = _MatchHistoryMapper.fromJson(rawItem);
+          entriesWithIndex.add((index: i, entry: parsed));
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint(
+              '[history] ayrıştırılamayan kayıt atlandı: ${e.runtimeType}',
+            );
+          }
+        }
+      }
 
       // En yeni başta sırala: finishedAtMs azalan; eşitlikte sonradan eklenen üstte (depodaki index'i küçük olan)
       entriesWithIndex.sort((a, b) {
@@ -52,50 +76,79 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
       });
 
       final entries = entriesWithIndex.map((e) => e.entry).toList();
-      if (entries.length > maxEntries) {
-        return entries.sublist(0, maxEntries);
+      final result = entries.length > maxEntries
+          ? entries.sublist(0, maxEntries)
+          : entries;
+
+      if (kDebugMode) {
+        debugPrint('[history] okundu: ${result.length} kayıt');
       }
-      return entries;
-    } catch (_) {
+      return result;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[history] okuma HATASI: ${e.runtimeType}: ${_shortErrorMessage(e)}',
+        );
+      }
       return [];
     }
   }
 
   @override
   Future<void> add(MatchHistoryEntry entry) async {
-    final prefs = await _getPrefs();
-    final currentEntries = await loadRecent();
+    try {
+      final prefs = await _getPrefs();
+      final currentEntries = await loadRecent();
 
-    // Aynı id varsa önce çıkar; yeni eklenen başa (index 0) gelir (en son eklenen)
-    final rawList = [
-      entry,
-      ...currentEntries.where((e) => e.id != entry.id),
-    ];
+      // Aynı id varsa önce çıkar; yeni eklenen başa (index 0) gelir (en son eklenen)
+      final rawList = [
+        entry,
+        ...currentEntries.where((e) => e.id != entry.id),
+      ];
 
-    // finishedAtMs azalan; eşitlikte sonradan eklenen üstte (rawList'te index'i küçük olan)
-    final rawWithIndex = rawList.asMap().entries.toList();
-    rawWithIndex.sort((a, b) {
-      final cmp = b.value.finishedAtMs.compareTo(a.value.finishedAtMs);
-      if (cmp != 0) return cmp;
-      return a.key.compareTo(b.key);
-    });
+      // finishedAtMs azalan; eşitlikte sonradan eklenen üstte (rawList'te index'i küçük olan)
+      final rawWithIndex = rawList.asMap().entries.toList();
+      rawWithIndex.sort((a, b) {
+        final cmp = b.value.finishedAtMs.compareTo(a.value.finishedAtMs);
+        if (cmp != 0) return cmp;
+        return a.key.compareTo(b.key);
+      });
 
-    final sortedList = rawWithIndex.map((e) => e.value).toList();
+      final sortedList = rawWithIndex.map((e) => e.value).toList();
 
-    // En fazla 10 kayıt tut: 11. maçta listenin sonundaki EN ESKİ kayıt silinir
-    final trimmedList = sortedList.length > maxEntries
-        ? sortedList.sublist(0, maxEntries)
-        : sortedList;
+      // En fazla 10 kayıt tut: 11. maçta listenin sonundaki EN ESKİ kayıt silinir
+      final trimmedList = sortedList.length > maxEntries
+          ? sortedList.sublist(0, maxEntries)
+          : sortedList;
 
-    final encodedString = jsonEncode(
-      trimmedList.map((e) => _MatchHistoryMapper.toJson(e)).toList(),
-    );
-    await prefs.setString(_storageKey, encodedString);
+      final encodedString = jsonEncode(
+        trimmedList.map((e) => _MatchHistoryMapper.toJson(e)).toList(),
+      );
+      await prefs.setString(_storageKey, encodedString);
 
-    // 10 maç sınırından düşen maçların itirazlarını temizle
-    if (objectionRepository != null) {
-      final validIds = trimmedList.map((e) => e.id).toSet();
-      await objectionRepository!.cleanupOrphaned(validIds);
+      if (kDebugMode) {
+        final byteCount = utf8.encode(encodedString).length;
+        debugPrint(
+          '[history] yazıldı: toplam ${trimmedList.length} kayıt, $byteCount bayt',
+        );
+      }
+
+      // 10 maç sınırından düşen maçların itirazlarını temizle
+      if (objectionRepository != null) {
+        try {
+          final validIds = trimmedList.map((e) => e.id).toSet();
+          await objectionRepository!.cleanupOrphaned(validIds);
+        } catch (_) {
+          // İtiraz temizleme hatası maç kaydını bozmamalı
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[history] yazma HATASI: ${e.runtimeType}: ${_shortErrorMessage(e)}',
+        );
+      }
+      rethrow;
     }
   }
 }
