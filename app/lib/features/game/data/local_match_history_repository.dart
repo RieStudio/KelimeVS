@@ -100,10 +100,18 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
       final prefs = await _getPrefs();
       final currentEntries = await loadRecent();
 
-      // Aynı id varsa önce çıkar; yeni eklenen başa (index 0) gelir (en son eklenen)
+      // Aynı id veya matchId varsa önce çıkar; yeni/güncellenen kayıt başa (index 0) gelir
       final rawList = [
         entry,
-        ...currentEntries.where((e) => e.id != entry.id),
+        ...currentEntries.where((e) {
+          if (e.id == entry.id) return false;
+          if (entry.matchId != null &&
+              e.matchId != null &&
+              e.matchId == entry.matchId) {
+            return false;
+          }
+          return true;
+        }),
       ];
 
       // finishedAtMs azalan; eşitlikte sonradan eklenen üstte (rawList'te index'i küçük olan)
@@ -158,28 +166,46 @@ abstract final class _MatchHistoryMapper {
   static Map<String, dynamic> toJson(MatchHistoryEntry entry) {
     return {
       'id': entry.id,
+      'matchId': entry.matchId,
       'opponentName': entry.opponentName,
       'finishedAtMs': entry.finishedAtMs,
       'myScore': entry.myScore,
       'opponentScore': entry.opponentScore,
       'result': entry.result.name,
       'endType': entry.endType.name,
+      'endReason': entry.endReason.name,
       'forfeitedPlayerId': entry.forfeitedPlayerId,
       'roundRecords': entry.roundRecords.map(_roundRecordToJson).toList(),
       'roundQuestionTexts': entry.roundQuestionTexts,
       'botlaOynandi': entry.botlaOynandi,
+      'isFinal': entry.isFinal,
     };
   }
 
   static MatchHistoryEntry fromJson(Map<String, dynamic> json) {
+    final result = MatchResult.values.byName(json['result'] as String);
+    final endType = MatchEndType.values.byName(json['endType'] as String);
+    final MatchEndReason endReason;
+    if (json['endReason'] != null) {
+      endReason = MatchEndReason.values.byName(json['endReason'] as String);
+    } else {
+      endReason = endType == MatchEndType.forfeit
+          ? (result == MatchResult.win
+              ? MatchEndReason.rakipTerk
+              : MatchEndReason.terk)
+          : MatchEndReason.normal;
+    }
+
     return MatchHistoryEntry(
       id: json['id'] as String,
+      matchId: json['matchId'] as String?,
       opponentName: json['opponentName'] as String,
       finishedAtMs: json['finishedAtMs'] as int,
       myScore: json['myScore'] as int,
       opponentScore: json['opponentScore'] as int,
-      result: MatchResult.values.byName(json['result'] as String),
-      endType: MatchEndType.values.byName(json['endType'] as String),
+      result: result,
+      endType: endType,
+      endReason: endReason,
       forfeitedPlayerId: json['forfeitedPlayerId'] as String?,
       roundRecords: (json['roundRecords'] as List<dynamic>)
           .map((r) => _roundRecordFromJson(r as Map<String, dynamic>))
@@ -189,6 +215,7 @@ abstract final class _MatchHistoryMapper {
               .toList() ??
           const [],
       botlaOynandi: json['botlaOynandi'] as bool? ?? false,
+      isFinal: json['isFinal'] as bool? ?? true,
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../online/application/match_reconciler.dart';
 import '../../online/application/online_match_session.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../online/data/online_match_client.dart';
@@ -12,6 +13,7 @@ import '../domain/bot/bot_config.dart';
 import '../domain/match/match_config.dart';
 import '../domain/text_filter.dart';
 import 'match_controller.dart';
+import 'match_history_provider.dart';
 import 'match_session.dart';
 import 'match_ui_state.dart';
 
@@ -91,6 +93,16 @@ final activeMatchSessionProvider = Provider<MatchSession>((ref) {
     return ref.watch(onlineMatchSessionProvider.notifier);
   }
   return ref.watch(matchControllerProvider.notifier);
+});
+
+final matchReconcilerProvider = Provider<MatchReconciler>((ref) {
+  final repo = ref.watch(matchHistoryRepositoryProvider);
+  final clientFactory = ref.watch(onlineMatchClientFactoryProvider);
+  return MatchReconciler(
+    repo: repo,
+    clientFactory: clientFactory,
+    onUpdated: () => ref.invalidate(matchHistoryProvider),
+  );
 });
 
 

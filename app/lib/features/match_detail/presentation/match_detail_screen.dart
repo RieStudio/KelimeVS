@@ -271,33 +271,63 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
             ],
           ),
 
-          // Orta: Skor, ResultBadge ve Terk Notu
+          // Orta: Skor, ResultBadge ve Terk / Kopma Notu
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${widget.match.myScore} – ${widget.match.opponentScore}',
-                  style: AppTextStyles.scoreMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppDimens.space6),
-                ResultBadge(
-                  variant: isWinner ? ResultBadgeVariant.won : ResultBadgeVariant.lost,
-                ),
-                if (isForfeit) ...[
-                  const SizedBox(height: AppDimens.space4),
+            child: () {
+              final String? endNote;
+              switch (widget.match.endReason) {
+                case MatchEndReason.terk:
+                  endNote = AppStrings.youLeftMatch;
+                case MatchEndReason.baglantiKoptu:
+                  endNote = AppStrings.yourConnectionLost;
+                case MatchEndReason.rakipTerk:
+                  endNote = AppStrings.opponentLeftMatch;
+                case MatchEndReason.rakipBaglantiKoptu:
+                  endNote = AppStrings.opponentConnectionLost;
+                case MatchEndReason.normal:
+                  endNote = null;
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    isWinner ? AppStrings.opponentLeftMatch : AppStrings.youLeftMatch,
-                    style: AppTextStyles.secondaryText.copyWith(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
+                    '${widget.match.myScore} – ${widget.match.opponentScore}',
+                    style: AppTextStyles.scoreMedium,
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: AppDimens.space6),
+                  ResultBadge(
+                    variant: isWinner
+                        ? ResultBadgeVariant.won
+                        : ResultBadgeVariant.lost,
+                  ),
+                  if (endNote != null) ...[
+                    const SizedBox(height: AppDimens.space4),
+                    Text(
+                      endNote,
+                      style: AppTextStyles.secondaryText.copyWith(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (widget.match.endReason == MatchEndReason.baglantiKoptu &&
+                      !widget.match.isFinal) ...[
+                    const SizedBox(height: AppDimens.space4),
+                    Text(
+                      AppStrings.scoreBeforeDisconnectNote,
+                      style: AppTextStyles.secondaryText.copyWith(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              );
+            }(),
           ),
 
           // Sağ: Rakip avatarı ve adı

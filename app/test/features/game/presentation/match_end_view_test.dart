@@ -11,6 +11,7 @@ import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
+import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
@@ -323,5 +324,69 @@ void main() {
       findsNothing,
     );
     expect(find.text(AppStrings.wonExclamation), findsOneWidget);
+  });
+
+  testWidgets('9. baglantiKoptu durumunda: "Bağlantın koptu" notu görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 0, 'bot': 0},
+      winnerId: 'bot',
+      endedBy: 'forfeit',
+    );
+    final historyEntry = MatchHistoryEntry(
+      id: 'm_disc_test',
+      matchId: 'm_disc_test',
+      opponentName: 'Ahmet',
+      finishedAtMs: 1000,
+      myScore: 0,
+      opponentScore: 0,
+      result: MatchResult.lose,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.baglantiKoptu,
+      roundRecords: const [],
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      lastSavedMatch: historyEntry,
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.lost), findsOneWidget);
+    expect(find.text(AppStrings.yourConnectionLost), findsOneWidget);
+  });
+
+  testWidgets('10. rakipBaglantiKoptu durumunda: "Rakibin bağlantısı koptu" notu görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      endedBy: 'forfeit',
+    );
+    final historyEntry = MatchHistoryEntry(
+      id: 'm_opp_disc_test',
+      matchId: 'm_opp_disc_test',
+      opponentName: 'Ahmet',
+      finishedAtMs: 1000,
+      myScore: 1,
+      opponentScore: 0,
+      result: MatchResult.win,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.rakipBaglantiKoptu,
+      roundRecords: const [],
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      lastSavedMatch: historyEntry,
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.wonExclamation), findsOneWidget);
+    expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
   });
 }

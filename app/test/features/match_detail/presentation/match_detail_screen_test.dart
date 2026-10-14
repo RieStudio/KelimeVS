@@ -67,14 +67,17 @@ void main() {
 
   MatchHistoryEntry createSampleMatch({
     String id = 'test_match_1',
+    String? matchId,
     String opponentName = 'Zeynep',
     int myScore = 2,
     int opponentScore = 1,
     MatchResult result = MatchResult.win,
     MatchEndType endType = MatchEndType.normal,
+    MatchEndReason? endReason,
     String? forfeitedPlayerId,
     List<RoundRecord>? rounds,
     List<String>? questionTexts,
+    bool isFinal = true,
   }) {
     final sampleRounds = rounds ??
         [
@@ -163,16 +166,19 @@ void main() {
 
     return MatchHistoryEntry(
       id: id,
+      matchId: matchId,
       opponentName: opponentName,
       finishedAtMs: 100000,
       myScore: myScore,
       opponentScore: opponentScore,
       result: result,
       endType: endType,
+      endReason: endReason,
       forfeitedPlayerId: forfeitedPlayerId,
       roundRecords: sampleRounds,
       roundQuestionTexts: questionTexts ??
           const ['Kışlık sebzeler', 'G20 ülkeleri', 'B ile başlayan hayvanlar'],
+      isFinal: isFinal,
     );
   }
 
@@ -209,6 +215,70 @@ void main() {
       await tester.pumpWidget(createDetailTestWidget(match: forfeitMatch));
 
       expect(find.text(AppStrings.opponentLeftMatch), findsOneWidget);
+    });
+
+    testWidgets('3b. baglantiKoptu durumunda "Bağlantın koptu" notu görünür', (tester) async {
+      final discMatch = createSampleMatch(
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.baglantiKoptu,
+        result: MatchResult.lose,
+        forfeitedPlayerId: 'me',
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: discMatch));
+
+      expect(find.text(AppStrings.yourConnectionLost), findsOneWidget);
+    });
+
+    testWidgets('3c. rakipBaglantiKoptu durumunda "Rakibin bağlantısı koptu" notu görünür', (tester) async {
+      final oppDiscMatch = createSampleMatch(
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.rakipBaglantiKoptu,
+        result: MatchResult.win,
+        forfeitedPlayerId: 'bot',
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: oppDiscMatch));
+
+      expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
+    });
+
+    testWidgets('3d. Ben maçı terk ettiğimde "Maçı terk ettin" notu görünür', (tester) async {
+      final leaveMatch = createSampleMatch(
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.terk,
+        result: MatchResult.lose,
+        forfeitedPlayerId: 'me',
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: leaveMatch));
+
+      expect(find.text(AppStrings.youLeftMatch), findsOneWidget);
+    });
+
+    testWidgets('3e. isFinal=false olan baglantiKoptu durumunda "Skor, bağlantı kopmadan önceki duruma göredir." notu görünür', (tester) async {
+      final tempMatch = createSampleMatch(
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.baglantiKoptu,
+        result: MatchResult.lose,
+        forfeitedPlayerId: 'me',
+        isFinal: false,
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: tempMatch));
+
+      expect(find.text(AppStrings.yourConnectionLost), findsOneWidget);
+      expect(find.text(AppStrings.scoreBeforeDisconnectNote), findsOneWidget);
+    });
+
+    testWidgets('3f. isFinal=true olan baglantiKoptu durumunda "Skor, bağlantı kopmadan önceki duruma göredir." notu GÖRÜNMEZ', (tester) async {
+      final finalizedMatch = createSampleMatch(
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.baglantiKoptu,
+        result: MatchResult.lose,
+        forfeitedPlayerId: 'me',
+        isFinal: true,
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: finalizedMatch));
+
+      expect(find.text(AppStrings.yourConnectionLost), findsOneWidget);
+      expect(find.text(AppStrings.scoreBeforeDisconnectNote), findsNothing);
     });
   });
 

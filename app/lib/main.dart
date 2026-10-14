@@ -9,6 +9,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/app_widgets.dart';
+import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'firebase_options.dart';
 
@@ -46,16 +47,17 @@ class KelimeGoApp extends StatelessWidget {
   }
 }
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   final String? initialAuthError;
 
   const MainShell({super.key, this.initialAuthError});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   String? _authError;
   StreamSubscription<User?>? _authSubscription;
@@ -63,8 +65,23 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _authError = widget.initialAuthError;
     _initAuth();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reconcilePendingMatches();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconcilePendingMatches();
+    }
+  }
+
+  void _reconcilePendingMatches() {
+    ref.read(matchReconcilerProvider).reconcile();
   }
 
   Future<void> _initAuth() async {
@@ -88,6 +105,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     super.dispose();
   }

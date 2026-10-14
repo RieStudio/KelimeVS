@@ -94,6 +94,7 @@ abstract final class OnlineMatchHistoryMapper {
     required String opponentName,
     required int finishedAtMs,
     required Map<String, String> questionTextsById,
+    MatchEndReason? endReason,
   }) {
     final roundRecords = <RoundRecord>[];
     final roundQuestionTexts = <String>[];
@@ -111,8 +112,14 @@ abstract final class OnlineMatchHistoryMapper {
     final isForfeit = finalMessage.endedBy == 'forfeit';
     final forfeitedPlayerId = isForfeit ? (isWinner ? 'bot' : 'me') : null;
 
+    final resolvedEndReason = endReason ??
+        (isForfeit
+            ? (isWinner ? MatchEndReason.rakipTerk : MatchEndReason.terk)
+            : MatchEndReason.normal);
+
     return MatchHistoryEntry(
       id: matchId,
+      matchId: matchId,
       opponentName:
           opponentName.isNotEmpty ? opponentName : AppStrings.opponent,
       finishedAtMs: finishedAtMs,
@@ -120,6 +127,7 @@ abstract final class OnlineMatchHistoryMapper {
       opponentScore: finalMessage.opponentScore,
       result: isWinner ? MatchResult.win : MatchResult.lose,
       endType: isForfeit ? MatchEndType.forfeit : MatchEndType.normal,
+      endReason: resolvedEndReason,
       forfeitedPlayerId: forfeitedPlayerId,
       roundRecords: roundRecords,
       roundQuestionTexts: roundQuestionTexts,
@@ -158,7 +166,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   OnlineMatchState? _lastOnlineState;
   String? _currentMatchId;
   bool _isMatchSaved = false;
+  bool _hasReceivedFinal = false;
   bool _isLeaving = false;
+  bool _wasReconnecting = false;
+  bool _opponentEverDisconnected = false;
   bool _isObserverRegistered = false;
 
   /// Maç boyunca `state` mesajlarından gelen soru metinlerinin önbelleği (`questionId -> text`).
@@ -216,7 +227,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
     _currentMatchId = matchId;
     _isMatchSaved = false;
+    _hasReceivedFinal = false;
     _isLeaving = false;
+    _wasReconnecting = false;
+    _opponentEverDisconnected = false;
     _lastOnlineState = null;
     _questionTextCache.clear();
     _observedRounds.clear();
@@ -244,6 +258,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   void _handleEvent(OnlineMatchEvent event) {
     if (event is OnlineMatchReconnecting) {
+      _wasReconnecting = true;
       state = state.copyWith(connectionStatus: ConnectionStatus.reconnecting);
     } else if (event is OnlineMatchConnected) {
       state = state.copyWith(connectionStatus: ConnectionStatus.connected);
@@ -262,6 +277,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   void _handleStateUpdate(OnlineMatchState onlineState) {
     _lastOnlineState = onlineState;
+
+    if (!onlineState.opponentConnected) {
+      _opponentEverDisconnected = true;
+    }
 
     if (onlineState.question != null &&
         onlineState.question!.id.isNotEmpty &&
@@ -479,8 +498,34 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   void _handleFinal(FinalServerMessage finalMsg) {
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
-    _isLeaving = false;
     _cancelTickTimer();
+
+    final isWinner = finalMsg.winnerIsMe;
+    final isForfeit = finalMsg.endedBy == 'forfeit';
+    final MatchEndReason endReason;
+    if (!isForfeit) {
+      endReason = MatchEndReason.normal;
+    } else {
+      if (!isWinner) {
+        if (_isLeaving) {
+          endReason = MatchEndReason.terk;
+        } else if (_wasReconnecting ||
+            state.connectionStatus ==
+                ConnectionStatus.permanentDisconnected) {
+          endReason = MatchEndReason.baglantiKoptu;
+        } else {
+          endReason = MatchEndReason.baglantiKoptu;
+        }
+      } else {
+        if (_opponentEverDisconnected || !state.opponentConnected) {
+          endReason = MatchEndReason.rakipBaglantiKoptu;
+        } else {
+          endReason = MatchEndReason.rakipTerk;
+        }
+      }
+    }
+
+    _isLeaving = false;
 
     final finishedAtMs = math.max(
       _clock.nowMs(),
@@ -494,6 +539,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       opponentName: state.opponentName,
       finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
+      endReason: endReason,
     );
 
     final winnerId = finalMsg.winnerIsMe ? 'me' : 'bot';
@@ -537,7 +583,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       ),
     );
 
-    if (!_isMatchSaved) {
+    if (!_hasReceivedFinal) {
+      _hasReceivedFinal = true;
       _isMatchSaved = true;
       unawaited(_persistHistoryEntry(entry));
     }
@@ -548,7 +595,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       final isForfeit = entry.endType == MatchEndType.forfeit;
       if (kDebugMode) {
         debugPrint(
-          '[history] kayıt istendi (kaynak: ${isForfeit ? 'forfeit' : 'online'})',
+          '[history] kayıt istendi (kaynak: ${isForfeit ? 'forfeit' : 'online'}, sebep: ${entry.endReason.name})',
         );
       }
       final repo = ref.read(matchHistoryRepositoryProvider);
@@ -582,10 +629,72 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     );
   }
 
+  void _saveLocalDisconnectLoss() {
+    if (_isMatchSaved) return;
+    _isMatchSaved = true;
+
+    final finishedAtMs = math.max(
+      _clock.nowMs(),
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    final matchId =
+        _currentMatchId ?? 'online_${finishedAtMs}_${_random.nextInt(100000)}';
+    final lastOnline = _lastOnlineState;
+    final myScore =
+        state.matchState?.scores['me'] ?? lastOnline?.myScore ?? 0;
+    final opponentScore =
+        state.matchState?.scores['bot'] ?? lastOnline?.opponentScore ?? 0;
+
+    final rounds = List<OnlineRoundRecord>.from(_observedRounds);
+    if (lastOnline != null &&
+        lastOnline.phase == OnlineMatchPhase.roundActive &&
+        lastOnline.question != null) {
+      rounds.add(
+        OnlineRoundRecord(
+          questionId: lastOnline.question!.id,
+          attempts: lastOnline.attempts,
+          winnerIsMe: false,
+          reason: 'timeout',
+        ),
+      );
+    }
+
+    final roundRecords = <RoundRecord>[];
+    final roundQuestionTexts = <String>[];
+    for (var i = 0; i < rounds.length; i++) {
+      final r = rounds[i];
+      roundRecords.add(OnlineMatchHistoryMapper.mapRoundRecord(r, i));
+      roundQuestionTexts.add(
+        _questionTextCache[r.questionId] ?? AppStrings.defaultQuestionText,
+      );
+    }
+
+    final entry = MatchHistoryEntry(
+      id: matchId,
+      matchId: _currentMatchId,
+      opponentName: state.opponentName.isNotEmpty
+          ? state.opponentName
+          : AppStrings.opponent,
+      finishedAtMs: finishedAtMs,
+      myScore: myScore,
+      opponentScore: opponentScore,
+      result: MatchResult.lose,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.baglantiKoptu,
+      forfeitedPlayerId: 'me',
+      roundRecords: roundRecords,
+      roundQuestionTexts: roundQuestionTexts,
+      botlaOynandi: false,
+      isFinal: false,
+    );
+
+    state = state.copyWith(lastSavedMatch: entry);
+    unawaited(_persistHistoryEntry(entry));
+  }
+
   void _handleDisconnected(DisconnectReason reason) {
     // Maç zaten tamamlandıysa veya terk sonucu bekleniyorsa kopma olayını yok say
-    if (_isMatchSaved ||
-        _isLeaving ||
+    if (_isLeaving ||
         state.matchState?.phase == MatchPhase.matchFinished ||
         state.isVoided) {
       return;
@@ -593,7 +702,6 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
     if (reason == DisconnectReason.permanent ||
         reason == DisconnectReason.replaced) {
-      // TODO: 4.5d'de ayrıntılı bağlantı kopma deneyimi
       _cancelAllTimers();
       final client = _client;
       _client = null;
@@ -605,7 +713,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
       final isReplaced = reason == DisconnectReason.replaced;
 
-      // Yenilgi yazılmaz; bağlantı koptu durumuyla sonlandırılır
+      if (reason == DisconnectReason.permanent && !_isMatchSaved) {
+        _saveLocalDisconnectLoss();
+      }
+
       state = state.copyWith(
         isLoading: false,
         connectionStatus: ConnectionStatus.permanentDisconnected,
@@ -657,7 +768,6 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   void _synthesizeLocalForfeit() {
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
-    _isLeaving = false;
     _cancelTickTimer();
 
     final lastOnline = _lastOnlineState;
@@ -741,6 +851,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   void _cleanupSession() {
     _cancelAllTimers();
+    _wasReconnecting = false;
+    _opponentEverDisconnected = false;
+    _hasReceivedFinal = false;
     if (_isObserverRegistered) {
       WidgetsBinding.instance.removeObserver(this);
       _isObserverRegistered = false;

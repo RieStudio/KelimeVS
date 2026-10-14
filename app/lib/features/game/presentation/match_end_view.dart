@@ -15,6 +15,7 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
+import '../domain/history/match_history_entry.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
 ///
@@ -62,6 +63,31 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
     final isWinner = matchState?.winnerId == 'me';
     final isForfeit = matchState?.endedBy == 'forfeit';
+
+    final resolvedEndReason = uiState.lastSavedMatch?.endReason ??
+        (isForfeit
+            ? (isWinner ? MatchEndReason.rakipTerk : MatchEndReason.terk)
+            : MatchEndReason.normal);
+
+    final String? endNote;
+    final Color endNoteColor;
+    switch (resolvedEndReason) {
+      case MatchEndReason.terk:
+        endNote = AppStrings.youLeftMatch;
+        endNoteColor = AppColors.dangerText;
+      case MatchEndReason.baglantiKoptu:
+        endNote = AppStrings.yourConnectionLost;
+        endNoteColor = AppColors.dangerText;
+      case MatchEndReason.rakipTerk:
+        endNote = AppStrings.opponentLeftMatch;
+        endNoteColor = AppColors.muted;
+      case MatchEndReason.rakipBaglantiKoptu:
+        endNote = AppStrings.opponentConnectionLost;
+        endNoteColor = AppColors.muted;
+      case MatchEndReason.normal:
+        endNote = null;
+        endNoteColor = AppColors.muted;
+    }
 
     final myScore = matchState?.scores['me'] ?? 0;
     final opponentScore = matchState?.scores['bot'] ?? 0;
@@ -133,13 +159,13 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 ),
               ),
 
-              // 4. Terk Notu (varsa)
-              if (isForfeit) ...[
+              // 4. Terk / Bağlantı Notu (varsa)
+              if (endNote != null) ...[
                 const SizedBox(height: AppDimens.space6),
                 Text(
-                  isWinner ? AppStrings.opponentLeftMatch : AppStrings.youLeftMatch,
+                  endNote,
                   style: AppTextStyles.secondaryText.copyWith(
-                    color: isWinner ? AppColors.muted : AppColors.dangerText,
+                    color: endNoteColor,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),

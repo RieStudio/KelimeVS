@@ -251,5 +251,12 @@ void main() {
       await sub.cancel();
       await client.dispose();
     });
+
+    test('defaultMaxReconnectDuration 35 saniyedir (sunucunun 30 sn zaman aşımından 5 sn uzun)', () {
+      expect(
+        OnlineMatchClient.defaultMaxReconnectDuration,
+        const Duration(seconds: 35),
+      );
+    });
   });
 }

@@ -12,32 +12,51 @@ enum MatchEndType {
   forfeit,
 }
 
+enum MatchEndReason {
+  normal,
+  terk,
+  baglantiKoptu,
+  rakipTerk,
+  rakipBaglantiKoptu,
+}
+
 class MatchHistoryEntry {
   final String id;
+  final String? matchId;
   final String opponentName;
   final int finishedAtMs;
   final int myScore;
   final int opponentScore;
   final MatchResult result;
   final MatchEndType endType;
+  final MatchEndReason endReason;
   final String? forfeitedPlayerId;
   final List<RoundRecord> roundRecords;
   final List<String> roundQuestionTexts;
   final bool botlaOynandi;
+  final bool isFinal;
 
   const MatchHistoryEntry({
     required this.id,
+    this.matchId,
     required this.opponentName,
     required this.finishedAtMs,
     required this.myScore,
     required this.opponentScore,
     required this.result,
     required this.endType,
+    MatchEndReason? endReason,
     this.forfeitedPlayerId,
     required this.roundRecords,
     this.roundQuestionTexts = const [],
     this.botlaOynandi = false,
-  });
+    this.isFinal = true,
+  }) : endReason = endReason ??
+            (endType == MatchEndType.forfeit
+                ? (result == MatchResult.win
+                    ? MatchEndReason.rakipTerk
+                    : MatchEndReason.terk)
+                : MatchEndReason.normal);
 
   String questionTextForRound(int index, {String fallback = 'Soru'}) {
     if (index >= 0 && index < roundQuestionTexts.length) {

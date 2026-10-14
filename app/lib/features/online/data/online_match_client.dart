@@ -140,13 +140,20 @@ class OnlineMatchClient {
   /// WebSocket bağlantısının aktif olup olmadığı.
   bool get isConnected => _connection != null;
 
+  /// Sunucu tarafı bağlantı kopması zaman aşımı 30 saniyedir (GDD 3.2, disconnectTimeoutMs).
+  /// İstemci tarafında 35 saniye beklenmesinin nedeni:
+  /// Sunucunun 30 sn'lik Durable Object alarmının tetiklenip maçı hükmen sonlandırmasına
+  /// ve istemcinin bu kararı (final mesajını) alabilmesine fırsat tanımaktır.
+  /// Böylece sunucu kararı kesinleşmeden istemci erken kopma üretmez.
+  static const Duration defaultMaxReconnectDuration = Duration(seconds: 35);
+
   OnlineMatchClient({
     WebSocketConnector? connector,
     AuthTokenProvider? tokenProvider,
     String? serverWsUrl,
     this._connectTimeout = const Duration(seconds: 8),
     this._cooldownDuration = const Duration(milliseconds: 600),
-    this._maxReconnectDuration = const Duration(seconds: 25),
+    this._maxReconnectDuration = defaultMaxReconnectDuration,
     this._reconnectDelays,
     int Function()? clock,
     Future<void> Function(Duration)? delayFunction,

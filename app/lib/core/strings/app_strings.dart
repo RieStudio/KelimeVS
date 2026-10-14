@@ -158,5 +158,8 @@ abstract final class AppStrings {
   static const String connectionRestored = 'Bağlandı';
   static const String opponentDisconnectedNote = 'Bağlantı koptu';
   static const String matchReplacedNotice = 'Maçı başka bir cihazda açtın';
+  static const String yourConnectionLost = 'Bağlantın koptu';
+  static const String opponentConnectionLost = 'Rakibin bağlantısı koptu';
+  static const String scoreBeforeDisconnectNote = 'Skor, bağlantı kopmadan önceki duruma göredir.';
 }
 

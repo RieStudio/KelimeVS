@@ -37,7 +37,16 @@ class FakeHistoryRepo implements MatchHistoryRepository {
 
   @override
   Future<void> add(MatchHistoryEntry entry) async {
-    entries.add(entry);
+    final idx = entries.indexWhere((e) =>
+        e.id == entry.id ||
+        (entry.matchId != null &&
+            e.matchId != null &&
+            e.matchId == entry.matchId));
+    if (idx != -1) {
+      entries[idx] = entry;
+    } else {
+      entries.insert(0, entry);
+    }
   }
 
   @override
@@ -594,11 +603,16 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      // Ana ekrana dönülmüş, bilgi mesajı gösterilmiş ve geçmişe yenilgi YAZILMAMIŞ olmalı
+      // Ana ekrana dönülmüş, bilgi mesajı gösterilmiş ve geçmişe baglantiKoptu yenilgisi yazılmış olmalı (GDD 3.2)
       expect(find.byType(MatchScreen), findsNothing);
       expect(find.text('StartOnline'), findsOneWidget);
       expect(find.text(AppStrings.connectionLostNotice), findsOneWidget);
-      expect(repo.entries, isEmpty);
+      expect(repo.entries.length, 1);
+      final discEntry = repo.entries.first;
+      expect(discEntry.result, MatchResult.lose);
+      expect(discEntry.endReason, MatchEndReason.baglantiKoptu);
+      expect(discEntry.matchId, 'm_disc');
+      expect(discEntry.isFinal, isFalse);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
@@ -904,7 +918,10 @@ void main() {
 
       expect(session2.state.isDisconnectedPermanent, isTrue);
       expect(session2.state.isDisconnectedReplaced, isFalse);
-      expect(repo2.entries, isEmpty); // Geçmişe kayıt yazılmaz!
+      expect(repo2.entries.length, 1); // Kalıcı kopmada yerel yenilgi kaydı yazılır!
+      expect(repo2.entries.first.result, MatchResult.lose);
+      expect(repo2.entries.first.endReason, MatchEndReason.baglantiKoptu);
+      expect(repo2.entries.first.matchId, 'm_permanent');
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
@@ -937,6 +954,170 @@ void main() {
 
       session.didChangeAppLifecycleState(AppLifecycleState.resumed);
       expect(client.resumedCalled, isTrue);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '14. Kalıcı kopma hemen yerel yenilgi yazar; sonradan gelen final mevcut kaydı günceller ve tek kayıt kalır',
+    () async {
+      final clock = FakeManualClock(60000);
+      final repo = FakeHistoryRepo();
+      final client = FakeOnlineMatchClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          gameClockProvider.overrideWithValue(clock),
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_disc_update',
+        opponentName: 'Deniz',
+        client: client,
+      );
+
+      // 1. Turda 0-0 iken kalıcı kopma
+      client.emit(
+        const OnlineMatchDisconnected(DisconnectReason.permanent),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repo.entries.length, 1);
+      final localLoss = repo.entries.first;
+      expect(localLoss.matchId, 'm_disc_update');
+      expect(localLoss.result, MatchResult.lose);
+      expect(localLoss.endReason, MatchEndReason.baglantiKoptu);
+      expect(localLoss.myScore, 0);
+      expect(localLoss.opponentScore, 0);
+      expect(localLoss.isFinal, isFalse);
+
+      // 2. Oyuncu yeniden bağlandı ve sunucudan kesin final geldi (ör. 0-2 skorla)
+      final client2 = FakeOnlineMatchClient();
+      await session.startOnlineMatch(
+        matchId: 'm_disc_update',
+        opponentName: 'Deniz',
+        client: client2,
+      );
+
+      const finalMsg = FinalServerMessage(
+        rounds: [],
+        myScore: 0,
+        opponentScore: 2,
+        winnerIsMe: false,
+        endedBy: 'forfeit',
+      );
+
+      client2.emit(const OnlineMatchFinal(finalMsg));
+      await Future<void>.delayed(Duration.zero);
+
+      // Toplam kayıt sayısı ARTMAZ (1 kalır), veriler güncellenir
+      expect(repo.entries.length, 1);
+      final updatedLoss = repo.entries.first;
+      expect(updatedLoss.matchId, 'm_disc_update');
+      expect(updatedLoss.result, MatchResult.lose);
+      expect(updatedLoss.endReason, MatchEndReason.baglantiKoptu);
+      expect(updatedLoss.myScore, 0);
+      expect(updatedLoss.opponentScore, 2);
+      expect(updatedLoss.isFinal, isTrue);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
+    '15. Rakip bağlantısı kopup maç bitince rakipBaglantiKoptu; kopmadan çıkınca rakipTerk atanır',
+    () async {
+      // Senaryo A: Rakip koptu (opponentConnected: false) ve ardından final (forfeit) geldi
+      final clientA = FakeOnlineMatchClient();
+      final repoA = FakeHistoryRepo();
+      final containerA = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repoA),
+        ],
+      );
+      addTearDown(containerA.dispose);
+
+      final sessionA = containerA.read(onlineMatchSessionProvider.notifier);
+      await sessionA.startOnlineMatch(
+        matchId: 'm_opp_disc',
+        opponentName: 'Ahmet',
+        client: clientA,
+      );
+
+      // Rakip bağlantısı koptu bilgisi state'e yansıdı
+      clientA.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            phase: OnlineMatchPhase.roundActive,
+            roundNumber: 1,
+            myScore: 1,
+            opponentScore: 0,
+            turnIsMine: true,
+            deadlineMs: 70000,
+            serverNowMs: 60000,
+            receivedLocalMs: 60000,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Ahmet',
+            opponentConnected: false,
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      clientA.emit(
+        const OnlineMatchFinal(
+          FinalServerMessage(
+            rounds: [],
+            myScore: 1,
+            opponentScore: 0,
+            winnerIsMe: true,
+            endedBy: 'forfeit',
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repoA.entries.length, 1);
+      expect(repoA.entries.first.endReason, MatchEndReason.rakipBaglantiKoptu);
+      expect(repoA.entries.first.result, MatchResult.win);
+
+      // Senaryo B: Rakip kopmadan maçı terk etti (opponentConnected hep true kaldı)
+      final clientB = FakeOnlineMatchClient();
+      final repoB = FakeHistoryRepo();
+      final containerB = ProviderContainer(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repoB),
+        ],
+      );
+      addTearDown(containerB.dispose);
+
+      final sessionB = containerB.read(onlineMatchSessionProvider.notifier);
+      await sessionB.startOnlineMatch(
+        matchId: 'm_opp_leave',
+        opponentName: 'Zeynep',
+        client: clientB,
+      );
+
+      clientB.emit(
+        const OnlineMatchFinal(
+          FinalServerMessage(
+            rounds: [],
+            myScore: 1,
+            opponentScore: 0,
+            winnerIsMe: true,
+            endedBy: 'forfeit',
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repoB.entries.length, 1);
+      expect(repoB.entries.first.endReason, MatchEndReason.rakipTerk);
+      expect(repoB.entries.first.result, MatchResult.win);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

@@ -467,6 +467,209 @@ void main() {
       expect(loaded[2].botlaOynandi, isFalse);
     },
   );
+
+  test(
+    'Aynı matchId ikinci kez eklenirse yeni kayıt açılmaz, mevcut kayıt güncellenir',
+    () async {
+      final repo = LocalMatchHistoryRepository();
+
+      // 1. İlk kayıt (ör. kalıcı kopma sırasında yazılan geçici kayıt: 0-0, baglantiKoptu)
+      final initialEntry = MatchHistoryEntry(
+        id: 'initial_temp_id',
+        matchId: 'match_room_42',
+        opponentName: 'Can',
+        finishedAtMs: 1000,
+        myScore: 0,
+        opponentScore: 0,
+        result: MatchResult.lose,
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.baglantiKoptu,
+        roundRecords: const [],
+      );
+
+      await repo.add(initialEntry);
+      var loaded = await repo.loadRecent();
+      expect(loaded.length, 1);
+      expect(loaded.first.id, 'initial_temp_id');
+      expect(loaded.first.matchId, 'match_room_42');
+      expect(loaded.first.myScore, 0);
+      expect(loaded.first.endReason, MatchEndReason.baglantiKoptu);
+
+      // 2. İkinci kayıt (ör. sunucudan gelen kesin final bilgisi: 1-2 skorla güncellenmiş)
+      final updatedEntry = MatchHistoryEntry(
+        id: 'final_server_id',
+        matchId: 'match_room_42',
+        opponentName: 'Can',
+        finishedAtMs: 2000,
+        myScore: 1,
+        opponentScore: 2,
+        result: MatchResult.lose,
+        endType: MatchEndType.forfeit,
+        endReason: MatchEndReason.baglantiKoptu,
+        roundRecords: const [],
+      );
+
+      await repo.add(updatedEntry);
+      loaded = await repo.loadRecent();
+
+      // Toplam kayıt sayısı ARTMAZ (1 kalır), bilgiler güncellenir
+      expect(loaded.length, 1);
+      expect(loaded.first.id, 'final_server_id');
+      expect(loaded.first.matchId, 'match_room_42');
+      expect(loaded.first.myScore, 1);
+      expect(loaded.first.opponentScore, 2);
+      expect(loaded.first.finishedAtMs, 2000);
+      expect(loaded.first.endReason, MatchEndReason.baglantiKoptu);
+    },
+  );
+
+  test(
+    'matchId ve endReason serileştirme ve geriye uyumluluk testleri',
+    () async {
+      const legacyJson = '['
+          '{'
+          '"id":"legacy_win_forfeit",'
+          '"opponentName":"Rakip 1",'
+          '"finishedAtMs":3000,'
+          '"myScore":2,'
+          '"opponentScore":0,'
+          '"result":"win",'
+          '"endType":"forfeit",'
+          '"forfeitedPlayerId":"bot",'
+          '"roundRecords":[],'
+          '"roundQuestionTexts":[]'
+          '},'
+          '{'
+          '"id":"legacy_lose_forfeit",'
+          '"opponentName":"Rakip 2",'
+          '"finishedAtMs":2000,'
+          '"myScore":0,'
+          '"opponentScore":2,'
+          '"result":"lose",'
+          '"endType":"forfeit",'
+          '"forfeitedPlayerId":"me",'
+          '"roundRecords":[],'
+          '"roundQuestionTexts":[]'
+          '},'
+          '{'
+          '"id":"new_entry_with_fields",'
+          '"matchId":"m_live_99",'
+          '"opponentName":"Rakip 3",'
+          '"finishedAtMs":4000,'
+          '"myScore":2,'
+          '"opponentScore":1,'
+          '"result":"win",'
+          '"endType":"forfeit",'
+          '"endReason":"rakipBaglantiKoptu",'
+          '"forfeitedPlayerId":"bot",'
+          '"roundRecords":[],'
+          '"roundQuestionTexts":[]'
+          '}'
+          ']';
+
+      SharedPreferences.setMockInitialValues({
+        'kelimego_match_history': legacyJson,
+      });
+
+      final repo = LocalMatchHistoryRepository();
+      final loaded = await repo.loadRecent();
+
+      expect(loaded.length, 3);
+
+      // 1. Yeni kayıt (matchId ve endReason mevcut)
+      expect(loaded[0].id, 'new_entry_with_fields');
+      expect(loaded[0].matchId, 'm_live_99');
+      expect(loaded[0].endReason, MatchEndReason.rakipBaglantiKoptu);
+
+      // 2. Eski kayıt (win + forfeit -> varsayılan rakipTerk, matchId null)
+      expect(loaded[1].id, 'legacy_win_forfeit');
+      expect(loaded[1].matchId, isNull);
+      expect(loaded[1].endReason, MatchEndReason.rakipTerk);
+
+      // 3. Eski kayıt (lose + forfeit -> varsayılan terk, matchId null)
+      expect(loaded[2].id, 'legacy_lose_forfeit');
+      expect(loaded[2].matchId, isNull);
+      expect(loaded[2].endReason, MatchEndReason.terk);
+
+      // Eski kayıtlarda isFinal varsayılan olarak true döner
+      expect(loaded[1].isFinal, isTrue);
+      expect(loaded[2].isFinal, isTrue);
+    },
+  );
+
+  test('isFinal: false geçici kaydı depoya yazılır ve okunurken isFinal: false kalır', () async {
+    final repo = LocalMatchHistoryRepository();
+    final tempEntry = MatchHistoryEntry(
+      id: 'temp_1',
+      matchId: 'online_match_abc',
+      opponentName: 'Rakip',
+      finishedAtMs: 1000,
+      myScore: 0,
+      opponentScore: 0,
+      result: MatchResult.lose,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.baglantiKoptu,
+      roundRecords: const [],
+      isFinal: false,
+    );
+
+    await repo.add(tempEntry);
+    final loaded = await repo.loadRecent();
+
+    expect(loaded.length, 1);
+    expect(loaded.first.id, 'temp_1');
+    expect(loaded.first.matchId, 'online_match_abc');
+    expect(loaded.first.isFinal, isFalse);
+    expect(loaded.first.endReason, MatchEndReason.baglantiKoptu);
+  });
+
+  test('Aynı matchId ile önce isFinal: false, sonra isFinal: true eklendiğinde tek kayıt kalır ve güncellenir', () async {
+    final repo = LocalMatchHistoryRepository();
+    final tempEntry = MatchHistoryEntry(
+      id: 'local_temp_id',
+      matchId: 'm_same_123',
+      opponentName: 'Ahmet',
+      finishedAtMs: 1000,
+      myScore: 0,
+      opponentScore: 0,
+      result: MatchResult.lose,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.baglantiKoptu,
+      roundRecords: const [],
+      isFinal: false,
+    );
+
+    await repo.add(tempEntry);
+    var loaded = await repo.loadRecent();
+    expect(loaded.length, 1);
+    expect(loaded.first.isFinal, isFalse);
+    expect(loaded.first.myScore, 0);
+
+    final finalEntry = MatchHistoryEntry(
+      id: 'local_temp_id',
+      matchId: 'm_same_123',
+      opponentName: 'Ahmet',
+      finishedAtMs: 1000,
+      myScore: 1,
+      opponentScore: 2,
+      result: MatchResult.lose,
+      endType: MatchEndType.forfeit,
+      endReason: MatchEndReason.baglantiKoptu,
+      roundRecords: const [],
+      isFinal: true,
+    );
+
+    await repo.add(finalEntry);
+    loaded = await repo.loadRecent();
+
+    // matchId'ye göre tekil olmalı: 2. kayıt açılmaz, mevcut kayıt güncellenir
+    expect(loaded.length, 1);
+    expect(loaded.first.id, 'local_temp_id');
+    expect(loaded.first.matchId, 'm_same_123');
+    expect(loaded.first.isFinal, isTrue);
+    expect(loaded.first.myScore, 1);
+    expect(loaded.first.opponentScore, 2);
+  });
 }
 
 
