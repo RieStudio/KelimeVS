@@ -80,6 +80,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _reconcilePendingMatches();
+      ref.read(profileProvider.notifier).retryPendingNicknameSync();
     }
   }
 

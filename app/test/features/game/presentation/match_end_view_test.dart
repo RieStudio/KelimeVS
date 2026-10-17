@@ -98,6 +98,7 @@ void main() {
     final uiState = MatchUiState(
       matchState: matchState,
       opponentName: 'Ahmet',
+      coinsAwarded: AppConfig.matchWinCoinReward,
     );
     final controller = FakeMatchController(uiState);
 
@@ -138,6 +139,7 @@ void main() {
     final uiState = MatchUiState(
       matchState: matchState,
       opponentName: 'Ahmet',
+      coinsAwarded: AppConfig.matchLoseCoinReward,
     );
     final controller = FakeMatchController(uiState);
 
@@ -173,6 +175,7 @@ void main() {
     final uiState = MatchUiState(
       matchState: matchState,
       opponentName: 'Ahmet',
+      coinsAwarded: AppConfig.matchWinCoinReward,
     );
     final controller = FakeMatchController(uiState);
 
@@ -196,6 +199,7 @@ void main() {
     final uiState = MatchUiState(
       matchState: matchState,
       opponentName: 'Ahmet',
+      coinsAwarded: AppConfig.matchLoseCoinReward,
     );
     final controller = FakeMatchController(uiState);
 

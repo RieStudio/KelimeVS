@@ -60,6 +60,8 @@ export interface ClientFinalMessage {
   readonly winnerIsMe: boolean;
   readonly endedBy: string;
   readonly opponentName?: string;
+  readonly coinsAwarded?: number;
+  readonly coins?: number;
 }
 
 export interface ClientFeedbackMessage {

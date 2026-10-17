@@ -23,6 +23,7 @@ import {
   serializeMatchState,
   type SerializedMatchState,
 } from './storage';
+import type { MatchRewardOutcome } from './userProfile';
 import type { Env } from './index';
 
 interface PlayerInfo {
@@ -38,6 +39,11 @@ export interface MatchRoomInitParams {
   readonly questionOrder: readonly string[];
 }
 
+export interface PlayerRewardInfo {
+  readonly coinsAwarded: number;
+  readonly coins: number;
+}
+
 interface StoredRoomData {
   readonly matchId: string;
   readonly p1: PlayerInfo;
@@ -48,6 +54,8 @@ interface StoredRoomData {
   readonly engineState?: SerializedMatchState;
   readonly schedule: TimersSchedule;
   readonly disconnectedUid?: string;
+  readonly rewards?: Record<string, PlayerRewardInfo>;
+  readonly rewardRetryCount?: number;
 }
 
 export class MatchRoom extends DurableObject<Env> {
@@ -366,6 +374,10 @@ export class MatchRoom extends DurableObject<Env> {
           await this.updateAlarm();
           this.broadcastState();
         }
+      } else if (action === 'rewardRetry') {
+        if (this.data.status === 'finished') {
+          await this.applyMatchRewards();
+        }
       } else if (action === 'cleanup') {
         await this.ctx.storage.deleteAll();
         this.data = null;
@@ -453,10 +465,87 @@ export class MatchRoom extends DurableObject<Env> {
       },
     };
 
+    await this.applyMatchRewards();
     await this.persist();
     await this.updateAlarm();
     this.broadcastState();
     this.broadcastFinal();
+  }
+
+  private async applyMatchRewards(): Promise<boolean> {
+    if (!this.data || !this.data.engineState) return false;
+    const state = deserializeMatchState(this.data.engineState);
+    const winnerId = state.winnerId;
+    const endedBy = state.endedBy;
+
+    const p1Uid = this.data.p1.uid;
+    const p2Uid = this.data.p2.uid;
+
+    const getOutcome = (uid: string): MatchRewardOutcome => {
+      const isWinner = winnerId === uid;
+      if (endedBy === 'forfeit') {
+        return isWinner ? 'win_by_opponent_disconnect' : 'loss_by_disconnect';
+      }
+      return isWinner ? 'win' : 'loss';
+    };
+
+    try {
+      const p1Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1Uid));
+      const p2Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2Uid));
+
+      const [r1, r2] = await Promise.all([
+        p1Stub.applyMatchReward({
+          matchId: this.data.matchId,
+          outcome: getOutcome(p1Uid),
+          uid: p1Uid,
+        }),
+        p2Stub.applyMatchReward({
+          matchId: this.data.matchId,
+          outcome: getOutcome(p2Uid),
+          uid: p2Uid,
+        }),
+      ]);
+
+      this.data = {
+        ...this.data,
+        rewards: {
+          [p1Uid]: { coinsAwarded: r1.coinsAwarded, coins: r1.coins },
+          [p2Uid]: { coinsAwarded: r2.coinsAwarded, coins: r2.coins },
+        },
+        schedule: {
+          ...this.data.schedule,
+          rewardRetryAtMs: undefined,
+        },
+      };
+      await this.persist();
+      return true;
+    } catch (err) {
+      console.error('applyMatchRewards failed:', err);
+      const currentRetries = this.data.rewardRetryCount ?? 0;
+      const maxRetries = 3;
+      if (currentRetries < maxRetries) {
+        const backoffMs = Math.min(30000, 2000 * Math.pow(2, currentRetries));
+        this.data = {
+          ...this.data,
+          rewardRetryCount: currentRetries + 1,
+          schedule: {
+            ...this.data.schedule,
+            rewardRetryAtMs: Date.now() + backoffMs,
+          },
+        };
+      } else {
+        this.data = {
+          ...this.data,
+          schedule: {
+            ...this.data.schedule,
+            rewardRetryAtMs: undefined,
+          },
+        };
+      }
+      await this.persist();
+      await this.updateAlarm();
+      return false;
+    }
   }
 
   private broadcastState(): void {
@@ -504,11 +593,19 @@ export class MatchRoom extends DurableObject<Env> {
     const opponent = isP1 ? this.data.p2 : this.data.p1;
     const state = deserializeMatchState(this.data.engineState);
 
+    const playerReward = this.data.rewards?.[uid];
+
     const msg = buildFinalMessage({
       state,
       playerUid: uid,
       opponentUid: opponent.uid,
       opponentName: opponent.name,
+      ...(playerReward
+        ? {
+            coinsAwarded: playerReward.coinsAwarded,
+            coins: playerReward.coins,
+          }
+        : {}),
     });
 
     this.sendToUid(uid, JSON.stringify(msg));

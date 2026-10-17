@@ -73,6 +73,7 @@ class MatchUiState {
   final bool isVoided;
   final bool isDisconnectedPermanent;
   final bool isDisconnectedReplaced;
+  final int? coinsAwarded;
 
   const MatchUiState({
     this.matchState,
@@ -97,6 +98,7 @@ class MatchUiState {
     this.isVoided = false,
     this.isDisconnectedPermanent = false,
     this.isDisconnectedReplaced = false,
+    this.coinsAwarded,
   });
 
   ConnectionStatus get kendiBaglanti => connectionStatus;
@@ -148,6 +150,7 @@ class MatchUiState {
     bool? isVoided,
     bool? isDisconnectedPermanent,
     bool? isDisconnectedReplaced,
+    int? coinsAwarded,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -176,6 +179,7 @@ class MatchUiState {
           isDisconnectedPermanent ?? this.isDisconnectedPermanent,
       isDisconnectedReplaced:
           isDisconnectedReplaced ?? this.isDisconnectedReplaced,
+      coinsAwarded: coinsAwarded ?? this.coinsAwarded,
     );
   }
 }

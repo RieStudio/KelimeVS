@@ -20,6 +20,12 @@
 				"MatchRoom"
 			],
 			"tag": "v1"
+		},
+		{
+			"new_sqlite_classes": [
+				"UserProfile"
+			],
+			"tag": "v2"
 		}
 	],
 	"durable_objects": {
@@ -31,6 +37,10 @@
 			{
 				"class_name": "MatchRoom",
 				"name": "MATCH_ROOM"
+			},
+			{
+				"class_name": "UserProfile",
+				"name": "USER_PROFILE"
 			}
 		]
 	},
@@ -58,7 +68,13 @@
 	"vars": {
 		"FIREBASE_PROJECT_ID": "kelimegov2",
 		"FIREBASE_DATABASE_URL": "https://kelimegov2-default-rtdb.europe-west1.firebasedatabase.app",
-		"CONTENT_TTL_SECONDS": "3600"
+		"CONTENT_TTL_SECONDS": "3600",
+		"START_COINS": "100",
+		"WIN_COINS": "30",
+		"LOSS_COINS": "5",
+		"DISCONNECT_WIN_COINS": "30",
+		"DISCONNECT_LOSS_COINS": "0",
+		"DAILY_MATCH_COIN_CAP": "300"
 	}
 	/**
 	 * Static Assets

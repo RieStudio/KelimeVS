@@ -119,8 +119,8 @@ class HomeScreen extends ConsumerWidget {
 
                   const Spacer(),
 
-                  // Jeton Hapı (Sabit 250, TODO: Ekonomi)
-                  const CoinPill(amount: 250),
+                  // Jeton Hapı
+                  CoinPill(amount: profile.coins),
 
                   const SizedBox(width: AppDimens.space8),
 

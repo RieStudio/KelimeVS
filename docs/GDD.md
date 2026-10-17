@@ -21,7 +21,7 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 | Giriş (Auth), Remote Config, bildirim (FCM), çökme takibi | **[KARAR]** Firebase (yeni proje, Spark planı) |
 | Oyun sunucusu | **[KARAR]** Cloudflare Workers + Durable Objects (TypeScript, WebSocket). Cloud Functions kullanılmaz (Blaze planı ve kart gerektirir) |
 | Canlı maç durumu | **[KARAR]** Maç başına bir Durable Object; durum sunucuda tutulur, istemciler WebSocket ile bağlanır |
-| Profil, jeton, envanter, görev, liderlik | **[KARAR]** Firestore (Spark kotaları içinde, yalnızca gerekli veri). Jeton yazımı sunucudan yapılır (Faz 5) |
+| Profil, jeton, envanter, görev, liderlik | **[KARAR]** Cloudflare Durable Objects (kullanıcı başına bir `UserProfile` nesnesi, SQLite; liderlik için ayrı tek bir tablo nesnesi). Firestore kullanılmaz. Jeton yazımı yalnızca sunucudan yapılır (Faz 5) |
 | Maç geçmişi | **[KARAR]** Telefonda yerel saklanır; sunucu maç bitince tur kayıtlarını iki oyuncuya gönderir. Firestore'a yazılmaz |
 | İçerik (sorular) | **[KARAR]** Realtime Database, mevcut CMS paneli ile yönetilir; oyun sunucusu okur |
 | Profil fotoğrafı | **[KARAR]** İlk sürümde yok (harf avatar). Cloud Storage for Firebase ücretsiz planda kullanılamaz; ileride hazır avatar seti ya da Cloudinary değerlendirilir |
@@ -154,9 +154,9 @@ Maç durumu, maç başına bir Durable Object'in belleğinde ve SQLite deposunda
 - Bağlantı, Firebase kimlik jetonuyla (ID token) doğrulanır.
 - Tur süresi sunucu alarmıyla (Durable Object alarm) izlenir.
 
-### 5.3 Kullanıcı verisi (Firestore)
+### 5.3 Kullanıcı verisi (Durable Objects)
 
-`users/{uid}`: ad, avatar, jeton, istatistikler, ayarlar. `inventory`, `quests`, `leaderboards` ayrı koleksiyonlardır. Jeton değişiklikleri yalnızca sunucudan yapılır. Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
+Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad, jeton, istatistikler (oynanan/kazanılan/kaybedilen), ayarlar. Envanter, görev ve liderlik sonraki aşamalarda eklenir. Takma ad bulutta tutulur; Google hesabıyla giriş yapılan yeni bir cihazda geri gelir. Jeton değişiklikleri yalnızca sunucudan yapılır ve her maç için en fazla bir kez uygulanır (`matchId` ile tekrar koruması). Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
 
 ## 6. Eşleştirme ve bot
 
@@ -176,11 +176,14 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 
 ## 8. Ekonomi (taslak)
 
-- **[AÇIK]** Jeton kazanma/harcama kuralları henüz belirlenmedi. Öneriler:
+- **[VARSAYIM]** İlk sürüm değerleri (sunucu ortam değişkeni olarak ayarlanır, kodda sabit değildir): başlangıç bakiyesi 100; maç kazanma +30; maç kaybetme +5; rakibin bağlantısı kopup kazanılan maç +30; bağlantısı kopup kaybedilen maç +0; günlük maç ödülü üst sınırı 300 jeton; botla oynanan maçlar jeton vermez (bot maçı istemcide oynandığı için sunucu doğrulayamaz).
+- Ödüller yalnızca sunucuda canlı maç bitince verilir; istemcinin "şu kadar jeton kazandım" demesine güvenilmez.
+- Harcama (güçlendirici, kozmetik) ve ödüllü reklam sonraki aşamadadır.
+- **[AÇIK]** Jeton kazanma/harcama kuralları henüz tam belirlenmedi. Öneriler:
   - Maç kazanma ve günlük görevlerle jeton kazanılır, ödüllü reklamla ek jeton alınır.
   - Güçlendiriciler (ek süre, pas, harf ipucu) jetonla alınır.
   - Pay-to-win'den kaçınılır; ücretli içerik kozmetik ağırlıklı olur.
-- Tüm sayısal değerler (ödül, fiyat, süre toleransı) **Remote Config**'te tutulur, kodda sabitlenmez.
+- Tüm sayısal değerler kodda sabitlenmez. İstemciyi ilgilendirenler (fiyat gösterimi vb.) Remote Config'te, sunucuyu ilgilendirenler (ödül miktarı, günlük sınır) Worker ortam değişkenlerinde tutulur.
 
 ## 9. Güvenlik ilkeleri
 
@@ -214,7 +217,7 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 
 1. Bağlantı kopması bekleme süresinin (30 sn) netleşmesi (bölüm 3.2)
 2. Botla oynanan maçlarda ödül ve bot bildirimi (bölüm 6)
-3. Jeton ekonomisi sayıları (bölüm 8)
+3. Jeton ekonomisi sayılarının onayı ve harcama kuralları (bölüm 8)
 4. iOS aşaması için iPhone erişiminin nasıl sağlanacağı (bölüm 10)
 5. Varsayımların onayı (bölüm 3, madde 6–9; bölüm 4.3 ve 4.4; bölüm 6)
 6. Cevap anahtarlarında özel karakter (`. $ # [ ] /`) sorunu (bölüm 5.1)

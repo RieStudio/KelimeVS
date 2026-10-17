@@ -24,16 +24,23 @@ class WSClient {
     reject: (err: Error) => void;
     timer: NodeJS.Timeout;
   }> = [];
+  public readonly url: string;
   public isClosed = false;
 
   constructor(url: string) {
+    this.url = url;
     this.ws = new WebSocket(url);
     this.ws.addEventListener('message', (event) => {
       try {
         const parsed = JSON.parse(String(event.data));
+        const text = String(event.data);
+        console.log(`[RAW WS DATA] ${url.split('?')[0]}: ${text}`);
+        const parsed = JSON.parse(text);
         this.handleIncoming(parsed);
       } catch {
         // yoksay
+      } catch (err) {
+        console.error('[PARSE ERROR]', err);
       }
     });
     this.ws.addEventListener('close', () => {
@@ -69,6 +76,7 @@ class WSClient {
   }
 
   private handleIncoming(msg: unknown): void {
+    console.log(`[WS DEBUG] ${this.url.split('?')[0]}: ${JSON.stringify(msg)}`);
     for (let i = 0; i < this.waiters.length; i++) {
       const w = this.waiters[i];
       if (w.predicate(msg)) {
@@ -184,6 +192,8 @@ async function ensureServerRunning(): Promise<ChildProcess | null> {
     stdio: 'pipe',
     shell: true,
   });
+  child.stdout?.on('data', (d) => process.stdout.write(d));
+  child.stderr?.on('data', (d) => process.stderr.write(d));
 
   const start = Date.now();
   while (Date.now() - start < 20000) {
@@ -303,6 +313,10 @@ async function main() {
       if (finalMsgA.scores.me !== 2 && finalMsgA.scores.opponent !== 2) {
         throw new Error(`2-0 skor beklentisi karşılanmadı: ${JSON.stringify(finalMsgA.scores)}`);
       }
+      if (finalMsgA.coinsAwarded === undefined || finalMsgA.coins === undefined) {
+        throw new Error(`Senaryo A final mesajında jeton bilgisi eksik: ${JSON.stringify(finalMsgA)}`);
+      }
+      console.log(`  ✓ Alice final mesajı jeton ödülü: +${finalMsgA.coinsAwarded}G (bakiye: ${finalMsgA.coins}G)`);
       roomA.close();
       roomB.close();
       console.log('  ✓ [Senaryo A Başarılı] 2-0 temiz maç tamamlandı.');
@@ -475,6 +489,10 @@ async function main() {
       if (!finalBob.winnerIsMe) {
         throw new Error('HATA: Geri dönmeyen oyuncu maçı terk etmiş sayılmalıydı.');
       }
+      if (finalBob.coinsAwarded === undefined || finalBob.coins === undefined) {
+        throw new Error(`Senaryo F final mesajında jeton bilgisi eksik: ${JSON.stringify(finalBob)}`);
+      }
+      console.log(`  ✓ Bob (rakip kopmasıyla galip) ödülü: +${finalBob.coinsAwarded}G (bakiye: ${finalBob.coins}G)`);
       console.log('  ✓ 3 sn dönmeyen Alice maçı kaybetti, Bob kazandı.');
 
       roomB.close();
@@ -529,8 +547,77 @@ async function main() {
       console.log('  ✓ [Senaryo H Başarılı] 403 erişim kontrolü doğrulandı.');
     }
 
+    // ------------------------------------------------------------------------
+    // Senaryo (i): /me ve /me/nickname HTTP uçları, profil oluşturma ve ad güncelleme
+    // ------------------------------------------------------------------------
+    console.log('\n[Senaryo I] Profil ve Takma Ad HTTP Uçları (/me & /me/nickname)...');
+    {
+      // 1. Yetkisiz istek 401 kontrolü
+      const unauthRes = await fetch(`${BASE_HTTP_URL}/me`);
+      if (unauthRes.status !== 401) {
+        throw new Error(`Yetkisiz GET /me beklenen 401 yerine ${unauthRes.status} döndü`);
+      }
+      console.log('  ✓ Yetkisiz GET /me 401 ile reddedildi.');
+
+      // 2. dev token ile GET /me (yeni profil oluşturulmalı)
+      const getRes1 = await fetch(`${BASE_HTTP_URL}/me`, {
+        headers: { Authorization: 'Bearer dev:alice_e2e' },
+      });
+      if (getRes1.status !== 200) {
+        throw new Error(`GET /me başarısız: HTTP ${getRes1.status}`);
+      }
+      const p1 = (await getRes1.json()) as any;
+      if (p1.uid !== 'alice_e2e' || p1.coins !== 100 || p1.nickname !== null) {
+        throw new Error(`GET /me beklenmeyen veri döndü: ${JSON.stringify(p1)}`);
+      }
+      console.log('  ✓ GET /me yeni profili başlangıç bakiyesiyle (100) döndürdü.');
+
+      // 3. PUT /me/nickname ile ad güncelleme
+      const putRes = await fetch(`${BASE_HTTP_URL}/me/nickname`, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer dev:alice_e2e',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: '   AliceE2E   ' }),
+      });
+      if (putRes.status !== 200) {
+        throw new Error(`PUT /me/nickname başarısız: HTTP ${putRes.status}`);
+      }
+      const putData = (await putRes.json()) as any;
+      if (!putData.ok || putData.nickname !== 'AliceE2E') {
+        throw new Error(`PUT /me/nickname beklenmeyen yanıt: ${JSON.stringify(putData)}`);
+      }
+      console.log('  ✓ PUT /me/nickname takma adı başarıyla güncelledi (AliceE2E).');
+
+      // 4. GET /me ile güncellenen adın doğrulanması
+      const getRes2 = await fetch(`${BASE_HTTP_URL}/me`, {
+        headers: { Authorization: 'Bearer dev:alice_e2e' },
+      });
+      const p2 = (await getRes2.json()) as any;
+      if (p2.nickname !== 'AliceE2E') {
+        throw new Error(`GET /me güncel adı döndürmedi: ${JSON.stringify(p2)}`);
+      }
+      console.log('  ✓ GET /me güncellenmiş takma adı teyit etti.');
+
+      // 5. Geçersiz ad 400 kontrolü
+      const badPutRes = await fetch(`${BASE_HTTP_URL}/me/nickname`, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer dev:alice_e2e',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: 'ab' }),
+      });
+      if (badPutRes.status !== 400) {
+        throw new Error(`Geçersiz takma ad beklenen 400 yerine ${badPutRes.status} döndü`);
+      }
+      console.log('  ✓ Geçersiz takma ad (2 karakter) 400 ile reddedildi.');
+      console.log('  ✓ [Senaryo I Başarılı] Profil ve takma ad HTTP akışları doğrulandı.');
+    }
+
     console.log('\n========================================================');
-    console.log('🎉 TÜM 8 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
+    console.log('🎉 TÜM 9 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
     console.log('========================================================\n');
   } catch (err: unknown) {
     console.error('\n❌ E2E TEST BAŞARISIZ OLDU:');
@@ -544,8 +631,12 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
 

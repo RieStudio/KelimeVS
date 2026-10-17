@@ -367,6 +367,61 @@ void main() {
         expect(finalized.endReason, MatchEndReason.rakipBaglantiKoptu);
       },
     );
+
+    test(
+      '8. Kural 5: Kesinleşen maçın final mesajındaki coins değeri onCoinsUpdated ile mutlak olarak iletilir',
+      () async {
+        final initialEntry = MatchHistoryEntry(
+          id: 'local_entry_1',
+          matchId: 'match_coins_reconcile',
+          opponentName: 'Rakip',
+          finishedAtMs: 1000,
+          myScore: 0,
+          opponentScore: 0,
+          result: MatchResult.lose,
+          endType: MatchEndType.forfeit,
+          endReason: MatchEndReason.baglantiKoptu,
+          roundRecords: const [],
+          isFinal: false,
+        );
+
+        final repo = _FakeMemoryMatchHistoryRepository([initialEntry]);
+        int? updatedCoins;
+
+        final reconciler = MatchReconciler(
+          repo: repo,
+          clientFactory: () {
+            late final _MockOnlineMatchClient client;
+            client = _MockOnlineMatchClient(
+              onConnect: (mId) async {
+                client.emit(
+                  const OnlineMatchFinal(
+                    FinalServerMessage(
+                      rounds: [],
+                      myScore: 2,
+                      opponentScore: 0,
+                      winnerIsMe: true,
+                      endedBy: 'normal',
+                      coinsAwarded: 30,
+                      coins: 160,
+                    ),
+                  ),
+                );
+              },
+            );
+            return client;
+          },
+          onCoinsUpdated: (coins) {
+            updatedCoins = coins;
+          },
+          reconcileTimeout: const Duration(seconds: 2),
+        );
+
+        await reconciler.reconcile();
+
+        expect(updatedCoins, 160);
+      },
+    );
   });
 }
 

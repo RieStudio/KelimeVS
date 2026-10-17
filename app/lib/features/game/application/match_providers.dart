@@ -7,6 +7,7 @@ import '../../online/application/match_reconciler.dart';
 import '../../online/application/online_match_session.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../online/data/online_match_client.dart';
+import '../../profile/application/profile_notifier.dart';
 import '../data/local_question_repository.dart';
 import '../data/question_repository.dart';
 import '../domain/bot/bot_config.dart';
@@ -102,6 +103,7 @@ final matchReconcilerProvider = Provider<MatchReconciler>((ref) {
     repo: repo,
     clientFactory: clientFactory,
     onUpdated: () => ref.invalidate(matchHistoryProvider),
+    onCoinsUpdated: (coins) => ref.read(profileProvider.notifier).updateCoins(coins),
   );
 });
 

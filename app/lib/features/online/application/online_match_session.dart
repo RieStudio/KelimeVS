@@ -18,6 +18,7 @@ import '../../game/domain/match/match_events.dart';
 import '../../game/domain/match/match_state.dart';
 import '../../game/domain/models.dart';
 import '../../game/domain/text_filter.dart';
+import '../../profile/application/profile_notifier.dart';
 import '../data/online_match_client.dart';
 import '../domain/models/online_match_state.dart';
 import '../domain/models/online_messages.dart';
@@ -587,7 +588,12 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         winnerId: winnerId,
         roundHistory: entry.roundRecords,
       ),
+      coinsAwarded: finalMsg.coinsAwarded,
     );
+
+    if (finalMsg.coins != null) {
+      unawaited(ref.read(profileProvider.notifier).updateCoins(finalMsg.coins!));
+    }
 
     if (!_hasReceivedFinal) {
       _hasReceivedFinal = true;

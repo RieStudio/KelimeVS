@@ -121,6 +121,8 @@ class FinalServerMessage extends ServerMessage {
   final bool winnerIsMe;
   final String endedBy; // 'normal', 'forfeit'
   final String? opponentName;
+  final int? coinsAwarded;
+  final int? coins;
 
   const FinalServerMessage({
     required this.rounds,
@@ -129,11 +131,13 @@ class FinalServerMessage extends ServerMessage {
     required this.winnerIsMe,
     required this.endedBy,
     this.opponentName,
+    this.coinsAwarded,
+    this.coins,
   });
 
   @override
   String toString() =>
-      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName)';
+      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName, coinsAwarded: $coinsAwarded, coins: $coins)';
 }
 
 /// İptal edilen maç bildirimi (`voided`).
@@ -210,6 +214,8 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final winnerIsMe = json['winnerIsMe'] as bool? ?? false;
         final endedBy = json['endedBy'] as String? ?? 'normal';
         final opponentName = json['opponentName'] as String?;
+        final coinsAwarded = (json['coinsAwarded'] as num?)?.toInt();
+        final coins = (json['coins'] as num?)?.toInt();
         return FinalServerMessage(
           rounds: roundsList,
           myScore: myScore,
@@ -217,6 +223,8 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           winnerIsMe: winnerIsMe,
           endedBy: endedBy,
           opponentName: opponentName,
+          coinsAwarded: coinsAwarded,
+          coins: coins,
         );
       case 'voided':
         final reason = json['reason'] as String? ?? 'opponent_absent';

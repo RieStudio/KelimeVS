@@ -13,6 +13,7 @@ class MatchReconciler {
   final MatchHistoryRepository repo;
   final OnlineMatchClient Function() clientFactory;
   final void Function()? onUpdated;
+  final void Function(int coins)? onCoinsUpdated;
   final Duration reconcileTimeout;
 
   bool _isReconciling = false;
@@ -21,6 +22,7 @@ class MatchReconciler {
     required this.repo,
     required this.clientFactory,
     this.onUpdated,
+    this.onCoinsUpdated,
     this.reconcileTimeout = const Duration(seconds: 5),
   });
 
@@ -141,6 +143,9 @@ class MatchReconciler {
         );
 
         await repo.add(updatedEntry);
+        if (finalMsg.coins != null) {
+          onCoinsUpdated?.call(finalMsg.coins!);
+        }
         onUpdated?.call();
       }
     } catch (_) {

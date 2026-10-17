@@ -75,10 +75,10 @@ void main() {
     await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
-    // Üst çubuk: "Oyuncu" adı, CoinPill (250)
+    // Üst çubuk: "Oyuncu" adı, CoinPill (100)
     expect(find.text(AppStrings.defaultPlayerName), findsOneWidget);
     expect(find.byType(CoinPill), findsOneWidget);
-    expect(find.text('250'), findsOneWidget);
+    expect(find.text('100'), findsOneWidget);
 
     // Logo & Slogan
     expect(find.byType(KelimeGoLogo), findsOneWidget);

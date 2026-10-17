@@ -35,6 +35,12 @@ abstract final class ServerConfig {
   /// Sağlık kontrolü yolu.
   static const String healthPath = '/health';
 
+  /// Kullanıcı profili yolu.
+  static const String mePath = '/me';
+
+  /// Takma ad güncelleme yolu.
+  static const String nicknamePath = '/me/nickname';
+
   /// Eşleştirme WebSocket yolu.
   static const String matchmakingWsPath = '/ws/matchmaking';
 
@@ -43,6 +49,12 @@ abstract final class ServerConfig {
 
   /// Tam Sağlık Kontrolü HTTP URL'si.
   static String get healthUrl => joinUrl(serverUrl, healthPath);
+
+  /// Tam Profil HTTP URL'si.
+  static String get meUrl => joinUrl(serverUrl, mePath);
+
+  /// Tam Takma Ad Güncelleme HTTP URL'si.
+  static String get nicknameUrl => joinUrl(serverUrl, nicknamePath);
 
   /// Tam Eşleştirme WebSocket URL'si.
   static String get matchmakingWsUrl => joinUrl(wsUrl, matchmakingWsPath);

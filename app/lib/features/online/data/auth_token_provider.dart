@@ -19,19 +19,31 @@ class FirebaseAuthTokenProvider implements AuthTokenProvider {
   const FirebaseAuthTokenProvider({FirebaseAuth? auth})
       : _injectedAuth = auth;
 
-  FirebaseAuth get _auth => _injectedAuth ?? FirebaseAuth.instance;
+  FirebaseAuth? get _auth {
+    try {
+      return _injectedAuth ?? FirebaseAuth.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   Future<String?> getIdToken({bool forceRefresh = false}) async {
-    User? user = _auth.currentUser;
-    if (user == null) {
-      final userCredential = await _auth.signInAnonymously();
-      user = userCredential.user;
-    }
-    if (user == null) {
+    try {
+      final auth = _auth;
+      if (auth == null) return null;
+      User? user = auth.currentUser;
+      if (user == null) {
+        final userCredential = await auth.signInAnonymously();
+        user = userCredential.user;
+      }
+      if (user == null) {
+        return null;
+      }
+      return await user.getIdToken(forceRefresh);
+    } catch (_) {
       return null;
     }
-    return user.getIdToken(forceRefresh);
   }
 }
 

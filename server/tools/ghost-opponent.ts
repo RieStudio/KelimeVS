@@ -389,8 +389,12 @@ function playMatch(
         log(`Geri bildirim: ${msg.kind}${reasonText}`);
       } else if (msg.t === 'final') {
         const winText = msg.winnerIsMe ? 'Kazandım' : 'Rakip kazandı';
+        const coinsText =
+          msg.coinsAwarded !== undefined
+            ? `, ödül: +${msg.coinsAwarded}G, yeni bakiye: ${msg.coins ?? '-'}G`
+            : '';
         log(
-          `Maç bitti: ${winText} (skor: ${msg.scores.me}-${msg.scores.opponent}, bitiş: ${msg.endedBy})`
+          `Maç bitti: ${winText} (skor: ${msg.scores.me}-${msg.scores.opponent}, bitiş: ${msg.endedBy}${coinsText})`
         );
         cleanup();
         currentCleanup = null;

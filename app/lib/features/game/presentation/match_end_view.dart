@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/config/app_config.dart';
 import '../../../core/icons/app_icons.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
@@ -109,9 +108,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       titleStyle = AppTextStyles.largeResultDanger;
     }
 
-    final int coinReward = isWinner
-        ? AppConfig.matchWinCoinReward
-        : AppConfig.matchLoseCoinReward;
+    final int? coinsAwarded = uiState.coinsAwarded;
 
     final Widget content = Container(
       color: AppColors.surface,
@@ -210,64 +207,66 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 ),
               ),
 
-              const SizedBox(height: AppDimens.space20),
-
-              // 6. Jeton Ödülü Kartı
-              Semantics(
-                label: 'Jeton ödülü: $coinReward',
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.space20,
-                    vertical: AppDimens.space8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppDimens.borderRadiusFull,
-                    border: Border.all(
-                      color: AppColors.mint,
-                      width: AppDimens.borderThin,
+              // 6. Jeton Ödülü Kartı (Yalnızca online maçta ve sunucudan coinsAwarded geldiğinde gösterilir; bot maçında hiç gösterilmez)
+              if (coinsAwarded != null) ...[
+                const SizedBox(height: AppDimens.space20),
+                Semantics(
+                  container: true,
+                  label: 'Jeton ödülü: $coinsAwarded',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space20,
+                      vertical: AppDimens.space8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: AppDimens.borderRadiusFull,
+                      border: Border.all(
+                        color: AppColors.mint,
+                        width: AppDimens.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Jeton Dairesi ("G")
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: AppColors.coin,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.ink,
+                              width: AppDimens.borderThin,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'G',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontFredoka,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: AppColors.ink,
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppDimens.space10),
+                        Text(
+                          '+$coinsAwarded${AppStrings.coinSuffix}',
+                          style: AppTextStyles.questionText.copyWith(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Jeton Dairesi ("G")
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: AppColors.coin,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.ink,
-                            width: AppDimens.borderThin,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'G',
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontFredoka,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            color: AppColors.ink,
-                            height: 1.0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppDimens.space10),
-                      Text(
-                        '+$coinReward${AppStrings.coinSuffix}',
-                        style: AppTextStyles.questionText.copyWith(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
+              ],
 
               const Spacer(flex: 4),
 
