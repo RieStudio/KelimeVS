@@ -36,6 +36,11 @@ class FakeMatchHistoryRepository implements MatchHistoryRepository {
   Future<List<MatchHistoryEntry>> loadRecent() async {
     return List.unmodifiable(entries);
   }
+
+  @override
+  Future<void> clear() async {
+    entries.clear();
+  }
 }
 
 void main() {

@@ -13,7 +13,20 @@
           "package_name": "com.kelimego.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "487342637535-bre70tefdaru1ecv99c94djpb70d6jc8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kelimego.app",
+            "certificate_hash": "a1e3b701c9f40317b368bb93702f5f3c06240baf"
+          }
+        },
+        {
+          "client_id": "487342637535-thrq6cg1vr2f6mro0kkpbsnabs8j0g30.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAPjo3v1tyuaygWby29Pmz2CY7zeefnBXU"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "487342637535-thrq6cg1vr2f6mro0kkpbsnabs8j0g30.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "487342637535-v7a3lnbhr26vfi0veuas17ide4sup14d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.kelimego.app"
+              }
+            }
+          ]
         }
       }
     }

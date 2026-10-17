@@ -171,5 +171,18 @@ abstract final class AppStrings {
   static const String changeNickname = 'Adı Değiştir';
   static const String newNicknamePrompt = 'Yeni Takma Ad';
   static const String save = 'Kaydet';
+
+  // Google Hesap Bağlama ve Çıkış
+  static const String linkGoogle = 'Google ile Bağla';
+  static const String linkedAccount = 'Bağlı Hesap';
+  static const String signOut = 'Çıkış Yap';
+  static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
+  static const String linkConflictDialogMessage =
+      'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu hesaba geçersen şu anki anonim ilerlemen (maç geçmişi, takma ad) silinir. Devam edilsin mi?';
+  static const String signOutDialogTitle = 'Çıkış Yap';
+  static const String signOutDialogMessage =
+      'Hesabından çıkmak istediğinden emin misin?\nBulut yedeklemesi henüz bulunmadığı için çıkış yaptığında cihazındaki maç geçmişin ve takma adın silinecektir.';
+  static const String networkError = 'İnternet bağlantını kontrol edip tekrar dene.';
+  static const String authGenericError = 'İşlem gerçekleştirilemedi. Lütfen tekrar dene.';
 }
 

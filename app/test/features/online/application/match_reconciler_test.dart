@@ -32,6 +32,11 @@ class _FakeMemoryMatchHistoryRepository implements MatchHistoryRepository {
         (entry.matchId != null && e.matchId != null && e.matchId == entry.matchId));
     _entries.insert(0, entry);
   }
+
+  @override
+  Future<void> clear() async {
+    _entries.clear();
+  }
 }
 
 class _MockOnlineMatchClient extends OnlineMatchClient {

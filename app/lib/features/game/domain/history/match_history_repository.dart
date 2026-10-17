@@ -8,5 +8,8 @@ abstract interface class MatchHistoryRepository {
 
   /// Yeni maç kaydı ekler. En fazla 10 kayıt sınırını korur.
   Future<void> add(MatchHistoryEntry entry);
+
+  /// Tüm maç geçmişini temizler.
+  Future<void> clear();
 }
 

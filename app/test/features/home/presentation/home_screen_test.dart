@@ -28,6 +28,9 @@ class FakeMatchHistoryRepository implements MatchHistoryRepository {
   Future<List<MatchHistoryEntry>> loadRecent() async {
     return initialEntries;
   }
+
+  @override
+  Future<void> clear() async {}
 }
 
 Widget _buildTestApp(MatchHistoryRepository repo) {

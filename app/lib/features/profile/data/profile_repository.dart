@@ -4,6 +4,7 @@ abstract class ProfileRepository {
   Future<String?> getNickname();
   Future<void> setNickname(String nickname);
   Future<bool> hasNickname();
+  Future<void> clear();
 }
 
 class LocalProfileRepository implements ProfileRepository {
@@ -35,5 +36,11 @@ class LocalProfileRepository implements ProfileRepository {
   Future<bool> hasNickname() async {
     final nick = await getNickname();
     return nick != null && nick.isNotEmpty;
+  }
+
+  @override
+  Future<void> clear() async {
+    final p = await _getPrefs();
+    await p.remove(keyNickname);
   }
 }

@@ -46,6 +46,12 @@ class ProfileNotifier extends Notifier<ProfileState> {
     await repo.setNickname(newNickname);
     state = ProfileState(nickname: newNickname.trim(), isLoaded: true);
   }
+
+  Future<void> clearNickname() async {
+    final repo = ref.read(profileRepositoryProvider);
+    await repo.clear();
+    state = const ProfileState(nickname: null, isLoaded: true);
+  }
 }
 
 final profileProvider = NotifierProvider<ProfileNotifier, ProfileState>(() {

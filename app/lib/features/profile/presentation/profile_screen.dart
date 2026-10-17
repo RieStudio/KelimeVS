@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,18 +11,25 @@ import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
+import '../../auth/application/auth_notifier.dart';
+import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
 import '../domain/nickname_validator.dart';
 
-/// Faz 5.1: Profil Ekranı
+/// Faz 5.1 & 5.2: Profil Ekranı
 ///
 /// Başlık: "Profil"
 /// Avatar: 88 px selfHome avatarı.
 /// Takma ad görünümü ve "Adı Değiştir" eylemi.
+/// Google ile bağlama, bağlı hesap kartı ve çıkış yap eylemleri.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  void _showChangeNicknameDialog(BuildContext context, WidgetRef ref, String currentNickname) {
+  void _showChangeNicknameDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String currentNickname,
+  ) {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -38,9 +46,139 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _handleLinkGoogle(BuildContext context, WidgetRef ref) async {
+    final result = await ref.read(authNotifierProvider.notifier).linkGoogle();
+
+    if (!context.mounted) return;
+
+    if (result is AuthLinkCanceled) {
+      // Kullanıcı Google penceresini kapatırsa sessizce dön
+      return;
+    }
+
+    if (result is AuthLinkConflict) {
+      // Çakışma diyaloğu göster
+      _showConflictDialog(context, ref, result.credential);
+      return;
+    }
+
+    if (result is AuthLinkError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isNetworkError
+                ? AppStrings.networkError
+                : result.message,
+            style: const TextStyle(
+              fontFamily: AppTextStyles.fontNunito,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: AppColors.ink,
+        ),
+      );
+    }
+  }
+
+  void _showConflictDialog(
+    BuildContext context,
+    WidgetRef ref,
+    AuthCredential credential,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppDimens.borderRadiusDialog,
+            side: const BorderSide(
+              color: AppColors.ink,
+              width: AppDimens.borderThick,
+            ),
+          ),
+          title: const Text(
+            AppStrings.linkConflictDialogTitle,
+            style: AppTextStyles.cardTitle,
+          ),
+          content: const Text(
+            AppStrings.linkConflictDialogMessage,
+            style: AppTextStyles.bodyText,
+          ),
+          actions: [
+            PrimaryButton(
+              text: AppStrings.continueAction,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await ref
+                    .read(authNotifierProvider.notifier)
+                    .resolveConflict(credential);
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
+            ),
+            const SizedBox(height: AppDimens.space8),
+            SecondaryButton(
+              text: AppStrings.cancel,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSignOutDialog(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppDimens.borderRadiusDialog,
+            side: const BorderSide(
+              color: AppColors.ink,
+              width: AppDimens.borderThick,
+            ),
+          ),
+          title: const Text(
+            AppStrings.signOutDialogTitle,
+            style: AppTextStyles.cardTitle,
+          ),
+          content: const Text(
+            AppStrings.signOutDialogMessage,
+            style: AppTextStyles.bodyText,
+          ),
+          actions: [
+            PrimaryButton(
+              text: AppStrings.signOut,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await ref.read(authNotifierProvider.notifier).signOut();
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
+            ),
+            const SizedBox(height: AppDimens.space8),
+            SecondaryButton(
+              text: AppStrings.cancel,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
+    final authState = ref.watch(authNotifierProvider);
+
     final nickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
         ? profile.nickname!.trim()
         : AppStrings.defaultPlayerName;
@@ -69,7 +207,7 @@ class ProfileScreen extends ConsumerWidget {
                     )
                   else
                     const SizedBox(width: 44, height: 44),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       AppStrings.profileTitle,
                       style: AppTextStyles.screenTitle,
@@ -112,6 +250,86 @@ class ProfileScreen extends ConsumerWidget {
                 text: AppStrings.changeNickname,
                 onPressed: () => _showChangeNicknameDialog(context, ref, nickname),
               ),
+
+              const SizedBox(height: AppDimens.space16),
+
+              // Google ile Bağla VEYA Bağlı Hesap Kartı + Çıkış Yap
+              if (!authState.isGoogleLinked)
+                SecondaryButton(
+                  text: AppStrings.linkGoogle,
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => _handleLinkGoogle(context, ref),
+                )
+              else ...[
+                // Bağlı Hesap Kartı
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space16,
+                    vertical: AppDimens.space12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: AppDimens.borderRadiusListCard,
+                    border: Border.all(
+                      color: AppColors.mint,
+                      width: AppDimens.borderThin,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.bright,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.ink,
+                            width: AppDimens.borderThin,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.check,
+                          size: 20,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(width: AppDimens.space12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              AppStrings.linkedAccount,
+                              style: AppTextStyles.sectionLabel,
+                            ),
+                            const SizedBox(height: AppDimens.space4),
+                            Text(
+                              authState.linkedEmail ?? '',
+                              style: AppTextStyles.playerName.copyWith(
+                                color: AppColors.ink,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppDimens.space12),
+
+                // Çıkış Yap Butonu
+                SecondaryButton(
+                  text: AppStrings.signOut,
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => _showSignOutDialog(context, ref),
+                ),
+              ],
             ],
           ),
         ),
@@ -216,7 +434,7 @@ class _ChangeNicknameDialogState extends State<_ChangeNicknameDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
+            const Text(
               AppStrings.newNicknamePrompt,
               style: AppTextStyles.cardTitle,
               textAlign: TextAlign.center,

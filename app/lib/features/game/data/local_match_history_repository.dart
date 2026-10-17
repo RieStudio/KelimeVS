@@ -159,6 +159,23 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<void> clear() async {
+    try {
+      final prefs = await _getPrefs();
+      await prefs.remove(_storageKey);
+      if (kDebugMode) {
+        debugPrint('[history] temizlendi');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[history] temizleme HATASI: ${e.runtimeType}: ${_shortErrorMessage(e)}',
+        );
+      }
+    }
+  }
 }
 
 /// Domain sınıflarına dokunmadan data katmanında JSON serileştirme/haritalama
