@@ -14,9 +14,9 @@ describe('Protocol Parsers and Validators', () => {
       expect(sanitizePlayerName('  Alice   Smith  ')).toBe('Alice Smith');
     });
 
-    it('en fazla 20 karaktere kırpar', () => {
+    it('16 karakterden uzun veya geçersiz isimde "Oyuncu" döner', () => {
       const longName = 'ÇokUzunBirOyuncuİsmiDenemesi';
-      expect(sanitizePlayerName(longName).length).toBe(20);
+      expect(sanitizePlayerName(longName)).toBe('Oyuncu');
     });
   });
 

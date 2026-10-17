@@ -120,6 +120,7 @@ class FinalServerMessage extends ServerMessage {
   final int opponentScore;
   final bool winnerIsMe;
   final String endedBy; // 'normal', 'forfeit'
+  final String? opponentName;
 
   const FinalServerMessage({
     required this.rounds,
@@ -127,11 +128,12 @@ class FinalServerMessage extends ServerMessage {
     required this.opponentScore,
     required this.winnerIsMe,
     required this.endedBy,
+    this.opponentName,
   });
 
   @override
   String toString() =>
-      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy)';
+      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName)';
 }
 
 /// İptal edilen maç bildirimi (`voided`).
@@ -207,12 +209,14 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final opponentScore = (scores?['opponent'] as num?)?.toInt() ?? 0;
         final winnerIsMe = json['winnerIsMe'] as bool? ?? false;
         final endedBy = json['endedBy'] as String? ?? 'normal';
+        final opponentName = json['opponentName'] as String?;
         return FinalServerMessage(
           rounds: roundsList,
           myScore: myScore,
           opponentScore: opponentScore,
           winnerIsMe: winnerIsMe,
           endedBy: endedBy,
+          opponentName: opponentName,
         );
       case 'voided':
         final reason = json['reason'] as String? ?? 'opponent_absent';

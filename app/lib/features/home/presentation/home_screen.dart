@@ -20,6 +20,8 @@ import '../../../gallery/component_gallery.dart';
 import '../../game/application/match_history_provider.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
+import '../../profile/application/profile_notifier.dart';
+import '../../profile/presentation/profile_screen.dart';
 
 /// DESIGN.md Bölüm 7: 1) Ana Ekran
 ///
@@ -65,6 +67,10 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(matchHistoryProvider);
+    final profile = ref.watch(profileProvider);
+    final nickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
+        ? profile.nickname!.trim()
+        : AppStrings.defaultPlayerName;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -81,18 +87,33 @@ class HomeScreen extends ConsumerWidget {
               // 1. Üst Çubuk
               Row(
                 children: [
-                  // Oyuncu Avatarı (44 px, selfHome)
-                  const PlayerAvatar.selfHome(
-                    name: AppStrings.defaultPlayerName,
-                    size: AppDimens.avatarHome,
-                  ),
-                  const SizedBox(width: AppDimens.space8),
-                  // Oyuncu Adı (TODO: Profil)
-                  Text(
-                    AppStrings.defaultPlayerName,
-                    style: AppTextStyles.playerName.copyWith(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w800,
+                  // Oyuncu Avatarı (44 px, selfHome) ve Adı - Dokunulduğunda Profil ekranını açar
+                  GestureDetector(
+                    key: const Key('profile_avatar_button'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PlayerAvatar.selfHome(
+                          name: nickname,
+                          size: AppDimens.avatarHome,
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        Text(
+                          nickname,
+                          style: AppTextStyles.playerName.copyWith(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 

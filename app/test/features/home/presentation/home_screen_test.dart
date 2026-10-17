@@ -15,6 +15,7 @@ import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/profile/presentation/profile_screen.dart';
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
   final List<MatchHistoryEntry> initialEntries;
@@ -237,5 +238,19 @@ void main() {
     expect(renderedCards[1].entry.id, 'm_same2');
     expect(renderedCards[2].entry.id, 'm_same1');
     expect(renderedCards[3].entry.id, 'm_old');
+  });
+
+  testWidgets('6. Avatar/takma ad butonuna tıklandığında ProfileScreen açılır', (tester) async {
+    final repo = FakeMatchHistoryRepository([]);
+
+    await tester.pumpWidget(_buildTestApp(repo));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProfileScreen), findsNothing);
+
+    await tester.tap(find.byKey(const Key('profile_avatar_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProfileScreen), findsOneWidget);
   });
 }

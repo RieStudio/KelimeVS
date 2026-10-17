@@ -29,9 +29,13 @@ class MatchCard extends StatelessWidget {
     final isWon = entry.result == MatchResult.win;
     final borderColor = isWon ? AppColors.mint : AppColors.dangerSoft;
 
+    final displayName = entry.opponentName.trim().isNotEmpty
+        ? entry.opponentName.trim()
+        : AppStrings.opponent;
+
     return Semantics(
       button: true,
-      label: '${entry.opponentName}, ${entry.myScore} – ${entry.opponentScore}, '
+      label: '$displayName, ${entry.myScore} – ${entry.opponentScore}, '
           '${isWon ? AppStrings.won : AppStrings.lost}',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -53,7 +57,7 @@ class MatchCard extends StatelessWidget {
             children: [
               // 1. Rakip Avatarı (40 px)
               PlayerAvatar.opponent(
-                name: entry.opponentName,
+                name: displayName,
                 size: AppDimens.avatarList,
                 borderWidth: AppDimens.borderThin,
               ),
@@ -63,7 +67,7 @@ class MatchCard extends StatelessWidget {
               // 2. Rakip Adı (Nunito 16/800, tek satır, dikey ortalı, uzunsa kısalt)
               Expanded(
                 child: Text(
-                  entry.opponentName,
+                  displayName,
                   style: AppTextStyles.playerName.copyWith(
                     color: AppColors.ink,
                   ),

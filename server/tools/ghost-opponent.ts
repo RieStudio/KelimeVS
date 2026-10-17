@@ -230,7 +230,8 @@ process.on('SIGINT', () => {
 /** Eşleştirme kuyruğuna girer ve eşleşme sonucunu döner. */
 function runMatchmaking(
   serverBaseUrl: string,
-  idToken: string
+  idToken: string,
+  name: string
 ): Promise<{ readonly matchId: string; readonly opponentName: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
     const wsUrl = `${serverBaseUrl}/ws/matchmaking`;
@@ -257,8 +258,8 @@ function runMatchmaking(
     currentCleanup = cleanup;
 
     ws.on('open', () => {
-      log('Eşleştirme sunucusuna bağlanıldı, kuyruğa giriliyor...');
-      ws.send(JSON.stringify({ t: 'queue', name: 'Test Rakibi' }));
+      log(`Eşleştirme sunucusuna bağlanıldı, kuyruğa giriliyor (Ad: ${name})...`);
+      ws.send(JSON.stringify({ t: 'queue', name }));
     });
 
     ws.on('message', (raw) => {
@@ -551,7 +552,7 @@ async function main(): Promise<void> {
     }
 
     try {
-      const matchInfo = await runMatchmaking(config.serverUrl, idToken);
+      const matchInfo = await runMatchmaking(config.serverUrl, idToken, config.name);
       await playMatch(config.serverUrl, matchInfo.matchId, idToken, config, questions);
     } catch (err) {
       logError(`Maç oynanırken hata oluştu: ${err instanceof Error ? err.message : String(err)}`);

@@ -11,6 +11,9 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/app_widgets.dart';
 import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
+import 'features/profile/application/profile_notifier.dart';
+import 'features/profile/presentation/onboarding_nickname_screen.dart';
+import 'features/profile/presentation/profile_screen.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -131,6 +134,18 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(profileProvider);
+    if (!profile.isLoaded) {
+      return const Scaffold(
+        backgroundColor: AppColors.surface,
+        body: SizedBox.shrink(),
+      );
+    }
+
+    if (!profile.hasNickname) {
+      return const OnboardingNicknameScreen();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: IndexedStack(
@@ -139,7 +154,7 @@ class _MainShellState extends ConsumerState<MainShell>
           const HomeScreen(),
           const _TabPlaceholder(title: AppStrings.navLeaderboard),
           const _TabPlaceholder(title: AppStrings.navShop),
-          const _TabPlaceholder(title: AppStrings.navProfile),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(

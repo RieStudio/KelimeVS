@@ -331,25 +331,32 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
           ),
 
           // Sağ: Rakip avatarı ve adı
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PlayerAvatar.opponent(
-                name: widget.match.opponentName,
-                size: 54,
-              ),
-              const SizedBox(height: AppDimens.space6),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 80),
-                child: Text(
-                  widget.match.opponentName,
-                  style: AppTextStyles.playerName.copyWith(fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
+          Builder(
+            builder: (context) {
+              final oppDisplayName = widget.match.opponentName.trim().isNotEmpty
+                  ? widget.match.opponentName.trim()
+                  : AppStrings.opponent;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PlayerAvatar.opponent(
+                    name: oppDisplayName,
+                    size: 54,
+                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 80),
+                    child: Text(
+                      oppDisplayName,
+                      style: AppTextStyles.playerName.copyWith(fontSize: 14),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

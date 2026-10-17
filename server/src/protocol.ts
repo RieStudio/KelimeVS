@@ -1,4 +1,5 @@
 // JSON Protokol Tanımları ve Ayrıştırıcıları
+import { validateNickname } from './engine/nicknameValidator';
 
 export type MatchmakerClientMessage =
   | { readonly t: 'queue'; readonly name: string }
@@ -58,6 +59,7 @@ export interface ClientFinalMessage {
   readonly scores: { readonly me: number; readonly opponent: number };
   readonly winnerIsMe: boolean;
   readonly endedBy: string;
+  readonly opponentName?: string;
 }
 
 export interface ClientFeedbackMessage {
@@ -79,9 +81,11 @@ export type MatchRoomServerMessage =
 
 export function sanitizePlayerName(rawName?: unknown): string {
   if (typeof rawName !== 'string') return 'Oyuncu';
-  const trimmed = rawName.trim().replace(/\s+/g, ' ');
-  if (trimmed.length === 0) return 'Oyuncu';
-  return trimmed.slice(0, 20);
+  const result = validateNickname(rawName);
+  if (!result.isValid || result.normalized === null) {
+    return 'Oyuncu';
+  }
+  return result.normalized;
 }
 
 export function parseMatchmakerMessage(raw: unknown): MatchmakerClientMessage | null {

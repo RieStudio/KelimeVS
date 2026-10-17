@@ -1,0 +1,163 @@
+[
+  {
+    "input": "Can",
+    "valid": true,
+    "normalized": "Can"
+  },
+  {
+    "input": "Su",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "A",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "   ",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "1234567890123456",
+    "valid": true,
+    "normalized": "1234567890123456"
+  },
+  {
+    "input": "12345678901234567",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "  Ahmet  ",
+    "valid": true,
+    "normalized": "Ahmet"
+  },
+  {
+    "input": "Ahmet   Yılmaz",
+    "valid": true,
+    "normalized": "Ahmet Yılmaz"
+  },
+  {
+    "input": "  a  ",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "  ab  ",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "İpek Çetin",
+    "valid": true,
+    "normalized": "İpek Çetin"
+  },
+  {
+    "input": "Iğdır_76",
+    "valid": true,
+    "normalized": "Iğdır_76"
+  },
+  {
+    "input": "Şükrü_Öztürk",
+    "valid": true,
+    "normalized": "Şükrü_Öztürk"
+  },
+  {
+    "input": "gamer_pro_99",
+    "valid": true,
+    "normalized": "gamer_pro_99"
+  },
+  {
+    "input": "12345",
+    "valid": true,
+    "normalized": "12345"
+  },
+  {
+    "input": "Ahmet😀",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "user@kelime",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "#proGamer",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Rich$Player",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Ali.Veli",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Winner!",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Player/1",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "kufur",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "KUFUR",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "KuFuR",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "kufurlu_biri",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "salak",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "SALAK_OYUNCU",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "aptal_adam",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Ahmet Mehmet Ali",
+    "valid": true,
+    "normalized": "Ahmet Mehmet Ali"
+  },
+  {
+    "input": "Zeynep",
+    "valid": true,
+    "normalized": "Zeynep"
+  }
+]
+

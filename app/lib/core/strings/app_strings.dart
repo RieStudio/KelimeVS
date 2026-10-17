@@ -160,5 +160,16 @@ abstract final class AppStrings {
   static const String yourConnectionLost = 'Bağlantın koptu';
   static const String opponentConnectionLost = 'Rakibin bağlantısı koptu';
   static const String scoreBeforeDisconnectNote = 'Skor, bağlantı kopmadan önceki duruma göredir.';
+
+  // Profil ve Onboarding
+  static const String welcomeTitle = 'Hoş Geldin!';
+  static const String welcomePrompt = 'KelimeGo’da seni nasıl çağıralım?';
+  static const String nicknameHint = 'Takma adın';
+  static const String nicknameRuleHint = '3–16 karakter. Harf, rakam ve alt çizgi.';
+  static const String continueAction = 'Devam';
+  static const String profileTitle = 'Profil';
+  static const String changeNickname = 'Adı Değiştir';
+  static const String newNicknamePrompt = 'Yeni Takma Ad';
+  static const String save = 'Kaydet';
 }
 

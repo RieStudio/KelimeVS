@@ -6,6 +6,23 @@ import { normalize } from '../src/engine/normalizer';
 
 export type GhostMode = 'play' | 'idle' | 'leave' | 'drop';
 
+export const DEFAULT_GHOST_NAMES: readonly string[] = [
+  'Zeynep',
+  'Mehmet',
+  'Elif',
+  'Can',
+  'Deniz',
+  'Barış',
+];
+
+export function pickGhostName(nameArg?: string): string {
+  if (nameArg && nameArg.trim().length > 0) {
+    return nameArg.trim();
+  }
+  const idx = Math.floor(Math.random() * DEFAULT_GHOST_NAMES.length);
+  return DEFAULT_GHOST_NAMES[idx] ?? 'Zeynep';
+}
+
 export interface GhostConfig {
   readonly mode: GhostMode;
   readonly serverUrl: string;
@@ -16,6 +33,7 @@ export interface GhostConfig {
   readonly backAfterSeconds: number;
   readonly fresh: boolean;
   readonly devAuth: boolean;
+  readonly name: string;
 }
 
 /** Komut satırı argümanlarını ayrıştırır. */
@@ -29,6 +47,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
   let backAfterSeconds = 5;
   let fresh = false;
   let devAuth = false;
+  let nameArg: string | undefined;
 
   for (const arg of argv) {
     if (arg === '--dev-auth' || arg === '--dev-auth=true') {
@@ -44,6 +63,8 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
       serverUrl = arg.slice('--url='.length).trim();
     } else if (arg.startsWith('--api-key=')) {
       apiKey = arg.slice('--api-key='.length).trim();
+    } else if (arg.startsWith('--name=')) {
+      nameArg = arg.slice('--name='.length).trim();
     } else if (arg.startsWith('--rounds=')) {
       const parsed = parseInt(arg.slice('--rounds='.length), 10);
       if (Number.isFinite(parsed) && parsed > 0) {
@@ -77,6 +98,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
     backAfterSeconds,
     fresh,
     devAuth,
+    name: pickGhostName(nameArg),
   };
 }
 

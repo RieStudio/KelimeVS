@@ -533,10 +533,16 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     );
     final matchId =
         _currentMatchId ?? 'online_${finishedAtMs}_${_random.nextInt(100000)}';
+    final resolvedOpponentName =
+        (finalMsg.opponentName != null && finalMsg.opponentName!.trim().isNotEmpty)
+            ? finalMsg.opponentName!.trim()
+            : (state.opponentName.trim().isNotEmpty
+                ? state.opponentName.trim()
+                : AppStrings.opponent);
     final entry = OnlineMatchHistoryMapper.toHistoryEntry(
       finalMessage: finalMsg,
       matchId: matchId,
-      opponentName: state.opponentName,
+      opponentName: resolvedOpponentName,
       finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
       endReason: endReason,

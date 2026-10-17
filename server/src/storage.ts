@@ -179,8 +179,9 @@ export function buildFinalMessage(params: {
   readonly state: MatchState;
   readonly playerUid: string;
   readonly opponentUid: string;
+  readonly opponentName?: string;
 }): ClientFinalMessage {
-  const { state, playerUid, opponentUid } = params;
+  const { state, playerUid, opponentUid, opponentName } = params;
 
   const rounds: ClientRoundRecord[] = state.roundHistory.map((r) => ({
     questionId: r.questionId,
@@ -203,6 +204,7 @@ export function buildFinalMessage(params: {
     },
     winnerIsMe: state.winnerId === playerUid,
     endedBy: state.endedBy ?? 'normal',
+    ...(opponentName ? { opponentName } : {}),
   };
 }
 

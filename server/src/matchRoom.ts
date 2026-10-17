@@ -508,6 +508,7 @@ export class MatchRoom extends DurableObject<Env> {
       state,
       playerUid: uid,
       opponentUid: opponent.uid,
+      opponentName: opponent.name,
     });
 
     this.sendToUid(uid, JSON.stringify(msg));

@@ -16,6 +16,7 @@ import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
 import '../../online/data/matchmaking_client.dart';
+import '../../profile/application/profile_notifier.dart';
 
 /// DESIGN.md Bölüm 7: 2) Eşleşme Bekleme Ekranı
 ///
@@ -130,7 +131,12 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       }
     });
 
-    unawaited(client.start(AppStrings.defaultPlayerName));
+    final myNickname = ref.read(profileProvider).nickname?.trim();
+    final nameToSend = (myNickname != null && myNickname.isNotEmpty)
+        ? myNickname
+        : AppStrings.defaultPlayerName;
+
+    unawaited(client.start(nameToSend));
   }
 
   void _handleOpponentFound() {
@@ -272,8 +278,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Kendi Avatarım (92 px, primary zemin, beyaz harf)
-                  const PlayerAvatar.selfMatch(
-                    name: 'S',
+                  PlayerAvatar.selfMatch(
+                    name: (ref.watch(profileProvider).nickname != null &&
+                            ref.watch(profileProvider).nickname!.trim().isNotEmpty)
+                        ? ref.watch(profileProvider).nickname!.trim()
+                        : 'S',
                     size: AppDimens.avatarSearch,
                   ),
 
