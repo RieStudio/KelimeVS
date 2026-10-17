@@ -8,6 +8,7 @@ import 'package:app/features/game/application/match_ui_state.dart';
 void main() {
   Widget buildTestWidget({
     required ConnectionStatus status,
+    bool opponentConnected = true,
     Duration debounceDuration = const Duration(milliseconds: 700),
     Duration fadeDuration = const Duration(milliseconds: 200),
     Duration pillDuration = const Duration(milliseconds: 1500),
@@ -19,6 +20,7 @@ void main() {
         child: Scaffold(
           body: ConnectionBanner(
             status: status,
+            opponentConnected: opponentConnected,
             debounceDuration: debounceDuration,
             fadeDuration: fadeDuration,
             pillDuration: pillDuration,
@@ -215,6 +217,173 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
         expect(find.text(AppStrings.connectionReconnecting), findsNothing);
         expect(find.text(AppStrings.connectionRestored), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Rakip bağlantısı kopunca (opponentConnected: false) şerit "Rakibin bağlantısı koptu" ile görünür',
+      (tester) async {
+        var opponentConnected = true;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: ConnectionStatus.connected,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+
+        // Rakip koptu
+        opponentConnected = false;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: ConnectionStatus.connected,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Rakip geri dönünce şerit kaybolur ve "Bağlandı" hapı GÖSTERİLMEZ',
+      (tester) async {
+        var opponentConnected = false;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: ConnectionStatus.connected,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
+
+        // Rakip geri döndü
+        opponentConnected = true;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: ConnectionStatus.connected,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+        // "Bağlandı" hapı çıkmamalı
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Kendi bağlantımız da koparsa öncelik bizim bağlantımızdadır, rakip şeridi gizlenir ve sadece bizim şeridimiz gösterilir',
+      (tester) async {
+        var status = ConnectionStatus.connected;
+        var opponentConnected = false;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: status,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
+
+        // Bizim bağlantımız koptu
+        status = ConnectionStatus.reconnecting;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: status,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        // Debounce sırasında rakip şeridi solar ve kaybolur (250 ms), ikisi üst üste binmez
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+        expect(find.text(AppStrings.connectionReconnecting), findsNothing);
+
+        // 700 ms debounce dolunca (kalan 450 ms) sadece kendi reconnection şeridimiz görünür
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.text(AppStrings.connectionReconnecting), findsOneWidget);
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Kendi bağlantımız geri gelince "Bağlandı" hapından sonra rakip hala kopuksa rakip şeridine dönülür',
+      (tester) async {
+        var status = ConnectionStatus.reconnecting;
+        var opponentConnected = false;
+
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: status,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.text(AppStrings.connectionReconnecting), findsOneWidget);
+
+        // Bizim bağlantımız geri geldi
+        status = ConnectionStatus.connected;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              return buildTestWidget(
+                status: status,
+                opponentConnected: opponentConnected,
+              );
+            },
+          ),
+        );
+
+        // 200 ms içinde "Bağlandı" hapı görünür
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.connectionRestored), findsOneWidget);
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+
+        // 1.5 sn dolunca "Bağlandı" hapı biter ve rakip şeridine dönülür
+        await tester.pump(const Duration(milliseconds: 1500));
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
+        expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
       },
     );
   });

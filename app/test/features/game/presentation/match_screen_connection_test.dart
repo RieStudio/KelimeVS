@@ -72,7 +72,7 @@ void main() {
 
   group('MatchScreen - Bağlantı Deneyimi (ADIM 4.5d)', () {
     testWidgets(
-      'Online maçta rakip bağlantısı kopunca (rakipBağlı: false) rakip kartında "Bağlantı koptu" notu görünür, kendi kartında çıkmaz',
+      'Online maçta rakip bağlantısı kopunca (rakipBağlı: false) üst çubuğun altında "Rakibin bağlantısı koptu" şeridi görünür, kartta not çıkmaz, dönünce şerit kaybolur',
       (tester) async {
         final testNotifier = TestUiStateNotifier(
           MatchUiState(
@@ -104,19 +104,26 @@ void main() {
 
         await tester.pump();
 
-        // Rakip kartında "Bağlantı koptu" notu görünür
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsOneWidget);
+        // Üst çubuğun altında tam genişlikte şerit görünür
+        expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
 
-        // Kendi kartında bu not HİÇ çıkmaz (kart adı "Sen" dir)
+        // Oyuncu kartlarında herhangi bir kopma notu ("Bağlantı koptu") ÇIKMAZ
+        expect(find.text('Bağlantı koptu'), findsNothing);
+
+        // Kendi kartı ve rakip kartı normal isimlerini korur
         expect(find.text(AppStrings.you), findsOneWidget);
+        expect(find.text('Mehmet'), findsOneWidget);
 
-        // Rakip geri gelince (opponentConnected: true) not kaybolur
+        // Rakip geri gelince (opponentConnected: true) şerit kaybolur
         testNotifier.updateState(
           testNotifier.state.copyWith(opponentConnected: true),
         );
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
 
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsNothing);
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
+        // "Bağlandı" hapı rakip için gösterilmez
+        expect(find.text(AppStrings.connectionRestored), findsNothing);
       },
     );
 
@@ -356,7 +363,7 @@ void main() {
 
         // Bot oturumunda şerit ve rakip notu asla çıkmaz
         expect(find.text(AppStrings.connectionReconnecting), findsNothing);
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsNothing);
+        expect(find.text(AppStrings.opponentConnectionLost), findsNothing);
         expect(find.text(AppStrings.connectionRestored), findsNothing);
       },
     );

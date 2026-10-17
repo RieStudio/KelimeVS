@@ -270,14 +270,5 @@ abstract final class AppTextStyles {
     color: AppColors.ink,
     height: 1.2,
   );
-
-  // Rakip bağlantı koptu notu (Nunito, 12, 800)
-  static const TextStyle opponentConnectionNote = TextStyle(
-    fontFamily: fontNunito,
-    fontSize: 12,
-    fontWeight: FontWeight.w800,
-    color: AppColors.dangerText,
-    height: 1.2,
-  );
 }
 

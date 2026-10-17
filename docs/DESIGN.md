@@ -133,7 +133,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Bağlantı uyarısı (`ConnectionBanner`)** – Maç ekranında, kendi bağlantın koptuğunda üst çubuğun hemen altında tam genişlikte ince şerit: `dangerSurface` zemin, altında 2 px `dangerSoft` çizgi, ortalı `dangerText` yazı (Nunito 13/800): "Bağlantı koptu, yeniden bağlanılıyor…", yükseklik 32. İçeriği aşağı itmez, üstüne biner. Yeniden bağlanınca şerit 200 ms'de kaybolur ve `bright` zeminli, `ink` yazılı kısa bir "Bağlandı" hapı 1.5 sn gösterilir. **[VARSAYIM]**
 
-**Rakip bağlantı notu** – Rakibin bağlantısı koptuğunda rakip oyuncu kartında adın altına küçük "Bağlantı koptu" notu (Nunito 12/800, `dangerText`) gelir; kart ve süre dolgusu normal çalışmaya devam eder. Rakip dönünce not kaybolur. **[VARSAYIM]**
+**Rakip bağlantı notu** – Rakibin bağlantısı koptuğunda, kendi bağlantı uyarısıyla (`ConnectionBanner`) **aynı yerde ve aynı biçimde** şerit çıkar: üst çubuğun hemen altında tam genişlikte, `dangerSurface` zemin, 2 px `dangerSoft` alt çizgi, ortalı `dangerText` Nunito 13/800 yazı: "Rakibin bağlantısı koptu", yükseklik 32, içeriği itmez. Oyuncu kartının içine not yazılmaz. Rakip dönünce şerit 200 ms'de kaybolur ("Bağlandı" hapı gösterilmez). Kendi bağlantın da kopuksa yalnızca kendi şeridin görünür, ikisi üst üste binmez. **[VARSAYIM]**
 
 **Bölüm etiketi** – BÜYÜK HARF, Nunito 12/800, `muted`, harf aralığı 0.08em.
 

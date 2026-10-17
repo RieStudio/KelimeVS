@@ -8,7 +8,7 @@ import 'package:app/core/widgets/player_card.dart';
 void main() {
   group('PlayerCard Widget Tests', () {
     testWidgets(
-      'statusNote verildiğinde oyuncu adının altında görünür ve dangerText rengindedir',
+      'Oyuncu adı, skoru ve avatarı düzgün görüntülenir',
       (tester) async {
         await tester.pumpWidget(
           const MaterialApp(
@@ -17,25 +17,19 @@ void main() {
                 name: 'Zeynep',
                 score: 2,
                 avatar: SizedBox(width: 36, height: 36),
-                statusNote: AppStrings.opponentDisconnectedNote,
               ),
             ),
           ),
         );
 
         expect(find.text('Zeynep'), findsOneWidget);
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsOneWidget);
-
-        final textWidget = tester.widget<Text>(
-          find.text(AppStrings.opponentDisconnectedNote),
-        );
-        expect(textWidget.style?.color, AppColors.dangerText);
-        expect(textWidget.style?.fontSize, 12);
+        expect(find.text('2'), findsOneWidget);
+        expect(find.byType(SizedBox), findsWidgets);
       },
     );
 
     testWidgets(
-      'statusNote null olduğunda adın altında not alanı görünmez',
+      'Pasif oyuncuda süre dolgusu ve süre yazısı görünmez',
       (tester) async {
         await tester.pumpWidget(
           const MaterialApp(
@@ -44,19 +38,22 @@ void main() {
                 name: 'Sen',
                 score: 1,
                 avatar: SizedBox(width: 36, height: 36),
-                statusNote: null,
+                isActive: false,
+                remainingSeconds: 12,
               ),
             ),
           ),
         );
 
         expect(find.text('Sen'), findsOneWidget);
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsNothing);
+        expect(find.text('1'), findsOneWidget);
+        expect(find.text('12 sn'), findsNothing);
+        expect(find.bySemanticsLabel(AppStrings.timeLeftLabel), findsNothing);
       },
     );
 
     testWidgets(
-      'Aktif oyuncuda hem statusNote hem de kalan süre ve ilerleme dolgusu birlikte çalışır',
+      'Aktif oyuncuda kalan süre ve ilerleme dolgusu gösterilir, 5 sn altında danger rengine geçer',
       (tester) async {
         await tester.pumpWidget(
           const MaterialApp(
@@ -66,22 +63,32 @@ void main() {
                 score: 0,
                 avatar: SizedBox(width: 36, height: 36),
                 isActive: true,
-                remainingSeconds: 11,
-                timeProgress: 0.73,
-                statusNote: AppStrings.opponentDisconnectedNote,
+                remainingSeconds: 4,
+                timeProgress: 0.25,
               ),
             ),
           ),
         );
 
         expect(find.text('Rakip'), findsOneWidget);
-        expect(find.text(AppStrings.opponentDisconnectedNote), findsOneWidget);
-        expect(find.text('11 sn'), findsOneWidget);
+        expect(find.text('0'), findsOneWidget);
+        expect(find.text('4 sn'), findsOneWidget);
 
         // Kalan süre dolgusu semantik olarak mevcuttur
         expect(find.bySemanticsLabel(AppStrings.timeLeftLabel), findsOneWidget);
+
+        // AnimatedContainer'ın rengi dangerSoft olmalıdır
+        final animatedContainer = tester.widget<AnimatedContainer>(
+          find.descendant(
+            of: find.bySemanticsLabel(AppStrings.timeLeftLabel),
+            matching: find.byType(AnimatedContainer),
+          ),
+        );
+        expect(
+          (animatedContainer.decoration as BoxDecoration?)?.color,
+          AppColors.dangerSoft,
+        );
       },
     );
   });
 }
-

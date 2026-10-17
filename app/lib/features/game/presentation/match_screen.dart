@@ -258,9 +258,6 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           isActive: isBotTurn,
                           remainingSeconds: isBotTurn ? remainingSec : null,
                           timeProgress: isBotTurn ? timeProgress : null,
-                          statusNote: !uiState.opponentConnected
-                              ? AppStrings.opponentDisconnectedNote
-                              : null,
                         ),
                       ),
                     ],
@@ -317,6 +314,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                 right: 0,
                 child: ConnectionBanner(
                   status: uiState.kendiBaglanti,
+                  opponentConnected: uiState.opponentConnected,
                 ),
               ),
 
