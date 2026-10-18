@@ -34,7 +34,8 @@ class PlayerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = (timeProgress ?? 0.0).clamp(0.0, 1.0);
-    final isDanger = remainingSeconds != null && remainingSeconds! <= 5;
+    final clampedSec = remainingSeconds?.clamp(0, 15);
+    final isDanger = clampedSec != null && clampedSec <= 5;
     final fillColor = isDanger ? AppColors.dangerSoft : AppColors.bright;
 
     return Container(
@@ -64,8 +65,8 @@ class PlayerCard extends StatelessWidget {
               Positioned.fill(
                 child: Semantics(
                   label: AppStrings.timeLeftLabel,
-                  value: remainingSeconds != null
-                      ? '$remainingSeconds${AppStrings.secondsSuffix}'
+                  value: clampedSec != null
+                      ? '$clampedSec${AppStrings.secondsSuffix}'
                       : null,
                   container: true,
                   child: FractionallySizedBox(
@@ -100,9 +101,9 @@ class PlayerCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (isActive && remainingSeconds != null)
+                        if (isActive && clampedSec != null)
                           Text(
-                            '$remainingSeconds${AppStrings.secondsSuffix}',
+                            '$clampedSec${AppStrings.secondsSuffix}',
                             style: AppTextStyles.secondaryText,
                           ),
                       ],

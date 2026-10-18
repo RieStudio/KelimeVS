@@ -142,14 +142,17 @@ class OnlineMatchState {
 
   /// Verilen yerel zamana göre ([nowLocalMs]) kalan hamle süresini (milisaniye)
   /// sunucu saat sapmasını ([clockOffsetMs]) hesaba katarak hesaplar.
-  int kalanSureMs(int nowLocalMs) {
+  /// Tur süresi üst sınırı [maxDurationMs] (varsayılan 15000 ms) ile 0 arasında sınırlandırılır (clamp).
+  int kalanSureMs(int nowLocalMs, {int maxDurationMs = 15000}) {
     final estimatedServerNow = nowLocalMs + clockOffsetMs;
     final remaining = deadlineMs - estimatedServerNow;
-    return remaining > 0 ? remaining : 0;
+    if (remaining <= 0) return 0;
+    return remaining > maxDurationMs ? maxDurationMs : remaining;
   }
 
   /// [kalanSureMs] için takma ad.
-  int remainingDeadlineMs(int nowLocalMs) => kalanSureMs(nowLocalMs);
+  int remainingDeadlineMs(int nowLocalMs, {int maxDurationMs = 15000}) =>
+      kalanSureMs(nowLocalMs, maxDurationMs: maxDurationMs);
 
   factory OnlineMatchState.fromJson(
     Map<String, dynamic> json, {

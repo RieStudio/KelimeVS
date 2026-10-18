@@ -22,6 +22,7 @@ import '../../profile/application/profile_notifier.dart';
 import '../data/online_match_client.dart';
 import '../domain/models/online_match_state.dart';
 import '../domain/models/online_messages.dart';
+import '../../leaderboard/application/leaderboard_providers.dart';
 
 /// Sunucudan gelen `final` mesajını yerel [MatchHistoryEntry] ve [RoundRecord]
 /// modellerine dönüştüren yardımcı sınıf.
@@ -594,6 +595,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     if (finalMsg.coins != null) {
       unawaited(ref.read(profileProvider.notifier).updateCoins(finalMsg.coins!));
     }
+    ref.invalidate(leaderboardNotifierProvider);
 
     if (!_hasReceivedFinal) {
       _hasReceivedFinal = true;

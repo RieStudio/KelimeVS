@@ -27,7 +27,7 @@ class LeaderboardNotifier extends AsyncNotifier<LeaderboardData> {
 }
 
 final leaderboardNotifierProvider =
-    AsyncNotifierProvider<LeaderboardNotifier, LeaderboardData>(() {
+    AsyncNotifierProvider.autoDispose<LeaderboardNotifier, LeaderboardData>(() {
   return LeaderboardNotifier();
 });
 

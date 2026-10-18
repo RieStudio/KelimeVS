@@ -164,7 +164,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     final isBotTurn = matchState?.phase == MatchPhase.roundActive &&
         matchState?.turnPlayerId == 'bot';
 
-    final remainingSec = (uiState.remainingMs / 1000).ceil();
+    final remainingSec = (uiState.remainingMs / 1000).ceil().clamp(0, 15);
     final timeProgress = (uiState.remainingMs / 15000.0).clamp(0.0, 1.0);
     final canLeaveWithoutPenalty = uiState.isMatchFinished;
 

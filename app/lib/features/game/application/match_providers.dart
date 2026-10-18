@@ -23,7 +23,7 @@ final questionRepositoryProvider = Provider<QuestionRepository>((ref) {
 });
 
 final gameClockProvider = Provider<GameClock>((ref) {
-  return StopwatchClock();
+  return const SystemClock();
 });
 
 final randomProvider = Provider<math.Random>((ref) {
@@ -53,7 +53,10 @@ final matchmakingClientFactoryProvider =
 
 final onlineMatchClientFactoryProvider =
     Provider<OnlineMatchClient Function()>((ref) {
-  return () => OnlineMatchClient();
+  return () {
+    final clock = ref.read(gameClockProvider);
+    return OnlineMatchClient(clock: () => clock.nowMs());
+  };
 });
 
 final matchControllerProvider =

@@ -25,6 +25,13 @@ abstract interface class GameClock {
   int nowMs();
 }
 
+class SystemClock implements GameClock {
+  const SystemClock();
+
+  @override
+  int nowMs() => DateTime.now().millisecondsSinceEpoch;
+}
+
 class StopwatchClock implements GameClock {
   final int _initialEpochMs = DateTime.now().millisecondsSinceEpoch;
   final Stopwatch _stopwatch = Stopwatch()..start();

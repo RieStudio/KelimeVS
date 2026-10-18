@@ -90,5 +90,74 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'Süre sınır testleri: 15ten büyük (4965 sn), negatif (-5 sn), tam 0 ve tam 15 sn durumları 0-15 arasına clamp edilir',
+      (tester) async {
+        // Durum 1: 4965 sn verildiğinde 15 sn olarak görüntülenir
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: PlayerCard(
+                name: 'Oyuncu 1',
+                score: 0,
+                avatar: SizedBox(),
+                isActive: true,
+                remainingSeconds: 4965,
+              ),
+            ),
+          ),
+        );
+        expect(find.text('15 sn'), findsOneWidget);
+
+        // Durum 2: Negatif süre (-5 sn) verildiğinde 0 sn olarak görüntülenir
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: PlayerCard(
+                name: 'Oyuncu 2',
+                score: 0,
+                avatar: SizedBox(),
+                isActive: true,
+                remainingSeconds: -5,
+              ),
+            ),
+          ),
+        );
+        expect(find.text('0 sn'), findsOneWidget);
+
+        // Durum 3: Tam 0 sn
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: PlayerCard(
+                name: 'Oyuncu 3',
+                score: 0,
+                avatar: SizedBox(),
+                isActive: true,
+                remainingSeconds: 0,
+              ),
+            ),
+          ),
+        );
+        expect(find.text('0 sn'), findsOneWidget);
+
+        // Durum 4: Tam 15 sn
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: PlayerCard(
+                name: 'Oyuncu 4',
+                score: 0,
+                avatar: SizedBox(),
+                isActive: true,
+                remainingSeconds: 15,
+              ),
+            ),
+          ),
+        );
+        expect(find.text('15 sn'), findsOneWidget);
+      },
+    );
   });
 }
