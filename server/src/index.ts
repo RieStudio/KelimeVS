@@ -2,13 +2,15 @@ import { authenticateRequest, type AuthEnv } from './auth';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile } from './userProfile';
+import { Leaderboard } from './leaderboard';
 
-export { Matchmaker, MatchRoom, UserProfile };
+export { Matchmaker, MatchRoom, UserProfile, Leaderboard };
 
 export interface Env extends AuthEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly USER_PROFILE: DurableObjectNamespace<UserProfile>;
+  readonly LEADERBOARD: DurableObjectNamespace<Leaderboard>;
   readonly FAST_TIMERS?: string;
   readonly CONTENT_SOURCE?: string;
   readonly FIREBASE_DATABASE_URL?: string;
@@ -105,6 +107,17 @@ export default {
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
         const result = await profileStub.setNickname(nickname, uid);
+
+        // Leaderboard tablosundaki eski takma adı da güncelle
+        if (env.LEADERBOARD) {
+          try {
+            const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+            await leaderboardStub.updateNickname(uid, result.nickname);
+          } catch (lbErr) {
+            console.error('Leaderboard updateNickname failed:', lbErr);
+          }
+        }
+
         return new Response(JSON.stringify(result), {
           status: 200,
           headers: jsonHeaders,
@@ -119,6 +132,24 @@ export default {
           }
         );
       }
+    }
+
+    // Liderlik tablosu rotası: GET /leaderboard
+    if (request.method === 'GET' && pathname === '/leaderboard') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+      const data = await leaderboardStub.getLeaderboard(uid);
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: jsonHeaders,
+      });
     }
 
     // Eşleştirme WebSocket yükseltmesi: /ws/matchmaking

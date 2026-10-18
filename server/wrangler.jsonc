@@ -26,6 +26,12 @@
 				"UserProfile"
 			],
 			"tag": "v2"
+		},
+		{
+			"new_sqlite_classes": [
+				"Leaderboard"
+			],
+			"tag": "v3"
 		}
 	],
 	"durable_objects": {
@@ -41,6 +47,10 @@
 			{
 				"class_name": "UserProfile",
 				"name": "USER_PROFILE"
+			},
+			{
+				"class_name": "Leaderboard",
+				"name": "LEADERBOARD"
 			}
 		]
 	},

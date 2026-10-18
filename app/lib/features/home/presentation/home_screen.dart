@@ -22,6 +22,7 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../leaderboard/presentation/leaderboard_screen.dart';
 
 /// DESIGN.md Bölüm 7: 1) Ana Ekran
 ///
@@ -88,39 +89,61 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 children: [
                   // Oyuncu Avatarı (44 px, selfHome) ve Adı - Dokunulduğunda Profil ekranını açar
-                  GestureDetector(
-                    key: const Key('profile_avatar_button'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileScreen(),
-                        ),
-                      );
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PlayerAvatar.selfHome(
-                          name: nickname,
-                          size: AppDimens.avatarHome,
-                        ),
-                        const SizedBox(width: AppDimens.space8),
-                        Text(
-                          nickname,
-                          style: AppTextStyles.playerName.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                  Flexible(
+                    child: GestureDetector(
+                      key: const Key('profile_avatar_button'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileScreen(),
                           ),
-                        ),
-                      ],
+                        );
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          PlayerAvatar.selfHome(
+                            name: nickname,
+                            size: AppDimens.avatarHome,
+                          ),
+                          const SizedBox(width: AppDimens.space8),
+                          Flexible(
+                            child: Text(
+                              nickname,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.playerName.copyWith(
+                                color: AppColors.ink,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
-                  const Spacer(),
+                  const SizedBox(width: AppDimens.space8),
 
                   // Jeton Hapı
                   CoinPill(amount: profile.coins),
+
+                  const SizedBox(width: AppDimens.space8),
+
+                  // Sıralama (Kupa) İkon Butonu
+                  AppIconButton(
+                    key: const Key('leaderboard_button'),
+                    icon: AppIcons.trophy,
+                    semanticLabel: AppStrings.leaderboard,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const LeaderboardScreen(),
+                        ),
+                      );
+                    },
+                  ),
 
                   const SizedBox(width: AppDimens.space8),
 

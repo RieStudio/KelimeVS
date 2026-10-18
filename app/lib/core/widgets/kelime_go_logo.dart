@@ -20,9 +20,11 @@ class KelimeGoLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Kelime Go',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             'Kelime',
@@ -68,8 +70,9 @@ class KelimeGoLogo extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _PlayTrianglePainter extends CustomPainter {

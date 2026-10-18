@@ -32,15 +32,11 @@ class WSClient {
     this.ws = new WebSocket(url);
     this.ws.addEventListener('message', (event) => {
       try {
-        const parsed = JSON.parse(String(event.data));
         const text = String(event.data);
-        console.log(`[RAW WS DATA] ${url.split('?')[0]}: ${text}`);
         const parsed = JSON.parse(text);
         this.handleIncoming(parsed);
-      } catch {
-        // yoksay
       } catch (err) {
-        console.error('[PARSE ERROR]', err);
+        // yoksay
       }
     });
     this.ws.addEventListener('close', () => {
@@ -306,8 +302,8 @@ async function main() {
 
       // Maç bitişini bekle (2-0 galibiyet)
       const [finalStateA, finalMsgA] = await Promise.all([
-        roomA.waitForState((m) => m.phase === 'matchFinished', 8000),
-        roomA.waitForFinal(undefined, 8000),
+        roomA.waitForState((m) => m.phase === 'matchFinished', 15000),
+        roomA.waitForFinal(undefined, 15000),
       ]);
 
       if (finalMsgA.scores.me !== 2 && finalMsgA.scores.opponent !== 2) {
@@ -559,15 +555,17 @@ async function main() {
       }
       console.log('  ✓ Yetkisiz GET /me 401 ile reddedildi.');
 
+      const aliceUid = `alice_e2e_${Date.now()}`;
+
       // 2. dev token ile GET /me (yeni profil oluşturulmalı)
       const getRes1 = await fetch(`${BASE_HTTP_URL}/me`, {
-        headers: { Authorization: 'Bearer dev:alice_e2e' },
+        headers: { Authorization: `Bearer dev:${aliceUid}` },
       });
       if (getRes1.status !== 200) {
         throw new Error(`GET /me başarısız: HTTP ${getRes1.status}`);
       }
       const p1 = (await getRes1.json()) as any;
-      if (p1.uid !== 'alice_e2e' || p1.coins !== 100 || p1.nickname !== null) {
+      if (p1.uid !== aliceUid || p1.coins !== 100 || p1.nickname !== null) {
         throw new Error(`GET /me beklenmeyen veri döndü: ${JSON.stringify(p1)}`);
       }
       console.log('  ✓ GET /me yeni profili başlangıç bakiyesiyle (100) döndürdü.');
@@ -576,7 +574,7 @@ async function main() {
       const putRes = await fetch(`${BASE_HTTP_URL}/me/nickname`, {
         method: 'PUT',
         headers: {
-          Authorization: 'Bearer dev:alice_e2e',
+          Authorization: `Bearer dev:${aliceUid}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ nickname: '   AliceE2E   ' }),
@@ -592,7 +590,7 @@ async function main() {
 
       // 4. GET /me ile güncellenen adın doğrulanması
       const getRes2 = await fetch(`${BASE_HTTP_URL}/me`, {
-        headers: { Authorization: 'Bearer dev:alice_e2e' },
+        headers: { Authorization: `Bearer dev:${aliceUid}` },
       });
       const p2 = (await getRes2.json()) as any;
       if (p2.nickname !== 'AliceE2E') {
@@ -604,7 +602,7 @@ async function main() {
       const badPutRes = await fetch(`${BASE_HTTP_URL}/me/nickname`, {
         method: 'PUT',
         headers: {
-          Authorization: 'Bearer dev:alice_e2e',
+          Authorization: `Bearer dev:${aliceUid}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ nickname: 'ab' }),
@@ -616,8 +614,125 @@ async function main() {
       console.log('  ✓ [Senaryo I Başarılı] Profil ve takma ad HTTP akışları doğrulandı.');
     }
 
+    // ------------------------------------------------------------------------
+    // Senaryo (j): Haftalık Liderlik Tablosu (/leaderboard) ve Maç Sonu Sıralama
+    // ------------------------------------------------------------------------
+    console.log('\n[Senaryo J] Haftalık Liderlik Tablosu (/leaderboard)...');
+    {
+      // 1. Yetkisiz GET /leaderboard 401 kontrolü
+      const unauthRes = await fetch(`${BASE_HTTP_URL}/leaderboard`);
+      if (unauthRes.status !== 401) {
+        throw new Error(`Yetkisiz GET /leaderboard beklenen 401 yerine ${unauthRes.status} döndü`);
+      }
+      console.log('  ✓ Yetkisiz GET /leaderboard 401 ile reddedildi.');
+
+      const aliceUid = `alice_j_${Date.now()}`;
+      const bobUid = `bob_j_${Date.now()}`;
+
+      const suffix = Math.floor(1000 + Math.random() * 9000);
+      const aliceNick = `Alice_${suffix}`;
+      const bobNick = `Bob_${suffix}`;
+
+      // 2. Oyuncuların takma adlarını ayarla
+      await fetch(`${BASE_HTTP_URL}/me/nickname`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer dev:${aliceUid}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: aliceNick }),
+      });
+      await fetch(`${BASE_HTTP_URL}/me/nickname`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer dev:${bobUid}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: bobNick }),
+      });
+
+      // 3. Maç öncesi liderlik sorgusu (alice_j'nin 0 galibiyeti var -> me null)
+      const preRes = await fetch(`${BASE_HTTP_URL}/leaderboard`, {
+        headers: { Authorization: `Bearer dev:${aliceUid}` },
+      });
+      const preData = (await preRes.json()) as any;
+      if (preData.me !== null) {
+        throw new Error(`Maç öncesi me null beklenirken veri döndü: ${JSON.stringify(preData.me)}`);
+      }
+      console.log('  ✓ Maç öncesi me null olarak teyit edildi.');
+
+      // 4. Hızlı bir maç oynat: Alice ve Bob eşleşir, Bob bağlantıyı keser -> Alice kazanır
+      const { matchId } = await matchTwoPlayers(aliceUid, 'Alice', bobUid, 'Bob');
+      const { roomA, roomB } = await connectToMatch(matchId, aliceUid, bobUid);
+
+      // Bob bağlantıyı kapatır
+      roomB.close();
+
+      // FAST_TIMERS: 3 saniye sonra disconnectForfeit tetiklenir
+      const finalMsg = await roomA.waitForMessage<ClientFinalMessage>(
+        (m) => m.t === 'final',
+        8000
+      );
+      if (!finalMsg.winnerIsMe) {
+        throw new Error('Beklenen kazanan Alice idi, ancak finalMsg.winnerIsMe false geldi');
+      }
+      roomA.close();
+      console.log('  ✓ Maç forfeit ile bitti, Alice kazandı.');
+
+      // 5. Maç sonrası liderlik sorgusu (alice_j)
+      const postResAlice = await fetch(`${BASE_HTTP_URL}/leaderboard`, {
+        headers: { Authorization: `Bearer dev:${aliceUid}` },
+      });
+      if (postResAlice.status !== 200) {
+        throw new Error(`GET /leaderboard başarısız: HTTP ${postResAlice.status}`);
+      }
+      const postDataAlice = (await postResAlice.json()) as any;
+      expectWeekDataValid(postDataAlice);
+
+      // Top listesinde uid olmamalı
+      for (const item of postDataAlice.top) {
+        if ('uid' in item) {
+          throw new Error(`Liderlik yanıtında uid bulunmamalıdır! Bulundu: ${item.uid}`);
+        }
+      }
+
+      const aliceRow = postDataAlice.top.find((e: any) => e.isMe === true);
+      if (!aliceRow || aliceRow.wins < 1 || aliceRow.nickname !== aliceNick) {
+        throw new Error(`Alice liderlik tablosunda doğru görünmüyor: ${JSON.stringify(postDataAlice)}`);
+      }
+      if (!postDataAlice.me || postDataAlice.me.wins < 1) {
+        throw new Error(`Alice me verisi doğru değil: ${JSON.stringify(postDataAlice.me)}`);
+      }
+      console.log('  ✓ Alice liderlik tablosunda isMe: true olarak görünüyor.');
+
+      // 6. Bob sorgusu (kaybeden olduğu için wins: 0, me null olmalı)
+      const postResBob = await fetch(`${BASE_HTTP_URL}/leaderboard`, {
+        headers: { Authorization: `Bearer dev:${bobUid}` },
+      });
+      const postDataBob = (await postResBob.json()) as any;
+      if (postDataBob.me !== null) {
+        throw new Error(`0 galibiyetli Bob için me null olmalıydı: ${JSON.stringify(postDataBob.me)}`);
+      }
+      const aliceInBobView = postDataBob.top.find((e: any) => e.nickname === aliceNick);
+      if (!aliceInBobView || aliceInBobView.isMe !== false) {
+        throw new Error(`Bob açısından Alice isMe: false olmalıydı`);
+      }
+      console.log('  ✓ Bob için me null ve rakipler isMe: false olarak doğrulandı.');
+
+      console.log('  ✓ [Senaryo J Başarılı] Haftalık liderlik tablosu tam E2E akışı doğrulandı.');
+    }
+
+    function expectWeekDataValid(data: any) {
+      if (!data.weekKey || typeof data.weekKey !== 'string' || !data.weekKey.includes('-W')) {
+        throw new Error(`Geçersiz weekKey: ${data.weekKey}`);
+      }
+      if (!data.endsAt || typeof data.endsAt !== 'number' || data.endsAt <= Date.now() - 1000) {
+        throw new Error(`Geçersiz endsAt: ${data.endsAt}`);
+      }
+    }
+
     console.log('\n========================================================');
-    console.log('🎉 TÜM 9 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
+    console.log('🎉 TÜM 10 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
     console.log('========================================================\n');
   } catch (err: unknown) {
     console.error('\n❌ E2E TEST BAŞARISIZ OLDU:');

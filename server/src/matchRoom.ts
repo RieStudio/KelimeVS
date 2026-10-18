@@ -56,6 +56,12 @@ interface StoredRoomData {
   readonly disconnectedUid?: string;
   readonly rewards?: Record<string, PlayerRewardInfo>;
   readonly rewardRetryCount?: number;
+  readonly leaderboardPending?: boolean;
+  readonly leaderboardRetryCount?: number;
+  readonly leaderboardWinnerUid?: string;
+  readonly leaderboardWinnerNickname?: string | null;
+  readonly leaderboardLoserUid?: string;
+  readonly leaderboardLoserNickname?: string | null;
 }
 
 export class MatchRoom extends DurableObject<Env> {
@@ -378,6 +384,10 @@ export class MatchRoom extends DurableObject<Env> {
         if (this.data.status === 'finished') {
           await this.applyMatchRewards();
         }
+      } else if (action === 'leaderboardRetry') {
+        if (this.data.status === 'finished' && this.data.leaderboardPending) {
+          await this.applyLeaderboard();
+        }
       } else if (action === 'cleanup') {
         await this.ctx.storage.deleteAll();
         this.data = null;
@@ -457,15 +467,31 @@ export class MatchRoom extends DurableObject<Env> {
     if (!this.data) return;
 
     const nowMs = Date.now();
+    const state = this.data.engineState ? deserializeMatchState(this.data.engineState) : null;
+    const winnerId = state?.winnerId;
+    const p1Uid = this.data.p1.uid;
+    const p2Uid = this.data.p2.uid;
+    const isWinnerPresent = winnerId === p1Uid || winnerId === p2Uid;
+
     this.data = {
       ...this.data,
       status: 'finished',
       schedule: {
         cleanupAtMs: nowMs + this.durations.cleanupMs,
       },
+      ...(isWinnerPresent
+        ? {
+            leaderboardPending: true,
+            leaderboardWinnerUid: winnerId,
+            leaderboardLoserUid: winnerId === p1Uid ? p2Uid : p1Uid,
+          }
+        : {}),
     };
 
     await this.applyMatchRewards();
+    if (this.data.leaderboardPending) {
+      await this.applyLeaderboard();
+    }
     await this.persist();
     await this.updateAlarm();
     this.broadcastState();
@@ -506,12 +532,23 @@ export class MatchRoom extends DurableObject<Env> {
         }),
       ]);
 
+      const winnerUid = this.data.leaderboardWinnerUid;
+      const loserUid = this.data.leaderboardLoserUid;
+      const winnerNick =
+        winnerUid === p1Uid ? r1.nickname : winnerUid === p2Uid ? r2.nickname : undefined;
+      const loserNick =
+        loserUid === p1Uid ? r1.nickname : loserUid === p2Uid ? r2.nickname : undefined;
+
       this.data = {
         ...this.data,
         rewards: {
           [p1Uid]: { coinsAwarded: r1.coinsAwarded, coins: r1.coins },
           [p2Uid]: { coinsAwarded: r2.coinsAwarded, coins: r2.coins },
         },
+        leaderboardWinnerNickname:
+          winnerNick !== undefined ? winnerNick : this.data.leaderboardWinnerNickname,
+        leaderboardLoserNickname:
+          loserNick !== undefined ? loserNick : this.data.leaderboardLoserNickname,
         schedule: {
           ...this.data.schedule,
           rewardRetryAtMs: undefined,
@@ -539,6 +576,91 @@ export class MatchRoom extends DurableObject<Env> {
           schedule: {
             ...this.data.schedule,
             rewardRetryAtMs: undefined,
+          },
+        };
+      }
+      await this.persist();
+      await this.updateAlarm();
+      return false;
+    }
+  }
+
+  private async applyLeaderboard(): Promise<boolean> {
+    if (
+      !this.data ||
+      !this.data.leaderboardPending ||
+      !this.data.leaderboardWinnerUid ||
+      !this.data.leaderboardLoserUid ||
+      !this.env.LEADERBOARD
+    ) {
+      return true;
+    }
+
+    let winnerNick = this.data.leaderboardWinnerNickname;
+    let loserNick = this.data.leaderboardLoserNickname;
+
+    if (winnerNick === undefined || loserNick === undefined) {
+      try {
+        const [pWinner, pLoser] = await Promise.all([
+          this.env.USER_PROFILE.get(
+            this.env.USER_PROFILE.idFromName(this.data.leaderboardWinnerUid)
+          ).getProfile(this.data.leaderboardWinnerUid),
+          this.env.USER_PROFILE.get(
+            this.env.USER_PROFILE.idFromName(this.data.leaderboardLoserUid)
+          ).getProfile(this.data.leaderboardLoserUid),
+        ]);
+        winnerNick = pWinner.nickname;
+        loserNick = pLoser.nickname;
+      } catch {
+        // Okunamazsa sonraki denemede tekrar çalışır
+      }
+    }
+
+    try {
+      const leaderboardStub = this.env.LEADERBOARD.get(
+        this.env.LEADERBOARD.idFromName('global')
+      );
+      await leaderboardStub.recordMatchResult({
+        matchId: this.data.matchId,
+        winnerUid: this.data.leaderboardWinnerUid,
+        winnerNickname: winnerNick ?? null,
+        loserUid: this.data.leaderboardLoserUid,
+        loserNickname: loserNick ?? null,
+      });
+
+      this.data = {
+        ...this.data,
+        leaderboardPending: false,
+        leaderboardWinnerNickname: winnerNick,
+        leaderboardLoserNickname: loserNick,
+        schedule: {
+          ...this.data.schedule,
+          leaderboardRetryAtMs: undefined,
+        },
+      };
+      await this.persist();
+      return true;
+    } catch (err) {
+      console.error('applyLeaderboard failed:', err);
+      const currentRetries = this.data.leaderboardRetryCount ?? 0;
+      const maxRetries = 3;
+      if (currentRetries < maxRetries) {
+        const backoffMs = Math.min(30000, 2000 * Math.pow(2, currentRetries));
+        this.data = {
+          ...this.data,
+          leaderboardPending: true,
+          leaderboardRetryCount: currentRetries + 1,
+          schedule: {
+            ...this.data.schedule,
+            leaderboardRetryAtMs: Date.now() + backoffMs,
+          },
+        };
+      } else {
+        this.data = {
+          ...this.data,
+          schedule: {
+            ...this.data.schedule,
+            leaderboardRetryAtMs: undefined,
           },
         };
       }

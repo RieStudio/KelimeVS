@@ -7,6 +7,7 @@ export interface TimersSchedule {
   readonly disconnectTimeoutAtMs?: number;
   readonly cleanupAtMs?: number;
   readonly rewardRetryAtMs?: number;
+  readonly leaderboardRetryAtMs?: number;
 }
 
 export type DueActionType =
@@ -15,7 +16,8 @@ export type DueActionType =
   | 'turnTimeout'
   | 'startNextRound'
   | 'cleanup'
-  | 'rewardRetry';
+  | 'rewardRetry'
+  | 'leaderboardRetry';
 
 export interface RoomDurations {
   readonly answerSeconds: number;
@@ -55,6 +57,7 @@ export function computeNextAlarm(schedule: TimersSchedule): number | null {
   if (schedule.disconnectTimeoutAtMs !== undefined) times.push(schedule.disconnectTimeoutAtMs);
   if (schedule.cleanupAtMs !== undefined) times.push(schedule.cleanupAtMs);
   if (schedule.rewardRetryAtMs !== undefined) times.push(schedule.rewardRetryAtMs);
+  if (schedule.leaderboardRetryAtMs !== undefined) times.push(schedule.leaderboardRetryAtMs);
 
   if (times.length === 0) return null;
   return Math.min(...times);
@@ -100,6 +103,12 @@ export function processDueTimers(
   if (schedule.rewardRetryAtMs !== undefined && nowMs >= schedule.rewardRetryAtMs) {
     dueActions.push('rewardRetry');
     const { rewardRetryAtMs, ...rest } = remaining;
+    remaining = rest;
+  }
+
+  if (schedule.leaderboardRetryAtMs !== undefined && nowMs >= schedule.leaderboardRetryAtMs) {
+    dueActions.push('leaderboardRetry');
+    const { leaderboardRetryAtMs, ...rest } = remaining;
     remaining = rest;
   }
 

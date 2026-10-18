@@ -184,5 +184,24 @@ abstract final class AppStrings {
       'Hesabından çıkmak istediğinden emin misin?\nBulut yedeklemesi henüz bulunmadığı için çıkış yaptığında cihazındaki maç geçmişin ve takma adın silinecektir.';
   static const String networkError = 'İnternet bağlantını kontrol edip tekrar dene.';
   static const String authGenericError = 'İşlem gerçekleştirilemedi. Lütfen tekrar dene.';
+
+  // Haftalık Liderlik Tablosu
+  static const String leaderboardTitle = 'Haftalık Sıralama';
+  static const String leaderboard = 'Sıralama';
+  static const String emptyLeaderboard = 'Bu hafta henüz maç yok';
+  static const String emptyLeaderboardSubtitle =
+      'Hızlı Maç oynayarak haftanın ilk galibiyetini sen al!';
+  static const String winsSuffix = ' galibiyet';
+  static const String yourRankLabel = 'Senin Sıran';
+  static String yourRank(int rank, int wins) => 'Senin sıran: #$rank ($wins$winsSuffix)';
+  static const String notRankedYet = 'Sıralamada değilsin';
+  static const String remainingTimePrefix = 'Kalan süre: ';
+  static const String leaderboardLoading = 'Sıralama yükleniyor…';
+  static const String leaderboardError = 'Sıralama yüklenemedi';
+  static const String retry = 'Tekrar Dene';
+  static const String daysUnit = 'g';
+  static const String hoursUnit = 's';
+  static const String minutesUnit = 'd';
+  static const String timeExpired = 'Süre doldu';
 }
 

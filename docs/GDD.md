@@ -158,6 +158,16 @@ Maç durumu, maç başına bir Durable Object'in belleğinde ve SQLite deposunda
 
 Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad, jeton, istatistikler (oynanan/kazanılan/kaybedilen), ayarlar. Envanter, görev ve liderlik sonraki aşamalarda eklenir. Takma ad bulutta tutulur; Google hesabıyla giriş yapılan yeni bir cihazda geri gelir. Jeton değişiklikleri yalnızca sunucudan yapılır ve her maç için en fazla bir kez uygulanır (`matchId` ile tekrar koruması). Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
 
+### 5.4 Liderlik tablosu
+
+- **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
+- Tabloda ilk 50 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
+- Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
+- Aynı rakibe karşı bir haftada en fazla **3 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
+- Takma adı henüz olmayan oyuncu tabloda görünmez.
+- Veri tek bir `Leaderboard` Durable Object içinde tutulur; yalnızca sunucu yazar. Maç bitince `UserProfile` güncellemesiyle birlikte tabloya galibiyet bildirilir. Bildirim hata verirse maç sonu etkilenmez, sonra tekrar denenir.
+- Geçmiş haftaların tablosu ve haftalık ödüller şimdilik yoktur (sonraki aşama).
+
 ## 6. Eşleştirme ve bot
 
 - Oyuncu "Hızlı Maç" seçince sunucudaki eşleştirme havuzuna (Durable Object) girer; sunucu iki oyuncuyu eşler.

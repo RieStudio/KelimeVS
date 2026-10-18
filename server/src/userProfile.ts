@@ -25,6 +25,7 @@ export interface UserProfileData {
 export interface MatchRewardResult {
   readonly coinsAwarded: number;
   readonly coins: number;
+  readonly nickname?: string | null;
   readonly alreadyProcessed?: boolean;
 }
 
@@ -185,6 +186,7 @@ export class UserProfile extends DurableObject<Env> {
       return {
         coinsAwarded: existingMatches[0].coins_awarded,
         coins: profile.coins,
+        nickname: profile.nickname,
         alreadyProcessed: true,
       };
     }
@@ -279,6 +281,7 @@ export class UserProfile extends DurableObject<Env> {
     return {
       coinsAwarded: actualCoinsAwarded,
       coins: updatedProfile.coins,
+      nickname: updatedProfile.nickname,
     };
   }
 

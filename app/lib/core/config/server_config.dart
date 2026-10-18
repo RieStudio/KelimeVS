@@ -41,6 +41,9 @@ abstract final class ServerConfig {
   /// Takma ad güncelleme yolu.
   static const String nicknamePath = '/me/nickname';
 
+  /// Liderlik tablosu yolu.
+  static const String leaderboardPath = '/leaderboard';
+
   /// Eşleştirme WebSocket yolu.
   static const String matchmakingWsPath = '/ws/matchmaking';
 
@@ -55,6 +58,9 @@ abstract final class ServerConfig {
 
   /// Tam Takma Ad Güncelleme HTTP URL'si.
   static String get nicknameUrl => joinUrl(serverUrl, nicknamePath);
+
+  /// Tam Liderlik Tablosu HTTP URL'si.
+  static String get leaderboardUrl => joinUrl(serverUrl, leaderboardPath);
 
   /// Tam Eşleştirme WebSocket URL'si.
   static String get matchmakingWsUrl => joinUrl(wsUrl, matchmakingWsPath);
