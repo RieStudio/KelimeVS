@@ -15,11 +15,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "487342637535-bre70tefdaru1ecv99c94djpb70d6jc8.apps.googleusercontent.com",
+          "client_id": "487342637535-cgne9a2fm6uqi6bjmlnfgdtnegk83cqu.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kelimego.app",
-            "certificate_hash": "a1e3b701c9f40317b368bb93702f5f3c06240baf"
+            "certificate_hash": "b63cfbe4e9d44f1d284157ffc97e7897262d669b"
           }
         },
         {

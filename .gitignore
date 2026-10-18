@@ -3,3 +3,8 @@ server/.wrangler/
 server/.ghost-session.json
 .ghost-session.json
 
+# Android keystore & release secrets
+**/key.properties
+*.jks
+*.keystore
+
