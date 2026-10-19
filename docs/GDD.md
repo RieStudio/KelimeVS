@@ -1,4 +1,4 @@
-# Kelime Go – Oyun Tasarım Dokümanı (GDD)
+# Kelimeta – Oyun Tasarım Dokümanı (GDD)
 
 > Taslak 0.1 (Faz 0) · Tarih: 4 Ekim 2026
 > Bu dosya projenin tek doğruluk kaynağıdır. Antigravity ve diğer araçlar kodlamadan önce bunu okumalıdır.
@@ -8,7 +8,7 @@
 
 ## 1. Özet
 
-Kelime Go, iki oyuncunun gerçek zamanlı eşleşip sırayla cevap verdiği bir kelime düello oyunudur. Ekranda bir kategori sorusu çıkar (örn. "B ile başlayan hayvanlar"). Oyuncular sırayla cevap yazar. Süresi içinde doğru ve daha önce söylenmemiş bir cevap veremeyen turu kaybeder.
+Kelimeta, iki oyuncunun gerçek zamanlı eşleşip sırayla cevap verdiği bir kelime düello oyunudur. Ekranda bir kategori sorusu çıkar (örn. "B ile başlayan hayvanlar"). Oyuncular sırayla cevap yazar. Süresi içinde doğru ve daha önce söylenmemiş bir cevap veremeyen turu kaybeder.
 
 Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, karakter ve soru metinleri tamamen özgün olacaktır.
 

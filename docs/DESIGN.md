@@ -1,4 +1,4 @@
-# Kelime Go – Tasarım Rehberi (DESIGN.md)
+# Kelimeta – Tasarım Rehberi (DESIGN.md)
 
 > Taslak 0.1 · Tarih: 6 Ekim 2026
 > Bu dosya `GDD.md` ile birlikte kodlamadan önce okunur. Arayüz kodu bu dosyayla çelişmemelidir.
@@ -12,7 +12,7 @@
 - **Hava:** Eğlenceli, renkli, çizgi film hissi. Kalın koyu kenarlıklar, yuvarlak köşeler, altta sert gölge ("basılabilir" butonlar).
 - **Renk yönü:** Beyaz ve yeşil. Sıcak vurgu olarak tek bir sarı (jeton). Kırmızı sadece olumsuz durumlar için.
 - **Maskot yok.** Kimlik tamamen tipografi ve ikonlarla kurulur.
-- **Logo:** `Kelime` + `Go`. "Go" yazısı "Kelime" ile aynı boyutta ve kalınlıkta, yeşil renkte; arkasında açık nane yeşili, yuvarlatılmış, sağa bakan bir oynat (play) üçgeni durur. Üçgenin kenarlığı ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz.
+- **Logo:** `Kelimeta` tek kelime. "Kelime" `ink` renginde, "ta" `primary` renginde ve arkasında açık nane yeşili (`mint`), yuvarlatılmış, sağa bakan bir oynat (play) üçgeni rozeti durur. Aynı boyut ve kalınlıkta (Fredoka 700). Üçgenin kenarlığı ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz. **[VARSAYIM]** Geçici çözüm; telefonda görüp netleştirilecek.
 
 ## 2. Renk jetonları
 
@@ -143,7 +143,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
-**1) Ana ekran** – Üstte: avatar (44) + oyuncu adı + jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık) + ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. **Sıralama mutlaka en yeni maç en üstte, yukarıdan aşağıya eskiye doğrudur** (maçın bitiş zamanına göre azalan); kartlarda tarih gösterilmez. En altta alt gezinme.
+**1) Ana ekran** – Üstte solda: avatar (44, dokununca profil) + oyuncu adı. Sağda sırayla: jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık), kupa ikon butonu (liderlik tablosu, 44×44) ve ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. **Sıralama mutlaka en yeni maç en üstte, yukarıdan aşağıya eskiye doğrudur** (maçın bitiş zamanına göre azalan); kartlarda tarih gösterilmez.  Alt gezinme çubuğu yoktur.
 
 **2) Eşleşme bekleme** – Sol üstte kapat. Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı. "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz". Üç noktalı yükleme göstergesi (nokta renkleri `primary`/`bright`/`mint`, sırayla yanıp söner). Altta ipucu kartı ("Türkçe karakter kullanmasan da olur…") ve "Vazgeç" butonu.
 
@@ -168,6 +168,10 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 - **İtiraz:** Kendi kabul edilmeyen ("yanlış" ve "çok yakın") cevap balonuna dokunmak onu seçer; varsayılan seçili olan turdaki **son** kabul edilmeyen denemendir. Seçili balonun altında uyarı kutusu çıkar (`dangerSurface`, `dangerSoft` kenarlık): "\"X\" kabul edilmedi. Sence doğru muydu?" ve altı çizili "İtiraz et" eylemi. Gönderildikten sonra eylem "İtiraz gönderildi" (`muted`, dokunulamaz) olur. Daha önce söylenmiş cevap seçilirse kutu yalnızca "Bu cevap daha önce söylenmişti" der, eylem yoktur. Rakibin cevapları için itiraz yoktur.
 
 Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgili fazlarda bu rehberdeki bileşenlerle tasarlanır.
+
+**7) Profil** – Ana ekrandaki avatara dokununca açılır. Üstte geri butonu ve "Profil" başlığı. Ortada büyük harf avatarı (takma adın ilk harfi), altında takma ad (Fredoka 22/600) ve "Adı Değiştir" ikincil butonu. Altında hesap kartı: bağlı değilse "Google ile Bağla" ikincil butonu; bağlıysa Google e-postası, onay rozeti ve `dangerSurface`/`dangerText` stilinde "Çıkış Yap". Çıkış ve hesap değiştirme onay diyalogları veri kaybı uyarısı içerir.
+
+**8) Liderlik tablosu** – Kupa butonuyla açılır. Üstte geri ve "Liderlik Tablosu" başlığı. Altında "Bu hafta" ve kalan süreyi gösteren hap şeklinde şerit (kart zemini, `mint` kenarlık). Liste: ilk 50 oyuncu; satırda sıra, harf avatarı (36), takma ad ve galibiyet sayısı. İlk üç sıra için sade madalya/kupa vurgusu (1. `coin` sarısı). Kendi satırın `surface` zemin ve `mint` kenarlıkla vurgulanır. İlk 50 dışındaysan listenin altında sabit "Senin sıran" çubuğu (kart zemini, sert gölge). Boş durum: "Bu hafta henüz maç yok". Hata durumunda "Tekrar Dene" butonu. Yalnızca haftalık galibiyetler listelenir (GDD bölüm 5.4).
 
 ## 8. Hareket (animasyon)
 
