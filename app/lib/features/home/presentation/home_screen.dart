@@ -10,7 +10,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_pill.dart';
-import '../../../core/widgets/kelime_go_logo.dart';
+import '../../../core/widgets/kelimeta_logo.dart';
 import '../../../core/widgets/match_card.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -168,7 +168,7 @@ class HomeScreen extends ConsumerWidget {
 
               // 2. Logo ve Slogan
               const Center(
-                child: KelimeGoLogo(),
+                child: KelimetaLogo(),
               ),
               const SizedBox(height: AppDimens.space8),
               Center(

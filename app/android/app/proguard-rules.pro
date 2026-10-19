@@ -1,4 +1,4 @@
-# Kelime Go - Minimal ProGuard / R8 Kuralları
+# Kelimeta - Minimal ProGuard / R8 Kuralları
 # Gereksiz geniş kurallardan kaçınılmış, yalnızca runtime refleksiyonu kullanan
 # Flutter platform kanalları, Firebase Auth ve Google Sign-In bileşenleri hedeflenmiştir.
 

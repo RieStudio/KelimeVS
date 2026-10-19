@@ -5,7 +5,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/kelime_go_logo.dart';
+import '../../../core/widgets/kelimeta_logo.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../application/profile_notifier.dart';
 import '../domain/nickname_validator.dart';
@@ -14,7 +14,7 @@ import '../domain/nickname_validator.dart';
 ///
 /// docs/DESIGN.md ve Faz 5.1 kurallarına uygun olarak:
 /// - Zemin `surface`, logo ortalı,
-/// - "Hoş Geldin!" ve "KelimeGo’da seni nasıl çağıralım?",
+/// - "Hoş Geldin!" ve "Kelimeta’da seni nasıl çağıralım?",
 /// - Tek satır giriş alanı (kart zemin, 3 px ink kenarlık, köşe 18),
 /// - Anlık doğrulama ve hata mesajı gösterimi,
 /// - Karakter sayacı (en fazla 16),
@@ -109,7 +109,7 @@ class _OnboardingNicknameScreenState
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: KelimeGoLogo()),
+                const Center(child: KelimetaLogo()),
                 const SizedBox(height: AppDimens.space24),
 
                 Text(

@@ -49,6 +49,58 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:487342637535:android:675fe7436355823ee3846a",
+        "android_client_info": {
+          "package_name": "com.kelimeta.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "487342637535-5cf0mognthrudqq8ojkf06cpmnl5kt4b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kelimeta.app",
+            "certificate_hash": "b63cfbe4e9d44f1d284157ffc97e7897262d669b"
+          }
+        },
+        {
+          "client_id": "487342637535-ojjni6clo7rrmnrqit5l0ph1u12oa509.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kelimeta.app",
+            "certificate_hash": "a1e3b701c9f40317b368bb93702f5f3c06240baf"
+          }
+        },
+        {
+          "client_id": "487342637535-thrq6cg1vr2f6mro0kkpbsnabs8j0g30.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPjo3v1tyuaygWby29Pmz2CY7zeefnBXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "487342637535-thrq6cg1vr2f6mro0kkpbsnabs8j0g30.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "487342637535-v7a3lnbhr26vfi0veuas17ide4sup14d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.kelimego.app"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

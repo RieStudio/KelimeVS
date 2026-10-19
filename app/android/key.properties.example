@@ -1,13 +1,13 @@
-# Kelime Go - Android Release İmzalama Yapılandırma Örneği
+# Kelimeta - Android Release İmzalama Yapılandırma Örneği
 # Bu dosyayı kopyalayarak 'key.properties' adıyla aynı dizine ('app/android/key.properties') kaydedin.
 # DİKKAT: 'key.properties' ve '.jks' dosyaları gizli bilgi içerir, ASLA Git'e eklenmemelidir (.gitignore'dadır).
 #
 # ÖNEMLİ (Windows kullanıcıları için):
 # Dosya yollarında TERS EĞİK ÇİZGİ (\) KULLANMAYIN!
 # '.properties' dosyalarında ters eğik çizgi kaçış karakteri (escape) olduğu için Gradle yolu bulamaz.
-# Her zaman İLERİ EĞİK ÇİZGİ (/) kullanın (örn. D:/RS/secrets/kelimego-upload.jks).
+# Her zaman İLERİ EĞİK ÇİZGİ (/) kullanın (örn. D:/RS/secrets/kelimeta-upload.jks).
 
-storeFile=D:/RS/secrets/kelimego-upload.jks
+storeFile=D:/RS/secrets/kelimeta-upload.jks
 storePassword=keystore-sifreniz
 keyAlias=upload
 keyPassword=anahtar-sifreniz

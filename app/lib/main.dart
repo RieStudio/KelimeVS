@@ -31,18 +31,18 @@ Future<void> main() async {
     authError = e.toString();
   }
 
-  runApp(ProviderScope(child: KelimeGoApp(authError: authError)));
+  runApp(ProviderScope(child: KelimetaApp(authError: authError)));
 }
 
-class KelimeGoApp extends StatelessWidget {
+class KelimetaApp extends StatelessWidget {
   final String? authError;
 
-  const KelimeGoApp({super.key, this.authError});
+  const KelimetaApp({super.key, this.authError});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kelime Go',
+      title: 'Kelimeta',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: MainShell(initialAuthError: authError),

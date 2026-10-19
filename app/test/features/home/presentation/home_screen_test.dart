@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/widgets/coin_pill.dart';
-import 'package:app/core/widgets/kelime_go_logo.dart';
+import 'package:app/core/widgets/kelimeta_logo.dart';
 import 'package:app/core/widgets/match_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/result_badge.dart';
@@ -81,7 +81,7 @@ void main() {
     expect(find.text('100'), findsOneWidget);
 
     // Logo & Slogan
-    expect(find.byType(KelimeGoLogo), findsOneWidget);
+    expect(find.byType(KelimetaLogo), findsOneWidget);
     expect(find.text(AppStrings.slogan), findsOneWidget);
 
     // Ana ve İkincil butonlar
