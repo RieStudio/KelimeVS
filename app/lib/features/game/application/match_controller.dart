@@ -203,6 +203,11 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     );
   }
 
+  @override
+  void useExtraTime() {
+    // Bot maçlarında ek süre güçlendiricisi kullanılamaz.
+  }
+
   /// Kullanıcının maçı terk etmesini sağlar.
   @override
   void leaveMatch() {

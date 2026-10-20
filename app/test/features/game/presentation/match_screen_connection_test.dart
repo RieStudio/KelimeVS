@@ -19,6 +19,9 @@ class FakeMatchSession implements MatchSession {
   void submit(String text) {}
 
   @override
+  void useExtraTime() {}
+
+  @override
   void leaveMatch() {}
 
   @override

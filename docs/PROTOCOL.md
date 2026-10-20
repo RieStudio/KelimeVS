@@ -219,6 +219,17 @@ Arkadaş düellosu da `/ws/matchmaking` WebSocket uç noktası üzerinden yönet
 ```
 - İstemcinin güncel durumu sunucudan yeniden talep etmesini sağlar.
 
+#### Güçlendirici Kullanma (`use_powerup`)
+```json
+{
+  "t": "use_powerup",
+  "type": "extra_time"
+}
+```
+- Yalnızca online hızlı maçta (ranked), tur aktifken ve sıra oyuncudayken kullanılabilir.
+- Maç başına oyuncu başına 1 kullanım ile sınırlıdır (30 jeton).
+- Arkadaş maçında veya bakiye yetersizliğinde reddedilir.
+
 ---
 
 ### Sunucu -> İstemci Mesajları
@@ -319,6 +330,39 @@ Rakip oyuncu belirlenen süre içinde maç odasına hiç bağlanmazsa gönderili
 {
   "t": "voided",
   "reason": "opponent_absent"
+}
+```
+
+#### Güçlendirici Onayı / Yanıtı (`powerup_ack`)
+Yalnızca güçlendiriciyi kullanmak isteyen oyuncuya gönderilir:
+```json
+{
+  "t": "powerup_ack",
+  "powerupType": "extra_time",
+  "success": true,
+  "deadlineMs": 1728518420000,
+  "coins": 70,
+  "remainingUses": 0
+}
+```
+Başarısızlık durumunda:
+```json
+{
+  "t": "powerup_ack",
+  "powerupType": "extra_time",
+  "success": false,
+  "code": "not_enough_coins" | "already_used" | "not_your_turn" | "round_not_active" | "not_allowed_in_match_type" | "account_deleted",
+  "message": "Açıklayıcı Türkçe hata mesajı"
+}
+```
+
+#### Rakip Güçlendirici Bildirimi (`opponent_powerup`)
+Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
+```json
+{
+  "t": "opponent_powerup",
+  "powerupType": "extra_time",
+  "seconds": 5
 }
 ```
 

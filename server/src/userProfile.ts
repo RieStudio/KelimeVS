@@ -29,6 +29,19 @@ export interface MatchRewardResult {
   readonly alreadyProcessed?: boolean;
 }
 
+export interface SpendCoinsResult {
+  readonly success: boolean;
+  readonly coins: number;
+  readonly alreadySpent?: boolean;
+  readonly error?: 'not_enough_coins' | 'account_deleted';
+}
+
+export interface RefundPowerupResult {
+  readonly ok: true;
+  readonly refunded: boolean;
+  readonly coins: number;
+}
+
 interface ProfileRow extends Record<string, string | number | null> {
   uid: string;
   nickname: string | null;
@@ -65,6 +78,13 @@ interface BlockedUserRow extends Record<string, string | number | null> {
 
 interface CountRow extends Record<string, string | number | null> {
   cnt: number;
+}
+
+interface PowerupPurchaseRow extends Record<string, string | number | null> {
+  match_id: string;
+  powerup: string;
+  amount: number;
+  created_at: number;
 }
 
 export interface BlockedUserItem {
@@ -117,6 +137,14 @@ export class UserProfile extends DurableObject<Env> {
         blocked_nickname TEXT NOT NULL,
         blocked_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS powerup_purchases (
+        match_id TEXT NOT NULL,
+        powerup TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (match_id, powerup)
+      );
     `);
 
     this.initialized = true;
@@ -155,6 +183,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM daily_coins;
       DELETE FROM processed_matches;
       DELETE FROM blocked_users;
+      DELETE FROM powerup_purchases;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -384,6 +413,144 @@ export class UserProfile extends DurableObject<Env> {
       coins: updatedProfile.coins,
       nickname: updatedProfile.nickname,
     };
+  }
+
+  /**
+   * Güçlendirici harcamasını tek bir SQLite transaction içinde atomik ve idempotent olarak uygular.
+   * Aynı (match_id, powerup) için tekrar jeton düşülmez.
+   * Günlük maç ödülü limitini (daily_coins) etkilemez.
+   * 7 günden eski powerup_purchases kayıtlarını fırsatçı temizler.
+   */
+  async spendCoins(params: {
+    readonly matchId: string;
+    readonly powerup: string;
+    readonly amount: number;
+    readonly uid?: string;
+  }): Promise<SpendCoinsResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { success: false, error: 'account_deleted', coins: 0 };
+    }
+
+    // Profilin varlığını garantiye al
+    await this.getProfile(params.uid);
+
+    const nowMs = Date.now();
+
+    // 7 günden eski powerup kayıtlarını fırsatçı temizle
+    const sevenDaysAgoMs = nowMs - 7 * 24 * 60 * 60 * 1000;
+    this.ctx.storage.sql.exec(
+      'DELETE FROM powerup_purchases WHERE created_at < ?',
+      sevenDaysAgoMs
+    );
+
+    // ctx.storage.transactionSync ile tek SQLite transaction içinde atomik kontrol + bakiye düşme + kayıt ekleme
+    return this.ctx.storage.transactionSync(() => {
+      // 1. İdempotentlik kontrolü: bu (match_id, powerup) zaten satın alındı mı?
+      const existingCursor = this.ctx.storage.sql.exec<PowerupPurchaseRow>(
+        'SELECT match_id, amount FROM powerup_purchases WHERE match_id = ? AND powerup = ? LIMIT 1',
+        params.matchId,
+        params.powerup
+      );
+      const existing = existingCursor.toArray();
+
+      const profileRows = this.ctx.storage.sql.exec<ProfileRow>(
+        'SELECT coins FROM profiles LIMIT 1'
+      ).toArray();
+      const currentCoins = profileRows.length > 0 ? profileRows[0].coins : 0;
+
+      if (existing.length > 0) {
+        return {
+          success: true,
+          coins: currentCoins,
+          alreadySpent: true,
+        };
+      }
+
+      // 2. Bakiye kontrolü
+      if (currentCoins < params.amount) {
+        return {
+          success: false,
+          error: 'not_enough_coins',
+          coins: currentCoins,
+        };
+      }
+
+      // 3. Atomik düşme (coins >= amount ile çift koruma)
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins - ? WHERE coins >= ?',
+        params.amount,
+        params.amount
+      );
+
+      // 4. powerup_purchases tablosuna kayıt
+      this.ctx.storage.sql.exec(
+        'INSERT INTO powerup_purchases (match_id, powerup, amount, created_at) VALUES (?, ?, ?, ?)',
+        params.matchId,
+        params.powerup,
+        params.amount,
+        nowMs
+      );
+
+      return {
+        success: true,
+        coins: currentCoins - params.amount,
+      };
+    });
+  }
+
+  /**
+   * Yarış durumunda güçlendirici kullanılamadıysa jeton iadesi yapar.
+   * İdempotenttir; kayıt zaten silinmişse tekrar iade yapmaz.
+   */
+  async refundPowerup(params: {
+    readonly matchId: string;
+    readonly powerup: string;
+    readonly amount: number;
+    readonly uid?: string;
+  }): Promise<RefundPowerupResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { ok: true, refunded: false, coins: 0 };
+    }
+
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.ctx.storage.sql.exec<PowerupPurchaseRow>(
+        'SELECT amount FROM powerup_purchases WHERE match_id = ? AND powerup = ? LIMIT 1',
+        params.matchId,
+        params.powerup
+      ).toArray();
+
+      if (existing.length === 0) {
+        const profileRows = this.ctx.storage.sql.exec<ProfileRow>(
+          'SELECT coins FROM profiles LIMIT 1'
+        ).toArray();
+        const currentCoins = profileRows.length > 0 ? profileRows[0].coins : 0;
+        return { ok: true, refunded: false, coins: currentCoins };
+      }
+
+      const refundAmount = existing[0].amount ?? params.amount;
+
+      this.ctx.storage.sql.exec(
+        'DELETE FROM powerup_purchases WHERE match_id = ? AND powerup = ?',
+        params.matchId,
+        params.powerup
+      );
+
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins + ?',
+        refundAmount
+      );
+
+      const profileRows = this.ctx.storage.sql.exec<ProfileRow>(
+        'SELECT coins FROM profiles LIMIT 1'
+      ).toArray();
+      const currentCoins = profileRows.length > 0 ? profileRows[0].coins : 0;
+
+      return { ok: true, refunded: true, coins: currentCoins };
+    });
   }
 
   /**

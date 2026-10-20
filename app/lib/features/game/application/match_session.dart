@@ -15,6 +15,9 @@ abstract interface class MatchSession {
   /// Kullanıcının cevap denemesini gönderir.
   void submit(String text);
 
+  /// Ek süre güçlendiricisini (+5 sn) aktifleştirir.
+  void useExtraTime();
+
   /// Kullanıcının maçı terk etmesini sağlar.
   void leaveMatch();
 

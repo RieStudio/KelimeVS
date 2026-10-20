@@ -300,6 +300,19 @@ abstract final class AppStrings {
   static const String friendDuelMatchBadge =
       'Dostluk Düellosu • Jeton verilmez';
 
+  // Güçlendiriciler (Power-ups)
+  static const String extraTimePowerup = '+5 sn';
+  static const String extraTimeUsed = 'Kullanıldı';
+  static const String extraTimeAdded = '+5 sn eklendi!';
+  static const String opponentUsedExtraTime = 'Rakip +5 sn ek süre kullandı';
+  static String opponentUsedExtraTimeSec(int seconds) =>
+      'Rakip +$seconds sn ek süre kullandı';
+  static String notEnoughCoinsForExtraTime(int cost) => 'Yetersiz jeton ($cost gerekli)';
+  static const String extraTimeAlreadyUsed = 'Bu maçta ek süre hakkını zaten kullandın.';
+  static const String notYourTurnPowerup = 'Ek süre sadece kendi cevabında kullanılabilir.';
+  static const String powerupGenericError = 'Güçlendirici şu anda kullanılamıyor.';
+  static const String powerupTemporaryError = 'Şu anda kullanılamıyor, tekrar dene.';
+
   // İleride Play Store linki açıldığında buraya URL yazılacak:
   static const String storeShareUrl = '';
 

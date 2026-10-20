@@ -75,6 +75,13 @@ class MatchUiState {
   final bool isDisconnectedReplaced;
   final int? coinsAwarded;
   final bool isFriendly;
+  final int? extraTimeCost;
+  final int? extraTimeSeconds;
+  final int? extraTimeRemainingUses;
+  final String? opponentExtraTimeBanner;
+  final bool isUsingPowerup;
+  final String? powerupErrorNotice;
+  final int powerupErrorCounter;
 
   const MatchUiState({
     this.matchState,
@@ -101,10 +108,24 @@ class MatchUiState {
     this.isDisconnectedReplaced = false,
     this.coinsAwarded,
     this.isFriendly = false,
+    this.extraTimeCost,
+    this.extraTimeSeconds,
+    this.extraTimeRemainingUses,
+    this.opponentExtraTimeBanner,
+    this.isUsingPowerup = false,
+    this.powerupErrorNotice,
+    this.powerupErrorCounter = 0,
   });
 
   ConnectionStatus get kendiBaglanti => connectionStatus;
   bool get rakipBagli => opponentConnected;
+
+  /// Güçlendirici ve tur süresinden türetilen dinamik tavan saniye (varsayılan: 15).
+  int get maxAllowedSeconds {
+    final base = matchState?.config.answerSeconds ?? 15;
+    final extra = extraTimeSeconds ?? 0;
+    return base + extra;
+  }
 
   bool get isMyTurn =>
       matchState?.phase == MatchPhase.roundActive &&
@@ -154,6 +175,14 @@ class MatchUiState {
     bool? isDisconnectedReplaced,
     int? coinsAwarded,
     bool? isFriendly,
+    int? extraTimeCost,
+    int? extraTimeSeconds,
+    int? extraTimeRemainingUses,
+    String? opponentExtraTimeBanner,
+    bool clearOpponentExtraTimeBanner = false,
+    bool? isUsingPowerup,
+    String? powerupErrorNotice,
+    int? powerupErrorCounter,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -184,6 +213,16 @@ class MatchUiState {
           isDisconnectedReplaced ?? this.isDisconnectedReplaced,
       coinsAwarded: coinsAwarded ?? this.coinsAwarded,
       isFriendly: isFriendly ?? this.isFriendly,
+      extraTimeCost: extraTimeCost ?? this.extraTimeCost,
+      extraTimeSeconds: extraTimeSeconds ?? this.extraTimeSeconds,
+      extraTimeRemainingUses:
+          extraTimeRemainingUses ?? this.extraTimeRemainingUses,
+      opponentExtraTimeBanner: clearOpponentExtraTimeBanner
+          ? null
+          : (opponentExtraTimeBanner ?? this.opponentExtraTimeBanner),
+      isUsingPowerup: isUsingPowerup ?? this.isUsingPowerup,
+      powerupErrorNotice: powerupErrorNotice ?? this.powerupErrorNotice,
+      powerupErrorCounter: powerupErrorCounter ?? this.powerupErrorCounter,
     );
   }
 }

@@ -190,6 +190,46 @@ class VoidedServerMessage extends ServerMessage {
   String toString() => 'VoidedServerMessage(reason: $reason)';
 }
 
+/// Güçlendirici onay / yanıt bildirimi (`powerup_ack`).
+class PowerupAckServerMessage extends ServerMessage {
+  final String powerupType;
+  final bool success;
+  final int? deadlineMs;
+  final int? coins;
+  final int? remainingUses;
+  final String? code;
+  final String? message;
+
+  const PowerupAckServerMessage({
+    required this.powerupType,
+    required this.success,
+    this.deadlineMs,
+    this.coins,
+    this.remainingUses,
+    this.code,
+    this.message,
+  });
+
+  @override
+  String toString() =>
+      'PowerupAckServerMessage(powerupType: $powerupType, success: $success, deadlineMs: $deadlineMs, coins: $coins, remainingUses: $remainingUses, code: $code)';
+}
+
+/// Rakip oyuncunun güçlendirici kullandığı bildirimi (`opponent_powerup`).
+class OpponentPowerupServerMessage extends ServerMessage {
+  final String powerupType;
+  final int seconds;
+
+  const OpponentPowerupServerMessage({
+    required this.powerupType,
+    required this.seconds,
+  });
+
+  @override
+  String toString() =>
+      'OpponentPowerupServerMessage(powerupType: $powerupType, seconds: $seconds)';
+}
+
 /// Sunucudan gelen ham metin veya JSON nesnesini güçlü tipli [ServerMessage] sınıfına dönüştürür.
 ///
 /// Hata fırlatmaz; bozuk veya beklenmeyen verilerde [UnknownServerMessage] döndürür.
@@ -283,6 +323,21 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
       case 'voided':
         final reason = json['reason'] as String? ?? 'opponent_absent';
         return VoidedServerMessage(reason: reason);
+      case 'powerup_ack':
+        return PowerupAckServerMessage(
+          powerupType: json['powerupType'] as String? ?? 'extra_time',
+          success: json['success'] as bool? ?? false,
+          deadlineMs: (json['deadlineMs'] as num?)?.toInt(),
+          coins: (json['coins'] as num?)?.toInt(),
+          remainingUses: (json['remainingUses'] as num?)?.toInt(),
+          code: json['code'] as String?,
+          message: json['message'] as String?,
+        );
+      case 'opponent_powerup':
+        return OpponentPowerupServerMessage(
+          powerupType: json['powerupType'] as String? ?? 'extra_time',
+          seconds: (json['seconds'] as num?)?.toInt() ?? 5,
+        );
       default:
         return UnknownServerMessage(raw);
     }
@@ -377,6 +432,14 @@ String createCancelRoomMessage({String? code}) {
   return jsonEncode({
     't': 'cancel_room',
     if (code != null && code.trim().isNotEmpty) 'code': code.trim().toUpperCase(),
+  });
+}
+
+/// Güçlendirici kullanma istemci mesajı (`use_powerup`).
+String createUsePowerupMessage(String type) {
+  return jsonEncode({
+    't': 'use_powerup',
+    'type': type,
   });
 }
 

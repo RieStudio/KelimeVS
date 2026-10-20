@@ -20,6 +20,7 @@ class PlayerCard extends StatelessWidget {
   final bool isActive;
   final int? remainingSeconds;
   final double? timeProgress;
+  final int maxSeconds;
 
   const PlayerCard({
     super.key,
@@ -29,12 +30,13 @@ class PlayerCard extends StatelessWidget {
     this.isActive = false,
     this.remainingSeconds,
     this.timeProgress,
+    this.maxSeconds = 15,
   });
 
   @override
   Widget build(BuildContext context) {
     final progress = (timeProgress ?? 0.0).clamp(0.0, 1.0);
-    final clampedSec = remainingSeconds?.clamp(0, 15);
+    final clampedSec = remainingSeconds?.clamp(0, maxSeconds);
     final isDanger = clampedSec != null && clampedSec <= 5;
     final fillColor = isDanger ? AppColors.dangerSoft : AppColors.bright;
 

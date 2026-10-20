@@ -93,6 +93,14 @@ export function filterStateForPlayer(params: {
   readonly opponentConnected: boolean;
   readonly serverNowMs: number;
   readonly nextRoundAtMs?: number;
+  readonly answerSeconds?: number;
+  readonly powerups?: {
+    readonly extraTime?: {
+      readonly cost: number;
+      readonly seconds: number;
+      readonly remainingUses: number;
+    };
+  };
 }): ClientStateMessage {
   const {
     state,
@@ -102,6 +110,8 @@ export function filterStateForPlayer(params: {
     opponentConnected,
     serverNowMs,
     nextRoundAtMs,
+    answerSeconds,
+    powerups,
   } = params;
 
   // Aktif veya sonlanan turun deneme kayıtlarını visibleAttempts ile filtrele
@@ -172,6 +182,8 @@ export function filterStateForPlayer(params: {
     ...(state.winnerId ? { winnerIsMe: state.winnerId === playerUid } : {}),
     ...(lastRound ? { lastRound } : {}),
     ...(nextRoundAtMs ? { nextRoundAtMs } : {}),
+    ...(answerSeconds ? { answerSeconds } : {}),
+    ...(powerups ? { powerups } : {}),
   };
 }
 

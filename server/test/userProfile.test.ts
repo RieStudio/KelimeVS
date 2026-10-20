@@ -20,6 +20,17 @@ function createMockCtx() {
   const sql = {
     exec<T extends Record<string, any>>(query: string, ...bindings: any[]) {
       const trimmed = query.trim();
+      const upper = trimmed.toUpperCase();
+      if (
+        upper.startsWith('BEGIN') ||
+        upper.startsWith('COMMIT') ||
+        upper.startsWith('ROLLBACK') ||
+        upper.startsWith('SAVEPOINT')
+      ) {
+        throw new Error(
+          'The Durable Object storage SQLite database does not allow manual transactions. Use state.storage.transaction() or state.storage.transactionSync() instead.'
+        );
+      }
       if (trimmed.toUpperCase().startsWith('SELECT')) {
         const stmt = db.prepare(trimmed);
         const rows = stmt.all(...bindings) as T[];
@@ -45,7 +56,22 @@ function createMockCtx() {
   };
 
   return {
-    storage: { sql },
+    storage: {
+      sql,
+      transactionSync<T>(closure: () => T): T {
+        db.exec('BEGIN TRANSACTION');
+        try {
+          const res = closure();
+          db.exec('COMMIT');
+          return res;
+        } catch (err) {
+          try {
+            db.exec('ROLLBACK');
+          } catch {}
+          throw err;
+        }
+      },
+    },
   } as unknown as DurableObjectState;
 }
 

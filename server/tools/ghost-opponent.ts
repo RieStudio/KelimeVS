@@ -365,6 +365,7 @@ function playMatch(
     let currentRound = 0;
     let attemptCount = 0;
     let lastTurnIsMine = false;
+    let extraTimeUsed = false;
     let activeTurnTimer: NodeJS.Timeout | null = null;
 
     function setTrackedTimeout(fn: () => void, ms: number): NodeJS.Timeout {
@@ -452,6 +453,12 @@ function playMatch(
         cleanup();
         currentCleanup = null;
         resolvePromise();
+      } else if (msg.t === 'powerup_ack') {
+        log(
+          `⚡ Güçlendirici yanıtı: success=${msg.success}${msg.code ? ` code=${msg.code}` : ''}${msg.coins !== undefined ? ` bakiye=${msg.coins}G` : ''}`
+        );
+      } else if (msg.t === 'opponent_powerup') {
+        log(`⚡ Rakip ek süre kullandı (+${msg.seconds} sn)!`);
       }
     }
 
@@ -469,6 +476,18 @@ function playMatch(
             `Tur ${state.roundNumber}: ${state.turnIsMine ? 'Sıra bende' : 'Sıra rakipte'}`
           );
         }
+      }
+
+      // --use-extra-time bayrağı varsa ve sıra bizdeyse maçta 1 kez ek süre kullan
+      if (
+        config.useExtraTime &&
+        !extraTimeUsed &&
+        state.phase === 'roundActive' &&
+        state.turnIsMine
+      ) {
+        extraTimeUsed = true;
+        log('⚡ [GHOST] Ek süre güçlendiricisi kullanılıyor (+5 sn)...');
+        socket.send(JSON.stringify({ t: 'use_powerup', type: 'extra_time' }));
       }
 
       if (state.phase === 'roundEnded' && state.lastRound) {

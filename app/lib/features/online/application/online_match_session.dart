@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../auth/application/auth_notifier.dart';
 import '../../game/application/match_controller.dart';
 import '../../game/application/match_history_provider.dart';
 import '../../game/application/match_providers.dart';
@@ -166,6 +167,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   StreamSubscription<OnlineMatchEvent>? _subscription;
   Timer? _tickTimer;
   Timer? _leaveTimeoutTimer;
+  Timer? _opponentBannerTimer;
 
   OnlineMatchState? _lastOnlineState;
   String? _currentMatchId;
@@ -279,6 +281,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       _handleFinal(event.result);
     } else if (event is OnlineMatchVoided) {
       _handleVoided();
+    } else if (event is OnlineMatchPowerupAck) {
+      _handlePowerupAck(event.message);
+    } else if (event is OnlineMatchOpponentPowerup) {
+      _handleOpponentPowerup(event.message);
     } else if (event is OnlineMatchDisconnected) {
       _handleDisconnected(event.reason);
     }
@@ -409,8 +415,14 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       winnerId = null;
     }
 
+    final extraTimeCfg = onlineState.extraTimePowerup;
+    final extraTimeCost = extraTimeCfg?.cost ?? state.extraTimeCost;
+    final extraTimeSeconds = extraTimeCfg?.seconds ?? state.extraTimeSeconds;
+    final extraTimeRemainingUses =
+        extraTimeCfg?.remainingUses ?? state.extraTimeRemainingUses;
+
     final mappedMatchState = MatchState(
-      config: const MatchConfig(),
+      config: MatchConfig(answerSeconds: onlineState.answerSeconds),
       playerIds: const ['me', 'bot'],
       scores: {
         'me': onlineState.myScore,
@@ -470,6 +482,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       isFinalReveal: false,
       roundTransitionRemainingMs: transitionRemainingMs,
       roundTransitionTotalMs: transitionTotalMs,
+      extraTimeCost: extraTimeCost,
+      extraTimeSeconds: extraTimeSeconds,
+      extraTimeRemainingUses: extraTimeRemainingUses,
     );
   }
 
@@ -749,6 +764,80 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     }
   }
 
+  void _handlePowerupAck(PowerupAckServerMessage ack) {
+    if (ack.success) {
+      if (ack.coins != null) {
+        unawaited(ref.read(profileProvider.notifier).updateCoins(ack.coins!));
+      }
+      int? newRemainingMs;
+      if (ack.deadlineMs != null && _lastOnlineState != null) {
+        final estimatedServerNow =
+            _clock.nowMs() + _lastOnlineState!.clockOffsetMs;
+        newRemainingMs = math.max(0, ack.deadlineMs! - estimatedServerNow);
+      }
+      state = state.copyWith(
+        isUsingPowerup: false,
+        extraTimeRemainingUses: ack.remainingUses ?? 0,
+        remainingMs: newRemainingMs ?? state.remainingMs,
+      );
+    } else {
+      final String errorMsg;
+      switch (ack.code) {
+        case 'temporary_error':
+          errorMsg = AppStrings.powerupTemporaryError;
+        case 'not_enough_coins':
+          errorMsg =
+              AppStrings.notEnoughCoinsForExtraTime(state.extraTimeCost ?? 30);
+        case 'already_used':
+          errorMsg = AppStrings.extraTimeAlreadyUsed;
+        case 'not_your_turn':
+          errorMsg = AppStrings.notYourTurnPowerup;
+        case 'round_not_active':
+          errorMsg = AppStrings.powerupGenericError;
+        default:
+          errorMsg = ack.message?.isNotEmpty == true
+              ? ack.message!
+              : AppStrings.powerupGenericError;
+      }
+      state = state.copyWith(
+        isUsingPowerup: false,
+        powerupErrorNotice: errorMsg,
+        powerupErrorCounter: state.powerupErrorCounter + 1,
+      );
+      if (ack.code == 'account_deleted') {
+        ref.read(accountDeletedHandlerProvider)();
+      }
+    }
+  }
+
+  void _handleOpponentPowerup(OpponentPowerupServerMessage msg) {
+    _opponentBannerTimer?.cancel();
+    final bannerText = msg.seconds == 5
+        ? AppStrings.opponentUsedExtraTime
+        : AppStrings.opponentUsedExtraTimeSec(msg.seconds);
+    state = state.copyWith(opponentExtraTimeBanner: bannerText);
+    _opponentBannerTimer = Timer(const Duration(seconds: 2), () {
+      state = state.copyWith(clearOpponentExtraTimeBanner: true);
+    });
+  }
+
+  @override
+  void useExtraTime() {
+    if (state.isUsingPowerup) return;
+    if ((state.extraTimeRemainingUses ?? 0) <= 0) return;
+    if (!state.isMyTurn) return;
+
+    state = state.copyWith(isUsingPowerup: true);
+    final sent = _client?.usePowerup('extra_time') ?? false;
+    if (!sent) {
+      state = state.copyWith(
+        isUsingPowerup: false,
+        powerupErrorNotice: AppStrings.powerupTemporaryError,
+        powerupErrorCounter: state.powerupErrorCounter + 1,
+      );
+    }
+  }
+
   @override
   void submit(String text) {
     final sanitized = AttemptTextSanitizer.sanitize(text);
@@ -870,6 +959,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     _cancelTickTimer();
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
+    _opponentBannerTimer?.cancel();
+    _opponentBannerTimer = null;
   }
 
   void _cleanupSession() {

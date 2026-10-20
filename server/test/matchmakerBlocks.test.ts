@@ -49,8 +49,9 @@ function createMockDOState() {
 describe('Matchmaker Blocking & Bot Timeout Tests', () => {
   const dummyQuestions = Array.from({ length: 10 }, (_, i) => ({
     id: `q${i}`,
+    categoryId: 'cat1',
     text: `Soru ${i}`,
-    answers: [{ id: `a${i}`, text: `Cevap ${i}`, aliases: [] }],
+    answers: [{ id: `a${i}`, display: `Cevap ${i}`, aliases: [] }],
   }));
 
   const mockProvider = {

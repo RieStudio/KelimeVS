@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   MatchEngine,
   type MatchConfig,
+  type MatchState,
   type Question,
 } from './engine';
 import {
@@ -23,7 +24,7 @@ import {
   serializeMatchState,
   type SerializedMatchState,
 } from './storage';
-import type { MatchRewardOutcome } from './userProfile';
+import type { MatchRewardOutcome, SpendCoinsResult } from './userProfile';
 import type { Env } from './index';
 
 interface PlayerInfo {
@@ -45,6 +46,12 @@ export interface PlayerRewardInfo {
   readonly coins: number;
 }
 
+interface PendingRefund {
+  readonly uid: string;
+  readonly amount: number;
+  readonly powerup: string;
+}
+
 interface StoredRoomData {
   readonly matchId: string;
   readonly p1: PlayerInfo;
@@ -64,6 +71,9 @@ interface StoredRoomData {
   readonly leaderboardWinnerNickname?: string | null;
   readonly leaderboardLoserUid?: string;
   readonly leaderboardLoserNickname?: string | null;
+  readonly powerupsUsed?: Record<string, { extraTime?: boolean }>;
+  readonly pendingRefunds?: readonly PendingRefund[];
+  readonly refundRetryCount?: number;
 }
 
 export class MatchRoom extends DurableObject<Env> {
@@ -233,6 +243,13 @@ export class MatchRoom extends DurableObject<Env> {
     }
 
     if (this.data.status !== 'active' || !this.data.engineState) return;
+
+    if (parsed.t === 'use_powerup') {
+      if (parsed.type === 'extra_time') {
+        await this.handleUseExtraTime(uid);
+      }
+      return;
+    }
 
     if (parsed.t === 'leave') {
       // Oyuncu maçı terk etti (forfeit)
@@ -441,6 +458,8 @@ export class MatchRoom extends DurableObject<Env> {
         if (this.data.status === 'finished' && this.data.leaderboardPending) {
           await this.applyLeaderboard();
         }
+      } else if (action === 'refundRetry') {
+        await this.processPendingRefunds();
       } else if (action === 'cleanup') {
         await this.ctx.storage.deleteAll();
         this.data = null;
@@ -782,6 +801,307 @@ export class MatchRoom extends DurableObject<Env> {
     }
   }
 
+  private get extraTimeConfig(): { cost: number; seconds: number } {
+    const costVal = parseInt(this.env.EXTRA_TIME_COST ?? '30', 10);
+    const secVal = parseInt(this.env.EXTRA_TIME_SECONDS ?? '5', 10);
+    return {
+      cost: Number.isFinite(costVal) && costVal >= 0 ? costVal : 30,
+      seconds: Number.isFinite(secVal) && secVal > 0 ? secVal : 5,
+    };
+  }
+
+  private async handleUseExtraTime(uid: string): Promise<void> {
+    if (!this.data) return;
+
+    if (this.data.matchType === 'friendly') {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'not_allowed_in_match_type',
+        message: 'Arkadaş maçında güçlendirici kullanılamaz.',
+      }));
+      return;
+    }
+
+    if (this.data.status !== 'active' || !this.data.engineState) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'round_not_active',
+        message: 'Aktif bir tur bulunmuyor.',
+      }));
+      return;
+    }
+
+    const state = deserializeMatchState(this.data.engineState);
+
+    if (state.phase !== 'roundActive') {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'round_not_active',
+        message: 'Aktif bir tur bulunmuyor.',
+      }));
+      return;
+    }
+
+    if (state.turnPlayerId !== uid) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'not_your_turn',
+        message: 'Sıra sende değil.',
+      }));
+      return;
+    }
+
+    if (this.data.powerupsUsed?.[uid]?.extraTime) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'already_used',
+        message: 'Bu maçta zaten ek süre hakkını kullandın.',
+      }));
+      return;
+    }
+
+    const nowMs = Date.now();
+    if (nowMs >= state.deadlineMs) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'round_not_active',
+        message: 'Süre doldu.',
+      }));
+      return;
+    }
+
+    const config = this.extraTimeConfig;
+    const userProfileStub = this.env.USER_PROFILE.get(
+      this.env.USER_PROFILE.idFromName(uid)
+    );
+
+    let spendRes: SpendCoinsResult;
+    try {
+      spendRes = await userProfileStub.spendCoins({
+        matchId: this.data.matchId,
+        powerup: 'extra_time',
+        amount: config.cost,
+        uid,
+      });
+    } catch (err) {
+      const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+      console.error(`spendCoins failed for uid ${uid}:`, errMsg);
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'temporary_error',
+        message: 'İşlem sırasında bir hata oluştu.',
+      }));
+      return;
+    }
+
+    if (!spendRes.success) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: spendRes.error ?? 'not_enough_coins',
+        message: spendRes.error === 'account_deleted'
+          ? 'Hesap silinmiş.'
+          : 'Yetersiz jeton bakiyesi.',
+      }));
+      return;
+    }
+
+    // Post-check (Yarış durumu kontrolü):
+    // Ağ çağrısı sırasında tur bitti mi veya sıra değişti mi?
+    if (
+      !this.data ||
+      this.data.status !== 'active' ||
+      !this.data.engineState
+    ) {
+      await this.enqueueAndRefund(uid, config.cost, 'extra_time');
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'round_not_active',
+        message: 'Tur sona erdiği için harcama iade edildi.',
+      }));
+      return;
+    }
+
+    const currentState = deserializeMatchState(this.data.engineState);
+    const currentNowMs = Date.now();
+
+    if (
+      currentState.phase !== 'roundActive' ||
+      currentState.turnPlayerId !== uid ||
+      currentNowMs >= currentState.deadlineMs
+    ) {
+      await this.enqueueAndRefund(uid, config.cost, 'extra_time');
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'round_not_active',
+        message: 'Tur sona erdiği için harcama iade edildi.',
+      }));
+      return;
+    }
+
+    // Eğer alreadySpent: true döndüyse ve bu odada zaten kaydedilmişse tekrar süre ekleme
+    if (spendRes.alreadySpent && this.data.powerupsUsed?.[uid]?.extraTime) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'extra_time',
+        success: false,
+        code: 'already_used',
+        message: 'Bu maçta zaten ek süre hakkını kullandın.',
+      }));
+      return;
+    }
+
+    // Süreyi uzat
+    const updatedState: MatchState = {
+      ...currentState,
+      deadlineMs: currentState.deadlineMs + config.seconds * 1000,
+    };
+
+    this.data = {
+      ...this.data,
+      engineState: serializeMatchState(updatedState),
+      schedule: {
+        ...this.data.schedule,
+        turnDeadlineMs: updatedState.deadlineMs,
+      },
+      powerupsUsed: {
+        ...this.data.powerupsUsed,
+        [uid]: { extraTime: true },
+      },
+    };
+
+    await this.persist();
+    await this.updateAlarm();
+
+    // Kullanan oyuncuya onay gönder
+    this.sendToUid(uid, JSON.stringify({
+      t: 'powerup_ack',
+      powerupType: 'extra_time',
+      success: true,
+      deadlineMs: updatedState.deadlineMs,
+      coins: spendRes.coins,
+      remainingUses: 0,
+    }));
+
+    // Rakibe bilgilendirme bildirimi gönder
+    const opponentUid = uid === this.data.p1.uid ? this.data.p2.uid : this.data.p1.uid;
+    this.sendToUid(opponentUid, JSON.stringify({
+      t: 'opponent_powerup',
+      powerupType: 'extra_time',
+      seconds: config.seconds,
+    }));
+
+    // Her iki oyuncuya güncel durumu yayınla
+    this.broadcastState();
+  }
+
+  private async enqueueAndRefund(
+    uid: string,
+    amount: number,
+    powerup: string
+  ): Promise<void> {
+    if (!this.data) return;
+    const refunds = [...(this.data.pendingRefunds ?? []), { uid, amount, powerup }];
+    this.data = {
+      ...this.data,
+      pendingRefunds: refunds,
+    };
+    await this.persist();
+    await this.processPendingRefunds();
+  }
+
+  private async processPendingRefunds(): Promise<void> {
+    if (!this.data || !this.data.pendingRefunds || this.data.pendingRefunds.length === 0) {
+      if (this.data?.schedule.refundRetryAtMs) {
+        this.data = {
+          ...this.data,
+          schedule: {
+            ...this.data.schedule,
+            refundRetryAtMs: undefined,
+          },
+        };
+        await this.persist();
+        await this.updateAlarm();
+      }
+      return;
+    }
+
+    const remainingRefunds: PendingRefund[] = [];
+    let hasTransientError = false;
+
+    for (const item of this.data.pendingRefunds) {
+      try {
+        const userProfileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(item.uid)
+        );
+        await userProfileStub.refundPowerup({
+          matchId: this.data.matchId,
+          powerup: item.powerup,
+          amount: item.amount,
+          uid: item.uid,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('account_deleted')) {
+          // Kalıcı hata: silinmiş hesap, tekrar denenmez
+        } else {
+          console.error('refundPowerup transient error for uid:', item.uid, err);
+          remainingRefunds.push(item);
+          hasTransientError = true;
+        }
+      }
+    }
+
+    const retryCount = (this.data.refundRetryCount ?? 0) + 1;
+    const nowMs = Date.now();
+
+    if (hasTransientError && remainingRefunds.length > 0) {
+      const delayMs = Math.min(60000, 1000 * Math.pow(2, Math.min(6, retryCount)));
+      this.data = {
+        ...this.data,
+        pendingRefunds: remainingRefunds,
+        refundRetryCount: retryCount,
+        schedule: {
+          ...this.data.schedule,
+          refundRetryAtMs: nowMs + delayMs,
+        },
+      };
+      await this.persist();
+      await this.updateAlarm();
+    } else {
+      this.data = {
+        ...this.data,
+        pendingRefunds: [],
+        refundRetryCount: 0,
+        schedule: {
+          ...this.data.schedule,
+          refundRetryAtMs: undefined,
+        },
+      };
+      await this.persist();
+      await this.updateAlarm();
+    }
+  }
+
   private broadcastState(): void {
     if (!this.data || !this.data.engineState) return;
     this.sendStateToPlayer(this.data.p1.uid);
@@ -801,6 +1121,19 @@ export class MatchRoom extends DurableObject<Env> {
         .some((s) => s.readyState === 1 || s.readyState === undefined);
 
     const state = deserializeMatchState(this.data.engineState);
+    const isFriendly = this.data.matchType === 'friendly';
+    const extraTimeCfg = this.extraTimeConfig;
+    const isUsed = this.data.powerupsUsed?.[uid]?.extraTime ?? false;
+    const powerups = isFriendly
+      ? undefined
+      : {
+          extraTime: {
+            cost: extraTimeCfg.cost,
+            seconds: extraTimeCfg.seconds,
+            remainingUses: isUsed ? 0 : 1,
+          },
+        };
+
     const msg = filterStateForPlayer({
       state,
       playerUid: uid,
@@ -809,6 +1142,8 @@ export class MatchRoom extends DurableObject<Env> {
       opponentConnected,
       serverNowMs: Date.now(),
       nextRoundAtMs: this.data.schedule.nextRoundAtMs,
+      answerSeconds: this.durations.answerSeconds,
+      powerups,
     });
 
     this.sendToUid(uid, JSON.stringify(msg));

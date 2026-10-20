@@ -55,7 +55,8 @@ export type MatchmakerServerMessage =
 export type MatchRoomClientMessage =
   | { readonly t: 'submit'; readonly text: string }
   | { readonly t: 'leave' }
-  | { readonly t: 'sync' };
+  | { readonly t: 'sync' }
+  | { readonly t: 'use_powerup'; readonly type: 'extra_time' };
 
 export interface ClientAttempt {
   readonly mine: boolean;
@@ -85,6 +86,14 @@ export interface ClientStateMessage {
     readonly reason: string;
   };
   readonly nextRoundAtMs?: number;
+  readonly answerSeconds?: number;
+  readonly powerups?: {
+    readonly extraTime?: {
+      readonly cost: number;
+      readonly seconds: number;
+      readonly remainingUses: number;
+    };
+  };
 }
 
 export interface ClientRoundRecord {
@@ -116,11 +125,30 @@ export interface ClientVoidedMessage {
   readonly reason: 'opponent_absent';
 }
 
+export interface ClientPowerupAckMessage {
+  readonly t: 'powerup_ack';
+  readonly powerupType: 'extra_time';
+  readonly success: boolean;
+  readonly deadlineMs?: number;
+  readonly coins?: number;
+  readonly remainingUses?: number;
+  readonly code?: string;
+  readonly message?: string;
+}
+
+export interface ClientOpponentPowerupMessage {
+  readonly t: 'opponent_powerup';
+  readonly powerupType: 'extra_time';
+  readonly seconds: number;
+}
+
 export type MatchRoomServerMessage =
   | ClientStateMessage
   | ClientFinalMessage
   | ClientFeedbackMessage
-  | ClientVoidedMessage;
+  | ClientVoidedMessage
+  | ClientPowerupAckMessage
+  | ClientOpponentPowerupMessage;
 
 export function sanitizePlayerName(rawName?: unknown): string {
   if (typeof rawName !== 'string') return 'Oyuncu';
@@ -207,6 +235,12 @@ export function parseMatchRoomMessage(
     }
     if (data.t === 'sync') {
       return { t: 'sync' };
+    }
+    if (data.t === 'use_powerup') {
+      if (data.type === 'extra_time') {
+        return { t: 'use_powerup', type: 'extra_time' };
+      }
+      return null;
     }
   } catch {
     return null;

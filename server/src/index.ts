@@ -27,6 +27,8 @@ export interface Env extends AuthEnv {
   readonly DISCONNECT_WIN_COINS?: string;
   readonly DISCONNECT_LOSS_COINS?: string;
   readonly DAILY_MATCH_COIN_CAP?: string;
+  readonly EXTRA_TIME_COST?: string;
+  readonly EXTRA_TIME_SECONDS?: string;
 }
 
 const jsonHeaders = {

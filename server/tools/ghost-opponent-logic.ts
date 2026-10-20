@@ -35,6 +35,7 @@ export interface GhostConfig {
   readonly devAuth: boolean;
   readonly name: string;
   readonly code?: string;
+  readonly useExtraTime?: boolean;
 }
 
 /** Komut satırı argümanlarını ayrıştırır. */
@@ -48,12 +49,15 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
   let backAfterSeconds = 5;
   let fresh = false;
   let devAuth = false;
+  let useExtraTime = false;
   let nameArg: string | undefined;
   let codeArg: string | undefined;
 
   for (const arg of argv) {
     if (arg === '--dev-auth' || arg === '--dev-auth=true') {
       devAuth = true;
+    } else if (arg === '--use-extra-time' || arg === '--use-extra-time=true') {
+      useExtraTime = true;
     } else if (arg === '--fresh' || arg === '--fresh=true') {
       fresh = true;
     } else if (arg.startsWith('--mode=')) {
@@ -111,6 +115,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
     devAuth,
     name: pickGhostName(nameArg),
     code: codeArg,
+    useExtraTime,
   };
 }
 

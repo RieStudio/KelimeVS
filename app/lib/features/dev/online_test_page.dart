@@ -192,6 +192,10 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
         _addLog('voided: Maç iptal edildi ($reason)');
       case OnlineMatchDisconnected(:final reason):
         _addLog('disconnected: Bağlantı koptu ($reason)');
+      case OnlineMatchPowerupAck(:final message):
+        _addLog('powerup_ack: success=${message.success}, code=${message.code}');
+      case OnlineMatchOpponentPowerup(:final message):
+        _addLog('opponent_powerup: ${message.powerupType} (+${message.seconds} sn)');
       case OnlineMatchError(:final message):
         _addLog('error: $message');
     }

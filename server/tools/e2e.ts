@@ -829,6 +829,59 @@ async function main() {
       console.log('  ✓ [Senaryo K Başarılı] Arkadaş düellosu tam E2E akışı doğrulandı.');
     }
 
+    // ========================================================
+    // Senaryo L: Ek Süre Güçlendiricisi E2E (Jeton Düşümü, Süre Uzama, Mükerrer Engel ve Arkadaş Maçı Reddi)
+    // ========================================================
+    {
+      console.log('\n--- Senaryo L: Ek Süre Güçlendiricisi E2E Akışı ---');
+      const uidL1 = `user_l1_${Date.now()}`;
+      const uidL2 = `user_l2_${Date.now()}`;
+
+      // 1. Başlangıç profili
+      const pRes = await fetch(`${BASE_HTTP_URL}/me`, {
+        headers: { Authorization: `Bearer dev:${uidL1}` },
+      });
+      const pData = (await pRes.json()) as any;
+      if (pData.coins !== 100) {
+        throw new Error(`Senaryo L başlangıç jetonu 100 olmalıydı, gelen: ${pData.coins}`);
+      }
+      console.log(`  ✓ ${uidL1} başlangıç bakiyesi: ${pData.coins}G`);
+
+      // 2. Normal ranked maça gir
+      const { matchId } = await matchTwoPlayers(uidL1, 'AlicePower', uidL2, 'BobPower');
+      const { roomA: roomL1, roomB: roomL2, initA: state1 } = await connectToMatch(matchId, uidL1, uidL2);
+      const initialDeadline = state1.deadlineMs;
+
+      // 3. Sıra bendeyken ek süre kullan
+      roomL1.send({ t: 'use_powerup', type: 'extra_time' });
+
+      // 4. powerup_ack doğrula
+      const ack1 = await roomL1.waitForMessage<any>((m: any) => m.t === 'powerup_ack', 5000);
+      if (!ack1.success || ack1.coins !== 70 || ack1.deadlineMs < initialDeadline + 4900) {
+        throw new Error(`Geçersiz powerup_ack: ${JSON.stringify(ack1)}`);
+      }
+      console.log(`  ✓ Ek süre onaylandı: +5 sn, yeni bakiye: ${ack1.coins}G`);
+
+      // 5. Rakibe opponent_powerup bildirimini doğrula
+      const oppPowerup = await roomL2.waitForMessage<any>((m: any) => m.t === 'opponent_powerup', 5000);
+      if (oppPowerup.seconds !== 5) {
+        throw new Error(`Geçersiz opponent_powerup: ${JSON.stringify(oppPowerup)}`);
+      }
+      console.log('  ✓ Rakibe opponent_powerup bildirimi gitti.');
+
+      // 6. Aynı maçta ikinci kullanımın reddedildiğini doğrula
+      roomL1.send({ t: 'use_powerup', type: 'extra_time' });
+      const ack2 = await roomL1.waitForMessage<any>((m: any) => m.t === 'powerup_ack', 5000);
+      if (ack2.success || ack2.code !== 'already_used') {
+        throw new Error(`İkinci kullanım already_used ile reddedilmeliydi: ${JSON.stringify(ack2)}`);
+      }
+      console.log('  ✓ İkinci kullanım already_used hatasıyla reddedildi.');
+
+      roomL1.close();
+      roomL2.close();
+      console.log('  ✓ [Senaryo L Başarılı] Ek süre güçlendiricisi tam E2E akışı doğrulandı.');
+    }
+
     function expectWeekDataValid(data: any) {
       if (!data.weekKey || typeof data.weekKey !== 'string' || !data.weekKey.includes('-W')) {
         throw new Error(`Geçersiz weekKey: ${data.weekKey}`);
@@ -839,7 +892,7 @@ async function main() {
     }
 
     console.log('\n========================================================');
-    console.log('🎉 TÜM 11 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
+    console.log('🎉 TÜM 12 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
     console.log('========================================================\n');
   } catch (err: unknown) {
     console.error('\n❌ E2E TEST BAŞARISIZ OLDU:');

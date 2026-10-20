@@ -23,7 +23,7 @@ import type { Question } from '../src/engine';
 import type { Env } from '../src/index';
 
 // 8 geçerli soru
-const mockQuestions: Question[] = [
+const mockQuestions: any[] = [
   { id: 'q1', text: 'Soru 1', answers: [{ text: 'elma', points: 1 }] },
   { id: 'q2', text: 'Soru 2', answers: [{ text: 'armut', points: 1 }] },
   { id: 'q3', text: 'Soru 3', answers: [{ text: 'kiraz', points: 1 }] },

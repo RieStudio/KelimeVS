@@ -106,6 +106,26 @@ class OnlineMatchError extends OnlineMatchEvent {
   String toString() => 'OnlineMatchError(message: $message)';
 }
 
+/// Güçlendirici yanıtı geldi (`powerup_ack`).
+class OnlineMatchPowerupAck extends OnlineMatchEvent {
+  final PowerupAckServerMessage message;
+
+  const OnlineMatchPowerupAck(this.message);
+
+  @override
+  String toString() => 'OnlineMatchPowerupAck(success: ${message.success})';
+}
+
+/// Rakip oyuncunun güçlendirici kullandığı bildirimi (`opponent_powerup`).
+class OnlineMatchOpponentPowerup extends OnlineMatchEvent {
+  final OpponentPowerupServerMessage message;
+
+  const OnlineMatchOpponentPowerup(this.message);
+
+  @override
+  String toString() => 'OnlineMatchOpponentPowerup(seconds: ${message.seconds})';
+}
+
 /// Canlı maç odası (`/ws/match/:matchId`) protokolünü yürüten istemci.
 class OnlineMatchClient {
   final WebSocketConnector _connector;
@@ -252,6 +272,10 @@ class OnlineMatchClient {
       _emit(OnlineMatchFinal(msg));
     } else if (msg is VoidedServerMessage) {
       _emit(OnlineMatchVoided(reason: msg.reason));
+    } else if (msg is PowerupAckServerMessage) {
+      _emit(OnlineMatchPowerupAck(msg));
+    } else if (msg is OpponentPowerupServerMessage) {
+      _emit(OnlineMatchOpponentPowerup(msg));
     } else if (msg is ErrorServerMessage) {
       _emit(OnlineMatchError(msg.code));
     }
@@ -432,6 +456,17 @@ class OnlineMatchClient {
     try {
       _connection!.send(createSyncMessage());
     } catch (_) {}
+  }
+
+  /// Güçlendirici kullanma isteği (`use_powerup`) gönderir.
+  bool usePowerup(String type) {
+    if (_isClosed || _connection == null) return false;
+    try {
+      _connection!.send(createUsePowerupMessage(type));
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Bağlantıyı istemci tarafından kasıtlı olarak kapatır; otomatik yeniden bağlanma YAPILMAZ.

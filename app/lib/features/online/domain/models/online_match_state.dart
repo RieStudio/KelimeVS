@@ -96,6 +96,27 @@ class OnlineLastRound {
   };
 }
 
+/// Güçlendirici konfigürasyon ve kullanım bilgisi.
+class OnlinePowerupConfig {
+  final int cost;
+  final int seconds;
+  final int remainingUses;
+
+  const OnlinePowerupConfig({
+    required this.cost,
+    required this.seconds,
+    required this.remainingUses,
+  });
+
+  factory OnlinePowerupConfig.fromJson(Map<String, dynamic> json) {
+    return OnlinePowerupConfig(
+      cost: (json['cost'] as num?)?.toInt() ?? 30,
+      seconds: (json['seconds'] as num?)?.toInt() ?? 5,
+      remainingUses: (json['remainingUses'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
 /// Sunucu durum mesajının (`state`) güçlü tipli modeli.
 class OnlineMatchState {
   final int serverNowMs;
@@ -115,6 +136,8 @@ class OnlineMatchState {
   final bool? winnerIsMe;
   final OnlineLastRound? lastRound;
   final int? nextRoundAtMs;
+  final int answerSeconds;
+  final OnlinePowerupConfig? extraTimePowerup;
 
   const OnlineMatchState({
     required this.serverNowMs,
@@ -134,24 +157,33 @@ class OnlineMatchState {
     this.winnerIsMe,
     this.lastRound,
     this.nextRoundAtMs,
+    this.answerSeconds = 15,
+    this.extraTimePowerup,
   });
 
   /// Sunucu saati ile istemcinin yerel saati arasındaki fark:
   /// serverNowMs = receivedLocalMs + clockOffsetMs
   int get clockOffsetMs => serverNowMs - receivedLocalMs;
 
+  /// Güçlendirici ve tur süresinden türetilen dinamik tavan (ms).
+  int get maxAllowedDurationMs {
+    final extraSec = extraTimePowerup?.seconds ?? 0;
+    return (answerSeconds + extraSec) * 1000;
+  }
+
   /// Verilen yerel zamana göre ([nowLocalMs]) kalan hamle süresini (milisaniye)
   /// sunucu saat sapmasını ([clockOffsetMs]) hesaba katarak hesaplar.
-  /// Tur süresi üst sınırı [maxDurationMs] (varsayılan 15000 ms) ile 0 arasında sınırlandırılır (clamp).
-  int kalanSureMs(int nowLocalMs, {int maxDurationMs = 15000}) {
+  /// Tur süresi üst sınırı [maxDurationMs] (varsayılan: [maxAllowedDurationMs]) ile 0 arasında sınırlandırılır (clamp).
+  int kalanSureMs(int nowLocalMs, {int? maxDurationMs}) {
+    final limit = maxDurationMs ?? maxAllowedDurationMs;
     final estimatedServerNow = nowLocalMs + clockOffsetMs;
     final remaining = deadlineMs - estimatedServerNow;
     if (remaining <= 0) return 0;
-    return remaining > maxDurationMs ? maxDurationMs : remaining;
+    return remaining > limit ? limit : remaining;
   }
 
   /// [kalanSureMs] için takma ad.
-  int remainingDeadlineMs(int nowLocalMs, {int maxDurationMs = 15000}) =>
+  int remainingDeadlineMs(int nowLocalMs, {int? maxDurationMs}) =>
       kalanSureMs(nowLocalMs, maxDurationMs: maxDurationMs);
 
   factory OnlineMatchState.fromJson(
@@ -177,6 +209,13 @@ class OnlineMatchState {
     final lastRound =
         lastRoundMap != null ? OnlineLastRound.fromJson(lastRoundMap) : null;
 
+    final ansSec = (json['answerSeconds'] as num?)?.toInt() ?? 15;
+    final powerupsMap = json['powerups'] as Map<String, dynamic>?;
+    final extraTimeMap = powerupsMap?['extraTime'] as Map<String, dynamic>?;
+    final extraTimePowerup = extraTimeMap != null
+        ? OnlinePowerupConfig.fromJson(extraTimeMap)
+        : null;
+
     return OnlineMatchState(
       serverNowMs: serverNow,
       receivedLocalMs: localTime,
@@ -195,6 +234,8 @@ class OnlineMatchState {
       winnerIsMe: json['winnerIsMe'] as bool?,
       lastRound: lastRound,
       nextRoundAtMs: (json['nextRoundAtMs'] as num?)?.toInt(),
+      answerSeconds: ansSec,
+      extraTimePowerup: extraTimePowerup,
     );
   }
 }
