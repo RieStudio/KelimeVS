@@ -14,10 +14,10 @@ void main() {
     });
   });
 
-  testWidgets('KelimetaApp smoke test - verifies navigation and gallery load', (
+  testWidgets('KelimeVSApp smoke test - verifies navigation and gallery load', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const ProviderScope(child: KelimetaApp()));
+    await tester.pumpWidget(const ProviderScope(child: KelimeVSApp()));
     await tester.pumpAndSettle();
 
     // Ana ekrandaki Hızlı Maç butonu ve alt gezinme sekmelerinin varlığını doğrula

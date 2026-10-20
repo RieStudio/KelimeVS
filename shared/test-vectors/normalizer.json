@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "TextNormalizer test vectors for KelimeGo Turkish text normalization",
+  "description": "TextNormalizer test vectors for KelimeVS Turkish text normalization",
   "totalCases": 102,
   "cases": [
     {

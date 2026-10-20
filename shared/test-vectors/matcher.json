@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "AnswerMatcher test vectors for KelimeGo answer checking with alias indexing",
+  "description": "AnswerMatcher test vectors for KelimeVS answer checking with alias indexing",
   "totalCases": 50,
   "cases": [
     {

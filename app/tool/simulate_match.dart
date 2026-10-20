@@ -679,7 +679,7 @@ void main(List<String> args) {
     final matchRandom = math.Random(matchSeed);
 
     stdout.writeln('========================================');
-    stdout.writeln('     KELİMEGO MAÇ SİMÜLASYONU           ');
+    stdout.writeln('     KELİMEVS MAÇ SİMÜLASYONU           ');
     stdout.writeln('========================================');
     stdout.writeln('Havuz: ${isSmallPool ? "Küçük Havuz (60 soru)" : "Normal Havuz (140 soru)"}');
     stdout.writeln('Tohum: $matchSeed');

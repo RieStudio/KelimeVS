@@ -34,7 +34,7 @@ void main() {
   _writeJson(File('${outDir.path}/normalizer.json'), {
     'version': 1,
     'description':
-        'TextNormalizer test vectors for KelimeGo Turkish text normalization',
+        'TextNormalizer test vectors for KelimeVS Turkish text normalization',
     'totalCases': normalizerCases.length,
     'cases': normalizerCases,
   });
@@ -44,7 +44,7 @@ void main() {
   _writeJson(File('${outDir.path}/matcher.json'), {
     'version': 1,
     'description':
-        'AnswerMatcher test vectors for KelimeGo answer checking with alias indexing',
+        'AnswerMatcher test vectors for KelimeVS answer checking with alias indexing',
     'totalCases': matcherCases.length,
     'cases': matcherCases,
   });

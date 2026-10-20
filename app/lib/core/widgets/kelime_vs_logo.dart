@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
-/// Kelimeta Logo
-/// "Kelime" (Fredoka 700, ink) + "ta" (Fredoka 700, primary).
-/// "ta" arkasında mint renkli, yuvarlatılmış, sağa bakan oynat (play) üçgeni.
+/// KelimeVS Logo
+/// "Kelime" (Fredoka 700, ink) + "VS" (Fredoka 700, primary).
+/// "VS" arkasında mint renkli, yuvarlatılmış, sağa bakan oynat (play) üçgeni.
 /// Üçgenin kenarlığı ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz.
-class KelimetaLogo extends StatelessWidget {
+class KelimeVSLogo extends StatelessWidget {
   final double fontSize;
 
-  const KelimetaLogo({
+  const KelimeVSLogo({
     super.key,
     this.fontSize = 64.0,
   });
@@ -19,7 +19,7 @@ class KelimetaLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Kelimeta',
+      label: 'KelimeVS',
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Row(
@@ -50,12 +50,12 @@ class KelimetaLogo extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(
                     left: fontSize * 0.16,
-                    right: fontSize * 0.32,
+                    right: fontSize * 0.30,
                     top: fontSize * 0.04,
                     bottom: fontSize * 0.04,
                   ),
                   child: Text(
-                    'ta',
+                    'VS',
                     style: TextStyle(
                       fontFamily: AppTextStyles.fontFredoka,
                       fontSize: fontSize,
@@ -99,35 +99,29 @@ class _PlayTrianglePainter extends CustomPainter {
     final path = Path();
     final count = points.length;
 
-    for (int i = 0; i < count; i++) {
-      final p1 = points[i];
-      final p2 = points[(i + 1) % count];
-      final p3 = points[(i + 2) % count];
+    for (var i = 0; i < count; i++) {
+      final pPrev = points[(i - 1 + count) % count];
+      final pCurr = points[i];
+      final pNext = points[(i + 1) % count];
 
-      final v1 = Offset(p1.dx - p2.dx, p1.dy - p2.dy);
-      final v2 = Offset(p3.dx - p2.dx, p3.dy - p2.dy);
+      final vPrev = (pPrev - pCurr);
+      final vNext = (pNext - pCurr);
 
-      final d1 = math.sqrt(v1.dx * v1.dx + v1.dy * v1.dy);
-      final d2 = math.sqrt(v2.dx * v2.dx + v2.dy * v2.dy);
+      final lenPrev = vPrev.distance;
+      final lenNext = vNext.distance;
 
-      final u1 = Offset(v1.dx / d1, v1.dy / d1);
-      final u2 = Offset(v2.dx / d2, v2.dy / d2);
+      final actualRadius = math.min(radius, math.min(lenPrev, lenNext) / 2);
 
-      final dot = u1.dx * u2.dx + u1.dy * u2.dy;
-      final angle = math.acos(dot.clamp(-1.0, 1.0));
-
-      final dist = radius / math.tan(angle / 2);
-
-      final startPt = Offset(p2.dx + u1.dx * dist, p2.dy + u1.dy * dist);
-      final endPt = Offset(p2.dx + u2.dx * dist, p2.dy + u2.dy * dist);
+      final startPoint = pCurr + (vPrev / lenPrev) * actualRadius;
+      final endPoint = pCurr + (vNext / lenNext) * actualRadius;
 
       if (i == 0) {
-        path.moveTo(startPt.dx, startPt.dy);
+        path.moveTo(startPoint.dx, startPoint.dy);
       } else {
-        path.lineTo(startPt.dx, startPt.dy);
+        path.lineTo(startPoint.dx, startPoint.dy);
       }
 
-      path.quadraticBezierTo(p2.dx, p2.dy, endPt.dx, endPt.dy);
+      path.quadraticBezierTo(pCurr.dx, pCurr.dy, endPoint.dx, endPoint.dy);
     }
 
     path.close();

@@ -1,4 +1,4 @@
-package com.kelimeta.app
+package com.kelimevs.app
 
 import io.flutter.embedding.android.FlutterActivity
 

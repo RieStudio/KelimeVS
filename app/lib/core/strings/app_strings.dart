@@ -163,7 +163,7 @@ abstract final class AppStrings {
 
   // Profil ve Onboarding
   static const String welcomeTitle = 'Hoş Geldin!';
-  static const String welcomePrompt = 'Kelimeta’da seni nasıl çağıralım?';
+  static const String welcomePrompt = 'KelimeVS’de seni nasıl çağıralım?';
   static const String nicknameHint = 'Takma adın';
   static const String nicknameRuleHint = '3–16 karakter. Harf, rakam ve alt çizgi.';
   static const String continueAction = 'Devam';

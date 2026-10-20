@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAPjo3v1tyuaygWby29Pmz2CY7zeefnBXU',
-    appId: '1:487342637535:android:675fe7436355823ee3846a',
+    appId: '1:487342637535:android:4da4191063d34d5de3846a',
     messagingSenderId: '487342637535',
     projectId: 'kelimegov2',
     databaseURL: 'https://kelimegov2-default-rtdb.europe-west1.firebasedatabase.app',

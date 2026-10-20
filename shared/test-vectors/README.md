@@ -1,6 +1,6 @@
-# KelimeGo Paylaşılan Test Vektörleri (Shared Test Vectors)
+# KelimeVS Paylaşılan Test Vektörleri (Shared Test Vectors)
 
-Bu dizin, KelimeGo oyun motorunun kurallarını ve saf fonksiyonlarını doğrulamak için Dart motorundan üretilmiş referans test verilerini içerir. Amaç, gelecekte geliştirilecek **TypeScript oyun motorunun (Cloudflare Worker / Durable Object)** Dart motoru ile birebir aynı davranış ve kurallarla çalışmasını garanti etmektir.
+Bu dizin, KelimeVS oyun motorunun kurallarını ve saf fonksiyonlarını doğrulamak için Dart motorundan üretilmiş referans test verilerini içerir. Amaç, gelecekte geliştirilecek **TypeScript oyun motorunun (Cloudflare Worker / Durable Object)** Dart motoru ile birebir aynı davranış ve kurallarla çalışmasını garanti etmektir.
 
 Tüm test dosyaları deterministiktir ve `app/tool/export_test_vectors.dart` betiği tarafından üretilir:
 ```bash
