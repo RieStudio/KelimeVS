@@ -143,7 +143,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
-**1) Ana ekran** – Üstte solda: avatar (44, dokununca profil) + oyuncu adı. Sağda sırayla: jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık), kupa ikon butonu (liderlik tablosu, 44×44) ve ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. **Sıralama mutlaka en yeni maç en üstte, yukarıdan aşağıya eskiye doğrudur** (maçın bitiş zamanına göre azalan); kartlarda tarih gösterilmez.  Alt gezinme çubuğu yoktur.
+**1) Ana ekran** – Üstte solda: avatar (44, dokununca profil) + oyuncu adı. Sağda sırayla: jeton hapı (`coin` daire içinde "G", sayı Fredoka 18/600, beyaz hap, 2 px `ink` kenarlık), kupa ikon butonu (liderlik tablosu, 44×44) ve ayarlar ikon butonu. Logo (üstten ~36 dp boşlukla ortalı), altında "Hızlı düşün, doğru yaz!" (Nunito 17/700, `muted`). Butonlar: "Hızlı Maç" (ana, alt yazı: "Rastgele bir rakiple eşleş") ve "Arkadaşınla Oyna" (ikincil, tam genişlik). **Antrenman modu yok.** Altında "SON MAÇLARIM" etiketi ve son 10 maçın kartlı, kaydırılabilir listesi. **Sıralama mutlaka en yeni maç en üstte, yukarıdan aşağıya eskiye doğrudur** (maçın bitiş zamanına göre azalan); kartlarda tarih gösterilmez.  **Altta alt gezinme çubuğu vardır** (Ana Sayfa, Sıralama, Mağaza, Profil; ana ekranda "Ana Sayfa" etkin). Üstteki avatar, kupa ve ayarlar kısayolları da korunmuştur.
 
 **2) Eşleşme bekleme** – Sol üstte kapat. Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı. "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz". Üç noktalı yükleme göstergesi (nokta renkleri `primary`/`bright`/`mint`, sırayla yanıp söner). Altta ipucu kartı ("Türkçe karakter kullanmasan da olur…") ve "Vazgeç" butonu.
 
@@ -172,6 +172,18 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 **7) Profil** – Ana ekrandaki avatara dokununca açılır. Üstte geri butonu ve "Profil" başlığı. Ortada büyük harf avatarı (takma adın ilk harfi), altında takma ad (Fredoka 22/600) ve "Adı Değiştir" ikincil butonu. Altında hesap kartı: bağlı değilse "Google ile Bağla" ikincil butonu; bağlıysa Google e-postası, onay rozeti ve `dangerSurface`/`dangerText` stilinde "Çıkış Yap". Çıkış ve hesap değiştirme onay diyalogları veri kaybı uyarısı içerir.
 
 **8) Liderlik tablosu** – Kupa butonuyla açılır. Üstte geri ve "Liderlik Tablosu" başlığı. Altında "Bu hafta" ve kalan süreyi gösteren hap şeklinde şerit (kart zemini, `mint` kenarlık). Liste: ilk 50 oyuncu; satırda sıra, harf avatarı (36), takma ad ve galibiyet sayısı. İlk üç sıra için sade madalya/kupa vurgusu (1. `coin` sarısı). Kendi satırın `surface` zemin ve `mint` kenarlıkla vurgulanır. İlk 50 dışındaysan listenin altında sabit "Senin sıran" çubuğu (kart zemini, sert gölge). Boş durum: "Bu hafta henüz maç yok". Hata durumunda "Tekrar Dene" butonu. Yalnızca haftalık galibiyetler listelenir (GDD bölüm 5.4).
+
+**9) Mağaza** – Alt gezinmedeki "Mağaza" sekmesinde açılır. Üstte "Mağaza" başlığı (Fredoka 28/700) ve sağda ana ekrandakiyle aynı jeton hapı (bakiye satın alma sonrası anında güncellenir). Şimdilik tek kategori vardır, bu yüzden sekme yok; altında "AVATAR ÇERÇEVELERİ" etiketi (`muted`, etiket stili) ve ürün ızgarası: 2 sütun, aralık 12, yan boşluk 20. Her ürün bir **çerçeve kartıdır** (`card` zemin, 2 px `ink` kenarlık, köşe 20): üstte oyuncunun **kendi avatarı** (72, harfiyle) çerçeve takılı halde önizlenir, altında çerçeve adı (Nunito 15/800) ve en altta duruma göre bir alan:
+- **Sahip değil, jeton yeter:** fiyat hapı (`coin` simgesi + sayı, Fredoka 16/600). Dokununca satın alma sayfası açılır.
+- **Sahip değil, jeton yetmez:** fiyat hapı soluk. Dokununca "Yetersiz jeton" ipucu (SnackBar), sayfa açılmaz.
+- **Sahip, kuşanılmamış:** "Kuşan" ikincil butonu (küçük, yükseklik 40).
+- **Kuşanılmış:** "Kuşanıldı" etiketi (`primary` yazı, tik ikonu) ve kartın kenarlığı `primary` olur.
+
+**Satın alma sayfası (alttan açılan sayfa):** büyük avatar önizlemesi (104), çerçeve adı, fiyat hapı, "Satın Al" (ana buton) ve "Vazgeç" (ikincil). Başarılı olunca sayfa kapanır, SnackBar ("Çerçeve satın alındı"), kart "Kuşan" durumuna geçer; otomatik kuşanma yoktur. Satın alma sunucuda yapılır, ağ hatasında anlaşılır Türkçe mesaj gösterilir ve jeton düşmez.
+
+**Çerçeve kataloğu [VARSAYIM]:** katalog ve fiyatlar sunucuda tutulur (istemciye mesajla gelir), kodda sabit değildir. İlk liste: Klasik (ücretsiz, varsayılan: mevcut 3 px `ink` kenarlık), Nane 100, Gün Batımı 150, Okyanus 150, Altın 300, Neon 300, Gökkuşağı 500, Elmas 800. Her çerçeve avatar etrafında yalnızca renk/doku değiştirir; boyut ve okunabilirlik aynı kalır (içerideki harf her zaman `ink`/beyaz kuralına uyar). Çerçeveler yalnızca kozmetiktir, oyun dengesini etkilemez.
+
+**Çerçevenin göründüğü yerler:** kendi avatarın (ana ekran, profil, maç kartı), maçtaki rakibin avatarı, liderlik tablosu satırı, maç detayı. Rakip kendi kuşandığı çerçeveyle görünür. Bot rakiplerde çerçeve, gerçek oyuncu dağılımına benzer şekilde (çoğunlukla Klasik, ara sıra diğerleri) rastgele atanır; böylece bot ayrıt edilemez ([KARAR] bot etiketlenmez).
 
 ## 8. Hareket (animasyon)
 
@@ -208,5 +220,5 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 1. Ses, titreşim ve oyun içi efektler
 2. Koyu tema (v1'de yok, sonradan gerekirse jetonlar karşılıklarıyla eklenir)
 3. Kayıp varyantları (tur sonu, maç sonucu) ve eşleşme sonrası geçiş ekranı
-4. Giriş, sıralama, mağaza, profil, ayarlar ekranları
+4. Giriş ve ayarlar ekranları (sıralama, profil ve mağaza tasarlandı)
 5. Kalan süre uyarısı eşiği (5 sn) ve renk geçişi
