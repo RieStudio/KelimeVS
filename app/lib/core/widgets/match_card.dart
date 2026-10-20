@@ -64,15 +64,47 @@ class MatchCard extends StatelessWidget {
 
               const SizedBox(width: AppDimens.space12),
 
-              // 2. Rakip Adı (Nunito 16/800, tek satır, dikey ortalı, uzunsa kısalt)
+              // 2. Rakip Adı (Nunito 16/800, tek satır, dikey ortalı, uzunsa kısalt) ve varsa Dostluk rozeti
               Expanded(
-                child: Text(
-                  displayName,
-                  style: AppTextStyles.playerName.copyWith(
-                    color: AppColors.ink,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        style: AppTextStyles.playerName.copyWith(
+                          color: AppColors.ink,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (entry.isFriendly) ...[
+                      const SizedBox(width: AppDimens.space6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.mint.withValues(alpha: 0.2),
+                          borderRadius: AppDimens.borderRadiusFull,
+                          border: Border.all(
+                            color: AppColors.mint,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Text(
+                          AppStrings.friendDuelBadge,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontNunito,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
 

@@ -227,14 +227,13 @@ process.on('SIGINT', () => {
   }
 });
 
-/** Eşleştirme kuyruğuna girer ve eşleşme sonucunu döner. */
+/** Eşleştirme kuyruğuna veya arkadaş lobisine girer ve eşleşme sonucunu döner. */
 function runMatchmaking(
-  serverBaseUrl: string,
-  idToken: string,
-  name: string
+  config: GhostConfig,
+  idToken: string
 ): Promise<{ readonly matchId: string; readonly opponentName: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const wsUrl = `${serverBaseUrl}/ws/matchmaking`;
+    const wsUrl = `${config.serverUrl}/ws/matchmaking`;
     const ws = new WebSocket(wsUrl, {
       headers: {
         Authorization: `Bearer ${idToken}`,
@@ -258,8 +257,34 @@ function runMatchmaking(
     currentCleanup = cleanup;
 
     ws.on('open', () => {
-      log(`Eşleştirme sunucusuna bağlanıldı, kuyruğa giriliyor (Ad: ${name})...`);
-      ws.send(JSON.stringify({ t: 'queue', name }));
+      if (config.mode === 'friend-host') {
+        log(`Arkadaş düellosu odası kuruluyor (Ad: ${config.name})...`);
+        ws.send(JSON.stringify({ t: 'create_room', name: config.name }));
+      } else if (config.mode === 'friend-join') {
+        if (!config.code) {
+          cleanup();
+          currentCleanup = null;
+          rejectPromise(
+            new Error(
+              '--mode=friend-join için --code parametresi zorunludur! (Örn: --mode=friend-join --code=K7M9P2)'
+            )
+          );
+          return;
+        }
+        log(
+          `Arkadaş düellosu odasına katılınıyor (Kod: ${config.code}, Ad: ${config.name})...`
+        );
+        ws.send(
+          JSON.stringify({
+            t: 'join_room',
+            code: config.code,
+            name: config.name,
+          })
+        );
+      } else {
+        log(`Eşleştirme sunucusuna bağlanıldı, kuyruğa giriliyor (Ad: ${config.name})...`);
+        ws.send(JSON.stringify({ t: 'queue', name: config.name }));
+      }
     });
 
     ws.on('message', (raw) => {
@@ -267,15 +292,38 @@ function runMatchmaking(
         const msg = JSON.parse(String(raw)) as MatchmakerServerMessage;
         if (msg.t === 'queued') {
           log('Kuyruğa girildi, rakip bekleniyor...');
+        } else if (msg.t === 'room_created') {
+          log('========================================================');
+          log(`ARKADAŞ DÜELLOSU ODASI KURULDU!`);
+          log(`DAVET KODU: ${msg.code}`);
+          log(`Geçerlilik süresi: 5 dakika`);
+          log(`Arkadaşının bu kodu girip bağlanması bekleniyor...`);
+          log('========================================================');
+        } else if (msg.t === 'room_resumed') {
+          log(`Arkadaş odası sürdürülüyor (Kod: ${msg.code})`);
         } else if (msg.t === 'matched') {
-          log(`Eşleşti (maç ID: ${msg.matchId}, rakip: ${msg.opponentName})`);
+          log(
+            `Eşleşti (maç ID: ${msg.matchId}, rakip: ${msg.opponentName}${
+              msg.isFriendly ? ', Dostluk Maçı' : ''
+            })`
+          );
           cleanup();
           currentCleanup = null;
           resolvePromise({ matchId: msg.matchId, opponentName: msg.opponentName });
+        } else if (msg.t === 'room_expired') {
+          cleanup();
+          currentCleanup = null;
+          rejectPromise(new Error('Oda süresi doldu (5 dakika).'));
         } else if (msg.t === 'error') {
           cleanup();
           currentCleanup = null;
-          rejectPromise(new Error(`Eşleştirme hatası: ${msg.code}`));
+          rejectPromise(
+            new Error(
+              `Eşleştirme/Oda hatası: ${msg.code}${
+                msg.message ? ' - ' + msg.message : ''
+              }`
+            )
+          );
         }
       } catch (err) {
         logError(`Gelen eşleştirme mesajı ayrıştırılamadı: ${err}`);
@@ -556,7 +604,7 @@ async function main(): Promise<void> {
     }
 
     try {
-      const matchInfo = await runMatchmaking(config.serverUrl, idToken, config.name);
+      const matchInfo = await runMatchmaking(config, idToken);
       await playMatch(config.serverUrl, matchInfo.matchId, idToken, config, questions);
     } catch (err) {
       logError(`Maç oynanırken hata oluştu: ${err instanceof Error ? err.message : String(err)}`);

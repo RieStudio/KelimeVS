@@ -17,6 +17,7 @@ import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/section_label.dart';
 import '../../../gallery/component_gallery.dart';
+import '../../friend_match/presentation/friend_duel_bottom_sheet.dart';
 import '../../game/application/match_history_provider.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
@@ -32,38 +33,6 @@ import '../../leaderboard/presentation/leaderboard_screen.dart';
 /// Altında "SON MAÇLARIM" etiketi ve son 10 maçın kaydırılabilir listesi.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
-
-  void _showComingSoonDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppDimens.borderRadiusDialog,
-            side: const BorderSide(
-              color: AppColors.ink,
-              width: AppDimens.borderThick,
-            ),
-          ),
-          title: const Text(
-            AppStrings.comingSoon,
-            style: AppTextStyles.cardTitle,
-          ),
-          content: const Text(
-            AppStrings.playWithFriendComingSoon,
-            style: AppTextStyles.bodyText,
-          ),
-          actions: [
-            PrimaryButton(
-              text: AppStrings.ok,
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -203,7 +172,14 @@ class HomeScreen extends ConsumerWidget {
               // 4. "Arkadaşınla Oyna" İkincil Butonu
               SecondaryButton(
                 text: AppStrings.playWithFriend,
-                onPressed: () => _showComingSoonDialog(context),
+                onPressed: () {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => const FriendDuelBottomSheet(),
+                  );
+                },
               ),
 
               const SizedBox(height: AppDimens.space20),

@@ -87,6 +87,7 @@ class FakeOnlineMatchSession extends OnlineMatchSession {
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    bool isFriendly = false,
     OnlineMatchClient? client,
   }) async {
     startOnlineMatchCalled = true;

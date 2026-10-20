@@ -71,15 +71,55 @@ class CancelledServerMessage extends ServerMessage {
 class MatchedServerMessage extends ServerMessage {
   final String matchId;
   final String opponentName;
+  final bool isFriendly;
 
   const MatchedServerMessage({
     required this.matchId,
     required this.opponentName,
+    this.isFriendly = false,
   });
 
   @override
   String toString() =>
-      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName)';
+      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly)';
+}
+
+/// Arkadaş odası kuruldu bildirimi (`room_created`).
+class RoomCreatedServerMessage extends ServerMessage {
+  final String code;
+  final int expiresAt;
+
+  const RoomCreatedServerMessage({
+    required this.code,
+    required this.expiresAt,
+  });
+
+  @override
+  String toString() =>
+      'RoomCreatedServerMessage(code: $code, expiresAt: $expiresAt)';
+}
+
+/// Askıdaki arkadaş odasına devam edildi bildirimi (`room_resumed`).
+class RoomResumedServerMessage extends ServerMessage {
+  final String code;
+  final int expiresAt;
+
+  const RoomResumedServerMessage({
+    required this.code,
+    required this.expiresAt,
+  });
+
+  @override
+  String toString() =>
+      'RoomResumedServerMessage(code: $code, expiresAt: $expiresAt)';
+}
+
+/// Arkadaş odası süresi doldu bildirimi (`room_expired`).
+class RoomExpiredServerMessage extends ServerMessage {
+  const RoomExpiredServerMessage();
+
+  @override
+  String toString() => 'RoomExpiredServerMessage()';
 }
 
 /// Sunucu hata bildirimi (`error`).
@@ -178,13 +218,27 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
       case 'matched':
         final matchId = json['matchId'];
         final opponentName = json['opponentName'];
+        final isFriendly = json['isFriendly'] as bool? ?? false;
         if (matchId is! String || opponentName is! String) {
           return UnknownServerMessage(raw);
         }
         return MatchedServerMessage(
           matchId: matchId,
           opponentName: opponentName,
+          isFriendly: isFriendly,
         );
+      case 'room_created':
+        final code = json['code'] as String?;
+        final expiresAt = (json['expiresAt'] as num?)?.toInt() ?? 0;
+        if (code == null) return UnknownServerMessage(raw);
+        return RoomCreatedServerMessage(code: code, expiresAt: expiresAt);
+      case 'room_resumed':
+        final code = json['code'] as String?;
+        final expiresAt = (json['expiresAt'] as num?)?.toInt() ?? 0;
+        if (code == null) return UnknownServerMessage(raw);
+        return RoomResumedServerMessage(code: code, expiresAt: expiresAt);
+      case 'room_expired':
+        return const RoomExpiredServerMessage();
       case 'error':
         final code = json['code'];
         if (code is! String) return UnknownServerMessage(raw);
@@ -290,6 +344,39 @@ String createLeaveMessage() {
 String createSyncMessage() {
   return jsonEncode({
     't': 'sync',
+  });
+}
+
+/// Arkadaş odası oluşturma istemci mesajı (`create_room`).
+String createRoomMessage({String? name}) {
+  return jsonEncode({
+    't': 'create_room',
+    if (name != null && name.trim().isNotEmpty) 'name': sanitizePlayerName(name),
+  });
+}
+
+/// Askıdaki arkadaş odasına yeniden bağlanma istemci mesajı (`resume_room`).
+String createResumeRoomMessage(String code) {
+  return jsonEncode({
+    't': 'resume_room',
+    'code': code.trim().toUpperCase(),
+  });
+}
+
+/// Arkadaş odasına katılma istemci mesajı (`join_room`).
+String createJoinRoomMessage(String code, {String? name}) {
+  return jsonEncode({
+    't': 'join_room',
+    'code': code.trim().toUpperCase(),
+    if (name != null && name.trim().isNotEmpty) 'name': sanitizePlayerName(name),
+  });
+}
+
+/// Arkadaş odasını iptal etme / kapatma istemci mesajı (`cancel_room`).
+String createCancelRoomMessage({String? code}) {
+  return jsonEncode({
+    't': 'cancel_room',
+    if (code != null && code.trim().isNotEmpty) 'code': code.trim().toUpperCase(),
   });
 }
 

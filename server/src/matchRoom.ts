@@ -37,6 +37,7 @@ export interface MatchRoomInitParams {
   readonly p2: PlayerInfo;
   readonly questions: readonly Question[];
   readonly questionOrder: readonly string[];
+  readonly matchType?: 'ranked' | 'friendly';
 }
 
 export interface PlayerRewardInfo {
@@ -51,6 +52,7 @@ interface StoredRoomData {
   readonly questions: Question[];
   readonly questionOrder: string[];
   readonly status: 'waiting_for_players' | 'active' | 'finished' | 'voided';
+  readonly matchType?: 'ranked' | 'friendly';
   readonly engineState?: SerializedMatchState;
   readonly schedule: TimersSchedule;
   readonly disconnectedUid?: string;
@@ -94,6 +96,7 @@ export class MatchRoom extends DurableObject<Env> {
       questions: [...params.questions],
       questionOrder: [...params.questionOrder],
       status: 'waiting_for_players',
+      matchType: params.matchType ?? 'ranked',
       schedule: { connectTimeoutAtMs },
     };
 
@@ -522,6 +525,7 @@ export class MatchRoom extends DurableObject<Env> {
     const p1Uid = this.data.p1.uid;
     const p2Uid = this.data.p2.uid;
     const isWinnerPresent = winnerId === p1Uid || winnerId === p2Uid;
+    const isFriendly = this.data.matchType === 'friendly';
 
     this.data = {
       ...this.data,
@@ -529,18 +533,28 @@ export class MatchRoom extends DurableObject<Env> {
       schedule: {
         cleanupAtMs: nowMs + this.durations.cleanupMs,
       },
-      ...(isWinnerPresent
+      ...(!isFriendly && isWinnerPresent
         ? {
             leaderboardPending: true,
             leaderboardWinnerUid: winnerId,
             leaderboardLoserUid: winnerId === p1Uid ? p2Uid : p1Uid,
           }
         : {}),
+      ...(isFriendly
+        ? {
+            rewards: {
+              [p1Uid]: { coinsAwarded: 0, coins: 0 },
+              [p2Uid]: { coinsAwarded: 0, coins: 0 },
+            },
+          }
+        : {}),
     };
 
-    await this.applyMatchRewards();
-    if (this.data.leaderboardPending) {
-      await this.applyLeaderboard();
+    if (!isFriendly) {
+      await this.applyMatchRewards();
+      if (this.data.leaderboardPending) {
+        await this.applyLeaderboard();
+      }
     }
     await this.persist();
     await this.updateAlarm();
@@ -549,7 +563,7 @@ export class MatchRoom extends DurableObject<Env> {
   }
 
   private async applyMatchRewards(): Promise<boolean> {
-    if (!this.data || !this.data.engineState) return false;
+    if (!this.data || !this.data.engineState || this.data.matchType === 'friendly') return false;
     const state = deserializeMatchState(this.data.engineState);
     const winnerId = state.winnerId;
     const endedBy = state.endedBy;
@@ -676,6 +690,7 @@ export class MatchRoom extends DurableObject<Env> {
   private async applyLeaderboard(): Promise<boolean> {
     if (
       !this.data ||
+      this.data.matchType === 'friendly' ||
       !this.data.leaderboardPending ||
       !this.data.leaderboardWinnerUid ||
       !this.data.leaderboardLoserUid ||
@@ -814,12 +829,15 @@ export class MatchRoom extends DurableObject<Env> {
 
     const playerReward = this.data.rewards?.[uid];
 
+    const isFriendly = this.data.matchType === 'friendly';
     const msg = buildFinalMessage({
       state,
       playerUid: uid,
       opponentUid: opponent.uid,
       opponentName: opponent.name,
-      ...(playerReward
+      ...(isFriendly
+        ? { coinsAwarded: 0 }
+        : playerReward
         ? {
             coinsAwarded: playerReward.coinsAwarded,
             coins: playerReward.coins,

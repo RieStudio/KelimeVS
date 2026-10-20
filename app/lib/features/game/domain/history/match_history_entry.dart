@@ -35,6 +35,7 @@ class MatchHistoryEntry {
   final List<String> roundQuestionTexts;
   final bool botlaOynandi;
   final bool isFinal;
+  final bool isFriendly;
 
   const MatchHistoryEntry({
     required this.id,
@@ -51,6 +52,7 @@ class MatchHistoryEntry {
     this.roundQuestionTexts = const [],
     this.botlaOynandi = false,
     this.isFinal = true,
+    this.isFriendly = false,
   }) : endReason = endReason ??
             (endType == MatchEndType.forfeit
                 ? (result == MatchResult.win

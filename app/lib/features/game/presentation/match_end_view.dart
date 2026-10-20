@@ -234,6 +234,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     }
 
     final int? coinsAwarded = uiState.coinsAwarded;
+    final bool isFriendly = uiState.isFriendly ||
+        (uiState.lastSavedMatch?.isFriendly ?? false);
 
     final Widget content = Container(
       color: AppColors.surface,
@@ -332,8 +334,46 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 ),
               ),
 
-              // 6. Jeton Ödülü Kartı (Yalnızca online maçta ve sunucudan coinsAwarded geldiğinde gösterilir; bot maçında hiç gösterilmez)
-              if (coinsAwarded != null) ...[
+              // 6. Dostluk Maçı Rozeti veya Jeton Ödülü Kartı
+              if (isFriendly) ...[
+                const SizedBox(height: AppDimens.space20),
+                Semantics(
+                  container: true,
+                  label: AppStrings.friendDuelMatchBadge,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space20,
+                      vertical: AppDimens.space8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: AppDimens.borderRadiusFull,
+                      border: Border.all(
+                        color: AppColors.mint,
+                        width: AppDimens.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.people_alt_rounded,
+                          size: 20,
+                          color: AppColors.mint,
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        Text(
+                          AppStrings.friendDuelMatchBadge,
+                          style: AppTextStyles.bodyText.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else if (coinsAwarded != null) ...[
                 const SizedBox(height: AppDimens.space20),
                 Semantics(
                   container: true,

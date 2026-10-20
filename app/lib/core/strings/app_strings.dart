@@ -259,5 +259,55 @@ abstract final class AppStrings {
   static const String unblockGenericError = 'Engel kaldırılırken bir hata oluştu.';
   static const String blockedUsersLoading = 'Engellenenler yükleniyor…';
   static const String blockedUsersError = 'Engellenenler yüklenemedi';
+
+  // Arkadaşla Düello
+  static const String friendDuel = 'Arkadaşla Düello';
+  static const String friendDuelSubtitle =
+      'Kendi odanı kur veya arkadaşının koduna katıl';
+  static const String createRoom = 'Oda Kur';
+  static const String createRoomSubtitle =
+      'Bir davet kodu oluştur ve arkadaşına gönder';
+  static const String joinRoom = 'Koda Katıl';
+  static const String joinRoomSubtitle =
+      'Arkadaşının paylaştığı 6 haneli kodu gir';
+  static const String yourInviteCode = 'DAVET KODUN';
+  static const String copyCode = 'Kodu Kopyala';
+  static const String codeCopied = 'Davet kodu panoya kopyalandı!';
+  static const String shareCode = 'Kodu Paylaş';
+  static const String waitingForOpponent = 'Arkadaşının katılması bekleniyor…';
+  static const String codeValidity = 'Kalan süre:';
+  static const String cancelRoom = 'Odayı Kapat';
+  static const String roomExpiredTitle = 'Süre Doldu';
+  static const String roomExpiredMessage =
+      'Odanın 5 dakikalık süresi doldu. Dilersen yeni bir oda kurabilirsin.';
+  static const String enterInviteCode = 'Davet Kodunu Gir';
+  static const String enterInviteCodeDescription =
+      'Arkadaşının seninle paylaştığı 6 haneli davet kodunu gir:';
+  static const String joinMatch = 'Maça Katıl';
+  static const String joiningRoom = 'Odaya bağlanılıyor…';
+  static const String creatingRoom = 'Oda kuruluyor…';
+  static const String roomNotFound = 'Bu oda bulunamadı veya süresi dolmuş.';
+  static const String roomFull = 'Bu odaya zaten başka bir oyuncu katılmış.';
+  static const String cannotJoinOwnRoom =
+      'Kendi oluşturduğun odaya katılamazsın.';
+  static const String friendRoomUnavailable =
+      'Bu odaya şu anda katılınamıyor.';
+  static const String friendRoomRateLimited =
+      'Çok fazla hatalı deneme yaptın. Lütfen biraz bekleyip tekrar dene.';
+  static const String friendRoomLobbyBusy =
+      'Lobi şu anda yoğun. Lütfen birkaç dakika sonra tekrar dene.';
+  static const String friendDuelBadge = 'Dostluk';
+  static const String friendDuelMatchBadge =
+      'Dostluk Düellosu • Jeton verilmez';
+
+  // İleride Play Store linki açıldığında buraya URL yazılacak:
+  static const String storeShareUrl = '';
+
+  static String friendDuelShareText(String code) {
+    if (storeShareUrl.isEmpty) {
+      return 'KelimeVS\'de benimle kelime düellosuna var mısın? Davet kodum: $code\nKelimeVS uygulamasını aç, "Koda Katıl" seçeneğiyle hemen maça başla!';
+    }
+    return 'KelimeVS\'de benimle kelime düellosuna var mısın? Davet kodum: $code\nOyunu indir ve hemen başla: $storeShareUrl';
+  }
 }
 

@@ -82,10 +82,11 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 {
   "t": "matched",
   "matchId": "m_1728518400000_abc123",
-  "opponentName": "Mehmet"
+  "opponentName": "Mehmet",
+  "isFriendly": false
 }
 ```
-- İstemci bu mesajı aldığında eşleştirme WebSocket bağlantısını kapatır ve doğrudan `/ws/match/:matchId?token=...` adresine bağlanır.
+- İstemci bu mesajı aldığında eşleştirme WebSocket bağlantısını kapatır ve doğrudan `/ws/match/:matchId` adresine bağlanır.
 
 #### Hata (`error`)
 ```json
@@ -97,6 +98,92 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 - Olası `code` değerleri:
   - `"content_unavailable"`: Veritabanından soru havuzu alınamadığında veya maç başlatmak için en az 8 uygun soru bulunamadığında her iki oyuncuya gönderilir. Sunucu oyuncuları kuyruktan çıkarır ve bağlantıyı kapatır. İstemci bu hatayı aldığında kullanıcıya uyarı gösterip botlu maça yönlendirebilir.
   - `"already_queued"`: Oyuncunun halihazırda aktif bir kuyruk kaydı varken mükerrer kuyruk isteği geldiğinde gönderilir.
+
+### 2.2. Arkadaşla Düello (Friend Duel) Protokolü
+
+Arkadaş düellosu da `/ws/matchmaking` WebSocket uç noktası üzerinden yönetilir. 28 karakterli alfabeden (`23456789BCDFGHJKMNPQRSTVWXYZ`) üretilen 6 haneli tek kullanımlık davet kodları ile çalışır. Kod 5 dakika geçerlidir. Kurucunun soketi koptuğunda (örn. kodu WhatsApp'ta paylaşırken) oda 5 dakika boyunca askıda tutulur (Grace Period).
+
+#### İstemci -> Sunucu Mesajları
+
+##### Oda Kurma (`create_room`)
+```json
+{
+  "t": "create_room",
+  "name": "Ahmet"
+}
+```
+
+##### Askıdaki Odaya Yeniden Bağlanma (`resume_room`)
+```json
+{
+  "t": "resume_room",
+  "code": "K7M9P2"
+}
+```
+
+##### Koda Katılma (`join_room`)
+```json
+{
+  "t": "join_room",
+  "code": "K7M9P2",
+  "name": "Zeynep"
+}
+```
+
+##### Odayı İptal Etme (`cancel_room`)
+```json
+{
+  "t": "cancel_room",
+  "code": "K7M9P2"
+}
+```
+
+#### Sunucu -> İstemci Mesajları
+
+##### Oda Kuruldu (`room_created`)
+```json
+{
+  "t": "room_created",
+  "code": "K7M9P2",
+  "expiresAt": 1729452000000
+}
+```
+
+##### Odaya Devam Edildi (`room_resumed`)
+```json
+{
+  "t": "room_resumed",
+  "code": "K7M9P2",
+  "expiresAt": 1729452000000
+}
+```
+
+##### Oda Süresi Doldu (`room_expired`)
+```json
+{
+  "t": "room_expired"
+}
+```
+
+##### Eşleşme Bulundu (`matched`)
+```json
+{
+  "t": "matched",
+  "matchId": "m_1729452000000_abc123",
+  "opponentName": "Zeynep",
+  "isFriendly": true
+}
+```
+- `isFriendly: true` ise maç arkadaş düellosudur. Jeton ödülü verilmez, UserProfile istatistiklerine ve haftalık liderlik tablosuna galibiyet yazılmaz.
+
+##### Hata Durumları (`error`)
+- `"room_not_found"`: Oda kodu bulunamadı veya süresi dolmuş.
+- `"room_full"`: Odaya zaten başka bir oyuncu katılmış.
+- `"cannot_join_own_room"`: Kurucu kendi oluşturduğu koda katılamaz.
+- `"rate_limited"`: Hatalı kod deneme limiti aşıldı (UID için 5/dk veya 15/saat; IP için 30/dk). `retryAfterSeconds` alanı içerir.
+- `"room_unavailable"`: Karşılıklı engelleme durumu var (nedeni sızdırmayan genel gizlilik mesajı).
+- `"lobby_busy"`: Küresel açık lobi üst sınırına (1000 oda) ulaşıldı.
+- `"account_deleted"`: Silinmiş hesap (tombstone).
 
 ---
 

@@ -722,6 +722,113 @@ async function main() {
       console.log('  ✓ [Senaryo J Başarılı] Haftalık liderlik tablosu tam E2E akışı doğrulandı.');
     }
 
+    // ========================================================
+    // Senaryo K: Arkadaş Düellosu E2E (Oda Kur, Koda Katıl, Maç Oyna, Sıfır Ödül ve Değişmeyen İstatistik)
+    // ========================================================
+    {
+      console.log('\n--- Senaryo K: Arkadaş Düellosu E2E Akışı ---');
+      const hostUid = `host_k_${Date.now()}`;
+      const guestUid = `guest_k_${Date.now()}`;
+
+      // 1. Başlangıç profillerini sorgula
+      const hostProfilePre = ((await (
+        await fetch(`${BASE_HTTP_URL}/me`, {
+          headers: { Authorization: `Bearer dev:${hostUid}` },
+        })
+      ).json()) as any);
+      const guestProfilePre = ((await (
+        await fetch(`${BASE_HTTP_URL}/me`, {
+          headers: { Authorization: `Bearer dev:${guestUid}` },
+        })
+      ).json()) as any);
+
+      // 2. Kurucu odayı kurar
+      const hostWs = new WSClient(`${BASE_WS_URL}/ws/matchmaking?token=dev:${hostUid}`);
+      await hostWs.waitForOpen();
+      hostWs.send({ t: 'create_room', name: 'HostK' });
+
+      const roomCreatedMsg = await hostWs.waitForMessage<any>((m: any) => m.t === 'room_created', 5000);
+      const code = roomCreatedMsg.code;
+      console.log(`  ✓ Oda kuruldu, kod alındı: ${code}`);
+
+      // 3. Katılan oyuncu koda katılır
+      const guestWs = new WSClient(`${BASE_WS_URL}/ws/matchmaking?token=dev:${guestUid}`);
+      await guestWs.waitForOpen();
+      guestWs.send({ t: 'join_room', code, name: 'GuestK' });
+
+      // 4. İki oyuncu da matched mesajını alır
+      const hostMatched = await hostWs.waitForMessage<any>((m: any) => m.t === 'matched', 5000);
+      const guestMatched = await guestWs.waitForMessage<any>((m: any) => m.t === 'matched', 5000);
+
+      if (hostMatched.matchId !== guestMatched.matchId) {
+        throw new Error('Eşleşen matchId uyuşmuyor!');
+      }
+      if (!hostMatched.isFriendly || !guestMatched.isFriendly) {
+        throw new Error('isFriendly bayrağı true gelmedi!');
+      }
+      console.log(`  ✓ İki oyuncu da isFriendly: true ile eşleşti (matchId: ${hostMatched.matchId})`);
+
+      hostWs.close();
+      guestWs.close();
+
+      // 5. Maç odasına bağlan
+      const { roomA, roomB } = await connectToMatch(hostMatched.matchId, hostUid, guestUid);
+
+      // 6. Host maçı terk eder (leave)
+      roomA.send({ t: 'leave' });
+
+      // Final mesajı beklenir
+      const finalA = await roomA.waitForMessage<ClientFinalMessage>((m: any) => m.t === 'final', 5000);
+      const finalB = await roomB.waitForMessage<ClientFinalMessage>((m: any) => m.t === 'final', 5000);
+
+      if (finalA.coinsAwarded !== 0 || finalB.coinsAwarded !== 0) {
+        throw new Error(
+          `Arkadaş maçında coinsAwarded 0 olmalıydı! (A: ${finalA.coinsAwarded}, B: ${finalB.coinsAwarded})`
+        );
+      }
+      console.log('  ✓ Final mesajında coinsAwarded: 0 olarak doğrulandı.');
+
+      roomA.close();
+      roomB.close();
+
+      // 7. Maç sonrası UserProfile doğrulaması (Jeton ve istatistik DEĞİŞMEMELİ)
+      const hostProfilePost = ((await (
+        await fetch(`${BASE_HTTP_URL}/me`, {
+          headers: { Authorization: `Bearer dev:${hostUid}` },
+        })
+      ).json()) as any);
+      const guestProfilePost = ((await (
+        await fetch(`${BASE_HTTP_URL}/me`, {
+          headers: { Authorization: `Bearer dev:${guestUid}` },
+        })
+      ).json()) as any);
+
+      if (
+        hostProfilePost.coins !== hostProfilePre.coins ||
+        guestProfilePost.coins !== guestProfilePre.coins
+      ) {
+        throw new Error('Arkadaş maçı sonrasında kullanıcı jetonları değişti!');
+      }
+      if (
+        hostProfilePost.stats.matchesPlayed !== hostProfilePre.stats.matchesPlayed ||
+        guestProfilePost.stats.matchesPlayed !== guestProfilePre.stats.matchesPlayed
+      ) {
+        throw new Error('Arkadaş maçı sonrasında matchesPlayed değişti!');
+      }
+      console.log('  ✓ Maç sonrası jeton ve istatistiklerin değişmediği doğrulandı.');
+
+      // 8. Liderlik tablosu kontrolü (wins artmamalı)
+      const lbRes = await fetch(`${BASE_HTTP_URL}/leaderboard`, {
+        headers: { Authorization: `Bearer dev:${guestUid}` },
+      });
+      const lbData = (await lbRes.json()) as any;
+      if (lbData.me !== null) {
+        throw new Error('Arkadaş maçı galibiyeti liderlik tablosuna yazılmamalıydı!');
+      }
+      console.log('  ✓ Liderlik tablosuna galibiyet yazılmadığı doğrulandı.');
+      console.log('  ✓ [Senaryo K Başarılı] Arkadaş düellosu tam E2E akışı doğrulandı.');
+    }
+
     function expectWeekDataValid(data: any) {
       if (!data.weekKey || typeof data.weekKey !== 'string' || !data.weekKey.includes('-W')) {
         throw new Error(`Geçersiz weekKey: ${data.weekKey}`);
@@ -732,7 +839,7 @@ async function main() {
     }
 
     console.log('\n========================================================');
-    console.log('🎉 TÜM 10 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
+    console.log('🎉 TÜM 11 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
     console.log('========================================================\n');
   } catch (err: unknown) {
     console.error('\n❌ E2E TEST BAŞARISIZ OLDU:');

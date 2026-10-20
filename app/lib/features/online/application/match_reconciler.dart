@@ -140,10 +140,11 @@ class MatchReconciler {
           roundQuestionTexts: roundQuestionTexts,
           botlaOynandi: entry.botlaOynandi,
           isFinal: true,
+          isFriendly: entry.isFriendly,
         );
 
         await repo.add(updatedEntry);
-        if (finalMsg.coins != null) {
+        if (!entry.isFriendly && finalMsg.coins != null) {
           onCoinsUpdated?.call(finalMsg.coins!);
         }
         onUpdated?.call();

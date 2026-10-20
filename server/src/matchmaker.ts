@@ -7,7 +7,12 @@ import {
   logContentError,
 } from './content';
 import type { Question } from './engine';
-import { parseMatchmakerMessage, type MatchmakerServerMessage } from './protocol';
+import {
+  parseMatchmakerMessage,
+  type MatchmakerServerMessage,
+  generateFriendCode,
+  sanitizePlayerName,
+} from './protocol';
 import type { Env } from './index';
 
 export interface QueueEntry {
@@ -76,8 +81,43 @@ export function createContentProvider(env: Env): ContentProvider {
   });
 }
 
+export interface StoredFriendRoom {
+  readonly code: string;
+  readonly hostUid: string;
+  readonly hostName: string;
+  readonly createdAt: number;
+  readonly expiresAt: number;
+  status: 'waiting_for_guest' | 'matched' | 'expired';
+  matchedMatchId?: string;
+  matchedOpponentName?: string;
+}
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+  hourCount: number;
+  hourResetAt: number;
+}
+
+interface IpRateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const MAX_ACTIVE_FRIEND_ROOMS = 1000;
+const IP_RATE_LIMIT_PER_MINUTE = 30;
+const UID_RATE_LIMIT_PER_MINUTE = 5;
+const UID_RATE_LIMIT_PER_HOUR = 15;
+
 export class Matchmaker extends DurableObject<Env> {
   private queue: QueueEntry[] = [];
+  private friendRooms = new Map<string, StoredFriendRoom>();
+  private matchedPendingByHostUid = new Map<
+    string,
+    { matchId: string; opponentName: string; expiresAt: number }
+  >();
+  private failedAttemptsByUid = new Map<string, RateLimitEntry>();
+  private failedAttemptsByIp = new Map<string, IpRateLimitEntry>();
   private contentProvider: ContentProvider;
 
   constructor(ctx: DurableObjectState, env: Env, customProvider?: ContentProvider) {
@@ -87,6 +127,15 @@ export class Matchmaker extends DurableObject<Env> {
       const stored = await this.ctx.storage.get<QueueEntry[]>('queue');
       if (stored) {
         this.queue = stored;
+      }
+      const storedRooms = await this.ctx.storage.get<StoredFriendRoom[]>('friend_rooms');
+      if (storedRooms) {
+        const now = Date.now();
+        for (const r of storedRooms) {
+          if (r.expiresAt > now) {
+            this.friendRooms.set(r.code, r);
+          }
+        }
       }
     });
   }
@@ -101,6 +150,11 @@ export class Matchmaker extends DurableObject<Env> {
       return new Response('Unauthorized', { status: 401 });
     }
 
+    const ip =
+      request.headers.get('cf-connecting-ip') ??
+      request.headers.get('x-forwarded-for') ??
+      'unknown';
+
     // Varsa eski bağlantıyı temizle
     const existing = this.ctx.getWebSockets(uid);
     for (const ws of existing) {
@@ -114,7 +168,7 @@ export class Matchmaker extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
-    this.ctx.acceptWebSocket(server, [uid]);
+    this.ctx.acceptWebSocket(server, [uid, `ip:${ip}`]);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -123,6 +177,9 @@ export class Matchmaker extends DurableObject<Env> {
     const tags = this.ctx.getTags(ws);
     const uid = tags[0];
     if (!uid) return;
+
+    const ipTag = tags.find((t) => t.startsWith('ip:'));
+    const ip = ipTag ? ipTag.slice(3) : 'unknown';
 
     const parsed = parseMatchmakerMessage(
       typeof message === 'string' ? message : new TextDecoder().decode(message)
@@ -181,6 +238,14 @@ export class Matchmaker extends DurableObject<Env> {
       } catch {
         // yoksay
       }
+    } else if (parsed.t === 'create_room') {
+      await this.handleCreateRoom(ws, uid, ip, parsed);
+    } else if (parsed.t === 'resume_room') {
+      await this.handleResumeRoom(ws, uid, ip, parsed);
+    } else if (parsed.t === 'join_room') {
+      await this.handleJoinRoom(ws, uid, ip, parsed);
+    } else if (parsed.t === 'cancel_room') {
+      await this.handleCancelRoom(ws, uid, parsed);
     }
   }
 
@@ -194,6 +259,9 @@ export class Matchmaker extends DurableObject<Env> {
       await this.ctx.storage.put('queue', this.queue);
     }
 
+    // Kullanıcının açık arkadaş odasını da temizle
+    await this.cancelFriendRoomByHost(uid);
+
     const sockets = this.ctx.getWebSockets(uid);
     for (const ws of sockets) {
       try {
@@ -202,6 +270,544 @@ export class Matchmaker extends DurableObject<Env> {
         // yoksay
       }
     }
+  }
+
+  async alarm(): Promise<void> {
+    await this.pruneExpiredFriendRooms();
+    await this.scheduleFriendRoomAlarm();
+  }
+
+  private async handleCreateRoom(
+    ws: WebSocket,
+    uid: string,
+    _ip: string,
+    parsed: { name?: string }
+  ): Promise<void> {
+    // 1. Kullanıcının önceki açık arkadaş odalarını temizle
+    await this.cancelFriendRoomByHost(uid);
+
+    // 2. Kapasite kontrolü
+    if (this.friendRooms.size >= MAX_ACTIVE_FRIEND_ROOMS) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'lobby_busy',
+          message: 'Lobi şu anda yoğun. Lütfen birkaç dakika sonra tekrar deneyin.',
+        })
+      );
+      return;
+    }
+
+    // 3. Hesap silinmiş mi (Tombstone)?
+    if (await this.isAccountDeleted(uid)) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'account_deleted',
+          message: 'Hesap silinmiş',
+        })
+      );
+      return;
+    }
+
+    // 4. Oyuncu adını profile güvenerek al
+    const hostName = await this.getPlayerNickname(uid, parsed.name);
+    this.prewarmContent();
+
+    // 5. Çakışmayan 6 karakterlik davet kodu üret
+    let code = generateFriendCode();
+    let attempts = 0;
+    while (this.friendRooms.has(code) && attempts < 10) {
+      code = generateFriendCode();
+      attempts++;
+    }
+
+    const now = Date.now();
+    const expiresAt = now + 5 * 60 * 1000;
+    const room: StoredFriendRoom = {
+      code,
+      hostUid: uid,
+      hostName,
+      createdAt: now,
+      expiresAt,
+      status: 'waiting_for_guest',
+    };
+
+    this.friendRooms.set(code, room);
+    await this.persistFriendRooms();
+    await this.scheduleFriendRoomAlarm();
+
+    try {
+      ws.send(
+        JSON.stringify({
+          t: 'room_created',
+          code,
+          expiresAt,
+        })
+      );
+    } catch {
+      // yoksay
+    }
+  }
+
+  private async handleResumeRoom(
+    ws: WebSocket,
+    uid: string,
+    _ip: string,
+    parsed: { code: string }
+  ): Promise<void> {
+    if (await this.isAccountDeleted(uid)) {
+      ws.send(JSON.stringify({ t: 'error', code: 'account_deleted' }));
+      return;
+    }
+
+    // Kurucu dışarıdayken (WhatsApp vb.) katılım gerçekleşmiş mi kontrol et
+    const pendingMatched = this.matchedPendingByHostUid.get(uid);
+    if (pendingMatched && pendingMatched.expiresAt > Date.now()) {
+      this.matchedPendingByHostUid.delete(uid);
+      try {
+        ws.send(
+          JSON.stringify({
+            t: 'matched',
+            matchId: pendingMatched.matchId,
+            opponentName: pendingMatched.opponentName,
+            isFriendly: true,
+          })
+        );
+      } catch {}
+      return;
+    }
+
+    const room = this.friendRooms.get(parsed.code);
+    const now = Date.now();
+    if (!room || room.expiresAt <= now) {
+      if (room) {
+        this.friendRooms.delete(parsed.code);
+        await this.persistFriendRooms();
+      }
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'room_not_found',
+          message: 'Bu oda bulunamadı veya süresi dolmuş.',
+        })
+      );
+      return;
+    }
+
+    if (room.hostUid !== uid) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'room_not_found',
+          message: 'Bu oda bulunamadı.',
+        })
+      );
+      return;
+    }
+
+    if (room.status === 'matched' && room.matchedMatchId && room.matchedOpponentName) {
+      this.friendRooms.delete(parsed.code);
+      await this.persistFriendRooms();
+      try {
+        ws.send(
+          JSON.stringify({
+            t: 'matched',
+            matchId: room.matchedMatchId,
+            opponentName: room.matchedOpponentName,
+            isFriendly: true,
+          })
+        );
+      } catch {}
+      return;
+    }
+
+    try {
+      ws.send(
+        JSON.stringify({
+          t: 'room_resumed',
+          code: room.code,
+          expiresAt: room.expiresAt,
+        })
+      );
+    } catch {}
+  }
+
+  private async handleJoinRoom(
+    ws: WebSocket,
+    uid: string,
+    ip: string,
+    parsed: { code: string; name?: string }
+  ): Promise<void> {
+    // 1. Hız sınırı (brute force) kontrolü
+    const rl = this.checkRateLimit(uid, ip);
+    if (!rl.allowed) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'rate_limited',
+          message: 'Çok fazla hatalı deneme yaptın. Lütfen biraz bekle.',
+          ...(rl.retryAfterSeconds ? { retryAfterSeconds: rl.retryAfterSeconds } : {}),
+        })
+      );
+      return;
+    }
+
+    // 2. Tombstone kontrolü
+    if (await this.isAccountDeleted(uid)) {
+      ws.send(JSON.stringify({ t: 'error', code: 'account_deleted' }));
+      return;
+    }
+
+    // 3. Oda varlığı ve geçerlilik süresi kontrolü
+    const room = this.friendRooms.get(parsed.code);
+    const now = Date.now();
+    if (!room || room.expiresAt <= now) {
+      if (room) {
+        this.friendRooms.delete(parsed.code);
+        await this.persistFriendRooms();
+      }
+      this.recordFailedAttempt(uid, ip);
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'room_not_found',
+          message: 'Bu oda bulunamadı veya süresi dolmuş.',
+        })
+      );
+      return;
+    }
+
+    // 4. Oda durumu kontrolü
+    if (room.status !== 'waiting_for_guest') {
+      this.recordFailedAttempt(uid, ip);
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'room_full',
+          message: 'Bu odaya zaten başka bir oyuncu katılmış.',
+        })
+      );
+      return;
+    }
+
+    // 5. Kendi odasına katılmayı engelle
+    if (room.hostUid === uid) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'cannot_join_own_room',
+          message: 'Kendi oluşturduğun odaya katılamazsın.',
+        })
+      );
+      return;
+    }
+
+    // 6. Karşılıklı engelleme kontrolü
+    let hostBlocked: string[] = [];
+    let guestBlocked: string[] = [];
+    try {
+      if (this.env.USER_PROFILE) {
+        const hostProfileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(room.hostUid)
+        );
+        hostBlocked = await hostProfileStub.getBlockedUids();
+        const guestProfileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(uid)
+        );
+        guestBlocked = await guestProfileStub.getBlockedUids();
+      }
+    } catch {}
+
+    if (hostBlocked.includes(uid) || guestBlocked.includes(room.hostUid)) {
+      this.recordFailedAttempt(uid, ip);
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'room_unavailable',
+          message: 'Bu odaya şu anda katılınamıyor.',
+        })
+      );
+      return;
+    }
+
+    // 7. Soru havuzu kontrolü
+    let allQuestions: Question[];
+    try {
+      allQuestions = await this.contentProvider.getQuestions();
+    } catch {
+      allQuestions = [];
+    }
+    if (!allQuestions || allQuestions.length < 8) {
+      ws.send(
+        JSON.stringify({
+          t: 'error',
+          code: 'content_unavailable',
+          message: 'Soru havuzu şu anda kullanılamıyor.',
+        })
+      );
+      return;
+    }
+
+    // Başarılı katılım: Hatalı deneme sayacını temizle
+    this.clearFailedAttempts(uid);
+
+    const guestName = await this.getPlayerNickname(uid, parsed.name);
+    const matchId = crypto.randomUUID();
+    const selectedQuestions = selectAndShuffleEightQuestions(allQuestions);
+    const questionOrder = selectedQuestions.map((q) => q.id);
+
+    // MatchRoom oluştur ve başlat (matchType: 'friendly')
+    const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
+    await roomStub.initMatch({
+      matchId,
+      p1: { uid: room.hostUid, name: room.hostName },
+      p2: { uid, name: guestName },
+      questions: selectedQuestions,
+      questionOrder,
+      matchType: 'friendly',
+    });
+
+    room.status = 'matched';
+    room.matchedMatchId = matchId;
+    room.matchedOpponentName = guestName;
+
+    // Katılana matched mesajı gönder
+    try {
+      ws.send(
+        JSON.stringify({
+          t: 'matched',
+          matchId,
+          opponentName: room.hostName,
+          isFriendly: true,
+        })
+      );
+    } catch {}
+
+    // Kurucuya matched mesajı gönder
+    const hostSockets = this.ctx.getWebSockets(room.hostUid);
+    let hostNotified = false;
+    for (const hs of hostSockets) {
+      try {
+        hs.send(
+          JSON.stringify({
+            t: 'matched',
+            matchId,
+            opponentName: guestName,
+            isFriendly: true,
+          })
+        );
+        hostNotified = true;
+      } catch {}
+    }
+
+    // Kurucu soketi o anda kapalıysa (örn. WhatsApp'ta ise) döndüğünde alabilmesi için sakla
+    if (!hostNotified) {
+      this.matchedPendingByHostUid.set(room.hostUid, {
+        matchId,
+        opponentName: guestName,
+        expiresAt: Date.now() + 2 * 60 * 1000,
+      });
+    }
+
+    // Odayı tek kullanımlık olarak kaldır
+    this.friendRooms.delete(parsed.code);
+    await this.persistFriendRooms();
+  }
+
+  private async handleCancelRoom(
+    ws: WebSocket,
+    uid: string,
+    parsed: { code?: string }
+  ): Promise<void> {
+    let changed = false;
+    for (const [code, r] of this.friendRooms.entries()) {
+      if (r.hostUid === uid && (!parsed.code || parsed.code === code)) {
+        this.friendRooms.delete(code);
+        changed = true;
+      }
+    }
+    this.matchedPendingByHostUid.delete(uid);
+    if (changed) {
+      await this.persistFriendRooms();
+    }
+    try {
+      ws.send(JSON.stringify({ t: 'cancelled' }));
+    } catch {}
+  }
+
+  async cancelFriendRoomByHost(uid: string): Promise<void> {
+    let changed = false;
+    for (const [code, r] of this.friendRooms.entries()) {
+      if (r.hostUid === uid) {
+        this.friendRooms.delete(code);
+        changed = true;
+      }
+    }
+    this.matchedPendingByHostUid.delete(uid);
+    if (changed) {
+      await this.persistFriendRooms();
+    }
+  }
+
+  private async pruneExpiredFriendRooms(): Promise<void> {
+    const now = Date.now();
+    let changed = false;
+    for (const [code, room] of this.friendRooms.entries()) {
+      if (room.expiresAt <= now) {
+        const sockets = this.ctx.getWebSockets(room.hostUid);
+        for (const s of sockets) {
+          try {
+            s.send(JSON.stringify({ t: 'room_expired' }));
+          } catch {}
+        }
+        this.friendRooms.delete(code);
+        changed = true;
+      }
+    }
+    for (const [uid, pending] of this.matchedPendingByHostUid.entries()) {
+      if (pending.expiresAt <= now) {
+        this.matchedPendingByHostUid.delete(uid);
+      }
+    }
+    if (changed) {
+      await this.persistFriendRooms();
+    }
+  }
+
+  private async scheduleFriendRoomAlarm(): Promise<void> {
+    const now = Date.now();
+    let earliest = Infinity;
+    for (const room of this.friendRooms.values()) {
+      if (room.expiresAt > now && room.expiresAt < earliest) {
+        earliest = room.expiresAt;
+      }
+    }
+    if (earliest !== Infinity) {
+      await this.ctx.storage.setAlarm(earliest);
+    }
+  }
+
+  private async persistFriendRooms(): Promise<void> {
+    const list = Array.from(this.friendRooms.values());
+    await this.ctx.storage.put('friend_rooms', list);
+  }
+
+  private checkRateLimit(
+    uid: string,
+    ip: string
+  ): { allowed: boolean; retryAfterSeconds?: number } {
+    const now = Date.now();
+    // IP kontrolü (dakikada 30)
+    const ipEntry = this.failedAttemptsByIp.get(ip);
+    if (ipEntry) {
+      if (now < ipEntry.resetAt) {
+        if (ipEntry.count >= IP_RATE_LIMIT_PER_MINUTE) {
+          return {
+            allowed: false,
+            retryAfterSeconds: Math.ceil((ipEntry.resetAt - now) / 1000),
+          };
+        }
+      } else {
+        this.failedAttemptsByIp.delete(ip);
+      }
+    }
+
+    // UID kontrolü (dakikada 5, saatte 15)
+    const uidEntry = this.failedAttemptsByUid.get(uid);
+    if (uidEntry) {
+      if (now < uidEntry.hourResetAt) {
+        if (uidEntry.hourCount >= UID_RATE_LIMIT_PER_HOUR) {
+          return {
+            allowed: false,
+            retryAfterSeconds: Math.ceil((uidEntry.hourResetAt - now) / 1000),
+          };
+        }
+      } else {
+        uidEntry.hourCount = 0;
+        uidEntry.hourResetAt = now + 3600_000;
+      }
+
+      if (now < uidEntry.resetAt) {
+        if (uidEntry.count >= UID_RATE_LIMIT_PER_MINUTE) {
+          return {
+            allowed: false,
+            retryAfterSeconds: Math.ceil((uidEntry.resetAt - now) / 1000),
+          };
+        }
+      } else {
+        uidEntry.count = 0;
+        uidEntry.resetAt = now + 60_000;
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  private recordFailedAttempt(uid: string, ip: string): void {
+    const now = Date.now();
+    const ipEntry = this.failedAttemptsByIp.get(ip) ?? {
+      count: 0,
+      resetAt: now + 60_000,
+    };
+    if (now >= ipEntry.resetAt) {
+      ipEntry.count = 1;
+      ipEntry.resetAt = now + 60_000;
+    } else {
+      ipEntry.count++;
+    }
+    this.failedAttemptsByIp.set(ip, ipEntry);
+
+    const uidEntry = this.failedAttemptsByUid.get(uid) ?? {
+      count: 0,
+      resetAt: now + 60_000,
+      hourCount: 0,
+      hourResetAt: now + 3600_000,
+    };
+    if (now >= uidEntry.resetAt) {
+      uidEntry.count = 1;
+      uidEntry.resetAt = now + 60_000;
+    } else {
+      uidEntry.count++;
+    }
+    if (now >= uidEntry.hourResetAt) {
+      uidEntry.hourCount = 1;
+      uidEntry.hourResetAt = now + 3600_000;
+    } else {
+      uidEntry.hourCount++;
+    }
+    this.failedAttemptsByUid.set(uid, uidEntry);
+  }
+
+  private clearFailedAttempts(uid: string): void {
+    this.failedAttemptsByUid.delete(uid);
+  }
+
+  private async getPlayerNickname(uid: string, fallbackName?: string): Promise<string> {
+    try {
+      if (this.env.USER_PROFILE) {
+        const profileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(uid)
+        );
+        const profile = await profileStub.getProfile(uid);
+        if (profile && profile.nickname) {
+          return sanitizePlayerName(profile.nickname);
+        }
+      }
+    } catch {}
+    return sanitizePlayerName(fallbackName);
+  }
+
+  private async isAccountDeleted(uid: string): Promise<boolean> {
+    try {
+      if (this.env.USER_PROFILE) {
+        const profileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(uid)
+        );
+        return await profileStub.isDeleted();
+      }
+    } catch {}
+    return false;
   }
 
   async webSocketClose(

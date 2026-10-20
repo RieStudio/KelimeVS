@@ -1,15 +1,56 @@
 // JSON Protokol Tanımları ve Ayrıştırıcıları
 import { validateNickname } from './engine/nicknameValidator';
 
+export const FRIEND_CODE_ALPHABET = '23456789BCDFGHJKMNPQRSTVWXYZ';
+
+export function generateFriendCode(): string {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += FRIEND_CODE_ALPHABET[bytes[i] % FRIEND_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+export function sanitizeFriendCode(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const clean = raw.trim().toUpperCase();
+  if (clean.length !== 6) return null;
+  for (let i = 0; i < 6; i++) {
+    if (!FRIEND_CODE_ALPHABET.includes(clean[i])) {
+      return null;
+    }
+  }
+  return clean;
+}
+
 export type MatchmakerClientMessage =
   | { readonly t: 'queue'; readonly name: string }
-  | { readonly t: 'cancel' };
+  | { readonly t: 'cancel' }
+  | { readonly t: 'create_room'; readonly name?: string }
+  | { readonly t: 'resume_room'; readonly code: string }
+  | { readonly t: 'join_room'; readonly code: string; readonly name?: string }
+  | { readonly t: 'cancel_room'; readonly code?: string };
 
 export type MatchmakerServerMessage =
   | { readonly t: 'queued' }
   | { readonly t: 'cancelled' }
-  | { readonly t: 'matched'; readonly matchId: string; readonly opponentName: string }
-  | { readonly t: 'error'; readonly code: string };
+  | { readonly t: 'room_created'; readonly code: string; readonly expiresAt: number }
+  | { readonly t: 'room_resumed'; readonly code: string; readonly expiresAt: number }
+  | { readonly t: 'room_expired' }
+  | {
+      readonly t: 'matched';
+      readonly matchId: string;
+      readonly opponentName: string;
+      readonly isFriendly?: boolean;
+    }
+  | {
+      readonly t: 'error';
+      readonly code: string;
+      readonly message?: string;
+      readonly retryAfterSeconds?: number;
+    };
 
 export type MatchRoomClientMessage =
   | { readonly t: 'submit'; readonly text: string }
@@ -106,6 +147,36 @@ export function parseMatchmakerMessage(raw: unknown): MatchmakerClientMessage | 
     }
     if (data.t === 'cancel') {
       return { t: 'cancel' };
+    }
+    if (data.t === 'create_room') {
+      return {
+        t: 'create_room',
+        name: typeof data.name === 'string' ? sanitizePlayerName(data.name) : undefined,
+      };
+    }
+    if (data.t === 'resume_room') {
+      const code = sanitizeFriendCode(data.code);
+      if (!code) return null;
+      return {
+        t: 'resume_room',
+        code,
+      };
+    }
+    if (data.t === 'join_room') {
+      const code = sanitizeFriendCode(data.code);
+      if (!code) return null;
+      return {
+        t: 'join_room',
+        code,
+        name: typeof data.name === 'string' ? sanitizePlayerName(data.name) : undefined,
+      };
+    }
+    if (data.t === 'cancel_room') {
+      const code = typeof data.code === 'string' ? sanitizeFriendCode(data.code) : undefined;
+      return {
+        t: 'cancel_room',
+        ...(code ? { code } : {}),
+      };
     }
   } catch {
     return null;

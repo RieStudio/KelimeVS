@@ -4,7 +4,7 @@
 import type { Answer, Question } from '../src/engine/models';
 import { normalize } from '../src/engine/normalizer';
 
-export type GhostMode = 'play' | 'idle' | 'leave' | 'drop';
+export type GhostMode = 'play' | 'idle' | 'leave' | 'drop' | 'friend-host' | 'friend-join';
 
 export const DEFAULT_GHOST_NAMES: readonly string[] = [
   'Zeynep',
@@ -34,6 +34,7 @@ export interface GhostConfig {
   readonly fresh: boolean;
   readonly devAuth: boolean;
   readonly name: string;
+  readonly code?: string;
 }
 
 /** Komut satırı argümanlarını ayrıştırır. */
@@ -48,6 +49,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
   let fresh = false;
   let devAuth = false;
   let nameArg: string | undefined;
+  let codeArg: string | undefined;
 
   for (const arg of argv) {
     if (arg === '--dev-auth' || arg === '--dev-auth=true') {
@@ -56,9 +58,18 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
       fresh = true;
     } else if (arg.startsWith('--mode=')) {
       const val = arg.slice('--mode='.length).toLowerCase();
-      if (val === 'play' || val === 'idle' || val === 'leave' || val === 'drop') {
+      if (
+        val === 'play' ||
+        val === 'idle' ||
+        val === 'leave' ||
+        val === 'drop' ||
+        val === 'friend-host' ||
+        val === 'friend-join'
+      ) {
         mode = val;
       }
+    } else if (arg.startsWith('--code=')) {
+      codeArg = arg.slice('--code='.length).trim().toUpperCase();
     } else if (arg.startsWith('--url=')) {
       serverUrl = arg.slice('--url='.length).trim();
     } else if (arg.startsWith('--api-key=')) {
@@ -99,6 +110,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
     fresh,
     devAuth,
     name: pickGhostName(nameArg),
+    code: codeArg,
   };
 }
 

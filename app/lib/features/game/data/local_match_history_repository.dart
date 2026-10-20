@@ -196,6 +196,7 @@ abstract final class _MatchHistoryMapper {
       'roundQuestionTexts': entry.roundQuestionTexts,
       'botlaOynandi': entry.botlaOynandi,
       'isFinal': entry.isFinal,
+      'isFriendly': entry.isFriendly,
     };
   }
 
@@ -233,6 +234,7 @@ abstract final class _MatchHistoryMapper {
           const [],
       botlaOynandi: json['botlaOynandi'] as bool? ?? false,
       isFinal: json['isFinal'] as bool? ?? true,
+      isFriendly: json['isFriendly'] as bool? ?? false,
     );
   }
 

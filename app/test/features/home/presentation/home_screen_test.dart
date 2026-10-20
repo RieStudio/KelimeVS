@@ -146,25 +146,21 @@ void main() {
     expect(find.byType(MatchmakingScreen), findsOneWidget);
   });
 
-  testWidgets('4. "Arkadaşınla Oyna" butonuna basıldığında "Yakında" bilgi penceresi açılır', (tester) async {
+  testWidgets('4. "Arkadaşınla Oyna" butonuna basıldığında arkadaşla düello penceresi açılır', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
 
     await tester.pumpWidget(_buildTestApp(repo));
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.comingSoon), findsNothing);
+    expect(find.text(AppStrings.createRoom), findsNothing);
 
     await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.playWithFriend));
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.comingSoon), findsOneWidget);
-    expect(find.text(AppStrings.playWithFriendComingSoon), findsOneWidget);
-
-    // Tamam butonuna basınca dialog kapanır
-    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.ok));
-    await tester.pumpAndSettle();
-
-    expect(find.text(AppStrings.comingSoon), findsNothing);
+    // FriendDuelBottomSheet açılmalı
+    expect(find.text(AppStrings.friendDuel), findsOneWidget);
+    expect(find.text(AppStrings.createRoom), findsOneWidget);
+    expect(find.text(AppStrings.joinRoom), findsOneWidget);
   });
 
   testWidgets('5. Ana ekran listesi finishedAtMs azalan sırayla ve eşitlikte son eklenen üstte olacak şekilde çizilir', (tester) async {

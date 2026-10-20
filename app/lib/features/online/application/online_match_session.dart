@@ -97,6 +97,7 @@ abstract final class OnlineMatchHistoryMapper {
     required int finishedAtMs,
     required Map<String, String> questionTextsById,
     MatchEndReason? endReason,
+    bool isFriendly = false,
   }) {
     final roundRecords = <RoundRecord>[];
     final roundQuestionTexts = <String>[];
@@ -134,6 +135,7 @@ abstract final class OnlineMatchHistoryMapper {
       roundRecords: roundRecords,
       roundQuestionTexts: roundQuestionTexts,
       botlaOynandi: false,
+      isFriendly: isFriendly,
     );
   }
 }
@@ -214,10 +216,13 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     _client?.handleAppResumed();
   }
 
+  bool _isFriendly = false;
+
   /// Yeni bir çevrimiçi maç oturumu başlatır ve [matchId] odasına bağlanır.
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    bool isFriendly = false,
     OnlineMatchClient? client,
   }) async {
     _cleanupSession();
@@ -228,6 +233,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     }
 
     _currentMatchId = matchId;
+    _isFriendly = isFriendly;
     _isMatchSaved = false;
     _hasReceivedFinal = false;
     _isLeaving = false;
@@ -246,6 +252,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       isVoided: false,
       isDisconnectedPermanent: false,
       isDisconnectedReplaced: false,
+      isFriendly: isFriendly,
     );
 
     final activeClient =
@@ -548,6 +555,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
       endReason: endReason,
+      isFriendly: _isFriendly,
     );
 
     final winnerId = finalMsg.winnerIsMe ? 'me' : 'bot';
@@ -700,6 +708,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       roundQuestionTexts: roundQuestionTexts,
       botlaOynandi: false,
       isFinal: false,
+      isFriendly: _isFriendly,
     );
 
     state = state.copyWith(lastSavedMatch: entry);
