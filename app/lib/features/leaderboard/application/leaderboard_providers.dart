@@ -1,3 +1,4 @@
+import '../../auth/application/auth_notifier.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +8,11 @@ import '../domain/models/leaderboard_models.dart';
 
 final leaderboardApiClientProvider = Provider<LeaderboardApiClient>((ref) {
   final authProvider = ref.watch(authTokenProviderForProfile);
-  return HttpLeaderboardApiClient(authTokenProvider: authProvider);
+  final onDeleted = ref.watch(accountDeletedHandlerProvider);
+  return HttpLeaderboardApiClient(
+    authTokenProvider: authProvider,
+    onAccountDeleted: onDeleted,
+  );
 });
 
 class LeaderboardNotifier extends AsyncNotifier<LeaderboardData> {

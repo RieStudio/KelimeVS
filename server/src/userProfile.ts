@@ -51,7 +51,10 @@ interface ProcessedMatchRow extends Record<string, string | number | null> {
   coins_awarded: number;
 }
 
-// NOT: İleride KVKK/GDPR hesap silme gereksinimi için bu sınıfa deleteAll() yöntemi eklenecektir.
+interface TombstoneRow extends Record<string, string | number | null> {
+  uid: string;
+  deleted_at: number;
+}
 
 export class UserProfile extends DurableObject<Env> {
   private initialized = false;
@@ -85,9 +88,70 @@ export class UserProfile extends DurableObject<Env> {
         outcome TEXT NOT NULL,
         coins_awarded INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS tombstone (
+        uid TEXT PRIMARY KEY,
+        deleted_at INTEGER NOT NULL
+      );
     `);
 
     this.initialized = true;
+  }
+
+  /**
+   * Profilin silinip silinmediğini (tombstone) kontrol eder.
+   */
+  isDeleted(): boolean {
+    this.ensureSchema();
+    const cursor = this.ctx.storage.sql.exec<TombstoneRow>(
+      'SELECT uid, deleted_at FROM tombstone LIMIT 1'
+    );
+    return cursor.toArray().length > 0;
+  }
+
+  /**
+   * Hesabı kalıcı olarak siler ve 24 saatlik tombstone kaydı bırakır.
+   * 24 saat sonra DO alarmı tetiklenir ve tüm depolama silinir.
+   * İdempotenttir; tombstone zaten varken çağrılsa bile 200 döner.
+   */
+  async deleteProfile(uid?: string): Promise<{ ok: true; deleted: true }> {
+    this.ensureSchema();
+
+    let effectiveUid = uid && uid.trim().length > 0 ? uid.trim() : '';
+    if (!effectiveUid) {
+      const existing = this.ctx.storage.sql.exec<ProfileRow>(
+        'SELECT uid FROM profiles LIMIT 1'
+      ).toArray();
+      effectiveUid = existing.length > 0 ? existing[0].uid : 'unknown';
+    }
+
+    // Tablolardaki tüm kişisel verileri sil
+    this.ctx.storage.sql.exec(`
+      DELETE FROM profiles;
+      DELETE FROM daily_coins;
+      DELETE FROM processed_matches;
+    `);
+
+    // Tombstone kaydı ekle veya güncelle
+    const nowMs = Date.now();
+    this.ctx.storage.sql.exec(
+      'INSERT OR REPLACE INTO tombstone (uid, deleted_at) VALUES (?, ?)',
+      effectiveUid,
+      nowMs
+    );
+
+    // 24 saat sonra DO verilerini tamamen temizleyecek alarm kur
+    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+    await this.ctx.storage.setAlarm(nowMs + twentyFourHoursMs);
+
+    return { ok: true, deleted: true };
+  }
+
+  /**
+   * 24 saat sonra çalışan alarm: tombstone dahil tüm Durable Object verisini temizler.
+   */
+  async alarm(): Promise<void> {
+    await this.ctx.storage.deleteAll();
   }
 
   /**
@@ -95,6 +159,10 @@ export class UserProfile extends DurableObject<Env> {
    */
   async getProfile(uid?: string): Promise<UserProfileData> {
     this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
       'SELECT uid, nickname, coins, played, won, lost, created_at FROM profiles LIMIT 1'
@@ -144,6 +212,10 @@ export class UserProfile extends DurableObject<Env> {
   async setNickname(nickname: string, uid?: string): Promise<{ ok: true; nickname: string }> {
     this.ensureSchema();
 
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
     const validation = validateNickname(nickname);
     if (!validation.isValid || validation.normalized === null) {
       throw new Error('invalid_nickname');
@@ -171,6 +243,10 @@ export class UserProfile extends DurableObject<Env> {
     readonly uid?: string;
   }): Promise<MatchRewardResult> {
     this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
 
     // Profilin varlığını garantiye al
     const profile = await this.getProfile(params.uid);
@@ -292,12 +368,34 @@ export class UserProfile extends DurableObject<Env> {
     const url = new URL(request.url);
     const uid = request.headers.get('X-User-Id') ?? undefined;
 
-    if (request.method === 'GET' && url.pathname === '/profile') {
-      const data = await this.getProfile(uid);
-      return new Response(JSON.stringify(data), {
+    if (request.method === 'DELETE' && (url.pathname === '/profile' || url.pathname === '/me')) {
+      const res = await this.deleteProfile(uid);
+      return new Response(JSON.stringify(res), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/profile') {
+      try {
+        const data = await this.getProfile(uid);
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     if (request.method === 'PUT' && url.pathname === '/nickname') {
@@ -316,6 +414,12 @@ export class UserProfile extends DurableObject<Env> {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
         return new Response(JSON.stringify({ error: 'invalid_nickname', message: msg }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
@@ -343,6 +447,12 @@ export class UserProfile extends DurableObject<Env> {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
         return new Response(JSON.stringify({ error: 'reward_error', message: msg }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },

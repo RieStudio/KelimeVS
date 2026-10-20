@@ -174,6 +174,93 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  void _showDeleteAccountDialog(BuildContext context, WidgetRef ref) {
+    final authState = ref.read(authNotifierProvider);
+    final dialogMessage = authState.isGoogleLinked
+        ? '${AppStrings.deleteAccountDialogMessage}\n\n${AppStrings.deleteAccountGoogleReauthNote}'
+        : AppStrings.deleteAccountDialogMessage;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppDimens.borderRadiusDialog,
+            side: const BorderSide(
+              color: AppColors.ink,
+              width: AppDimens.borderThick,
+            ),
+          ),
+          title: const Text(
+            AppStrings.deleteAccountDialogTitle,
+            style: AppTextStyles.cardTitle,
+          ),
+          content: Text(
+            dialogMessage,
+            style: AppTextStyles.bodyText,
+          ),
+          actions: [
+            PrimaryButton(
+              text: AppStrings.deleteAccountConfirm,
+              backgroundColor: AppColors.danger,
+              shadowColor: AppColors.dangerDark,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _handleDeleteAccount(context, ref);
+              },
+            ),
+            const SizedBox(height: AppDimens.space8),
+            SecondaryButton(
+              text: AppStrings.cancel,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final success =
+        await ref.read(authNotifierProvider.notifier).deleteAccount();
+
+    if (!context.mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            AppStrings.deleteAccountSuccess,
+            style: TextStyle(
+              fontFamily: AppTextStyles.fontNunito,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: AppColors.ink,
+        ),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      final error = ref.read(authNotifierProvider).errorMessage;
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            backgroundColor: AppColors.ink,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
@@ -188,7 +275,7 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimens.screenPaddingHorizontal,
             vertical: AppDimens.space12,
@@ -330,6 +417,16 @@ class ProfileScreen extends ConsumerWidget {
                       : () => _showSignOutDialog(context, ref),
                 ),
               ],
+
+              const SizedBox(height: AppDimens.space32),
+
+              // Hesabı Sil Butonu
+              SecondaryButton.danger(
+                text: AppStrings.deleteAccount,
+                onPressed: authState.isLoading
+                    ? null
+                    : () => _showDeleteAccountDialog(context, ref),
+              ),
             ],
           ),
         ),

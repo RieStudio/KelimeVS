@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:app/features/profile/data/profile_api_client.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
+import 'package:app/features/auth/application/auth_notifier.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +25,7 @@ class FakeAuthRepository implements AuthRepository {
   String? linkedEmail;
 
   AuthLinkResult linkResultToReturn;
+  AuthLinkResult reauthResultToReturn;
   bool signInWithConflictCalled = false;
   bool signOutCalled = false;
 
@@ -30,6 +35,7 @@ class FakeAuthRepository implements AuthRepository {
     this.isGoogleLinked = false,
     this.linkedEmail,
     this.linkResultToReturn = const AuthLinkCanceled(),
+    this.reauthResultToReturn = const AuthLinkSuccess(),
   });
 
   @override
@@ -63,6 +69,51 @@ class FakeAuthRepository implements AuthRepository {
     linkedEmail = null;
     _controller.add(null);
   }
+
+  bool reauthenticateCalled = false;
+  bool deleteUserCalled = false;
+  bool completeAccountDeletionCalled = false;
+
+  @override
+  Future<AuthLinkResult> reauthenticateGoogle() async {
+    reauthenticateCalled = true;
+    return reauthResultToReturn;
+  }
+
+  @override
+  Future<void> deleteFirebaseUser() async {
+    deleteUserCalled = true;
+  }
+
+  @override
+  Future<void> completeAccountDeletionAndReset() async {
+    completeAccountDeletionCalled = true;
+    isGoogleLinked = false;
+    linkedEmail = null;
+    _controller.add(null);
+  }
+}
+
+
+class FakeProfileApiClient implements ProfileApiClient {
+  bool deleteCalled = false;
+  bool shouldFailDelete = false;
+
+  @override
+  Future<UserProfileModel?> getProfile() async => null;
+
+  @override
+  Future<ProfileUpdateResult> updateNickname(String nickname) async =>
+      ProfileUpdateSuccess(nickname);
+
+  @override
+  Future<bool> deleteProfile() async {
+    deleteCalled = true;
+    if (shouldFailDelete) {
+      throw const SocketException('Network error');
+    }
+    return true;
+  }
 }
 
 void main() {
@@ -74,10 +125,11 @@ void main() {
     });
   });
 
-  Widget buildTestScreen(FakeAuthRepository repo) {
+  Widget buildTestScreen(FakeAuthRepository repo, {ProfileApiClient? apiClient}) {
     return ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(repo),
+        if (apiClient != null) profileApiClientProvider.overrideWithValue(apiClient),
       ],
       child: const MaterialApp(
         home: ProfileScreen(),
@@ -202,5 +254,163 @@ void main() {
     const profileRepo = LocalProfileRepository();
     final nick = await profileRepo.getNickname();
     expect(nick, isNull);
+  });
+
+  testWidgets('7. Hesabı Sil butonu görünür ve basılınca onay penceresi açılır (anonim: re-auth notu yok)', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: false);
+    await tester.pumpWidget(buildTestScreen(repo));
+    await tester.pumpAndSettle();
+
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    expect(deleteBtn, findsOneWidget);
+
+    await tester.tap(deleteBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.descendant(of: find.byType(AlertDialog), matching: find.text(AppStrings.deleteAccountDialogTitle)), findsOneWidget);
+    expect(find.text(AppStrings.deleteAccountDialogMessage), findsOneWidget);
+    expect(find.textContaining(AppStrings.deleteAccountGoogleReauthNote), findsNothing);
+    expect(find.widgetWithText(SecondaryButton, AppStrings.cancel), findsOneWidget);
+    expect(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm), findsOneWidget);
+  });
+
+  testWidgets('7b. Google bağlı kullanıcıda onay penceresinde re-auth notu gösterilir', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: true, linkedEmail: 'user@example.com');
+    await tester.pumpWidget(buildTestScreen(repo));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.textContaining(AppStrings.deleteAccountGoogleReauthNote), findsOneWidget);
+  });
+
+  testWidgets('8. Hesabı Sil onay penceresinde Vazgeç seçilirse işlem iptal edilir', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: false);
+    final fakeApi = FakeProfileApiClient();
+    await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(fakeApi.deleteCalled, isFalse);
+    expect(repo.completeAccountDeletionCalled, isFalse);
+  });
+
+  testWidgets('9. Anonim hesapta Hesabı Sil onaylandığında: sunucu silinir, Firebase silinir, yerel veri sıfırlanır', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: false);
+    final fakeApi = FakeProfileApiClient();
+    await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
+    await tester.pumpAndSettle();
+
+    expect(fakeApi.deleteCalled, isTrue);
+    expect(repo.deleteUserCalled, isTrue);
+    expect(repo.completeAccountDeletionCalled, isTrue);
+
+    // Yerel depodaki takma ad silinmiş olmalı
+    const profileRepo = LocalProfileRepository();
+    final nick = await profileRepo.getNickname();
+    expect(nick, isNull);
+  });
+
+  testWidgets('10. Google bağlı hesapta Hesabı Sil onaylandığında re-auth çağrılır', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: true, linkedEmail: 'user@gmail.com');
+    final fakeApi = FakeProfileApiClient();
+    await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
+    await tester.pumpAndSettle();
+
+    expect(repo.reauthenticateCalled, isTrue);
+    expect(fakeApi.deleteCalled, isTrue);
+    expect(repo.completeAccountDeletionCalled, isTrue);
+  });
+
+  testWidgets('11. handleAccountDeletedElsewhere çağrıldığında yerel veriler temizlenir ve sıfırlanır', (tester) async {
+    final repo = FakeAuthRepository(isGoogleLinked: false);
+    final container = ProviderContainer(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(repo),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // Takma adın var olduğunu doğrula
+    const profileRepo = LocalProfileRepository();
+    await profileRepo.setNickname('TestUser');
+    expect(await profileRepo.getNickname(), 'TestUser');
+
+    // Sunucudan 410 geldiğinde tetiklenen akış
+    await container.read(authNotifierProvider.notifier).handleAccountDeletedElsewhere();
+
+    expect(repo.completeAccountDeletionCalled, isTrue);
+    expect(await profileRepo.getNickname(), isNull);
+  });
+
+  testWidgets('12. Re-auth sırasında farklı Google hesabı seçilirse (user-mismatch vb.) veri silinmez ve uyarı gösterilir', (tester) async {
+    final repo = FakeAuthRepository(
+      isGoogleLinked: true,
+      linkedEmail: 'user@example.com',
+      reauthResultToReturn: const AuthLinkError(AppStrings.reauthWrongAccountError),
+    );
+    final fakeApi = FakeProfileApiClient();
+    await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
+    await tester.pumpAndSettle();
+
+    expect(repo.reauthenticateCalled, isTrue);
+    expect(fakeApi.deleteCalled, isFalse);
+    expect(repo.deleteUserCalled, isFalse);
+    expect(repo.completeAccountDeletionCalled, isFalse);
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text(AppStrings.reauthWrongAccountError), findsOneWidget);
+  });
+
+  testWidgets('13. Re-auth sırasında kullanıcı pencereyi kapatır veya iptal ederse sessizce döner, veri silinmez', (tester) async {
+    final repo = FakeAuthRepository(
+      isGoogleLinked: true,
+      linkedEmail: 'user@example.com',
+      reauthResultToReturn: const AuthLinkCanceled(),
+    );
+    final fakeApi = FakeProfileApiClient();
+    await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
+    await tester.pumpAndSettle();
+
+    expect(repo.reauthenticateCalled, isTrue);
+    expect(fakeApi.deleteCalled, isFalse);
+    expect(repo.deleteUserCalled, isFalse);
+    expect(repo.completeAccountDeletionCalled, isFalse);
+
+    // Sessizce dönmeli: SnackBar gösterilmez
+    expect(find.byType(SnackBar), findsNothing);
   });
 }

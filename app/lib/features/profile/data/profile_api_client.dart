@@ -60,15 +60,18 @@ class ProfileUpdateNetworkError extends ProfileUpdateResult {
 abstract interface class ProfileApiClient {
   Future<UserProfileModel?> getProfile();
   Future<ProfileUpdateResult> updateNickname(String nickname);
+  Future<bool> deleteProfile();
 }
 
 class HttpProfileApiClient implements ProfileApiClient {
   final AuthTokenProvider authTokenProvider;
   final HttpClient Function()? clientFactory;
+  final void Function()? onAccountDeleted;
 
   const HttpProfileApiClient({
     required this.authTokenProvider,
     this.clientFactory,
+    this.onAccountDeleted,
   });
 
   HttpClient _createClient(Duration timeout) {
@@ -100,6 +103,9 @@ class HttpProfileApiClient implements ProfileApiClient {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
         return UserProfileModel.fromJson(decoded);
+      } else if (response.statusCode == 410) {
+        onAccountDeleted?.call();
+        return null;
       }
       return null;
     } catch (_) {
@@ -142,6 +148,9 @@ class HttpProfileApiClient implements ProfileApiClient {
         final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
         final normalized = decoded['nickname'] as String? ?? nickname.trim();
         return ProfileUpdateSuccess(normalized);
+      } else if (response.statusCode == 410) {
+        onAccountDeleted?.call();
+        return const ProfileUpdateNetworkError('account_deleted');
       } else if (response.statusCode == 400) {
         String msg = 'Geçersiz takma ad';
         try {
@@ -159,5 +168,38 @@ class HttpProfileApiClient implements ProfileApiClient {
       client.close();
     }
   }
-}
+  @override
+  Future<bool> deleteProfile() async {
+    final token = await authTokenProvider.getIdToken();
+    if (token == null) {
+      throw const SocketException('Yetkilendirme jetonu alınamadı');
+    }
 
+    final uri = Uri.parse(ServerConfig.meUrl);
+    final client = _createClient(const Duration(seconds: 8));
+
+    try {
+      final request =
+          await client.deleteUrl(uri).timeout(const Duration(seconds: 8));
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+
+      final response =
+          await request.close().timeout(const Duration(seconds: 8));
+      final responseBody = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200 || response.statusCode == 410) {
+        return true;
+      }
+      throw HttpException(
+        'Hesap silinemedi (HTTP ${response.statusCode}: $responseBody)',
+        uri: uri,
+      );
+    } finally {
+      client.close();
+    }
+  }
+}

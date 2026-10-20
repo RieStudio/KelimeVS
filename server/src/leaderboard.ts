@@ -100,6 +100,8 @@ export interface RecordMatchResultParams {
   readonly loserUid: string;
   readonly loserNickname: string | null;
   readonly finishedAtMs?: number;
+  readonly deletedUids?: readonly string[];
+  readonly skipPairWins?: boolean;
 }
 
 export interface RecordMatchResultResult {
@@ -196,29 +198,37 @@ export class Leaderboard extends DurableObject<Env> {
     const weekKey = weekInfo.weekKey;
 
     // 2. Anti-farming / Pair win sınırı kontrolü (aynı rakibe en fazla 3 galibiyet)
-    const pairRows = this.ctx.storage.sql.exec<{ count: number }>(
-      'SELECT count FROM pair_wins WHERE week_key = ? AND winner_uid = ? AND loser_uid = ? LIMIT 1',
-      weekKey,
-      params.winnerUid,
-      params.loserUid
-    ).toArray();
+    // Silinmiş kullanıcı varsa pair_wins'e yazılmaz.
+    const isWinnerDeleted = params.deletedUids?.includes(params.winnerUid) ?? false;
+    const isLoserDeleted = params.deletedUids?.includes(params.loserUid) ?? false;
+    const shouldSkipPairWins = params.skipPairWins || isWinnerDeleted || isLoserDeleted;
 
-    const currentPairCount = pairRows.length > 0 ? pairRows[0].count : 0;
-    const isCapped = currentPairCount >= 3;
+    let isCapped = false;
+    if (!shouldSkipPairWins) {
+      const pairRows = this.ctx.storage.sql.exec<{ count: number }>(
+        'SELECT count FROM pair_wins WHERE week_key = ? AND winner_uid = ? AND loser_uid = ? LIMIT 1',
+        weekKey,
+        params.winnerUid,
+        params.loserUid
+      ).toArray();
 
-    // İkili galibiyet sayısını güncelle
-    this.ctx.storage.sql.exec(
-      `INSERT INTO pair_wins (week_key, winner_uid, loser_uid, count)
-       VALUES (?, ?, ?, 1)
-       ON CONFLICT(week_key, winner_uid, loser_uid) DO UPDATE SET count = count + 1`,
-      weekKey,
-      params.winnerUid,
-      params.loserUid
-    );
+      const currentPairCount = pairRows.length > 0 ? pairRows[0].count : 0;
+      isCapped = currentPairCount >= 3;
 
-    // 3. Kazananı güncelle (sınır aşılmadıysa ve takma adı varsa)
+      // İkili galibiyet sayısını güncelle
+      this.ctx.storage.sql.exec(
+        `INSERT INTO pair_wins (week_key, winner_uid, loser_uid, count)
+         VALUES (?, ?, ?, 1)
+         ON CONFLICT(week_key, winner_uid, loser_uid) DO UPDATE SET count = count + 1`,
+        weekKey,
+        params.winnerUid,
+        params.loserUid
+      );
+    }
+
+    // 3. Kazananı güncelle (silinmemişse, sınır aşılmadıysa ve takma adı varsa)
     const winnerNick = params.winnerNickname?.trim();
-    if (winnerNick && !isCapped) {
+    if (winnerNick && !isCapped && !isWinnerDeleted) {
       this.ctx.storage.sql.exec(
         `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at)
          VALUES (?, ?, ?, 1, 0, ?)
@@ -233,9 +243,9 @@ export class Leaderboard extends DurableObject<Env> {
       );
     }
 
-    // 4. Kaybedeni güncelle (takma adı varsa mağlubiyet sayacı eşitlik sırası için artar)
+    // 4. Kaybedeni güncelle (silinmemişse ve takma adı varsa mağlubiyet sayacı eşitlik sırası için artar)
     const loserNick = params.loserNickname?.trim();
-    if (loserNick) {
+    if (loserNick && !isLoserDeleted) {
       this.ctx.storage.sql.exec(
         `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at)
          VALUES (?, ?, ?, 0, 1, ?)
@@ -266,6 +276,22 @@ export class Leaderboard extends DurableObject<Env> {
     }
 
     return { ok: true, capped: isCapped };
+  }
+
+  /**
+   * Kullanıcının haftalık galibiyet ve ikili galibiyet (pair_wins) verilerini kalıcı olarak siler.
+   */
+  async deleteUserData(uid: string): Promise<void> {
+    this.ensureSchema();
+    const effectiveUid = uid.trim();
+    if (!effectiveUid) return;
+
+    this.ctx.storage.sql.exec('DELETE FROM week_wins WHERE uid = ?', effectiveUid);
+    this.ctx.storage.sql.exec(
+      'DELETE FROM pair_wins WHERE winner_uid = ? OR loser_uid = ?',
+      effectiveUid,
+      effectiveUid
+    );
   }
 
   /**
@@ -374,6 +400,16 @@ export class Leaderboard extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const callerUid = request.headers.get('X-User-Id') ?? undefined;
+
+    if (request.method === 'DELETE' && (url.pathname === '/user' || url.pathname === '/me')) {
+      if (callerUid) {
+        await this.deleteUserData(callerUid);
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     if (request.method === 'GET' && url.pathname === '/leaderboard') {
       const data = await this.getLeaderboard(callerUid);

@@ -221,4 +221,69 @@ describe('MatchRoom Coin Reward Tolerance and Retries', () => {
     expect(reconnectedFinal.coinsAwarded).toBe(30);
     expect(reconnectedFinal.coins).toBe(130);
   });
+
+  it('3. applyMatchReward account_deleted hatası verirse kalıcı hata sayılır, retry yapılmaz ve alarm kurulmaz', async () => {
+    const { ctx, sockets } = createMockRoomCtx();
+    const sentMessages: string[] = [];
+    const mockSocket = {
+      tag: 'alice',
+      readyState: 1,
+      send: (txt: string) => sentMessages.push(txt),
+      close: () => {},
+    };
+    const mockSocketBob = {
+      tag: 'bob',
+      readyState: 1,
+      send: () => {},
+      close: () => {},
+    };
+    sockets.push(mockSocket, mockSocketBob);
+
+    let aliceRewardAttempts = 0;
+    let bobRewardAttempts = 0;
+
+    const mockUserProfile = {
+      idFromName: (name: string) => name,
+      get: (uid: string) => ({
+        applyMatchReward: async () => {
+          if (uid === 'bob') {
+            bobRewardAttempts++;
+            throw new Error('account_deleted');
+          }
+          aliceRewardAttempts++;
+          return { coinsAwarded: 30, coins: 130 };
+        },
+      }),
+    };
+
+    const env = {
+      USER_PROFILE: mockUserProfile,
+      FAST_TIMERS: 'true',
+    } as unknown as Env;
+
+    const room = new MatchRoom(ctx, env);
+    await room.initMatch({
+      matchId: 'match_account_deleted_test',
+      p1: { uid: 'alice', name: 'Alice' },
+      p2: { uid: 'bob', name: 'Bob' },
+      questions: [sampleQuestion],
+      questionOrder: ['q1'],
+    });
+
+    await (room as any).handlePlayerConnected('alice');
+    await (room as any).handlePlayerConnected('bob');
+
+    // Maç biter
+    await (room as any).handleMatchFinished();
+
+    // Alice ödülü başarıyla uygulandı, Bob ise account_deleted aldı
+    expect(aliceRewardAttempts).toBe(1);
+    expect(bobRewardAttempts).toBe(1);
+
+    // KALICI hata olduğu için rewardRetryAtMs tanımsız olmalıdır (alarm kurulmaz)
+    const roomData = ctx.storage ? await (ctx.storage as any).get('roomData') : null;
+    expect(roomData.schedule.rewardRetryAtMs).toBeUndefined();
+    expect(roomData.rewards.alice).toEqual({ coinsAwarded: 30, coins: 130 });
+    expect(roomData.rewards.bob).toEqual({ coinsAwarded: 0, coins: 0 });
+  });
 });

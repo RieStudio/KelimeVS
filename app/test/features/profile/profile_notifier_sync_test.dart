@@ -63,6 +63,9 @@ class FakeProfileApiClient implements ProfileApiClient {
     lastUpdatedNickname = nickname;
     return updateResult;
   }
+
+  @override
+  Future<bool> deleteProfile() async => true;
 }
 
 void main() {

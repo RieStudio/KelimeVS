@@ -1,3 +1,4 @@
+import '../../auth/application/auth_notifier.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,7 +51,11 @@ final authTokenProviderForProfile = Provider<AuthTokenProvider>((ref) {
 
 final profileApiClientProvider = Provider<ProfileApiClient>((ref) {
   final authProvider = ref.watch(authTokenProviderForProfile);
-  return HttpProfileApiClient(authTokenProvider: authProvider);
+  final onDeleted = ref.watch(accountDeletedHandlerProvider);
+  return HttpProfileApiClient(
+    authTokenProvider: authProvider,
+    onAccountDeleted: onDeleted,
+  );
 });
 
 class ProfileNotifier extends Notifier<ProfileState> {

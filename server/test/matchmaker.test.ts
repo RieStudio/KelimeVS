@@ -285,5 +285,41 @@ describe('Matchmaker Content Pre-warming (İçeriği Önden Isıtma)', () => {
   });
 });
 
+describe('Matchmaker removeFromQueue', () => {
+  it('oyuncuyu kuyruktan çıkarır ve websocket bağlantısını 4001 account_deleted ile kapatır', async () => {
+    let storedQueue: QueueEntry[] = [
+      { uid: 'del_user', name: 'DelUser', joinedAt: 1000 },
+      { uid: 'stay_user', name: 'StayUser', joinedAt: 2000 },
+    ];
+    const mockWs = { close: vi.fn() } as unknown as WebSocket;
+
+    const mockState = {
+      storage: {
+        get: vi.fn().mockImplementation(async () => storedQueue),
+        put: vi.fn().mockImplementation(async (_key: string, val: any) => {
+          storedQueue = val;
+        }),
+      },
+      blockConcurrencyWhile: (fn: () => Promise<void>) => fn(),
+      getWebSockets: vi.fn().mockReturnValue([mockWs]),
+    };
+
+    const mm = new Matchmaker(
+      mockState as unknown as DurableObjectState,
+      {} as unknown as Env,
+      new DevContentProvider()
+    );
+
+    // blockConcurrencyWhile microtaskının tamamlanması için bekle
+    await new Promise((r) => setTimeout(r, 10));
+
+    await mm.removeFromQueue('del_user');
+
+    expect(storedQueue).toHaveLength(1);
+    expect(storedQueue[0].uid).toBe('stay_user');
+    expect(mockWs.close).toHaveBeenCalledWith(4001, 'account_deleted');
+  });
+});
+
 
 

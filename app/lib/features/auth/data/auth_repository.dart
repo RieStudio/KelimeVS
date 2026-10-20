@@ -17,6 +17,10 @@ abstract interface class AuthRepository {
   Future<AuthLinkResult> linkWithGoogle();
   Future<void> signInWithConflictCredential(AuthCredential credential);
   Future<void> signOutAndResetToAnonymous();
+
+  Future<AuthLinkResult> reauthenticateGoogle();
+  Future<void> deleteFirebaseUser();
+  Future<void> completeAccountDeletionAndReset();
 }
 
 class FirebaseAuthRepository implements AuthRepository {
@@ -122,6 +126,87 @@ class FirebaseAuthRepository implements AuthRepository {
     await a.signOut();
     await _googleAuthService.signOut();
     await a.signInAnonymously();
+  }
+
+  @override
+  Future<AuthLinkResult> reauthenticateGoogle() async {
+    final user = currentUser;
+    if (user == null) {
+      return const AuthLinkError('Kullanıcı oturumu bulunamadı.');
+    }
+
+    final AuthCredential? credential;
+    try {
+      credential = await _googleAuthService.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return const AuthLinkCanceled();
+      }
+      return AuthLinkError('Google doğrulaması başarısız oldu (${e.code}).');
+    } catch (_) {
+      return const AuthLinkError(AppStrings.authGenericError);
+    }
+
+    if (credential == null) {
+      return const AuthLinkCanceled();
+    }
+
+    try {
+      await user.reauthenticateWithCredential(credential);
+      return const AuthLinkSuccess();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-mismatch' ||
+          e.code == 'wrong-credential' ||
+          e.code == 'user-not-found' ||
+          e.code == 'invalid-credential') {
+        return const AuthLinkError(AppStrings.reauthWrongAccountError);
+      }
+      if (e.code == 'network-request-failed') {
+        return const AuthLinkError(AppStrings.networkError, isNetworkError: true);
+      }
+      return AuthLinkError(e.message ?? AppStrings.authGenericError);
+    } catch (_) {
+      return const AuthLinkError(AppStrings.authGenericError);
+    }
+  }
+
+  @override
+  Future<void> deleteFirebaseUser() async {
+    final user = currentUser;
+    if (user == null) return;
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      // 3. Kural: Anonim hesapta user.delete() requires-recent-login verirse yoksay
+      if (user.isAnonymous && e.code == 'requires-recent-login') {
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> completeAccountDeletionAndReset() async {
+    final a = _auth;
+    final user = a?.currentUser;
+    if (user != null) {
+      try {
+        await user.delete();
+      } catch (_) {
+        // Hata olursa yoksay
+      }
+    }
+
+    try {
+      await _googleAuthService.signOut();
+    } catch (_) {}
+
+    if (a != null) {
+      try {
+        await a.signOut();
+      } catch (_) {}
+      await a.signInAnonymously();
+    }
   }
 }
 

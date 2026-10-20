@@ -27,7 +27,7 @@ export interface Env extends AuthEnv {
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 };
 
@@ -62,12 +62,29 @@ export default {
         });
       }
 
-      const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-      const profile = await profileStub.getProfile(uid);
-      return new Response(JSON.stringify(profile), {
-        status: 200,
-        headers: jsonHeaders,
-      });
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const profile = await profileStub.getProfile(uid);
+        return new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            {
+              status: 410,
+              headers: jsonHeaders,
+            }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
     }
 
     // Takma ad güncelleme rotası: PUT /me/nickname
@@ -124,6 +141,15 @@ export default {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            {
+              status: 410,
+              headers: jsonHeaders,
+            }
+          );
+        }
         return new Response(
           JSON.stringify({ error: 'invalid_nickname', message: msg }),
           {
@@ -132,6 +158,46 @@ export default {
           }
         );
       }
+    }
+
+    // Hesap silme rotası: DELETE /me
+    if (request.method === 'DELETE' && pathname === '/me') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      // 1. Eşleştirmedeyse kuyruktan çıkar ve açık soketi kapat
+      if (env.MATCHMAKER) {
+        try {
+          const matchmaker = env.MATCHMAKER.get(env.MATCHMAKER.idFromName('global'));
+          await matchmaker.removeFromQueue(uid);
+        } catch (mmErr) {
+          console.error('Matchmaker removeFromQueue failed:', mmErr);
+        }
+      }
+
+      // 2. Leaderboard tablosundaki week_wins ve pair_wins kayıtlarını temizle
+      if (env.LEADERBOARD) {
+        try {
+          const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+          await leaderboardStub.deleteUserData(uid);
+        } catch (lbErr) {
+          console.error('Leaderboard deleteUserData failed:', lbErr);
+        }
+      }
+
+      // 3. UserProfile DO verilerini temizle ve 24h tombstone kaydı bırak
+      const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+      await profileStub.deleteProfile(uid);
+
+      return new Response(JSON.stringify({ ok: true, deleted: true }), {
+        status: 200,
+        headers: jsonHeaders,
+      });
     }
 
     // Liderlik tablosu rotası: GET /leaderboard

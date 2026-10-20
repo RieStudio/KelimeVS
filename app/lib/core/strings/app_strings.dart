@@ -203,5 +203,22 @@ abstract final class AppStrings {
   static const String hoursUnit = 's';
   static const String minutesUnit = 'd';
   static const String timeExpired = 'Süre doldu';
+
+  // Hesap Silme
+  static const String deleteAccount = 'Hesabı Sil';
+  static const String deleteAccountDialogTitle = 'Hesabı Sil';
+  static const String deleteAccountDialogMessage =
+      'Hesabını ve tüm verilerini kalıcı olarak silmek istediğinden emin misin?\nBu işlem geri alınamaz; takma adın, istatistiklerin, jetonların ve maç geçmişin tamamen silinecektir.';
+  static const String deleteAccountConfirm = 'Evet, Hesabı Sil';
+  static const String deleteAccountInProgress = 'Hesap siliniyor…';
+  static const String deleteAccountSuccess = 'Hesabın başarıyla silindi.';
+  static const String deleteAccountNetworkError =
+      'Hesap silinirken bir bağlantı hatası oluştu. Lütfen internetini kontrol edip tekrar dene.';
+  static const String accountDeletedNotice =
+      'Hesabın silindiği için oturumun sonlandırıldı.';
+  static const String deleteAccountGoogleReauthNote =
+      'Güvenlik için Google hesabını bir kez daha seçmen istenecek.';
+  static const String reauthWrongAccountError =
+      'Lütfen uygulamaya bağlı Google hesabını seç.';
 }
 

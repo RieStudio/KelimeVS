@@ -11,6 +11,10 @@ class SecondaryButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final double? width;
   final double height;
+  final Color? backgroundColor;
+  final Color? textColor;
+  final Color? borderColor;
+  final List<BoxShadow>? boxShadow;
 
   const SecondaryButton({
     super.key,
@@ -18,7 +22,28 @@ class SecondaryButton extends StatefulWidget {
     this.onPressed,
     this.width,
     this.height = AppDimens.secondaryButtonHeight,
+    this.backgroundColor,
+    this.textColor,
+    this.borderColor,
+    this.boxShadow,
   });
+
+  const SecondaryButton.danger({
+    super.key,
+    required this.text,
+    this.onPressed,
+    this.width,
+    this.height = AppDimens.secondaryButtonHeight,
+  })  : backgroundColor = AppColors.dangerSoft,
+        textColor = AppColors.dangerText,
+        borderColor = AppColors.danger,
+        boxShadow = const [
+          BoxShadow(
+            color: AppColors.dangerDark,
+            offset: Offset(0, 4),
+            blurRadius: 0,
+          ),
+        ];
 
   @override
   State<SecondaryButton> createState() => _SecondaryButtonState();
@@ -78,15 +103,15 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                   child: Container(
                     height: widget.height,
                     decoration: BoxDecoration(
-                      color: AppColors.card,
+                      color: widget.backgroundColor ?? AppColors.card,
                       borderRadius: AppDimens.borderRadiusButton,
                       border: Border.all(
-                        color: AppColors.ink,
+                        color: widget.borderColor ?? AppColors.ink,
                         width: AppDimens.borderThick,
                       ),
                       boxShadow: _isPressed
                           ? const []
-                          : AppDimens.shadowSecondaryButton,
+                          : (widget.boxShadow ?? AppDimens.shadowSecondaryButton),
                     ),
                     child: Center(
                       child: Padding(
@@ -95,7 +120,9 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                         ),
                         child: Text(
                           widget.text,
-                          style: AppTextStyles.secondaryButton,
+                          style: AppTextStyles.secondaryButton.copyWith(
+                            color: widget.textColor ?? AppColors.ink,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),

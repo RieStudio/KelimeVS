@@ -13,6 +13,8 @@ class PrimaryButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool isLarge;
   final double? width;
+  final Color? backgroundColor;
+  final Color? shadowColor;
 
   const PrimaryButton({
     super.key,
@@ -21,6 +23,8 @@ class PrimaryButton extends StatefulWidget {
     this.onPressed,
     this.isLarge = false,
     this.width,
+    this.backgroundColor,
+    this.shadowColor,
   });
 
   @override
@@ -87,13 +91,21 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                   child: Container(
                     height: height,
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: widget.backgroundColor ?? AppColors.primary,
                       borderRadius: widget.isLarge
                           ? AppDimens.borderRadiusButtonLarge
                           : AppDimens.borderRadiusButton,
                       boxShadow: _isPressed
                           ? const []
-                          : AppDimens.shadowPrimaryButton,
+                          : (widget.shadowColor != null
+                              ? [
+                                  BoxShadow(
+                                    color: widget.shadowColor!,
+                                    offset: const Offset(0, 5),
+                                    blurRadius: 0,
+                                  ),
+                                ]
+                              : AppDimens.shadowPrimaryButton),
                     ),
                     child: Center(
                       child: Padding(

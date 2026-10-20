@@ -170,6 +170,26 @@ export class Matchmaker extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Kullanıcıyı kuyruktan çıkarır ve varsa açık WebSocket bağlantısını kapatır.
+   */
+  async removeFromQueue(uid: string): Promise<void> {
+    const beforeLen = this.queue.length;
+    this.queue = this.queue.filter((e) => e.uid !== uid);
+    if (this.queue.length !== beforeLen) {
+      await this.ctx.storage.put('queue', this.queue);
+    }
+
+    const sockets = this.ctx.getWebSockets(uid);
+    for (const ws of sockets) {
+      try {
+        ws.close(4001, 'account_deleted');
+      } catch {
+        // yoksay
+      }
+    }
+  }
+
   async webSocketClose(
     ws: WebSocket,
     _code: number,

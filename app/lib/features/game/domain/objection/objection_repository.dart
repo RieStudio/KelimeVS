@@ -6,5 +6,6 @@ abstract interface class ObjectionRepository {
   Future<Set<ObjectionKey>> loadForMatch(String matchId);
   Future<void> add(Objection objection);
   Future<void> cleanupOrphaned(Set<String> validMatchIds);
+  Future<void> clear();
 }
 

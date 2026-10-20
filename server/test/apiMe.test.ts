@@ -17,6 +17,7 @@ import { UserProfile } from '../src/userProfile';
 
 function createMockCtx() {
   const db = new DatabaseSync(':memory:');
+  let alarmTime: number | null = null;
   const sql = {
     exec<T extends Record<string, any>>(query: string, ...bindings: any[]) {
       const trimmed = query.trim();
@@ -45,7 +46,21 @@ function createMockCtx() {
   };
 
   return {
-    storage: { sql },
+    storage: {
+      sql,
+      async setAlarm(t: number) {
+        alarmTime = t;
+      },
+      async getAlarm() {
+        return alarmTime;
+      },
+      async deleteAlarm() {
+        alarmTime = null;
+      },
+      async deleteAll() {
+        alarmTime = null;
+      },
+    },
   } as unknown as DurableObjectState;
 }
 
@@ -170,6 +185,110 @@ describe('API Routes: /me & /me/nickname (auth & validation)', () => {
     });
     const resInvalid = await worker.fetch(reqInvalid, env);
     expect(resInvalid.status).toBe(400);
+  });
+
+  it('6. OPTIONS preflight başlığında DELETE metodu bulunur', async () => {
+    const env = createEnv();
+    const req = new Request('http://127.0.0.1/me', { method: 'OPTIONS' });
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(204);
+    const allowMethods = res.headers.get('Access-Control-Allow-Methods');
+    expect(allowMethods).toContain('DELETE');
+  });
+
+  it('7. DELETE /me yetkisiz istekte 401 döner', async () => {
+    const env = createEnv();
+    const req = new Request('http://127.0.0.1/me', { method: 'DELETE' });
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(401);
+  });
+
+  it('8. DELETE /me başarıyla çalışır, Matchmaker ve Leaderboard temizleme çağrılarını yapar', async () => {
+    let removedFromQueueUid = '';
+    let deletedLeaderboardUid = '';
+
+    const mockMatchmaker = {
+      idFromName: () => 'global',
+      get: () => ({
+        removeFromQueue: async (uid: string) => {
+          removedFromQueueUid = uid;
+        },
+      }),
+    };
+
+    const mockLeaderboard = {
+      idFromName: () => 'global',
+      get: () => ({
+        updateNickname: async () => {},
+        deleteUserData: async (uid: string) => {
+          deletedLeaderboardUid = uid;
+        },
+      }),
+    };
+
+    const env = createEnv({
+      ALLOW_DEV_AUTH: 'true',
+      MATCHMAKER: mockMatchmaker as any,
+      LEADERBOARD: mockLeaderboard as any,
+    });
+
+    // Önce kullanıcı profili oluşturalım
+    const putReq = new Request('http://127.0.0.1/me/nickname', {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer dev:carol',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nickname: 'CarolPlayer' }),
+    });
+    const putRes = await worker.fetch(putReq, env);
+    expect(putRes.status).toBe(200);
+
+    // DELETE /me çağır
+    const delReq = new Request('http://127.0.0.1/me', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer dev:carol' },
+    });
+    const delRes = await worker.fetch(delReq, env);
+    expect(delRes.status).toBe(200);
+    const delBody = (await delRes.json()) as any;
+    expect(delBody.ok).toBe(true);
+    expect(delBody.deleted).toBe(true);
+
+    expect(removedFromQueueUid).toBe('carol');
+    expect(deletedLeaderboardUid).toBe('carol');
+
+    // 2. Kural: DELETE /me tombstone varken de 200 döner (idempotent)
+    const delAgainRes = await worker.fetch(delReq, env);
+    expect(delAgainRes.status).toBe(200);
+
+    // Silinmiş hesaba GET /me yapıldığında 410 Gone döner
+    const getRes = await worker.fetch(
+      new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer dev:carol' },
+      }),
+      env
+    );
+    expect(getRes.status).toBe(410);
+    const getBody = (await getRes.json()) as any;
+    expect(getBody.error).toBe('account_deleted');
+
+    // Silinmiş hesaba PUT /me/nickname yapıldığında 410 Gone döner
+    const putAfterDelRes = await worker.fetch(
+      new Request('http://127.0.0.1/me/nickname', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer dev:carol',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: 'NewCarol' }),
+      }),
+      env
+    );
+    expect(putAfterDelRes.status).toBe(410);
+    const putAfterDelBody = (await putAfterDelRes.json()) as any;
+    expect(putAfterDelBody.error).toBe('account_deleted');
   });
 });
 

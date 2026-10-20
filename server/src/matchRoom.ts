@@ -515,36 +515,73 @@ export class MatchRoom extends DurableObject<Env> {
       return isWinner ? 'win' : 'loss';
     };
 
-    try {
-      const p1Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1Uid));
-      const p2Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2Uid));
+    const p1Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1Uid));
+    const p2Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2Uid));
 
-      const [r1, r2] = await Promise.all([
-        p1Stub.applyMatchReward({
+    const existingRewards = this.data.rewards ?? {};
+    let p1Reward = existingRewards[p1Uid];
+    let p2Reward = existingRewards[p2Uid];
+    let p1Nick: string | null | undefined = undefined;
+    let p2Nick: string | null | undefined = undefined;
+    let hasTransientError = false;
+
+    if (!p1Reward) {
+      try {
+        const r1 = await p1Stub.applyMatchReward({
           matchId: this.data.matchId,
           outcome: getOutcome(p1Uid),
           uid: p1Uid,
-        }),
-        p2Stub.applyMatchReward({
+        });
+        p1Reward = { coinsAwarded: r1.coinsAwarded, coins: r1.coins };
+        p1Nick = r1.nickname;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('account_deleted')) {
+          // Kalıcı hata: ödül verilmez, tekrar denenmez
+          p1Reward = { coinsAwarded: 0, coins: 0 };
+        } else {
+          console.error('applyMatchRewards failed for p1:', err);
+          hasTransientError = true;
+        }
+      }
+    }
+
+    if (!p2Reward) {
+      try {
+        const r2 = await p2Stub.applyMatchReward({
           matchId: this.data.matchId,
           outcome: getOutcome(p2Uid),
           uid: p2Uid,
-        }),
-      ]);
+        });
+        p2Reward = { coinsAwarded: r2.coinsAwarded, coins: r2.coins };
+        p2Nick = r2.nickname;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('account_deleted')) {
+          // Kalıcı hata: ödül verilmez, tekrar denenmez
+          p2Reward = { coinsAwarded: 0, coins: 0 };
+        } else {
+          console.error('applyMatchRewards failed for p2:', err);
+          hasTransientError = true;
+        }
+      }
+    }
 
-      const winnerUid = this.data.leaderboardWinnerUid;
-      const loserUid = this.data.leaderboardLoserUid;
-      const winnerNick =
-        winnerUid === p1Uid ? r1.nickname : winnerUid === p2Uid ? r2.nickname : undefined;
-      const loserNick =
-        loserUid === p1Uid ? r1.nickname : loserUid === p2Uid ? r2.nickname : undefined;
+    const winnerUid = this.data.leaderboardWinnerUid;
+    const loserUid = this.data.leaderboardLoserUid;
+    const winnerNick =
+      winnerUid === p1Uid ? p1Nick : winnerUid === p2Uid ? p2Nick : undefined;
+    const loserNick =
+      loserUid === p1Uid ? p1Nick : loserUid === p2Uid ? p2Nick : undefined;
 
+    const newRewards: Record<string, { coinsAwarded: number; coins: number }> = {};
+    if (p1Reward) newRewards[p1Uid] = p1Reward;
+    if (p2Reward) newRewards[p2Uid] = p2Reward;
+
+    if (!hasTransientError) {
       this.data = {
         ...this.data,
-        rewards: {
-          [p1Uid]: { coinsAwarded: r1.coinsAwarded, coins: r1.coins },
-          [p2Uid]: { coinsAwarded: r2.coinsAwarded, coins: r2.coins },
-        },
+        rewards: newRewards,
         leaderboardWinnerNickname:
           winnerNick !== undefined ? winnerNick : this.data.leaderboardWinnerNickname,
         leaderboardLoserNickname:
@@ -556,14 +593,14 @@ export class MatchRoom extends DurableObject<Env> {
       };
       await this.persist();
       return true;
-    } catch (err) {
-      console.error('applyMatchRewards failed:', err);
+    } else {
       const currentRetries = this.data.rewardRetryCount ?? 0;
       const maxRetries = 3;
       if (currentRetries < maxRetries) {
         const backoffMs = Math.min(30000, 2000 * Math.pow(2, currentRetries));
         this.data = {
           ...this.data,
+          rewards: newRewards,
           rewardRetryCount: currentRetries + 1,
           schedule: {
             ...this.data.schedule,
@@ -573,6 +610,7 @@ export class MatchRoom extends DurableObject<Env> {
       } else {
         this.data = {
           ...this.data,
+          rewards: newRewards,
           schedule: {
             ...this.data.schedule,
             rewardRetryAtMs: undefined,
@@ -598,21 +636,29 @@ export class MatchRoom extends DurableObject<Env> {
 
     let winnerNick = this.data.leaderboardWinnerNickname;
     let loserNick = this.data.leaderboardLoserNickname;
+    const deletedUids: string[] = [];
 
     if (winnerNick === undefined || loserNick === undefined) {
       try {
-        const [pWinner, pLoser] = await Promise.all([
-          this.env.USER_PROFILE.get(
-            this.env.USER_PROFILE.idFromName(this.data.leaderboardWinnerUid)
-          ).getProfile(this.data.leaderboardWinnerUid),
-          this.env.USER_PROFILE.get(
-            this.env.USER_PROFILE.idFromName(this.data.leaderboardLoserUid)
-          ).getProfile(this.data.leaderboardLoserUid),
-        ]);
+        const pWinner = await this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(this.data.leaderboardWinnerUid)
+        ).getProfile(this.data.leaderboardWinnerUid);
         winnerNick = pWinner.nickname;
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('account_deleted')) {
+          deletedUids.push(this.data.leaderboardWinnerUid);
+        }
+      }
+
+      try {
+        const pLoser = await this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(this.data.leaderboardLoserUid)
+        ).getProfile(this.data.leaderboardLoserUid);
         loserNick = pLoser.nickname;
-      } catch {
-        // Okunamazsa sonraki denemede tekrar çalışır
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('account_deleted')) {
+          deletedUids.push(this.data.leaderboardLoserUid);
+        }
       }
     }
 
@@ -626,6 +672,7 @@ export class MatchRoom extends DurableObject<Env> {
         winnerNickname: winnerNick ?? null,
         loserUid: this.data.leaderboardLoserUid,
         loserNickname: loserNick ?? null,
+        deletedUids,
       });
 
       this.data = {

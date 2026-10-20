@@ -13,10 +13,12 @@ abstract interface class LeaderboardApiClient {
 class HttpLeaderboardApiClient implements LeaderboardApiClient {
   final AuthTokenProvider authTokenProvider;
   final HttpClient Function()? clientFactory;
+  final void Function()? onAccountDeleted;
 
   const HttpLeaderboardApiClient({
     required this.authTokenProvider,
     this.clientFactory,
+    this.onAccountDeleted,
   });
 
   HttpClient _createClient(Duration timeout) {
@@ -50,6 +52,12 @@ class HttpLeaderboardApiClient implements LeaderboardApiClient {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
         return LeaderboardData.fromJson(decoded);
+      } else if (response.statusCode == 410) {
+        onAccountDeleted?.call();
+        throw HttpException(
+          'Hesap silinmiş (410)',
+          uri: uri,
+        );
       } else {
         throw HttpException(
           'Sunucu hatası: ${response.statusCode}',

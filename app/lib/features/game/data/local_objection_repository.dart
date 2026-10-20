@@ -50,6 +50,12 @@ class LocalObjectionRepository implements ObjectionRepository {
     }
   }
 
+  @override
+  Future<void> clear() async {
+    final p = await _getPrefs();
+    await p.remove(_storageKey);
+  }
+
   Future<List<Objection>> _loadAll() async {
     final p = await _getPrefs();
     final jsonStr = p.getString(_storageKey);

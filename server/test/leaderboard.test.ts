@@ -446,5 +446,90 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       .toArray();
     expect(fossilRows).toHaveLength(0);
   });
+
+  it('9. deleteUserData kullanıcının week_wins ve pair_wins satırlarını temizler', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv();
+    const lb = new Leaderboard(ctx, env);
+    const nowMs = new Date('2026-10-18T12:00:00Z').getTime();
+
+    // Alice Bob'a karşı kazandı
+    await lb.recordMatchResult({
+      matchId: 'match_del_1',
+      winnerUid: 'alice',
+      winnerNickname: 'Alice',
+      loserUid: 'bob',
+      loserNickname: 'Bob',
+      finishedAtMs: nowMs,
+    });
+
+    // Bob Charlie'ye karşı kazandı
+    await lb.recordMatchResult({
+      matchId: 'match_del_2',
+      winnerUid: 'bob',
+      winnerNickname: 'Bob',
+      loserUid: 'charlie',
+      loserNickname: 'Charlie',
+      finishedAtMs: nowMs + 100,
+    });
+
+    // Bob hesabını sildi
+    await lb.deleteUserData('bob');
+
+    // Bob week_wins içinde bulunmamalı
+    const bobWeekWins = (ctx.storage as any).sql
+      .exec('SELECT * FROM week_wins WHERE uid = ?', 'bob')
+      .toArray();
+    expect(bobWeekWins).toHaveLength(0);
+
+    // pair_wins içinde Bob winner veya loser olarak bulunmamalı
+    const bobPairWins = (ctx.storage as any).sql
+      .exec('SELECT * FROM pair_wins WHERE winner_uid = ? OR loser_uid = ?', 'bob', 'bob')
+      .toArray();
+    expect(bobPairWins).toHaveLength(0);
+
+    // Alice'in week_wins kaydı korunmalı
+    const aliceWeekWins = (ctx.storage as any).sql
+      .exec('SELECT * FROM week_wins WHERE uid = ?', 'alice')
+      .toArray();
+    expect(aliceWeekWins).toHaveLength(1);
+  });
+
+  it('10. Silinen kullanıcıyla (deletedUids) oynayıp kazanan rakibin galibiyeti week_wins tablosuna yazılır ancak pair_wins tablosuna yazılmaz', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv();
+    const lb = new Leaderboard(ctx, env);
+    const nowMs = new Date('2026-10-18T12:00:00Z').getTime();
+
+    // Alice kazandı, ancak rakip Bob maç anında silinmiş (deletedUids: ['bob'])
+    await lb.recordMatchResult({
+      matchId: 'match_deleted_opponent',
+      winnerUid: 'alice',
+      winnerNickname: 'Alice',
+      loserUid: 'bob',
+      loserNickname: 'Bob',
+      finishedAtMs: nowMs,
+      deletedUids: ['bob'],
+    });
+
+    // Alice'in galibiyeti week_wins'e yazılmalıdır
+    const aliceWins = (ctx.storage as any).sql
+      .exec('SELECT wins FROM week_wins WHERE uid = ?', 'alice')
+      .toArray();
+    expect(aliceWins).toHaveLength(1);
+    expect(aliceWins[0].wins).toBe(1);
+
+    // Bob silindiği için week_wins'e mağlubiyet yazılmamalıdır
+    const bobWins = (ctx.storage as any).sql
+      .exec('SELECT * FROM week_wins WHERE uid = ?', 'bob')
+      .toArray();
+    expect(bobWins).toHaveLength(0);
+
+    // pair_wins tablosuna silinen Bob'un uid'si yazılmamalıdır
+    const pairRows = (ctx.storage as any).sql
+      .exec('SELECT * FROM pair_wins WHERE winner_uid = ? OR loser_uid = ?', 'bob', 'bob')
+      .toArray();
+    expect(pairRows).toHaveLength(0);
+  });
 });
 
