@@ -56,6 +56,23 @@ interface TombstoneRow extends Record<string, string | number | null> {
   deleted_at: number;
 }
 
+interface BlockedUserRow extends Record<string, string | number | null> {
+  id: string;
+  blocked_uid: string;
+  blocked_nickname: string;
+  blocked_at: number;
+}
+
+interface CountRow extends Record<string, string | number | null> {
+  cnt: number;
+}
+
+export interface BlockedUserItem {
+  readonly id: string;
+  readonly nickname: string;
+  readonly blockedAt: number;
+}
+
 export class UserProfile extends DurableObject<Env> {
   private initialized = false;
 
@@ -92,6 +109,13 @@ export class UserProfile extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS tombstone (
         uid TEXT PRIMARY KEY,
         deleted_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS blocked_users (
+        id TEXT PRIMARY KEY,
+        blocked_uid TEXT UNIQUE NOT NULL,
+        blocked_nickname TEXT NOT NULL,
+        blocked_at INTEGER NOT NULL
       );
     `);
 
@@ -130,6 +154,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM profiles;
       DELETE FROM daily_coins;
       DELETE FROM processed_matches;
+      DELETE FROM blocked_users;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -359,6 +384,118 @@ export class UserProfile extends DurableObject<Env> {
       coins: updatedProfile.coins,
       nickname: updatedProfile.nickname,
     };
+  }
+
+  /**
+   * Bir oyuncuyu engeller. Üst sınır kontrol edilir (varsayılan 100).
+   * Engellenen oyuncu için opak bir ID (UUID) üretilerek kaydedilir.
+   */
+  async blockUser(params: {
+    readonly blockedUid: string;
+    readonly blockedNickname: string;
+    readonly uid?: string;
+  }): Promise<{ ok: true; id: string } | { ok: false; error: 'block_limit_reached' }> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    // Profil yoksa önce oluştur
+    await this.getProfile(params.uid);
+
+    // Zaten engelliyse mevcut kaydın ID'sini döndür
+    const existing = this.ctx.storage.sql.exec<BlockedUserRow>(
+      'SELECT id FROM blocked_users WHERE blocked_uid = ? LIMIT 1',
+      params.blockedUid
+    ).toArray();
+
+    if (existing.length > 0) {
+      return { ok: true, id: existing[0].id };
+    }
+
+    // Üst sınır kontrolü (100)
+    const maxBlocks = parseInt(this.env.MAX_BLOCKS_PER_USER ?? '100', 10);
+    const limit = Number.isFinite(maxBlocks) && maxBlocks > 0 ? maxBlocks : 100;
+
+    const countRes = this.ctx.storage.sql.exec<CountRow>(
+      'SELECT COUNT(*) as cnt FROM blocked_users'
+    ).toArray();
+    const count = countRes.length > 0 ? Number(countRes[0].cnt) : 0;
+
+    if (count >= limit) {
+      return { ok: false, error: 'block_limit_reached' };
+    }
+
+    const opaqueId = crypto.randomUUID();
+    const nowMs = Date.now();
+
+    this.ctx.storage.sql.exec(
+      'INSERT INTO blocked_users (id, blocked_uid, blocked_nickname, blocked_at) VALUES (?, ?, ?, ?)',
+      opaqueId,
+      params.blockedUid,
+      params.blockedNickname,
+      nowMs
+    );
+
+    return { ok: true, id: opaqueId };
+  }
+
+  /**
+   * Opak kimlik (UUID) ile engeli kaldırır.
+   */
+  async unblockUser(id: string): Promise<{ ok: true }> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    this.ctx.storage.sql.exec(
+      'DELETE FROM blocked_users WHERE id = ?',
+      id
+    );
+
+    return { ok: true };
+  }
+
+  /**
+   * Kullanıcının engellediği oyuncuları istemciye sunmak üzere döndürür.
+   * GÜVENLİK / GİZLİLİK: Engellenen oyuncunun gerçek UID'si ASLA döndürülmez.
+   */
+  async getBlockedUsers(): Promise<BlockedUserItem[]> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const rows = this.ctx.storage.sql.exec<BlockedUserRow>(
+      'SELECT id, blocked_nickname, blocked_at FROM blocked_users ORDER BY blocked_at DESC'
+    ).toArray();
+
+    return rows.map((r) => ({
+      id: r.id,
+      nickname: r.blocked_nickname,
+      blockedAt: Number(r.blocked_at),
+    }));
+  }
+
+  /**
+   * Matchmaker tarafından dahili kullanım için engellenen UID listesini döndürür.
+   */
+  async getBlockedUids(): Promise<string[]> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return [];
+    }
+
+    const rows = this.ctx.storage.sql.exec<BlockedUserRow>(
+      'SELECT blocked_uid FROM blocked_users'
+    ).toArray();
+
+    return rows.map((r) => r.blocked_uid);
   }
 
   /**

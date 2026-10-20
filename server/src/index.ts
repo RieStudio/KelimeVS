@@ -3,14 +3,19 @@ import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile } from './userProfile';
 import { Leaderboard } from './leaderboard';
+import { ReportStore } from './reportStore';
 
-export { Matchmaker, MatchRoom, UserProfile, Leaderboard };
+export { Matchmaker, MatchRoom, UserProfile, Leaderboard, ReportStore };
 
 export interface Env extends AuthEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly USER_PROFILE: DurableObjectNamespace<UserProfile>;
-  readonly LEADERBOARD: DurableObjectNamespace<Leaderboard>;
+  readonly LEADERBOARD?: DurableObjectNamespace<Leaderboard>;
+  readonly REPORT_STORE?: DurableObjectNamespace<ReportStore>;
+  readonly ADMIN_TOKEN?: string;
+  readonly MAX_REPORTS_PER_DAY?: string;
+  readonly MAX_BLOCKS_PER_USER?: string;
   readonly FAST_TIMERS?: string;
   readonly CONTENT_SOURCE?: string;
   readonly FIREBASE_DATABASE_URL?: string;
@@ -210,6 +215,13 @@ export default {
         });
       }
 
+      if (!env.LEADERBOARD) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
       const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
       const data = await leaderboardStub.getLeaderboard(uid);
       return new Response(JSON.stringify(data), {
@@ -252,6 +264,307 @@ export default {
       const forwardReq = new Request(request.url, request);
       forwardReq.headers.set('X-User-Id', uid);
       return room.fetch(forwardReq);
+    }
+
+    // Oyuncu Bildirme rotası: POST /matches/:matchId/report
+    const reportMatch = pathname.match(/^\/matches\/([a-zA-Z0-9_-]+)\/report$/);
+    if (request.method === 'POST' && reportMatch) {
+      const matchId = reportMatch[1];
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      // 3. Kural: Tombstone kontrolü (silinmiş hesap 410 alır)
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+      } catch {}
+
+      let body: any;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const validReasons = [
+        'inappropriate_nickname',
+        'inappropriate_content',
+        'cheating',
+        'other',
+      ];
+      if (typeof body?.reason !== 'string' || !validReasons.includes(body.reason)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_reason', message: 'Geçersiz bildirim sebebi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.MATCH_ROOM) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const room = env.MATCH_ROOM.get(env.MATCH_ROOM.idFromName(matchId));
+      const matchCtx = await room.getMatchReportContext(uid);
+
+      if (matchCtx === null) {
+        return new Response(
+          JSON.stringify({
+            error: 'match_expired',
+            message: 'Maç süresi dolduğu için bildirim yapılamıyor. Bildirimler maç bittikten sonraki 10 dakika içinde yapılabilir.',
+          }),
+          { status: 410, headers: jsonHeaders }
+        );
+      }
+
+      if (!matchCtx.ok) {
+        return new Response(
+          JSON.stringify({ error: 'forbidden', message: 'Bu maçın tarafı değilsin' }),
+          { status: 403, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.REPORT_STORE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const reportStore = env.REPORT_STORE.get(env.REPORT_STORE.idFromName('global'));
+      const addRes = await reportStore.addReport({
+        reporterUid: uid,
+        reportedUid: matchCtx.context.reportedUid,
+        matchId,
+        reason: body.reason,
+        reportedNickname: matchCtx.context.reportedNickname,
+        answers: matchCtx.context.answers,
+      });
+
+      if (!addRes.ok) {
+        if (addRes.error === 'already_reported') {
+          return new Response(
+            JSON.stringify({ error: 'already_reported', message: 'Bu maç için zaten bildirim yaptın.' }),
+            { status: 409, headers: jsonHeaders }
+          );
+        }
+        if (addRes.error === 'daily_limit_exceeded') {
+          return new Response(
+            JSON.stringify({ error: 'daily_limit_exceeded', message: 'Günlük bildirim sınırına ulaştın.' }),
+            { status: 429, headers: jsonHeaders }
+          );
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: jsonHeaders,
+      });
+    }
+
+    // Oyuncu Engelleme rotası: POST /matches/:matchId/block
+    const blockMatch = pathname.match(/^\/matches\/([a-zA-Z0-9_-]+)\/block$/);
+    if (request.method === 'POST' && blockMatch) {
+      const matchId = blockMatch[1];
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      // 3. Kural: Tombstone kontrolü
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+      } catch {}
+
+      if (!env.MATCH_ROOM) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const room = env.MATCH_ROOM.get(env.MATCH_ROOM.idFromName(matchId));
+      const matchCtx = await room.getMatchReportContext(uid);
+
+      if (matchCtx === null) {
+        return new Response(
+          JSON.stringify({
+            error: 'match_expired',
+            message: 'Maç süresi dolduğu için engelleme yapılamıyor.',
+          }),
+          { status: 410, headers: jsonHeaders }
+        );
+      }
+
+      if (!matchCtx.ok) {
+        return new Response(
+          JSON.stringify({ error: 'forbidden', message: 'Bu maçın tarafı değilsin' }),
+          { status: 403, headers: jsonHeaders }
+        );
+      }
+
+      const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+      const blockRes = await profileStub.blockUser({
+        blockedUid: matchCtx.context.reportedUid,
+        blockedNickname: matchCtx.context.reportedNickname,
+        uid,
+      });
+
+      if (!blockRes.ok) {
+        return new Response(
+          JSON.stringify({ error: 'block_limit_reached', message: 'En fazla 100 oyuncu engelleyebilirsin.' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      return new Response(JSON.stringify({ ok: true, id: blockRes.id }), {
+        status: 200,
+        headers: jsonHeaders,
+      });
+    }
+
+    // Engellenenleri Listeleme: GET /me/blocks
+    if (request.method === 'GET' && pathname === '/me/blocks') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        const blocks = await profileStub.getBlockedUsers();
+        return new Response(JSON.stringify(blocks), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Engeli Kaldırma: DELETE /me/blocks/:id
+    const unblockMatch = pathname.match(/^\/me\/blocks\/([a-zA-Z0-9_-]+)$/);
+    if (request.method === 'DELETE' && unblockMatch) {
+      const blockId = unblockMatch[1];
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        const res = await profileStub.unblockUser(blockId);
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Yönetici Bildirimleri İnceleme: GET /admin/reports
+    if (request.method === 'GET' && pathname === '/admin/reports') {
+      const authHeader = request.headers.get('Authorization') ?? '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+
+      if (!env.ADMIN_TOKEN || token.length === 0 || token !== env.ADMIN_TOKEN) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!env.REPORT_STORE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const reportStore = env.REPORT_STORE.get(env.REPORT_STORE.idFromName('global'));
+      const view = url.searchParams.get('view');
+
+      if (view === 'summary') {
+        const limit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+        const summary = await reportStore.getSummary(limit);
+        return new Response(JSON.stringify({ summary }), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      }
+
+      const limit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+      const offset = parseInt(url.searchParams.get('offset') ?? '0', 10);
+      const reportedUid = url.searchParams.get('reportedUid') ?? undefined;
+
+      const data = await reportStore.getReports({ limit, offset, reportedUid });
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: jsonHeaders,
+      });
     }
 
     return new Response('Not Found', { status: 404 });

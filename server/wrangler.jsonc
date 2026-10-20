@@ -32,6 +32,12 @@
 				"Leaderboard"
 			],
 			"tag": "v3"
+		},
+		{
+			"new_sqlite_classes": [
+				"ReportStore"
+			],
+			"tag": "v4"
 		}
 	],
 	"durable_objects": {
@@ -51,6 +57,10 @@
 			{
 				"class_name": "Leaderboard",
 				"name": "LEADERBOARD"
+			},
+			{
+				"class_name": "ReportStore",
+				"name": "REPORT_STORE"
 			}
 		]
 	},

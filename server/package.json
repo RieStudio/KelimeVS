@@ -9,6 +9,7 @@
     "ghost": "tsx tools/ghost-opponent.ts",
     "check:content": "tsx tools/check-content.ts",
     "lb-debug": "tsx tools/lb-debug.ts",
+    "reports": "tsx tools/reports.ts",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "dev:real": "wrangler dev --var CONTENT_SOURCE:realtime",

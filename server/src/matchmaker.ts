@@ -14,6 +14,7 @@ export interface QueueEntry {
   readonly uid: string;
   readonly name: string;
   readonly joinedAt: number;
+  readonly blockedUids?: readonly string[];
 }
 
 export function selectAndShuffleEightQuestions(questions: readonly Question[]): Question[] {
@@ -132,12 +133,25 @@ export class Matchmaker extends DurableObject<Env> {
       // İçerik önbelleği geçerli değilse arka planda yüklemeye başla (önden ısıt)
       this.prewarmContent();
 
+      // Kullanıcının engel listesini UserProfile'dan çek
+      // NOT: Kuyruktayken eklenen engelin o kuyruk oturumunda geçerli olmayabileceği kabul edilen bir sınırlamadır.
+      let blockedUids: string[] = [];
+      try {
+        if (this.env.USER_PROFILE) {
+          const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(uid));
+          blockedUids = await profileStub.getBlockedUids();
+        }
+      } catch {
+        // Hata durumunda boş engel listesiyle devam et
+      }
+
       // Aynı uid varsa güncelle, yoksa ekle (FIFO)
       const existingIdx = this.queue.findIndex((e) => e.uid === uid);
       const newEntry: QueueEntry = {
         uid,
         name: parsed.name,
         joinedAt: Date.now(),
+        blockedUids,
       };
 
       if (existingIdx !== -1) {
@@ -231,18 +245,50 @@ export class Matchmaker extends DurableObject<Env> {
 
   private async tryMatch(): Promise<void> {
     while (this.queue.length >= 2) {
-      const p1 = this.queue[0];
-      const p2 = this.queue[1];
+      // Kuyruktaki eşleşebilir ilk ikiliyi bul
+      let matchIdx1 = -1;
+      let matchIdx2 = -1;
 
-      // Kendi kendisiyle eşleşmeyi önle
-      if (p1.uid === p2.uid) {
-        this.queue.splice(1, 1);
-        await this.ctx.storage.put('queue', this.queue);
-        continue;
+      for (let i = 0; i < this.queue.length - 1; i++) {
+        const candidate1 = this.queue[i];
+        for (let j = i + 1; j < this.queue.length; j++) {
+          const candidate2 = this.queue[j];
+
+          // Kendi kendisiyle eşleşmeyi önle
+          if (candidate1.uid === candidate2.uid) {
+            this.queue.splice(j, 1);
+            await this.ctx.storage.put('queue', this.queue);
+            j--;
+            continue;
+          }
+
+          // Karşılıklı engelleme kontrolü (iki taraftan biri engellediyse eşleştirme)
+          const b1 = candidate1.blockedUids ? new Set(candidate1.blockedUids) : null;
+          const b2 = candidate2.blockedUids ? new Set(candidate2.blockedUids) : null;
+
+          if (b1?.has(candidate2.uid) || b2?.has(candidate1.uid)) {
+            continue;
+          }
+
+          matchIdx1 = i;
+          matchIdx2 = j;
+          break;
+        }
+        if (matchIdx1 !== -1) break;
       }
 
-      // İki oyuncuyu kuyruktan çıkar
-      this.queue.splice(0, 2);
+      if (matchIdx1 === -1 || matchIdx2 === -1) {
+        // Kuyrukta birbirini engellememiş uyumlu çift yok.
+        // Oyuncular kuyrukta kalır ve kendi bekleme süreleri (10 sn) dolunca bot maçına geçerler.
+        break;
+      }
+
+      const p1 = this.queue[matchIdx1];
+      const p2 = this.queue[matchIdx2];
+
+      // İki oyuncuyu kuyruktan çıkar (önce büyük indeksi sil)
+      this.queue.splice(matchIdx2, 1);
+      this.queue.splice(matchIdx1, 1);
       await this.ctx.storage.put('queue', this.queue);
 
       let allQuestions: Question[];

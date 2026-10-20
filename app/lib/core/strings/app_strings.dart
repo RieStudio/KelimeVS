@@ -220,5 +220,44 @@ abstract final class AppStrings {
       'Güvenlik için Google hesabını bir kez daha seçmen istenecek.';
   static const String reauthWrongAccountError =
       'Lütfen uygulamaya bağlı Google hesabını seç.';
+
+  // Oyuncu Bildirme ve Engelleme
+  static const String reportAction = 'Bildir';
+  static const String blockAction = 'Engelle';
+  static const String reportedStatus = 'Bildirildi';
+  static const String blockedStatus = 'Engellendi';
+  static const String reportDialogTitle = 'Oyuncuyu Bildir';
+  static const String reportReasonPrompt = 'Bildirme Sebebi Seç';
+  static const String reasonInappropriateNickname = 'Uygunsuz takma ad';
+  static const String reasonInappropriateContent = 'Hakaret / uygunsuz cevap';
+  static const String reasonCheating = 'Hile veya kötüye kullanım';
+  static const String reasonOther = 'Diğer';
+  static const String reportSuccess = 'Bildirimin alındı. Teşekkür ederiz.';
+  static const String reportAlreadyReported = 'Bu maç için zaten bildirim yaptın.';
+  static const String reportDailyLimit = 'Günlük bildirim sınırına ulaştın.';
+  static const String reportMatchExpired = 'Maç süresi dolduğu için bildirim yapılamadı.';
+  static const String reportGenericError = 'Bildirim gönderilemedi. Lütfen internetini kontrol et.';
+
+  static const String blockDialogTitle = 'Oyuncuyu Engelle';
+  static String blockDialogMessage(String nickname) =>
+      ' adlı oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.';
+  static const String blockConfirm = 'Engelle';
+  static String blockSuccess(String nickname) => ' engellendi.';
+  static const String blockLimitReached = 'En fazla 100 oyuncu engelleyebilirsin.';
+  static const String blockMatchExpired = 'Maç süresi dolduğu için engelleme yapılamadı.';
+  static const String blockGenericError = 'Engelleme işlemi gerçekleştirilemedi.';
+
+  // Engellenen Oyuncular Ekranı (Profil)
+  static const String blockedUsersTitle = 'Engellenenler';
+  static const String blockedUsersTileTitle = 'Engellenen Oyuncular';
+  static const String blockedUsersTileSubtitle = 'Engellediğin oyuncularla eşleşmezsin';
+  static const String emptyBlockedUsers = 'Henüz engellenen oyuncu yok';
+  static const String emptyBlockedUsersSubtitle =
+      'Maç sonu ekranından uygunsuz oyuncuları engelleyebilirsin.';
+  static const String unblockAction = 'Kaldır';
+  static const String unblockSuccess = 'Engel kaldırıldı.';
+  static const String unblockGenericError = 'Engel kaldırılırken bir hata oluştu.';
+  static const String blockedUsersLoading = 'Engellenenler yükleniyor…';
+  static const String blockedUsersError = 'Engellenenler yüklenemedi';
 }
 

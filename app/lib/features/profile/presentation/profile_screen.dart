@@ -15,6 +15,7 @@ import '../../auth/application/auth_notifier.dart';
 import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
 import '../domain/nickname_validator.dart';
+import 'blocked_users_screen.dart';
 
 /// Faz 5.1 & 5.2: Profil Ekranı
 ///
@@ -417,6 +418,20 @@ class ProfileScreen extends ConsumerWidget {
                       : () => _showSignOutDialog(context, ref),
                 ),
               ],
+
+              const SizedBox(height: AppDimens.space16),
+
+              // Engellenenler Butonu
+              SecondaryButton(
+                text: AppStrings.blockedUsersTitle,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BlockedUsersScreen(),
+                    ),
+                  );
+                },
+              ),
 
               const SizedBox(height: AppDimens.space32),
 

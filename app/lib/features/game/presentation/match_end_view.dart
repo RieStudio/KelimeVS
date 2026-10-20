@@ -14,7 +14,10 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
+import '../application/match_session.dart';
 import '../domain/history/match_history_entry.dart';
+import '../../profile/application/blocked_users_notifier.dart';
+import '../../profile/data/blocked_users_api_client.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
 ///
@@ -34,6 +37,114 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
+
+  bool _isReported = false;
+  bool _isBlocked = false;
+  bool _isSubmittingReport = false;
+  bool _isSubmittingBlock = false;
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: AppTextStyles.fontNunito,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        backgroundColor: AppColors.ink,
+      ),
+    );
+  }
+
+  void _showReportBottomSheet(BuildContext context, String matchId, String opponentName) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => _ReportBottomSheet(
+        opponentName: opponentName,
+        onSubmit: (reason) async {
+          Navigator.of(sheetContext).pop();
+          setState(() => _isSubmittingReport = true);
+          final client = ref.read(blockedUsersApiClientProvider);
+          final res = await client.reportUser(matchId: matchId, reason: reason);
+          if (!mounted) return;
+          setState(() => _isSubmittingReport = false);
+
+          if (res is ReportUserSuccess) {
+            setState(() => _isReported = true);
+            _showSnackBar(AppStrings.reportSuccess);
+          } else if (res is ReportUserError) {
+            if (res.isAlreadyReported) {
+              setState(() => _isReported = true);
+            }
+            _showSnackBar(res.message);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showBlockDialog(BuildContext context, String matchId, String opponentName) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppDimens.borderRadiusDialog,
+            side: const BorderSide(
+              color: AppColors.ink,
+              width: AppDimens.borderThick,
+            ),
+          ),
+          title: const Text(
+            AppStrings.blockDialogTitle,
+            style: AppTextStyles.cardTitle,
+          ),
+          content: Text(
+            AppStrings.blockDialogMessage(opponentName),
+            style: AppTextStyles.bodyText,
+          ),
+          actions: [
+            PrimaryButton(
+              text: AppStrings.blockConfirm,
+              backgroundColor: AppColors.danger,
+              shadowColor: AppColors.dangerDark,
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                setState(() => _isSubmittingBlock = true);
+                final client = ref.read(blockedUsersApiClientProvider);
+                final res = await client.blockUser(matchId);
+                if (!mounted) return;
+                setState(() => _isSubmittingBlock = false);
+
+                if (res is BlockUserSuccess) {
+                  ref.invalidate(blockedUsersProvider);
+                  setState(() => _isBlocked = true);
+                  _showSnackBar(AppStrings.blockSuccess(opponentName));
+                } else if (res is BlockUserError) {
+                  _showSnackBar(res.message);
+                }
+              },
+            ),
+            const SizedBox(height: AppDimens.space8),
+            SecondaryButton(
+              text: AppStrings.cancel,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -90,6 +201,20 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
     final myScore = matchState?.scores['me'] ?? 0;
     final opponentScore = matchState?.scores['bot'] ?? 0;
+
+    final mode = ref.watch(activeMatchSessionModeProvider);
+    final lastMatch = uiState.lastSavedMatch;
+    final isOnlineMatch = mode == MatchSessionMode.online &&
+        lastMatch != null &&
+        lastMatch.matchId != null &&
+        !lastMatch.botlaOynandi;
+    final matchId = lastMatch?.matchId;
+    final opponentDisplayName = (lastMatch?.opponentName.isNotEmpty ?? false)
+        ? lastMatch!.opponentName
+        : (uiState.opponentName.isNotEmpty ? uiState.opponentName : AppStrings.opponent);
+    final opponentInitial = opponentDisplayName.isNotEmpty
+        ? opponentDisplayName.substring(0, 1).toUpperCase()
+        : '?';
 
     final ResultCircleVariant circleVariant;
     final AppIconData icon;
@@ -268,6 +393,91 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 ),
               ],
 
+              // 6b. Rakip Kartı (Yalnızca online maçta gösterilir, bot maçında ASLA gösterilmez)
+              if (isOnlineMatch && matchId != null) ...[
+                const SizedBox(height: AppDimens.space16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space16,
+                    vertical: AppDimens.space12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: AppDimens.borderRadiusListCard,
+                    border: Border.all(
+                      color: AppColors.mint,
+                      width: AppDimens.borderThin,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppColors.ink,
+                        offset: Offset(0, 2),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Rakip Avatar
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.mint,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.ink,
+                            width: AppDimens.borderThin,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          opponentInitial,
+                          style: const TextStyle(
+                            fontFamily: AppTextStyles.fontFredoka,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppDimens.space10),
+
+                      // Rakip Takma Adı
+                      Expanded(
+                        child: Text(
+                          opponentDisplayName,
+                          style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: AppDimens.space8),
+
+                      // Bildir Düğmesi
+                      SecondaryButton(
+                        text: _isReported ? AppStrings.reportedStatus : AppStrings.reportAction,
+                        height: 38,
+                        width: 78,
+                        onPressed: (_isReported || _isSubmittingReport)
+                            ? null
+                            : () => _showReportBottomSheet(context, matchId, opponentDisplayName),
+                      ),
+                      const SizedBox(width: AppDimens.space8),
+
+                      // Engelle Düğmesi
+                      SecondaryButton.danger(
+                        text: _isBlocked ? AppStrings.blockedStatus : AppStrings.blockAction,
+                        height: 38,
+                        width: 82,
+                        onPressed: (_isBlocked || _isSubmittingBlock)
+                            ? null
+                            : () => _showBlockDialog(context, matchId, opponentDisplayName),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const Spacer(flex: 4),
 
               // 7. Butonlar ("Tekrar Oyna")
@@ -328,6 +538,114 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     return FadeTransition(
       opacity: _fadeAnim,
       child: content,
+    );
+  }
+}
+
+class _ReportBottomSheet extends StatefulWidget {
+  final String opponentName;
+  final ValueChanged<String> onSubmit;
+
+  const _ReportBottomSheet({
+    required this.opponentName,
+    required this.onSubmit,
+  });
+
+  @override
+  State<_ReportBottomSheet> createState() => _ReportBottomSheetState();
+}
+
+class _ReportBottomSheetState extends State<_ReportBottomSheet> {
+  String? _selectedReason;
+
+  final _reasons = const [
+    (key: 'inappropriate_nickname', label: AppStrings.reasonInappropriateNickname),
+    (key: 'inappropriate_content', label: AppStrings.reasonInappropriateContent),
+    (key: 'cheating', label: AppStrings.reasonCheating),
+    (key: 'other', label: AppStrings.reasonOther),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.screenPaddingHorizontal,
+          vertical: AppDimens.space20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppStrings.reportDialogTitle,
+              style: AppTextStyles.cardTitle.copyWith(fontSize: 20),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimens.space6),
+            Text(
+              '${widget.opponentName} adlı oyuncuyu neden bildirmek istiyorsun?',
+              style: AppTextStyles.bodyText.copyWith(color: AppColors.muted),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimens.space16),
+            ..._reasons.map((r) {
+              final isSelected = _selectedReason == r.key;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppDimens.space8),
+                child: InkWell(
+                  onTap: () => setState(() => _selectedReason = r.key),
+                  borderRadius: AppDimens.borderRadiusListCard,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space16,
+                      vertical: AppDimens.space12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.surface : AppColors.card,
+                      borderRadius: AppDimens.borderRadiusListCard,
+                      border: Border.all(
+                        color: isSelected ? AppColors.ink : AppColors.mint,
+                        width: isSelected ? AppDimens.borderThick : AppDimens.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? AppColors.primary : AppColors.muted,
+                        ),
+                        const SizedBox(width: AppDimens.space12),
+                        Expanded(
+                          child: Text(
+                            r.label,
+                            style: AppTextStyles.bodyText.copyWith(
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: AppDimens.space16),
+            PrimaryButton(
+              text: AppStrings.reportAction,
+              onPressed: _selectedReason != null
+                  ? () => widget.onSubmit(_selectedReason!)
+                  : null,
+            ),
+            const SizedBox(height: AppDimens.space8),
+            SecondaryButton(
+              text: AppStrings.cancel,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

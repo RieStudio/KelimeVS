@@ -86,7 +86,7 @@ function createEnv(overrides?: Partial<Env>): { env: Env; leaderboardDO: Leaderb
     ...overrides,
   };
 
-  return { env: fullEnv, leaderboardDO: leaderboardNamespace.get({ toString: () => 'id_global' }) };
+  return { env: fullEnv, leaderboardDO: (leaderboardNamespace.get as any)({ toString: () => 'id_global' }) as Leaderboard };
 }
 
 describe('API Route: GET /leaderboard (Auth & Response Format)', () => {

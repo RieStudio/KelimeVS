@@ -101,6 +101,56 @@ export class MatchRoom extends DurableObject<Env> {
     await this.updateAlarm();
   }
 
+  /**
+   * Bildirme ve engelleme işlemleri için maç bağlamını ve rakip bilgilerini döndürür.
+   * Maç 10 dakikalık tutulma süresinden sonra silindiyse null döner.
+   */
+  async getMatchReportContext(callerUid: string): Promise<
+    | {
+        readonly ok: true;
+        readonly context: {
+          readonly reporterUid: string;
+          readonly reportedUid: string;
+          readonly reportedNickname: string;
+          readonly answers: readonly string[];
+        };
+      }
+    | { readonly ok: false; readonly error: 'forbidden' }
+    | null
+  > {
+    if (!this.data) {
+      return null;
+    }
+
+    if (callerUid !== this.data.p1.uid && callerUid !== this.data.p2.uid) {
+      return { ok: false, error: 'forbidden' };
+    }
+
+    const opponent = callerUid === this.data.p1.uid ? this.data.p2 : this.data.p1;
+    const answers: string[] = [];
+
+    if (this.data.engineState) {
+      const state = deserializeMatchState(this.data.engineState);
+      for (const round of state.roundHistory) {
+        for (const attempt of round.attempts) {
+          if (attempt.playerId === opponent.uid && attempt.rawInput) {
+            answers.push(attempt.rawInput);
+          }
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      context: {
+        reporterUid: callerUid,
+        reportedUid: opponent.uid,
+        reportedNickname: opponent.name,
+        answers,
+      },
+    };
+  }
+
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected WebSocket Upgrade', { status: 400 });
