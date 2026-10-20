@@ -111,6 +111,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "487342637535-1mdkvqjfp8d6jqgpr750f84csvikjt00.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kelimevs.app",
+            "certificate_hash": "b47980ff22a7c9e605b21fbab29bd8fb5ca7051d"
+          }
+        },
+        {
           "client_id": "487342637535-c4t243io7c7af2nt20v946nf7gvv8nt9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
