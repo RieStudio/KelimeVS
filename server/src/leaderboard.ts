@@ -79,6 +79,7 @@ export interface LeaderboardEntry {
   readonly nickname: string;
   readonly wins: number;
   readonly isMe: boolean;
+  readonly frame?: string;
 }
 
 export interface LeaderboardMe {
@@ -102,6 +103,7 @@ export interface RecordMatchResultParams {
   readonly finishedAtMs?: number;
   readonly deletedUids?: readonly string[];
   readonly skipPairWins?: boolean;
+  readonly winnerFrame?: string;
 }
 
 export interface RecordMatchResultResult {
@@ -147,6 +149,17 @@ export class Leaderboard extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_week_wins_leaderboard ON week_wins (week_key, wins, losses, reached_at);
       CREATE INDEX IF NOT EXISTS idx_processed_matches_at ON processed_matches (processed_at);
     `);
+
+    // PRAGMA ile week_wins tablosunda frame kolonunun varlığı kontrol edilir, yoksa ALTER çalıştırılır
+    const weekWinsCols = this.ctx.storage.sql
+      .exec<{ name: string }>('PRAGMA table_info(week_wins)')
+      .toArray();
+    const hasFrameCol = weekWinsCols.some((c) => c.name === 'frame');
+    if (!hasFrameCol) {
+      this.ctx.storage.sql.exec(
+        "ALTER TABLE week_wins ADD COLUMN frame TEXT NOT NULL DEFAULT 'classic'"
+      );
+    }
 
     this.initialized = true;
   }
@@ -228,18 +241,21 @@ export class Leaderboard extends DurableObject<Env> {
 
     // 3. Kazananı güncelle (silinmemişse, sınır aşılmadıysa ve takma adı varsa)
     const winnerNick = params.winnerNickname?.trim();
+    const winnerFrame = params.winnerFrame?.trim() || 'classic';
     if (winnerNick && !isCapped && !isWinnerDeleted) {
       this.ctx.storage.sql.exec(
-        `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at)
-         VALUES (?, ?, ?, 1, 0, ?)
+        `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at, frame)
+         VALUES (?, ?, ?, 1, 0, ?, ?)
          ON CONFLICT(week_key, uid) DO UPDATE SET
            wins = wins + 1,
            nickname = excluded.nickname,
-           reached_at = excluded.reached_at`,
+           reached_at = excluded.reached_at,
+           frame = excluded.frame`,
         weekKey,
         params.winnerUid,
         winnerNick,
-        nowMs
+        nowMs,
+        winnerFrame
       );
     }
 
@@ -310,6 +326,21 @@ export class Leaderboard extends DurableObject<Env> {
   }
 
   /**
+   * Kullanıcının avatar çerçevesi değiştiğinde mevcut tablodaki satırlarını günceller.
+   */
+  async updateFrame(uid: string, frame: string): Promise<void> {
+    this.ensureSchema();
+    const trimmed = frame.trim();
+    if (!trimmed) return;
+
+    this.ctx.storage.sql.exec(
+      'UPDATE week_wins SET frame = ? WHERE uid = ?',
+      trimmed,
+      uid
+    );
+  }
+
+  /**
    * Haftalık liderlik tablosunu ve istek yapan kullanıcının sırasını getirir.
    */
   async getLeaderboard(callerUid?: string, atMs?: number): Promise<LeaderboardResponse> {
@@ -325,6 +356,7 @@ export class Leaderboard extends DurableObject<Env> {
       uid: string;
       nickname: string;
       wins: number;
+      frame: string | null;
     }>(
       `WITH ranked AS (
         SELECT
@@ -333,13 +365,14 @@ export class Leaderboard extends DurableObject<Env> {
           wins,
           losses,
           reached_at,
+          frame,
           ROW_NUMBER() OVER (
             ORDER BY wins DESC, losses ASC, reached_at ASC, uid ASC
           ) as rank
         FROM week_wins
         WHERE week_key = ? AND wins > 0 AND nickname IS NOT NULL AND TRIM(nickname) != ''
       )
-      SELECT rank, uid, nickname, wins FROM ranked ORDER BY rank ASC LIMIT 50`,
+      SELECT rank, uid, nickname, wins, frame FROM ranked ORDER BY rank ASC LIMIT 50`,
       weekKey
     );
 
@@ -349,6 +382,7 @@ export class Leaderboard extends DurableObject<Env> {
       nickname: String(r.nickname),
       wins: Number(r.wins),
       isMe: callerUid ? r.uid === callerUid : false,
+      frame: r.frame || 'classic',
     }));
 
     let me: LeaderboardMe | null = null;

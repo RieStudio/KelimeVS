@@ -131,6 +131,7 @@ class OnlineMatchState {
   final int myHintsLeft;
   final List<OnlineAttempt> attempts;
   final String opponentName;
+  final String opponentFrame;
   final bool opponentConnected;
   final String? endedBy;
   final bool? winnerIsMe;
@@ -152,6 +153,7 @@ class OnlineMatchState {
     required this.myHintsLeft,
     required this.attempts,
     required this.opponentName,
+    this.opponentFrame = 'classic',
     required this.opponentConnected,
     this.endedBy,
     this.winnerIsMe,
@@ -229,6 +231,7 @@ class OnlineMatchState {
       myHintsLeft: (json['myHintsLeft'] as num?)?.toInt() ?? 0,
       attempts: attemptsList,
       opponentName: json['opponentName'] as String? ?? '',
+      opponentFrame: json['opponentFrame'] as String? ?? 'classic',
       opponentConnected: json['opponentConnected'] as bool? ?? false,
       endedBy: json['endedBy'] as String?,
       winnerIsMe: json['winnerIsMe'] as bool?,

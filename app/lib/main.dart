@@ -14,6 +14,7 @@ import 'features/home/presentation/home_screen.dart';
 import 'features/profile/application/profile_notifier.dart';
 import 'features/profile/presentation/onboarding_nickname_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
+import 'features/store/presentation/store_screen.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -154,7 +155,7 @@ class _MainShellState extends ConsumerState<MainShell>
         children: [
           const HomeScreen(),
           const _TabPlaceholder(title: AppStrings.navLeaderboard),
-          const _TabPlaceholder(title: AppStrings.navShop),
+          const StoreScreen(),
           const ProfileScreen(),
         ],
       ),

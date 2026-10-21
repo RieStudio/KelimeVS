@@ -5,6 +5,7 @@ import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/bot_frame_resolver.dart';
 import '../../features/game/domain/history/match_history_entry.dart';
 import 'player_avatar.dart';
 import 'result_badge.dart';
@@ -58,6 +59,9 @@ class MatchCard extends StatelessWidget {
               // 1. Rakip Avatarı (40 px)
               PlayerAvatar.opponent(
                 name: displayName,
+                frame: entry.botlaOynandi
+                    ? BotFrameResolver.resolve(entry.opponentName)
+                    : entry.opponentFrame,
                 size: AppDimens.avatarList,
                 borderWidth: AppDimens.borderThin,
               ),

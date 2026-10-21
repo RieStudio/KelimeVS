@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/bot_frame_resolver.dart';
+
 import '../data/question_repository.dart';
 import '../domain/attempt_text_sanitizer.dart';
 import '../domain/bot/bot_config.dart';
@@ -394,6 +396,9 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
       recentEvents: updatedEvents,
       eventCounter: updatedEventCounter,
       opponentName: opponentName ?? state.opponentName,
+      opponentFrame: opponentName != null
+          ? BotFrameResolver.resolve(opponentName)
+          : state.opponentFrame,
       summary: summary,
       isLoading: false,
       acceptedAnswers: updatedAcceptedAnswers,
@@ -591,6 +596,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
         roundRecords: finishedState.roundHistory,
         roundQuestionTexts: questionTexts,
         botlaOynandi: true,
+        opponentFrame: BotFrameResolver.resolve(opponentName),
       );
 
       state = state.copyWith(lastSavedMatch: entry);

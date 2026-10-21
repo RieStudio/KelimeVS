@@ -118,7 +118,7 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
       });
       _startCountdown(event.expiresAt);
     } else if (event is FriendMatchMatched) {
-      _onMatched(event.matchId, event.opponentName);
+      _onMatched(event.matchId, event.opponentName, event.opponentFrame);
     } else if (event is FriendMatchRoomExpired) {
       _showExpiredDialog();
     } else if (event is FriendMatchFailed) {
@@ -129,7 +129,7 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
     }
   }
 
-  void _onMatched(String matchId, String opponentName) {
+  void _onMatched(String matchId, String opponentName, String opponentFrame) {
     if (_isMatched) return;
     _isMatched = true;
     _countdownTimer?.cancel();
@@ -149,6 +149,7 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
       ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
             matchId: matchId,
             opponentName: opponentName,
+            opponentFrame: opponentFrame,
             isFriendly: true,
           ),
     );

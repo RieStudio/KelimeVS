@@ -57,6 +57,7 @@ class MatchUiState {
   final int eventCounter;
   final String myPlayerId;
   final String opponentName;
+  final String opponentFrame;
   final MatchSummary? summary;
   final bool isLoading;
   final String? errorMessage;
@@ -90,6 +91,7 @@ class MatchUiState {
     this.eventCounter = 0,
     this.myPlayerId = 'me',
     this.opponentName = '',
+    this.opponentFrame = 'classic',
     this.summary,
     this.isLoading = false,
     this.errorMessage,
@@ -157,6 +159,7 @@ class MatchUiState {
     int? eventCounter,
     String? myPlayerId,
     String? opponentName,
+    String? opponentFrame,
     MatchSummary? summary,
     bool? isLoading,
     String? errorMessage,
@@ -191,6 +194,7 @@ class MatchUiState {
       eventCounter: eventCounter ?? this.eventCounter,
       myPlayerId: myPlayerId ?? this.myPlayerId,
       opponentName: opponentName ?? this.opponentName,
+      opponentFrame: opponentFrame ?? this.opponentFrame,
       summary: summary ?? this.summary,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,

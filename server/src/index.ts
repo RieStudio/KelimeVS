@@ -38,6 +38,20 @@ const jsonHeaders = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 };
 
+function isValidAdminToken(token: string, expected?: string): boolean {
+  if (!expected || token.length === 0) return false;
+  const enc = new TextEncoder();
+  const aBuf = enc.encode(token);
+  const bBuf = enc.encode(expected);
+  if (aBuf.byteLength !== bBuf.byteLength) return false;
+
+  let mismatch = 0;
+  for (let i = 0; i < aBuf.byteLength; i++) {
+    mismatch |= aBuf[i] ^ bBuf[i];
+  }
+  return mismatch === 0;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -164,6 +178,191 @@ export default {
             headers: jsonHeaders,
           }
         );
+      }
+    }
+
+    // Avatar çerçevesi kuşanma rotası: PUT /me/frame
+    if (request.method === 'PUT' && pathname === '/me/frame') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let body: { frameId?: unknown; frame?: unknown };
+      try {
+        body = (await request.json()) as { frameId?: unknown; frame?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const rawFrame =
+        typeof body?.frameId === 'string' && body.frameId.trim().length > 0
+          ? body.frameId
+          : typeof body?.frame === 'string' && body.frame.trim().length > 0
+            ? body.frame
+            : null;
+
+      if (!rawFrame) {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'frameId veya frame alanı dize olmalıdır' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const frameId = rawFrame.trim().toLowerCase();
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.equipFrame(frameId, uid);
+        if (!res.success) {
+          if (res.error === 'item_not_owned') {
+            return new Response(
+              JSON.stringify({ error: 'item_not_owned', message: 'Bu çerçeveye sahip değilsiniz' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: 'invalid_frame', message: 'Geçersiz çerçeve kimliği' }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        // Leaderboard tablosundaki çerçeveyi de güncelle (hata verirse kuşanma başarısız sayılmaz)
+        if (env.LEADERBOARD) {
+          try {
+            const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+            await leaderboardStub.updateFrame(uid, frameId);
+          } catch (lbErr) {
+            console.error('Leaderboard updateFrame failed:', lbErr);
+          }
+        }
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        console.error('PUT /me/frame error:', err);
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Mağaza katalog ve durum rotası: GET /store
+    if (request.method === 'GET' && pathname === '/store') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const storeData = await profileStub.getStoreState(uid);
+        return new Response(JSON.stringify(storeData), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            {
+              status: 410,
+              headers: jsonHeaders,
+            }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Mağazadan çerçeve satın alma: POST /store/purchase
+    if (request.method === 'POST' && pathname === '/store/purchase') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let body: { itemId?: unknown };
+      try {
+        body = (await request.json()) as { itemId?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (typeof body?.itemId !== 'string' || body.itemId.trim().length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'itemId alanı dize olmalıdır' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.purchaseItem(body.itemId.trim(), uid);
+        if (!res.success) {
+          if (res.error === 'not_enough_coins') {
+            return new Response(
+              JSON.stringify({ error: 'not_enough_coins', message: 'Yetersiz jeton', coins: res.coins }),
+              { status: 402, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'already_owned') {
+            return new Response(
+              JSON.stringify({ error: 'already_owned', message: 'Bu çerçeveye zaten sahipsiniz' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: 'invalid_item', message: 'Geçersiz çerçeve öğesi' }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
       }
     }
 
@@ -532,7 +731,7 @@ export default {
       const authHeader = request.headers.get('Authorization') ?? '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
-      if (!env.ADMIN_TOKEN || token.length === 0 || token !== env.ADMIN_TOKEN) {
+      if (!isValidAdminToken(token, env.ADMIN_TOKEN)) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), {
           status: 401,
           headers: jsonHeaders,
@@ -567,6 +766,78 @@ export default {
         status: 200,
         headers: jsonHeaders,
       });
+    }
+
+    // Yönetici Jeton / Çerçeve Tanımlama: POST /admin/grant
+    if (request.method === 'POST' && pathname === '/admin/grant') {
+      const authHeader = request.headers.get('Authorization') ?? '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+
+      if (!isValidAdminToken(token, env.ADMIN_TOKEN)) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!env.USER_PROFILE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const body = (await request.json().catch(() => ({}))) as {
+        uid?: unknown;
+        coins?: unknown;
+        frameIds?: unknown;
+      };
+
+      const targetUid = typeof body.uid === 'string' ? body.uid.trim() : '';
+      if (!targetUid) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_request', message: 'uid is required' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
+        const res = await profileStub.adminGrant({
+          uid: targetUid,
+          coins: typeof body.coins === 'number' ? body.coins : undefined,
+          frameIds: Array.isArray(body.frameIds) ? (body.frameIds as string[]) : undefined,
+        });
+
+        if (!res.success) {
+          if (res.error === 'account_deleted') {
+            return new Response(
+              JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+              { status: 410, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: 'bad_request', message: res.error }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            uid: targetUid,
+            coins: res.coins,
+            grantedFrames: res.grantedFrames,
+          }),
+          { status: 200, headers: jsonHeaders }
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(
+          JSON.stringify({ error: 'internal_error', message: msg }),
+          { status: 500, headers: jsonHeaders }
+        );
+      }
     }
 
     return new Response('Not Found', { status: 404 });

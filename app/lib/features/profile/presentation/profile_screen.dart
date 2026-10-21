@@ -311,6 +311,7 @@ class ProfileScreen extends ConsumerWidget {
               Center(
                 child: PlayerAvatar.selfHome(
                   name: nickname,
+                  frame: profile.equippedFrame,
                   size: 88,
                   borderWidth: AppDimens.borderThick,
                 ),

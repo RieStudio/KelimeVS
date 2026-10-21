@@ -36,6 +36,7 @@ export interface GhostConfig {
   readonly name: string;
   readonly code?: string;
   readonly useExtraTime?: boolean;
+  readonly frame?: string;
 }
 
 /** Komut satırı argümanlarını ayrıştırır. */
@@ -52,6 +53,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
   let useExtraTime = false;
   let nameArg: string | undefined;
   let codeArg: string | undefined;
+  let frameArg: string | undefined;
 
   for (const arg of argv) {
     if (arg === '--dev-auth' || arg === '--dev-auth=true') {
@@ -74,6 +76,8 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
       }
     } else if (arg.startsWith('--code=')) {
       codeArg = arg.slice('--code='.length).trim().toUpperCase();
+    } else if (arg.startsWith('--frame=')) {
+      frameArg = arg.slice('--frame='.length).trim().toLowerCase();
     } else if (arg.startsWith('--url=')) {
       serverUrl = arg.slice('--url='.length).trim();
     } else if (arg.startsWith('--api-key=')) {
@@ -116,6 +120,7 @@ export function parseGhostArgs(argv: readonly string[], env: Record<string, stri
     name: pickGhostName(nameArg),
     code: codeArg,
     useExtraTime,
+    frame: frameArg,
   };
 }
 

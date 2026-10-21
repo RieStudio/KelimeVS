@@ -4,6 +4,7 @@ import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'avatar_frame_decorator.dart';
 
 enum PlayerAvatarVariant {
   selfHome, // bright zemin + ink harf
@@ -13,11 +14,12 @@ enum PlayerAvatarVariant {
 }
 
 /// DESIGN.md Bölüm 6: Avatar
-/// Tam yuvarlak, 3 px (liste için 2 px) ink kenarlık,
-/// ortada oyuncu adının baş harfi (Fredoka 700).
+/// Tam yuvarlak, 3 px (liste için 2 px) kenarlık,
+/// seçili avatar çerçevesi ve ortada oyuncu adının baş harfi (Fredoka 700).
 class PlayerAvatar extends StatelessWidget {
   final PlayerAvatarVariant variant;
   final String? name;
+  final String? frame;
   final double size;
   final double? borderWidth;
 
@@ -25,6 +27,7 @@ class PlayerAvatar extends StatelessWidget {
     super.key,
     required this.variant,
     this.name,
+    this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
   });
@@ -32,6 +35,7 @@ class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar.selfHome({
     super.key,
     this.name,
+    this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
   }) : variant = PlayerAvatarVariant.selfHome;
@@ -39,6 +43,7 @@ class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar.selfMatch({
     super.key,
     this.name,
+    this.frame = 'classic',
     this.size = AppDimens.avatarMatch,
     this.borderWidth,
   }) : variant = PlayerAvatarVariant.selfMatch;
@@ -46,6 +51,7 @@ class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar.opponent({
     super.key,
     this.name,
+    this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
   }) : variant = PlayerAvatarVariant.opponent;
@@ -55,7 +61,8 @@ class PlayerAvatar extends StatelessWidget {
     this.size = AppDimens.avatarSearch,
     this.borderWidth,
   })  : variant = PlayerAvatarVariant.unknown,
-        name = null;
+        name = null,
+        frame = null;
 
   @override
   Widget build(BuildContext context) {
@@ -99,19 +106,15 @@ class PlayerAvatar extends StatelessWidget {
     final isUnknown = variant == PlayerAvatarVariant.unknown;
 
     return Semantics(
-      label: name != null && name!.isNotEmpty ? name : AppStrings.opponent,
+      label: isUnknown
+          ? AppStrings.opponent
+          : AppStrings.avatarSemantics(name: name, frameId: frame),
       child: Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
           color: bgColor,
           shape: BoxShape.circle,
-          border: isUnknown
-              ? null
-              : Border.all(
-                  color: AppColors.ink,
-                  width: effectiveBorderWidth,
-                ),
         ),
         child: Stack(
           alignment: Alignment.center,
@@ -123,6 +126,15 @@ class PlayerAvatar extends StatelessWidget {
                     color: AppColors.ink,
                     strokeWidth: effectiveBorderWidth,
                     dashCount: (size / 3.2).clamp(12, 36).round(),
+                  ),
+                ),
+              )
+            else
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: AvatarFramePainter(
+                    frameType: AvatarFrameType.fromId(frame),
+                    borderWidth: effectiveBorderWidth,
                   ),
                 ),
               ),

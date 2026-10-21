@@ -268,7 +268,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                             PlayerCard(
                               name: AppStrings.you,
                               score: matchState?.scores['me'] ?? 0,
-                              avatar: const PlayerAvatar.selfMatch(),
+                              avatar: PlayerAvatar.selfMatch(
+                                frame: ref.watch(profileProvider).equippedFrame,
+                              ),
                               isActive: isMyTurn,
                               remainingSeconds: isMyTurn ? remainingSec : null,
                               timeProgress: isMyTurn ? timeProgress : null,
@@ -318,6 +320,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               score: matchState?.scores['bot'] ?? 0,
                               avatar: PlayerAvatar.opponent(
                                 name: uiState.opponentName,
+                                frame: uiState.opponentFrame,
                                 size: AppDimens.avatarMatch,
                               ),
                               isActive: isBotTurn,

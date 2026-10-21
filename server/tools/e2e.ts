@@ -882,6 +882,77 @@ async function main() {
       console.log('  ✓ [Senaryo L Başarılı] Ek süre güçlendiricisi tam E2E akışı doğrulandı.');
     }
 
+    // ========================================================
+    // Senaryo M: Mağaza & Avatar Çerçeveleri E2E (Katalog, Satın Alma, Kuşanma, Maçta Rakibe İletim)
+    // ========================================================
+    {
+      console.log('\n--- Senaryo M: Mağaza & Avatar Çerçeveleri E2E Akışı ---');
+      const uidM1 = `user_m1_${Date.now()}`;
+      const uidM2 = `user_m2_${Date.now()}`;
+
+      // 1. Mağaza kataloğunu çek
+      const storeRes = await fetch(`${BASE_HTTP_URL}/store`, {
+        headers: { Authorization: `Bearer dev:${uidM1}` },
+      });
+      const storeData = (await storeRes.json()) as any;
+      if (storeData.coins !== 100 || storeData.equippedFrame !== 'classic' || storeData.items.length < 8) {
+        throw new Error(`Geçersiz store yanıtı: ${JSON.stringify(storeData)}`);
+      }
+      console.log('  ✓ Başlangıç mağaza durumu: 100G, Klasik çerçeve kuşanılmış, 8 katalog ürünü.');
+
+      // 2. Nane çerçevesi satın al (100G)
+      const buyRes = await fetch(`${BASE_HTTP_URL}/store/purchase`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer dev:${uidM1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ itemId: 'mint' }),
+      });
+      const buyData = (await buyRes.json()) as any;
+      if (!buyData.success || buyData.coins !== 0 || buyData.itemId !== 'mint') {
+        throw new Error(`Satın alma başarısız: ${JSON.stringify(buyData)}`);
+      }
+      console.log('  ✓ Nane çerçevesi satın alındı, bakiye 0G.');
+
+      // 3. Nane çerçevesini kuşan
+      const equipRes = await fetch(`${BASE_HTTP_URL}/me/frame`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer dev:${uidM1}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ frameId: 'mint' }),
+      });
+      const equipData = (await equipRes.json()) as any;
+      if (!equipData.success || equipData.equippedFrame !== 'mint') {
+        throw new Error(`Kuşanma başarısız: ${JSON.stringify(equipData)}`);
+      }
+      console.log('  ✓ Nane çerçevesi başarıyla kuşandı.');
+
+      // 4. İki oyuncuyu eşleştir ve rakibin çerçevesini (opponentFrame) doğrula
+      const { matchId } = await matchTwoPlayers(uidM1, 'MintOyuncu', uidM2, 'KlasikOyuncu');
+      const { roomA: roomM1, roomB: roomM2, initA: stateM1, initB: stateM2 } = await connectToMatch(
+        matchId,
+        uidM1,
+        uidM2
+      );
+
+      // roomM2 (KlasikOyuncu), rakibi olan MintOyuncu'nun çerçevesini 'mint' olarak görmeli
+      if (stateM2.opponentFrame !== 'mint') {
+        throw new Error(`Rakip çerçevesi 'mint' bekleniyordu, gelen: ${stateM2.opponentFrame}`);
+      }
+      // roomM1 (MintOyuncu), rakibi olan KlasikOyuncu'nun çerçevesini 'classic' olarak görmeli
+      if (stateM1.opponentFrame !== 'classic') {
+        throw new Error(`Rakip çerçevesi 'classic' bekleniyordu, gelen: ${stateM1.opponentFrame}`);
+      }
+      console.log('  ✓ Maç içinde her iki tarafın rakip çerçevesini (opponentFrame) doğru gördüğü doğrulandı.');
+
+      roomM1.close();
+      roomM2.close();
+      console.log('  ✓ [Senaryo M Başarılı] Mağaza ve avatar çerçeveleri tam E2E akışı doğrulandı.');
+    }
+
     function expectWeekDataValid(data: any) {
       if (!data.weekKey || typeof data.weekKey !== 'string' || !data.weekKey.includes('-W')) {
         throw new Error(`Geçersiz weekKey: ${data.weekKey}`);
@@ -892,7 +963,7 @@ async function main() {
     }
 
     console.log('\n========================================================');
-    console.log('🎉 TÜM 12 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
+    console.log('🎉 TÜM 13 E2E TEST SENARYOSU BAŞARIYLA TAMAMLANDI! (0 hata)');
     console.log('========================================================\n');
   } catch (err: unknown) {
     console.error('\n❌ E2E TEST BAŞARISIZ OLDU:');

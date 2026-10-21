@@ -74,6 +74,7 @@ class HomeScreen extends ConsumerWidget {
                         children: [
                           PlayerAvatar.selfHome(
                             name: nickname,
+                            frame: profile.equippedFrame,
                             size: AppDimens.avatarHome,
                           ),
                           const SizedBox(width: AppDimens.space8),

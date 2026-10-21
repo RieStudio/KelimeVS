@@ -36,6 +36,9 @@ class LocalMatchHistoryRepository implements MatchHistoryRepository {
     return '${sanitized.substring(0, 80)}...';
   }
 
+  static MatchHistoryEntry entryFromJson(Map<String, dynamic> json) =>
+      _MatchHistoryMapper.fromJson(json);
+
   @override
   Future<List<MatchHistoryEntry>> loadRecent() async {
     try {
@@ -197,6 +200,7 @@ abstract final class _MatchHistoryMapper {
       'botlaOynandi': entry.botlaOynandi,
       'isFinal': entry.isFinal,
       'isFriendly': entry.isFriendly,
+      'opponentFrame': entry.opponentFrame,
     };
   }
 
@@ -235,6 +239,7 @@ abstract final class _MatchHistoryMapper {
       botlaOynandi: json['botlaOynandi'] as bool? ?? false,
       isFinal: json['isFinal'] as bool? ?? true,
       isFriendly: json['isFriendly'] as bool? ?? false,
+      opponentFrame: json['opponentFrame'] as String? ?? 'classic',
     );
   }
 

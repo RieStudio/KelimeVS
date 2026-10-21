@@ -30,15 +30,17 @@ class MatchmakingQueued extends MatchmakingEvent {
 class MatchmakingMatched extends MatchmakingEvent {
   final String matchId;
   final String opponentName;
+  final String opponentFrame;
 
   const MatchmakingMatched({
     required this.matchId,
     required this.opponentName,
+    this.opponentFrame = 'classic',
   });
 
   @override
   String toString() =>
-      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName)';
+      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame)';
 }
 
 /// Kullanıcı veya sistem tarafından eşleştirme iptal edildi.
@@ -218,6 +220,7 @@ class MatchmakingClient {
       _emit(MatchmakingMatched(
         matchId: msg.matchId,
         opponentName: msg.opponentName,
+        opponentFrame: msg.opponentFrame,
       ));
       _finishAndClose();
     } else if (msg is ErrorServerMessage) {

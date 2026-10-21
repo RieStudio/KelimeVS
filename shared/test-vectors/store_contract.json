@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "description": "Store HTTP API contract test vectors between Cloudflare Worker server and Flutter client",
+  "get_store": {
+    "method": "GET",
+    "path": "/store",
+    "response_200": {
+      "status": 200,
+      "body": {
+        "coins": 250,
+        "equippedFrame": "classic",
+        "items": [
+          {
+            "id": "classic",
+            "name": "Klasik",
+            "cost": 0,
+            "description": "Sade ve şık orijinal kenarlık",
+            "order": 1,
+            "isOwned": true,
+            "isEquipped": true
+          },
+          {
+            "id": "mint",
+            "name": "Nane",
+            "cost": 100,
+            "description": "Taze nane yeşili canlı çerçeve",
+            "order": 2,
+            "isOwned": false,
+            "isEquipped": false
+          },
+          {
+            "id": "sunset",
+            "name": "Gün Batımı",
+            "cost": 150,
+            "description": "Sıcak gün batımı renkleri",
+            "order": 3,
+            "isOwned": false,
+            "isEquipped": false
+          },
+          {
+            "id": "ocean",
+            "name": "Okyanus",
+            "cost": 150,
+            "description": "Derin mavi okyanus esintisi",
+            "order": 4,
+            "isOwned": false,
+            "isEquipped": false
+          },
+          {
+            "id": "gold",
+            "name": "Altın",
+            "cost": 300,
+            "description": "Parıltılı şampiyon altını",
+            "order": 5,
+            "isOwned": true,
+            "isEquipped": false
+          },
+          {
+            "id": "neon",
+            "name": "Neon",
+            "cost": 300,
+            "description": "Göz alıcı elektrik neonu",
+            "order": 6,
+            "isOwned": false,
+            "isEquipped": false
+          },
+          {
+            "id": "rainbow",
+            "name": "Gökkuşağı",
+            "cost": 500,
+            "description": "Büyüleyici renk tayfı",
+            "order": 7,
+            "isOwned": false,
+            "isEquipped": false
+          },
+          {
+            "id": "diamond",
+            "name": "Elmas",
+            "cost": 800,
+            "description": "Eşsiz kristal elmas ışıltısı",
+            "order": 8,
+            "isOwned": false,
+            "isEquipped": false
+          }
+        ]
+      }
+    }
+  },
+  "purchase_item": {
+    "method": "POST",
+    "path": "/store/purchase",
+    "request": {
+      "itemId": "mint"
+    },
+    "response_200": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "itemId": "mint",
+        "coins": 150
+      }
+    },
+    "response_402_not_enough_coins": {
+      "status": 402,
+      "body": {
+        "error": "not_enough_coins",
+        "message": "Yetersiz jeton",
+        "coins": 50
+      }
+    },
+    "response_400_already_owned": {
+      "status": 400,
+      "body": {
+        "error": "already_owned",
+        "message": "Bu çerçeveye zaten sahipsiniz"
+      }
+    },
+    "response_400_invalid_item": {
+      "status": 400,
+      "body": {
+        "error": "invalid_item",
+        "message": "Geçersiz çerçeve öğesi"
+      }
+    }
+  },
+  "equip_frame": {
+    "method": "PUT",
+    "path": "/me/frame",
+    "request": {
+      "frameId": "mint"
+    },
+    "request_client_payload": {
+      "frameId": "mint",
+      "frame": "mint"
+    },
+    "response_200": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "equippedFrame": "mint"
+      }
+    },
+    "response_400_item_not_owned": {
+      "status": 400,
+      "body": {
+        "error": "item_not_owned",
+        "message": "Bu çerçeveye sahip değilsiniz"
+      }
+    },
+    "response_400_invalid_frame": {
+      "status": 400,
+      "body": {
+        "error": "invalid_frame",
+        "message": "Geçersiz çerçeve kimliği"
+      }
+    }
+  },
+  "common_errors": {
+    "response_401_unauthorized": {
+      "status": 401,
+      "body": {
+        "error": "unauthorized"
+      }
+    },
+    "response_410_account_deleted": {
+      "status": 410,
+      "body": {
+        "error": "account_deleted",
+        "message": "Hesap silinmiş"
+      }
+    },
+    "response_500_internal_error": {
+      "status": 500,
+      "body": {
+        "error": "internal_error",
+        "message": "Durable Object error"
+      }
+    }
+  }
+}
+

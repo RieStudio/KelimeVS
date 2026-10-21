@@ -8,6 +8,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/bot_frame_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/secondary_button.dart';
@@ -61,6 +62,7 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
 class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   late final String _fallbackOpponentName;
   String _opponentName = '';
+  String _opponentFrame = 'classic';
   String? _matchedMatchId;
   bool _isOnlineMatch = false;
   bool _isOpponentFound = false;
@@ -96,6 +98,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       // Devre kesici kapalıysa veya voided sonrası doğrudan botlu maça düşülüyorsa
       _isOnlineMatch = false;
       _matchedMatchId = null;
+      _opponentFrame = BotFrameResolver.resolve(_opponentName);
       _searchTimer = Timer(
         widget.searchDuration ?? Duration.zero,
         _handleOpponentFound,
@@ -119,6 +122,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         _opponentName = event.opponentName.isNotEmpty
             ? event.opponentName
             : _fallbackOpponentName;
+        _opponentFrame = event.opponentFrame;
         _handleOpponentFound();
       } else if (event is MatchmakingNoOpponent ||
           event is MatchmakingUnavailable ||
@@ -127,6 +131,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         _isOnlineMatch = false;
         _matchedMatchId = null;
         _opponentName = _fallbackOpponentName;
+        _opponentFrame = BotFrameResolver.resolve(_opponentName);
         _handleOpponentFound();
       }
     });
@@ -176,6 +181,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
               matchId: matchId,
               opponentName: oppName,
+              opponentFrame: _opponentFrame,
             ),
       );
     } else {
@@ -283,6 +289,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                             ref.watch(profileProvider).nickname!.trim().isNotEmpty)
                         ? ref.watch(profileProvider).nickname!.trim()
                         : 'S',
+                    frame: ref.watch(profileProvider).equippedFrame,
                     size: AppDimens.avatarSearch,
                   ),
 
@@ -313,6 +320,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                       children: [
                         PlayerAvatar.opponent(
                           name: _opponentName,
+                          frame: _opponentFrame,
                           size: AppDimens.avatarSearch,
                         ),
                         const SizedBox(height: AppDimens.space6),

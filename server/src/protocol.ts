@@ -43,6 +43,7 @@ export type MatchmakerServerMessage =
       readonly t: 'matched';
       readonly matchId: string;
       readonly opponentName: string;
+      readonly opponentFrame?: string;
       readonly isFriendly?: boolean;
     }
   | {
@@ -77,6 +78,7 @@ export interface ClientStateMessage {
   readonly myHintsLeft: number;
   readonly attempts: readonly ClientAttempt[];
   readonly opponentName: string;
+  readonly opponentFrame?: string;
   readonly opponentConnected: boolean;
   readonly endedBy?: string;
   readonly winnerIsMe?: boolean;
@@ -110,6 +112,7 @@ export interface ClientFinalMessage {
   readonly winnerIsMe: boolean;
   readonly endedBy: string;
   readonly opponentName?: string;
+  readonly opponentFrame?: string;
   readonly coinsAwarded?: number;
   readonly coins?: number;
 }

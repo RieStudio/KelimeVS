@@ -8,6 +8,7 @@ class FakeProfileRepository implements ProfileRepository {
   String? _nickname;
   int _coins = 100;
   bool _syncPending = false;
+  String _equippedFrame = 'classic';
 
   FakeProfileRepository({String? initialNickname, int initialCoins = 100})
       : _nickname = initialNickname,
@@ -30,6 +31,16 @@ class FakeProfileRepository implements ProfileRepository {
   @override
   Future<void> setCoins(int coins) async {
     _coins = coins;
+
+  }
+
+  @override
+  Future<String> getEquippedFrame({String defaultFrame = 'classic'}) async =>
+      _equippedFrame;
+
+  @override
+  Future<void> setEquippedFrame(String frame) async {
+    _equippedFrame = frame;
   }
 
   @override

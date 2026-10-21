@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validateNickname } from './engine/nicknameValidator';
+import { FRAME_CATALOG, getFrameCatalogItem, isValidFrameId } from './frames';
 import type { Env } from './index';
 
 export type MatchRewardOutcome =
@@ -20,6 +21,7 @@ export interface UserProfileData {
   readonly coins: number;
   readonly stats: UserStats;
   readonly createdAt: number;
+  readonly equippedFrame: string;
 }
 
 export interface MatchRewardResult {
@@ -42,6 +44,40 @@ export interface RefundPowerupResult {
   readonly coins: number;
 }
 
+export interface StoreCatalogItem {
+  readonly id: string;
+  readonly name: string;
+  readonly cost: number;
+  readonly price?: number;
+  readonly description: string;
+  readonly order: number;
+  readonly isOwned: boolean;
+  readonly owned?: boolean;
+  readonly isEquipped: boolean;
+}
+
+export interface StoreStateResult {
+  readonly coins: number;
+  readonly equippedFrame: string;
+  readonly items: readonly StoreCatalogItem[];
+}
+
+export type PurchaseItemResult =
+  | { readonly success: true; readonly itemId: string; readonly coins: number }
+  | {
+      readonly success: false;
+      readonly error: 'not_enough_coins' | 'already_owned' | 'invalid_item';
+      readonly coins?: number;
+    };
+
+export type EquipFrameResult =
+  | { readonly success: true; readonly equippedFrame: string }
+  | { readonly success: false; readonly error: 'item_not_owned' | 'invalid_frame' };
+
+export type AdminGrantResult =
+  | { readonly success: true; readonly coins: number; readonly grantedFrames: readonly string[] }
+  | { readonly success: false; readonly error: 'account_deleted' | string };
+
 interface ProfileRow extends Record<string, string | number | null> {
   uid: string;
   nickname: string | null;
@@ -50,6 +86,7 @@ interface ProfileRow extends Record<string, string | number | null> {
   won: number;
   lost: number;
   created_at: number;
+  equipped_frame?: string | null;
 }
 
 interface DailyCoinsRow extends Record<string, string | number | null> {
@@ -145,7 +182,23 @@ export class UserProfile extends DurableObject<Env> {
         created_at INTEGER NOT NULL,
         PRIMARY KEY (match_id, powerup)
       );
+
+      CREATE TABLE IF NOT EXISTS owned_items (
+        item_id TEXT PRIMARY KEY,
+        purchased_at INTEGER NOT NULL
+      );
     `);
+
+    // PRAGMA ile equipped_frame sütununun varlığı kontrol edilir, yoksa ALTER çalıştırılır
+    const profileCols = this.ctx.storage.sql
+      .exec<{ name: string }>('PRAGMA table_info(profiles)')
+      .toArray();
+    const hasEquippedFrame = profileCols.some((c) => c.name === 'equipped_frame');
+    if (!hasEquippedFrame) {
+      this.ctx.storage.sql.exec(
+        "ALTER TABLE profiles ADD COLUMN equipped_frame TEXT NOT NULL DEFAULT 'classic'"
+      );
+    }
 
     this.initialized = true;
   }
@@ -184,6 +237,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM processed_matches;
       DELETE FROM blocked_users;
       DELETE FROM powerup_purchases;
+      DELETE FROM owned_items;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -219,7 +273,7 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
-      'SELECT uid, nickname, coins, played, won, lost, created_at FROM profiles LIMIT 1'
+      'SELECT uid, nickname, coins, played, won, lost, created_at, equipped_frame FROM profiles LIMIT 1'
     );
     const rows = cursor.toArray();
 
@@ -235,6 +289,7 @@ export class UserProfile extends DurableObject<Env> {
           lost: row.lost,
         },
         createdAt: row.created_at,
+        equippedFrame: (row.equipped_frame as string) || 'classic',
       };
     }
 
@@ -244,8 +299,8 @@ export class UserProfile extends DurableObject<Env> {
     const nowMs = Date.now();
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at)
-       VALUES (?, NULL, ?, 0, 0, 0, ?)`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at, equipped_frame)
+       VALUES (?, NULL, ?, 0, 0, 0, ?, 'classic')`,
       effectiveUid,
       initialCoins,
       nowMs
@@ -257,6 +312,7 @@ export class UserProfile extends DurableObject<Env> {
       coins: initialCoins,
       stats: { played: 0, won: 0, lost: 0 },
       createdAt: nowMs,
+      equippedFrame: 'classic',
     };
   }
 
@@ -666,6 +722,218 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   /**
+   * Mağaza durumunu döndürür: güncel bakiye, kuşanılan çerçeve ve tüm katalog ürünlerinin
+   * sahiplik/kuşanılma durumu.
+   */
+  async getStoreState(uid?: string): Promise<StoreStateResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const profile = await this.getProfile(uid);
+
+    const ownedRows = this.ctx.storage.sql
+      .exec<{ item_id: string }>('SELECT item_id FROM owned_items')
+      .toArray();
+    const ownedSet = new Set(ownedRows.map((r) => r.item_id));
+    ownedSet.add('classic'); // 'classic' her zaman ücretsiz ve sahiplenilmiştir
+
+    const items: StoreCatalogItem[] = FRAME_CATALOG.map((item) => ({
+      id: item.id,
+      name: item.name,
+      cost: item.cost,
+      price: item.cost,
+      description: item.description,
+      order: item.order,
+      isOwned: ownedSet.has(item.id),
+      owned: ownedSet.has(item.id),
+      isEquipped: profile.equippedFrame === item.id,
+    }));
+
+    return {
+      coins: profile.coins,
+      equippedFrame: profile.equippedFrame,
+      items,
+    };
+  }
+
+  /**
+   * Jetonla bir avatar çerçevesi satın alır.
+   * DO SQLite depolama kuralı: BEGIN/COMMIT yasak; ctx.storage.transactionSync kullanılır.
+   * Atomik olarak:
+   * 1. Ürün ve sahiplik kontrolü
+   * 2. Bakiye kontrolü
+   * 3. Bakiye düşme + owned_items tablosuna ekleme
+   */
+  async purchaseItem(itemId: string, uid?: string): Promise<PurchaseItemResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const catalogItem = getFrameCatalogItem(itemId);
+    if (!catalogItem) {
+      return { success: false, error: 'invalid_item' };
+    }
+
+    if (catalogItem.id === 'classic') {
+      return { success: false, error: 'already_owned' };
+    }
+
+    await this.getProfile(uid);
+
+    return this.ctx.storage.transactionSync(() => {
+      // 1. Mükerrer alım kontrolü
+      const existing = this.ctx.storage.sql
+        .exec<{ item_id: string }>(
+          'SELECT item_id FROM owned_items WHERE item_id = ? LIMIT 1',
+          itemId
+        )
+        .toArray();
+      if (existing.length > 0) {
+        return { success: false, error: 'already_owned' as const };
+      }
+
+      // 2. Bakiye kontrolü
+      const profileRows = this.ctx.storage.sql
+        .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+        .toArray();
+      const currentCoins = profileRows.length > 0 ? profileRows[0].coins : 0;
+      if (currentCoins < catalogItem.cost) {
+        return {
+          success: false,
+          error: 'not_enough_coins' as const,
+          coins: currentCoins,
+        };
+      }
+
+      // 3. Bakiye düş ve sahiplik kaydet
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins - ? WHERE coins >= ?',
+        catalogItem.cost,
+        catalogItem.cost
+      );
+
+      this.ctx.storage.sql.exec(
+        'INSERT INTO owned_items (item_id, purchased_at) VALUES (?, ?)',
+        itemId,
+        Date.now()
+      );
+
+      const updatedRows = this.ctx.storage.sql
+        .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+        .toArray();
+      const finalCoins =
+        updatedRows.length > 0 ? updatedRows[0].coins : currentCoins - catalogItem.cost;
+
+      return {
+        success: true as const,
+        itemId,
+        coins: finalCoins,
+      };
+    });
+  }
+
+  /**
+   * Oyuncunun avatar çerçevesini kuşandırır.
+   * Klasik çerçeve her zaman kuşanılabilir; diğerleri için owned_items sahiplik doğrulaması yapılır.
+   */
+  async equipFrame(frameId: string, uid?: string): Promise<EquipFrameResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const normalizedFrameId = typeof frameId === 'string' ? frameId.trim().toLowerCase() : '';
+
+    if (!isValidFrameId(normalizedFrameId)) {
+      return { success: false, error: 'invalid_frame' };
+    }
+
+    if (normalizedFrameId !== 'classic') {
+      const owned = this.ctx.storage.sql
+        .exec<{ item_id: string }>(
+          'SELECT item_id FROM owned_items WHERE item_id = ? LIMIT 1',
+          normalizedFrameId
+        )
+        .toArray();
+      if (owned.length === 0) {
+        return { success: false, error: 'item_not_owned' };
+      }
+    }
+
+    await this.getProfile(uid);
+
+    this.ctx.storage.sql.exec(
+      'UPDATE profiles SET equipped_frame = ?',
+      normalizedFrameId
+    );
+
+    return {
+      success: true,
+      equippedFrame: normalizedFrameId,
+    };
+  }
+
+  /**
+   * Yönetici tarafından kullanıcıya jeton ve/veya çerçeve tanımlar.
+   * Atomik (transactionSync), idempotent (INSERT OR IGNORE) ve silinmiş hesaplara kapalıdır.
+   */
+  async adminGrant(params: {
+    uid?: string;
+    coins?: number;
+    frameIds?: readonly string[];
+  }): Promise<AdminGrantResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { success: false, error: 'account_deleted' };
+    }
+
+    await this.getProfile(params.uid);
+
+    return this.ctx.storage.transactionSync(() => {
+      if (typeof params.coins === 'number' && Number.isFinite(params.coins) && params.coins !== 0) {
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET coins = MAX(0, coins + ?)',
+          Math.floor(params.coins)
+        );
+      }
+
+      const grantedFrames: string[] = [];
+      if (Array.isArray(params.frameIds)) {
+        const now = Date.now();
+        for (const rawId of params.frameIds) {
+          const frameId = typeof rawId === 'string' ? rawId.trim().toLowerCase() : '';
+          if (isValidFrameId(frameId) && frameId !== 'classic') {
+            this.ctx.storage.sql.exec(
+              'INSERT OR IGNORE INTO owned_items (item_id, purchased_at) VALUES (?, ?)',
+              frameId,
+              now
+            );
+            grantedFrames.push(frameId);
+          }
+        }
+      }
+
+      const rows = this.ctx.storage.sql
+        .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+        .toArray();
+      const finalCoins = rows.length > 0 ? rows[0].coins : 0;
+
+      return {
+        success: true,
+        coins: finalCoins,
+        grantedFrames,
+      };
+    });
+  }
+
+  /**
    * HTTP Fetch arayüzü desteği
    */
   async fetch(request: Request): Promise<Response> {
@@ -758,6 +1026,43 @@ export class UserProfile extends DurableObject<Env> {
           );
         }
         return new Response(JSON.stringify({ error: 'reward_error', message: msg }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/admin/grant') {
+      try {
+        const body = (await request.json().catch(() => ({}))) as {
+          uid?: unknown;
+          coins?: unknown;
+          frameIds?: unknown;
+        };
+        const res = await this.adminGrant({
+          uid: typeof body.uid === 'string' ? body.uid : uid,
+          coins: typeof body.coins === 'number' ? body.coins : undefined,
+          frameIds: Array.isArray(body.frameIds) ? (body.frameIds as string[]) : undefined,
+        });
+        if (!res.success) {
+          if (res.error === 'account_deleted') {
+            return new Response(JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }), {
+              status: 410,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          return new Response(JSON.stringify({ error: res.error }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' },
         });

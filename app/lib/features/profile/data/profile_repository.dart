@@ -6,6 +6,8 @@ abstract class ProfileRepository {
   Future<bool> hasNickname();
   Future<int> getCoins({int defaultCoins = 100});
   Future<void> setCoins(int coins);
+  Future<String> getEquippedFrame({String defaultFrame = 'classic'});
+  Future<void> setEquippedFrame(String frame);
   Future<bool> isNicknameSyncPending();
   Future<void> setNicknameSyncPending(bool pending);
   Future<void> clear();
@@ -14,6 +16,7 @@ abstract class ProfileRepository {
 class LocalProfileRepository implements ProfileRepository {
   static const String keyNickname = 'user_nickname';
   static const String keyCoins = 'user_coins';
+  static const String keyEquippedFrame = 'user_equipped_frame';
   static const String keyNicknameSyncPending = 'user_nickname_sync_pending';
 
   final SharedPreferences? prefs;
@@ -57,6 +60,18 @@ class LocalProfileRepository implements ProfileRepository {
   }
 
   @override
+  Future<String> getEquippedFrame({String defaultFrame = 'classic'}) async {
+    final p = await _getPrefs();
+    return p.getString(keyEquippedFrame) ?? defaultFrame;
+  }
+
+  @override
+  Future<void> setEquippedFrame(String frame) async {
+    final p = await _getPrefs();
+    await p.setString(keyEquippedFrame, frame.trim());
+  }
+
+  @override
   Future<bool> isNicknameSyncPending() async {
     final p = await _getPrefs();
     return p.getBool(keyNicknameSyncPending) ?? false;
@@ -77,6 +92,7 @@ class LocalProfileRepository implements ProfileRepository {
     final p = await _getPrefs();
     await p.remove(keyNickname);
     await p.remove(keyCoins);
+    await p.remove(keyEquippedFrame);
     await p.remove(keyNicknameSyncPending);
   }
 }

@@ -36,6 +36,7 @@ class MatchHistoryEntry {
   final bool botlaOynandi;
   final bool isFinal;
   final bool isFriendly;
+  final String opponentFrame;
 
   const MatchHistoryEntry({
     required this.id,
@@ -53,6 +54,7 @@ class MatchHistoryEntry {
     this.botlaOynandi = false,
     this.isFinal = true,
     this.isFriendly = false,
+    this.opponentFrame = 'classic',
   }) : endReason = endReason ??
             (endType == MatchEndType.forfeit
                 ? (result == MatchResult.win

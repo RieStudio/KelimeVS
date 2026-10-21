@@ -12,6 +12,7 @@ class ProfileState {
   final bool isLoaded;
   final bool isSyncing;
   final String? syncError;
+  final String equippedFrame;
 
   const ProfileState({
     this.nickname,
@@ -19,6 +20,7 @@ class ProfileState {
     this.isLoaded = false,
     this.isSyncing = false,
     this.syncError,
+    this.equippedFrame = 'classic',
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -29,6 +31,7 @@ class ProfileState {
     bool? isLoaded,
     bool? isSyncing,
     String? syncError,
+    String? equippedFrame,
     bool clearSyncError = false,
   }) {
     return ProfileState(
@@ -37,6 +40,7 @@ class ProfileState {
       isLoaded: isLoaded ?? this.isLoaded,
       isSyncing: isSyncing ?? this.isSyncing,
       syncError: clearSyncError ? null : (syncError ?? this.syncError),
+      equippedFrame: equippedFrame ?? this.equippedFrame,
     );
   }
 }
@@ -71,10 +75,12 @@ class ProfileNotifier extends Notifier<ProfileState> {
     final repo = ref.read(profileRepositoryProvider);
     final nick = await repo.getNickname();
     final coins = await repo.getCoins(defaultCoins: 100);
+    final frame = await repo.getEquippedFrame(defaultFrame: 'classic');
 
     state = state.copyWith(
       nickname: state.nickname ?? nick,
       coins: state.coins == 100 ? coins : state.coins,
+      equippedFrame: frame,
       isLoaded: true,
     );
 
@@ -96,7 +102,8 @@ class ProfileNotifier extends Notifier<ProfileState> {
       if (remote != null) {
         // 1. Jeton bakiyesini senkronla
         await repo.setCoins(remote.coins);
-        state = state.copyWith(coins: remote.coins);
+        await repo.setEquippedFrame(remote.equippedFrame);
+        state = state.copyWith(coins: remote.coins, equippedFrame: remote.equippedFrame);
 
         // 2. Takma ad senkronizasyonu (Kural 2)
         final localNick = state.nickname ?? await repo.getNickname();
@@ -185,6 +192,13 @@ class ProfileNotifier extends Notifier<ProfileState> {
     final repo = ref.read(profileRepositoryProvider);
     await repo.setCoins(newTotal);
     state = state.copyWith(coins: newTotal);
+  }
+
+  /// Kuşanılan avatar çerçevesini yerelde ve durumda günceller.
+  Future<void> setEquippedFrame(String frame) async {
+    final repo = ref.read(profileRepositoryProvider);
+    await repo.setEquippedFrame(frame);
+    state = state.copyWith(equippedFrame: frame);
   }
 
   Future<void> clearNickname() async {

@@ -13,6 +13,7 @@ class UserProfileModel {
   final int won;
   final int lost;
   final int createdAt;
+  final String equippedFrame;
 
   const UserProfileModel({
     required this.uid,
@@ -22,6 +23,7 @@ class UserProfileModel {
     this.won = 0,
     this.lost = 0,
     this.createdAt = 0,
+    this.equippedFrame = 'classic',
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class UserProfileModel {
       won: (stats?['won'] as num?)?.toInt() ?? 0,
       lost: (stats?['lost'] as num?)?.toInt() ?? 0,
       createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
+      equippedFrame: json['equippedFrame'] as String? ?? 'classic',
     );
   }
 }

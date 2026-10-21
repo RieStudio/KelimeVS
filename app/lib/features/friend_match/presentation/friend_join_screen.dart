@@ -50,7 +50,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
     if (!mounted) return;
 
     if (event is FriendMatchMatched) {
-      _onMatched(event.matchId, event.opponentName);
+      _onMatched(event.matchId, event.opponentName, event.opponentFrame);
     } else if (event is FriendMatchFailed) {
       setState(() {
         _isLoading = false;
@@ -78,7 +78,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
     }
   }
 
-  void _onMatched(String matchId, String opponentName) {
+  void _onMatched(String matchId, String opponentName, String opponentFrame) {
     if (_isMatched) return;
     _isMatched = true;
 
@@ -96,6 +96,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
       ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
             matchId: matchId,
             opponentName: opponentName,
+            opponentFrame: opponentFrame,
             isFriendly: true,
           ),
     );

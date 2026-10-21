@@ -18,6 +18,7 @@ import type { Env } from './index';
 export interface QueueEntry {
   readonly uid: string;
   readonly name: string;
+  readonly frame?: string;
   readonly joinedAt: number;
   readonly blockedUids?: readonly string[];
 }
@@ -85,11 +86,13 @@ export interface StoredFriendRoom {
   readonly code: string;
   readonly hostUid: string;
   readonly hostName: string;
+  readonly hostFrame?: string;
   readonly createdAt: number;
   readonly expiresAt: number;
   status: 'waiting_for_guest' | 'matched' | 'expired';
   matchedMatchId?: string;
   matchedOpponentName?: string;
+  matchedOpponentFrame?: string;
 }
 
 interface RateLimitEntry {
@@ -114,7 +117,7 @@ export class Matchmaker extends DurableObject<Env> {
   private friendRooms = new Map<string, StoredFriendRoom>();
   private matchedPendingByHostUid = new Map<
     string,
-    { matchId: string; opponentName: string; expiresAt: number }
+    { matchId: string; opponentName: string; opponentFrame?: string; expiresAt: number }
   >();
   private failedAttemptsByUid = new Map<string, RateLimitEntry>();
   private failedAttemptsByIp = new Map<string, IpRateLimitEntry>();
@@ -190,23 +193,26 @@ export class Matchmaker extends DurableObject<Env> {
       // İçerik önbelleği geçerli değilse arka planda yüklemeye başla (önden ısıt)
       this.prewarmContent();
 
-      // Kullanıcının engel listesini UserProfile'dan çek
+      // Kullanıcının profil bilgilerini ve engel listesini çek
       // NOT: Kuyruktayken eklenen engelin o kuyruk oturumunda geçerli olmayabileceği kabul edilen bir sınırlamadır.
       let blockedUids: string[] = [];
+      let playerInfo = { name: parsed.name, frame: 'classic' };
       try {
         if (this.env.USER_PROFILE) {
           const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(uid));
           blockedUids = await profileStub.getBlockedUids();
+          playerInfo = await this.getPlayerInfo(uid, parsed.name);
         }
       } catch {
-        // Hata durumunda boş engel listesiyle devam et
+        // Hata durumunda varsayılanlarla devam et
       }
 
       // Aynı uid varsa güncelle, yoksa ekle (FIFO)
       const existingIdx = this.queue.findIndex((e) => e.uid === uid);
       const newEntry: QueueEntry = {
         uid,
-        name: parsed.name,
+        name: playerInfo.name,
+        frame: playerInfo.frame,
         joinedAt: Date.now(),
         blockedUids,
       };
@@ -310,8 +316,8 @@ export class Matchmaker extends DurableObject<Env> {
       return;
     }
 
-    // 4. Oyuncu adını profile güvenerek al
-    const hostName = await this.getPlayerNickname(uid, parsed.name);
+    // 4. Oyuncu adını ve çerçevesini profile güvenerek al
+    const hostInfo = await this.getPlayerInfo(uid, parsed.name);
     this.prewarmContent();
 
     // 5. Çakışmayan 6 karakterlik davet kodu üret
@@ -327,7 +333,8 @@ export class Matchmaker extends DurableObject<Env> {
     const room: StoredFriendRoom = {
       code,
       hostUid: uid,
-      hostName,
+      hostName: hostInfo.name,
+      hostFrame: hostInfo.frame,
       createdAt: now,
       expiresAt,
       status: 'waiting_for_guest',
@@ -371,6 +378,7 @@ export class Matchmaker extends DurableObject<Env> {
             t: 'matched',
             matchId: pendingMatched.matchId,
             opponentName: pendingMatched.opponentName,
+            opponentFrame: pendingMatched.opponentFrame || 'classic',
             isFriendly: true,
           })
         );
@@ -415,6 +423,7 @@ export class Matchmaker extends DurableObject<Env> {
             t: 'matched',
             matchId: room.matchedMatchId,
             opponentName: room.matchedOpponentName,
+            opponentFrame: room.matchedOpponentFrame || 'classic',
             isFriendly: true,
           })
         );
@@ -552,7 +561,7 @@ export class Matchmaker extends DurableObject<Env> {
     // Başarılı katılım: Hatalı deneme sayacını temizle
     this.clearFailedAttempts(uid);
 
-    const guestName = await this.getPlayerNickname(uid, parsed.name);
+    const guestInfo = await this.getPlayerInfo(uid, parsed.name);
     const matchId = crypto.randomUUID();
     const selectedQuestions = selectAndShuffleEightQuestions(allQuestions);
     const questionOrder = selectedQuestions.map((q) => q.id);
@@ -561,8 +570,8 @@ export class Matchmaker extends DurableObject<Env> {
     const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
     await roomStub.initMatch({
       matchId,
-      p1: { uid: room.hostUid, name: room.hostName },
-      p2: { uid, name: guestName },
+      p1: { uid: room.hostUid, name: room.hostName, frame: room.hostFrame || 'classic' },
+      p2: { uid, name: guestInfo.name, frame: guestInfo.frame || 'classic' },
       questions: selectedQuestions,
       questionOrder,
       matchType: 'friendly',
@@ -570,7 +579,8 @@ export class Matchmaker extends DurableObject<Env> {
 
     room.status = 'matched';
     room.matchedMatchId = matchId;
-    room.matchedOpponentName = guestName;
+    room.matchedOpponentName = guestInfo.name;
+    room.matchedOpponentFrame = guestInfo.frame;
 
     // Katılana matched mesajı gönder
     try {
@@ -579,6 +589,7 @@ export class Matchmaker extends DurableObject<Env> {
           t: 'matched',
           matchId,
           opponentName: room.hostName,
+          opponentFrame: room.hostFrame || 'classic',
           isFriendly: true,
         })
       );
@@ -593,7 +604,8 @@ export class Matchmaker extends DurableObject<Env> {
           JSON.stringify({
             t: 'matched',
             matchId,
-            opponentName: guestName,
+            opponentName: guestInfo.name,
+            opponentFrame: guestInfo.frame || 'classic',
             isFriendly: true,
           })
         );
@@ -605,7 +617,8 @@ export class Matchmaker extends DurableObject<Env> {
     if (!hostNotified) {
       this.matchedPendingByHostUid.set(room.hostUid, {
         matchId,
-        opponentName: guestName,
+        opponentName: guestInfo.name,
+        opponentFrame: guestInfo.frame || 'classic',
         expiresAt: Date.now() + 2 * 60 * 1000,
       });
     }
@@ -783,19 +796,31 @@ export class Matchmaker extends DurableObject<Env> {
     this.failedAttemptsByUid.delete(uid);
   }
 
-  private async getPlayerNickname(uid: string, fallbackName?: string): Promise<string> {
+  private async getPlayerInfo(
+    uid: string,
+    fallbackName?: string
+  ): Promise<{ name: string; frame: string }> {
     try {
       if (this.env.USER_PROFILE) {
         const profileStub = this.env.USER_PROFILE.get(
           this.env.USER_PROFILE.idFromName(uid)
         );
         const profile = await profileStub.getProfile(uid);
-        if (profile && profile.nickname) {
-          return sanitizePlayerName(profile.nickname);
+        if (profile) {
+          const name = profile.nickname
+            ? sanitizePlayerName(profile.nickname)
+            : sanitizePlayerName(fallbackName);
+          const frame = profile.equippedFrame || 'classic';
+          return { name, frame };
         }
       }
     } catch {}
-    return sanitizePlayerName(fallbackName);
+    return { name: sanitizePlayerName(fallbackName), frame: 'classic' };
+  }
+
+  private async getPlayerNickname(uid: string, fallbackName?: string): Promise<string> {
+    const info = await this.getPlayerInfo(uid, fallbackName);
+    return info.name;
   }
 
   private async isAccountDeleted(uid: string): Promise<boolean> {
@@ -945,8 +970,8 @@ export class Matchmaker extends DurableObject<Env> {
       const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
       await roomStub.initMatch({
         matchId,
-        p1: { uid: p1.uid, name: p1.name },
-        p2: { uid: p2.uid, name: p2.name },
+        p1: { uid: p1.uid, name: p1.name, frame: p1.frame || 'classic' },
+        p2: { uid: p2.uid, name: p2.name, frame: p2.frame || 'classic' },
         questions: selectedQuestions,
         questionOrder,
       });
@@ -959,11 +984,13 @@ export class Matchmaker extends DurableObject<Env> {
         t: 'matched',
         matchId,
         opponentName: p2.name,
+        opponentFrame: p2.frame || 'classic',
       };
       const p2Matched: MatchmakerServerMessage = {
         t: 'matched',
         matchId,
         opponentName: p1.name,
+        opponentFrame: p1.frame || 'classic',
       };
 
       for (const s of p1Sockets) {

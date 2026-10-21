@@ -10,6 +10,7 @@
     "check:content": "tsx tools/check-content.ts",
     "lb-debug": "tsx tools/lb-debug.ts",
     "reports": "tsx tools/reports.ts",
+    "grant": "tsx tools/grant.ts",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "dev:real": "wrangler dev --var CONTENT_SOURCE:realtime",

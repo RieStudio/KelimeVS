@@ -171,6 +171,7 @@ Arkadaş düellosu da `/ws/matchmaking` WebSocket uç noktası üzerinden yönet
   "t": "matched",
   "matchId": "m_1729452000000_abc123",
   "opponentName": "Zeynep",
+  "opponentFrame": "mint",
   "isFriendly": true
 }
 ```
@@ -268,6 +269,7 @@ Her hamle, tur geçişi veya durum değişikliğinde (veya `sync` istendiğinde)
     }
   ],
   "opponentName": "Mehmet",
+  "opponentFrame": "classic",
   "opponentConnected": true,
   "nextRoundAtMs": 1728518417000,
   "endedBy": "normal",
@@ -319,6 +321,8 @@ Maç sonuçlandığında her iki oyuncuya gönderilir. Maç detay ekranı ve ge�
     "me": 2,
     "opponent": 1
   },
+  "opponentName": "Mehmet",
+  "opponentFrame": "classic",
   "winnerIsMe": true,
   "endedBy": "normal" | "forfeit"
 }
@@ -415,4 +419,46 @@ Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
 |---|---|---|---|
 | `ALLOW_DEV_AUTH` | `"true"` / `"false"` | `"false"` | Geliştirme ortamında `dev:<uid>` token'larına izin verir. |
 | `FAST_TIMERS` | `"true"` / `"false"` | `"false"` | E2E ve otomatik testlerin saniyeler içinde tamamlanması için zamanlayıcıları hızlandırır. |
+
+---
+
+## 8. HTTP REST API Uç Noktaları
+
+Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmiş hesaplar tüm uçlardan `410 Gone` alır.
+
+### Profil ve Hesap
+- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`, `createdAt`, `equippedFrame`) döndürür.
+- `PUT /me/nickname`: Takma ad günceller (`{ "nickname": "..." }`).
+- `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
+- `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller.
+
+### Mağaza (Store)
+- `GET /store`: Mağaza durumu ve katalog ürünlerini döndürür:
+  ```json
+  {
+    "coins": 100,
+    "equippedFrame": "classic",
+    "items": [
+      {
+        "id": "classic",
+        "name": "Klasik",
+        "cost": 0,
+        "description": "Sade ve şık orijinal kenarlık",
+        "order": 1,
+        "isOwned": true,
+        "isEquipped": true
+      },
+      ...
+    ]
+  }
+  ```
+- `POST /store/purchase`: Jetonla avatar çerçevesi satın alır (`{ "itemId": "mint" }`).
+  - Başarılı: `200 OK` (`{ "success": true, "itemId": "mint", "coins": 0 }`).
+  - Yetersiz bakiye: `402 Payment Required` (`{ "error": "not_enough_coins", "coins": ... }`).
+  - Zaten sahip olunan ürün: `400 Bad Request` (`{ "error": "already_owned" }`).
+  - Geçersiz ürün: `400 Bad Request` (`{ "error": "invalid_item" }`).
+
+### Liderlik Tablosu
+- `GET /leaderboard`: Haftalık ilk 50 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.
+
 

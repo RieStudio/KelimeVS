@@ -322,5 +322,62 @@ abstract final class AppStrings {
     }
     return 'KelimeVS\'de benimle kelime düellosuna var mısın? Davet kodum: $code\nOyunu indir ve hemen başla: $storeShareUrl';
   }
+
+  // Mağaza & Avatar Çerçeveleri
+  static const String storeTitle = 'Mağaza';
+  static const String avatarFramesSection = 'AVATAR ÇERÇEVELERİ';
+  static const String equipAction = 'Kuşan';
+  static const String equippedStatus = 'Kuşanıldı';
+  static const String buyAction = 'Satın Al';
+  static const String cancelAction = 'Vazgeç';
+  static const String insufficientCoins = 'Yetersiz jeton';
+  static const String framePurchasedSuccess = 'Çerçeve satın alındı';
+  static const String frameEquippedSuccess = 'Çerçeve kuşandı';
+  static const String alreadyOwnedError = 'Bu çerçeveye zaten sahipsin.';
+  static const String itemNotOwnedError = 'Bu çerçeveye henüz sahip değilsin.';
+  static const String storeInvalidFrameError = 'Geçersiz çerçeve seçildi.';
+  static const String storeServerError = 'Sunucu hatası oluştu, lütfen daha sonra tekrar dene.';
+  static const String storeNetworkError = 'Bağlantı hatası. Lütfen internetini kontrol et.';
+  static const String storeGenericError = 'İşlem gerçekleştirilemedi, lütfen tekrar dene.';
+
+  // Çerçeve adları
+  static const String frameClassic = 'Klasik';
+  static const String frameMint = 'Nane';
+  static const String frameSunset = 'Gün Batımı';
+  static const String frameOcean = 'Okyanus';
+  static const String frameGold = 'Altın';
+  static const String frameNeon = 'Neon';
+  static const String frameRainbow = 'Gökkuşağı';
+  static const String frameDiamond = 'Elmas';
+
+  static String frameDisplayName(String frameId) {
+    switch (frameId.toLowerCase()) {
+      case 'mint':
+        return frameMint;
+      case 'sunset':
+        return frameSunset;
+      case 'ocean':
+        return frameOcean;
+      case 'gold':
+        return frameGold;
+      case 'neon':
+        return frameNeon;
+      case 'rainbow':
+        return frameRainbow;
+      case 'diamond':
+        return frameDiamond;
+      case 'classic':
+      default:
+        return frameClassic;
+    }
+  }
+
+  static String avatarSemantics({String? name, String? frameId}) {
+    final frameName = frameDisplayName(frameId ?? 'classic');
+    if (name != null && name.trim().isNotEmpty) {
+      return '$name, $frameName çerçeveli avatar';
+    }
+    return '$frameName çerçeveli avatar';
+  }
 }
 

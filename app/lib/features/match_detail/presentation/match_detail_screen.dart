@@ -6,6 +6,8 @@ import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/bot_frame_resolver.dart';
+import '../../profile/application/profile_notifier.dart';
 import '../../../../core/widgets/answer_bubble.dart';
 import '../../../../core/widgets/app_icon_button.dart';
 import '../../../../core/widgets/player_avatar.dart';
@@ -238,6 +240,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
     required bool isWinner,
     required bool isForfeit,
   }) {
+    final myFrame = ref.watch(profileProvider).equippedFrame;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -259,8 +262,9 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const PlayerAvatar.selfMatch(
+              PlayerAvatar.selfMatch(
                 name: AppStrings.you,
+                frame: myFrame,
                 size: 54,
               ),
               const SizedBox(height: AppDimens.space6),
@@ -341,6 +345,9 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                 children: [
                   PlayerAvatar.opponent(
                     name: oppDisplayName,
+                    frame: widget.match.botlaOynandi
+                        ? BotFrameResolver.resolve(oppDisplayName)
+                        : widget.match.opponentFrame,
                     size: 54,
                   ),
                   const SizedBox(height: AppDimens.space6),

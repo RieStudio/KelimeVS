@@ -7,12 +7,14 @@ class LeaderboardEntry {
   final String nickname;
   final int wins;
   final bool isMe;
+  final String frame;
 
   const LeaderboardEntry({
     required this.rank,
     required this.nickname,
     required this.wins,
     required this.isMe,
+    this.frame = 'classic',
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
@@ -21,6 +23,7 @@ class LeaderboardEntry {
       nickname: (json['nickname'] as String?)?.trim() ?? '',
       wins: (json['wins'] as num).toInt(),
       isMe: json['isMe'] == true,
+      frame: json['frame'] as String? ?? 'classic',
     );
   }
 
@@ -32,10 +35,11 @@ class LeaderboardEntry {
           rank == other.rank &&
           nickname == other.nickname &&
           wins == other.wins &&
-          isMe == other.isMe;
+          isMe == other.isMe &&
+          frame == other.frame;
 
   @override
-  int get hashCode => Object.hash(rank, nickname, wins, isMe);
+  int get hashCode => Object.hash(rank, nickname, wins, isMe, frame);
 }
 
 @immutable

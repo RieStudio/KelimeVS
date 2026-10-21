@@ -90,6 +90,7 @@ export function filterStateForPlayer(params: {
   readonly playerUid: string;
   readonly opponentUid: string;
   readonly opponentName: string;
+  readonly opponentFrame?: string;
   readonly opponentConnected: boolean;
   readonly serverNowMs: number;
   readonly nextRoundAtMs?: number;
@@ -107,6 +108,7 @@ export function filterStateForPlayer(params: {
     playerUid,
     opponentUid,
     opponentName,
+    opponentFrame,
     opponentConnected,
     serverNowMs,
     nextRoundAtMs,
@@ -177,6 +179,7 @@ export function filterStateForPlayer(params: {
     myHintsLeft: state.remainingNearMisses[playerUid] ?? 0,
     attempts: clientAttempts,
     opponentName,
+    ...(opponentFrame ? { opponentFrame } : {}),
     opponentConnected,
     ...(state.endedBy ? { endedBy: state.endedBy } : {}),
     ...(state.winnerId ? { winnerIsMe: state.winnerId === playerUid } : {}),
@@ -192,10 +195,11 @@ export function buildFinalMessage(params: {
   readonly playerUid: string;
   readonly opponentUid: string;
   readonly opponentName?: string;
+  readonly opponentFrame?: string;
   readonly coinsAwarded?: number;
   readonly coins?: number;
 }): ClientFinalMessage {
-  const { state, playerUid, opponentUid, opponentName, coinsAwarded, coins } = params;
+  const { state, playerUid, opponentUid, opponentName, opponentFrame, coinsAwarded, coins } = params;
 
   const rounds: ClientRoundRecord[] = state.roundHistory.map((r) => ({
     questionId: r.questionId,
@@ -219,6 +223,7 @@ export function buildFinalMessage(params: {
     winnerIsMe: state.winnerId === playerUid,
     endedBy: state.endedBy ?? 'normal',
     ...(opponentName ? { opponentName } : {}),
+    ...(opponentFrame ? { opponentFrame } : {}),
     ...(coinsAwarded !== undefined ? { coinsAwarded } : {}),
     ...(coins !== undefined ? { coins } : {}),
   };

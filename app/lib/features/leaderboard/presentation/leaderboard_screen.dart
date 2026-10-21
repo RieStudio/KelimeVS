@@ -225,11 +225,13 @@ class _LeaderboardItemCard extends StatelessWidget {
           isMe
               ? PlayerAvatar.selfHome(
                   name: entry.nickname,
+                  frame: entry.frame,
                   size: AppDimens.avatarMatch,
                   borderWidth: AppDimens.borderThin,
                 )
               : PlayerAvatar.opponent(
                   name: entry.nickname,
+                  frame: entry.frame,
                   size: AppDimens.avatarMatch,
                   borderWidth: AppDimens.borderThin,
                 ),

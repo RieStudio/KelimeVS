@@ -95,6 +95,7 @@ abstract final class OnlineMatchHistoryMapper {
     required FinalServerMessage finalMessage,
     required String matchId,
     required String opponentName,
+    String opponentFrame = 'classic',
     required int finishedAtMs,
     required Map<String, String> questionTextsById,
     MatchEndReason? endReason,
@@ -137,6 +138,7 @@ abstract final class OnlineMatchHistoryMapper {
       roundQuestionTexts: roundQuestionTexts,
       botlaOynandi: false,
       isFriendly: isFriendly,
+      opponentFrame: opponentFrame,
     );
   }
 }
@@ -224,6 +226,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    String opponentFrame = 'classic',
     bool isFriendly = false,
     OnlineMatchClient? client,
   }) async {
@@ -255,6 +258,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       isDisconnectedPermanent: false,
       isDisconnectedReplaced: false,
       isFriendly: isFriendly,
+      opponentFrame: opponentFrame,
     );
 
     final activeClient =
@@ -469,11 +473,13 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final updatedOpponentName = onlineState.opponentName.isNotEmpty
         ? onlineState.opponentName
         : state.opponentName;
+    final updatedOpponentFrame = onlineState.opponentFrame;
 
     state = state.copyWith(
       matchState: mappedMatchState,
       remainingMs: remainingMs,
       opponentName: updatedOpponentName,
+      opponentFrame: updatedOpponentFrame,
       connectionStatus: ConnectionStatus.connected,
       opponentConnected: onlineState.opponentConnected,
       isLoading: false,
@@ -563,10 +569,12 @@ class OnlineMatchSession extends Notifier<MatchUiState>
             : (state.opponentName.trim().isNotEmpty
                 ? state.opponentName.trim()
                 : AppStrings.opponent);
+    final resolvedOpponentFrame = finalMsg.opponentFrame;
     final entry = OnlineMatchHistoryMapper.toHistoryEntry(
       finalMessage: finalMsg,
       matchId: matchId,
       opponentName: resolvedOpponentName,
+      opponentFrame: resolvedOpponentFrame,
       finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
       endReason: endReason,
@@ -613,6 +621,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         roundHistory: entry.roundRecords,
       ),
       coinsAwarded: finalMsg.coinsAwarded,
+      opponentFrame: resolvedOpponentFrame,
     );
 
     if (finalMsg.coins != null) {

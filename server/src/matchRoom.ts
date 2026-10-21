@@ -30,6 +30,7 @@ import type { Env } from './index';
 interface PlayerInfo {
   readonly uid: string;
   readonly name: string;
+  readonly frame?: string;
 }
 
 export interface MatchRoomInitParams {
@@ -750,10 +751,16 @@ export class MatchRoom extends DurableObject<Env> {
       const leaderboardStub = this.env.LEADERBOARD.get(
         this.env.LEADERBOARD.idFromName('global')
       );
+      const winnerFrame =
+        (this.data.leaderboardWinnerUid === this.data.p1.uid
+          ? this.data.p1.frame
+          : this.data.p2.frame) || 'classic';
+
       await leaderboardStub.recordMatchResult({
         matchId: this.data.matchId,
         winnerUid: this.data.leaderboardWinnerUid,
         winnerNickname: winnerNick ?? null,
+        winnerFrame,
         loserUid: this.data.leaderboardLoserUid,
         loserNickname: loserNick ?? null,
         deletedUids,
@@ -1139,6 +1146,7 @@ export class MatchRoom extends DurableObject<Env> {
       playerUid: uid,
       opponentUid: opponent.uid,
       opponentName: opponent.name,
+      opponentFrame: opponent.frame || 'classic',
       opponentConnected,
       serverNowMs: Date.now(),
       nextRoundAtMs: this.data.schedule.nextRoundAtMs,
@@ -1170,6 +1178,7 @@ export class MatchRoom extends DurableObject<Env> {
       playerUid: uid,
       opponentUid: opponent.uid,
       opponentName: opponent.name,
+      opponentFrame: opponent.frame || 'classic',
       ...(isFriendly
         ? { coinsAwarded: 0 }
         : playerReward

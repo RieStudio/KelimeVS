@@ -41,6 +41,15 @@ abstract final class ServerConfig {
   /// Takma ad güncelleme yolu.
   static const String nicknamePath = '/me/nickname';
 
+  /// Çerçeve kuşanma yolu.
+  static const String framePath = '/me/frame';
+
+  /// Mağaza durumu yolu.
+  static const String storePath = '/store';
+
+  /// Satın alma yolu.
+  static const String purchasePath = '/store/purchase';
+
   /// Liderlik tablosu yolu.
   static const String leaderboardPath = '/leaderboard';
 
@@ -58,6 +67,15 @@ abstract final class ServerConfig {
 
   /// Tam Takma Ad Güncelleme HTTP URL'si.
   static String get nicknameUrl => joinUrl(serverUrl, nicknamePath);
+
+  /// Tam Çerçeve Güncelleme HTTP URL'si.
+  static String get frameUrl => joinUrl(serverUrl, framePath);
+
+  /// Tam Mağaza HTTP URL'si.
+  static String get storeUrl => joinUrl(serverUrl, storePath);
+
+  /// Tam Satın Alma HTTP URL'si.
+  static String get purchaseUrl => joinUrl(serverUrl, purchasePath);
 
   /// Tam Liderlik Tablosu HTTP URL'si.
   static String get leaderboardUrl => joinUrl(serverUrl, leaderboardPath);

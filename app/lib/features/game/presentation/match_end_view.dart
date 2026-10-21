@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/result_circle.dart';
 import '../../../core/widgets/secondary_button.dart';
@@ -212,9 +213,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final opponentDisplayName = (lastMatch?.opponentName.isNotEmpty ?? false)
         ? lastMatch!.opponentName
         : (uiState.opponentName.isNotEmpty ? uiState.opponentName : AppStrings.opponent);
-    final opponentInitial = opponentDisplayName.isNotEmpty
-        ? opponentDisplayName.substring(0, 1).toUpperCase()
-        : '?';
+    final oppFrame = lastMatch?.opponentFrame ?? uiState.opponentFrame;
 
     final ResultCircleVariant circleVariant;
     final AppIconData icon;
@@ -459,27 +458,10 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                   child: Row(
                     children: [
                       // Rakip Avatar
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.mint,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.ink,
-                            width: AppDimens.borderThin,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          opponentInitial,
-                          style: const TextStyle(
-                            fontFamily: AppTextStyles.fontFredoka,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18,
-                            color: AppColors.ink,
-                          ),
-                        ),
+                      PlayerAvatar.opponent(
+                        name: opponentDisplayName,
+                        frame: oppFrame,
+                        size: 36,
                       ),
                       const SizedBox(width: AppDimens.space10),
 

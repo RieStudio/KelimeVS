@@ -72,11 +72,13 @@ class MatchedServerMessage extends ServerMessage {
   final String matchId;
   final String opponentName;
   final bool isFriendly;
+  final String opponentFrame;
 
   const MatchedServerMessage({
     required this.matchId,
     required this.opponentName,
     this.isFriendly = false,
+    this.opponentFrame = 'classic',
   });
 
   @override
@@ -161,6 +163,7 @@ class FinalServerMessage extends ServerMessage {
   final bool winnerIsMe;
   final String endedBy; // 'normal', 'forfeit'
   final String? opponentName;
+  final String opponentFrame;
   final int? coinsAwarded;
   final int? coins;
 
@@ -171,6 +174,7 @@ class FinalServerMessage extends ServerMessage {
     required this.winnerIsMe,
     required this.endedBy,
     this.opponentName,
+    this.opponentFrame = 'classic',
     this.coinsAwarded,
     this.coins,
   });
@@ -259,6 +263,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final matchId = json['matchId'];
         final opponentName = json['opponentName'];
         final isFriendly = json['isFriendly'] as bool? ?? false;
+        final opponentFrame = json['opponentFrame'] as String? ?? 'classic';
         if (matchId is! String || opponentName is! String) {
           return UnknownServerMessage(raw);
         }
@@ -266,6 +271,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           matchId: matchId,
           opponentName: opponentName,
           isFriendly: isFriendly,
+          opponentFrame: opponentFrame,
         );
       case 'room_created':
         final code = json['code'] as String?;
@@ -308,6 +314,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final winnerIsMe = json['winnerIsMe'] as bool? ?? false;
         final endedBy = json['endedBy'] as String? ?? 'normal';
         final opponentName = json['opponentName'] as String?;
+        final opponentFrame = json['opponentFrame'] as String? ?? 'classic';
         final coinsAwarded = (json['coinsAwarded'] as num?)?.toInt();
         final coins = (json['coins'] as num?)?.toInt();
         return FinalServerMessage(
@@ -317,6 +324,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           winnerIsMe: winnerIsMe,
           endedBy: endedBy,
           opponentName: opponentName,
+          opponentFrame: opponentFrame,
           coinsAwarded: coinsAwarded,
           coins: coins,
         );

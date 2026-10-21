@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import WebSocket from 'ws';
+import { getFrameCatalogItem } from '../src/frames.js';
 import { parseQuestionsPool, type Question } from '../src/engine/models';
 import type {
   ClientStateMessage,
@@ -304,8 +305,8 @@ function runMatchmaking(
         } else if (msg.t === 'matched') {
           log(
             `Eşleşti (maç ID: ${msg.matchId}, rakip: ${msg.opponentName}${
-              msg.isFriendly ? ', Dostluk Maçı' : ''
-            })`
+              msg.opponentFrame ? ` [Çerçeve: ${msg.opponentFrame}]` : ''
+            }${msg.isFriendly ? ', Dostluk Maçı' : ''})`
           );
           cleanup();
           currentCleanup = null;
@@ -612,6 +613,73 @@ async function main(): Promise<void> {
       logError(`Giriş başarısız: ${err instanceof Error ? err.message : String(err)}`);
       process.exitCode = 1;
       return;
+    }
+  }
+
+  if (config.frame) {
+    try {
+      const httpUrl = config.serverUrl.replace(/^ws(s)?:\/\//, 'http$1://');
+      const frameId = config.frame;
+      let canEquip = frameId === 'classic';
+
+      if (!canEquip) {
+        log(`Avatar çerçevesi satın alma deneniyor: ${frameId}...`);
+        const purchaseResp = await fetch(`${httpUrl}/store/purchase`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ itemId: frameId }),
+        });
+
+        if (purchaseResp.ok) {
+          log(`✓ Çerçeve (${frameId}) başarıyla satın alındı.`);
+          canEquip = true;
+        } else if (purchaseResp.status === 400) {
+          const errData = (await purchaseResp.json().catch(() => ({}))) as { error?: string };
+          if (errData.error === 'already_owned') {
+            log(`✓ Çerçeve (${frameId}) zaten sahiplenilmiş.`);
+            canEquip = true;
+          } else {
+            logError(`Çerçeve satın alınamadı: ${errData.error ?? 'geçersiz ürün'}. Kuşanma atlandı.`);
+          }
+        } else if (purchaseResp.status === 402) {
+          const errData = (await purchaseResp.json().catch(() => ({}))) as {
+            error?: string;
+            coins?: number;
+          };
+          const catalogItem = getFrameCatalogItem(frameId);
+          const frameCost = catalogItem ? catalogItem.cost : '?';
+          const currentCoins = typeof errData.coins === 'number' ? errData.coins : '?';
+          logError(
+            `Çerçeve satın alınamadı: yetersiz bakiye (bakiye ${currentCoins}, çerçeve ${frameCost} jeton). Kuşanma atlandı.`
+          );
+        } else {
+          logError(`Çerçeve satın alınamadı: HTTP ${purchaseResp.status}. Kuşanma atlandı.`);
+        }
+      }
+
+      if (canEquip) {
+        log(`Avatar çerçevesi kuşanılıyor: ${frameId}...`);
+        const resp = await fetch(`${httpUrl}/me/frame`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ frameId }),
+        });
+        if (resp.ok) {
+          log(`✓ Çerçeve (${frameId}) başarıyla kuşandı.`);
+        } else {
+          logError(`Çerçeve kuşanılamadı: HTTP ${resp.status}`);
+        }
+      }
+    } catch (frameErr) {
+      logError(
+        `Çerçeve işleminde hata: ${frameErr instanceof Error ? frameErr.message : String(frameErr)}`
+      );
     }
   }
 
