@@ -16,9 +16,77 @@ export interface RealtimeDbContentProviderOptions {
   readonly serviceAccountB64?: string;
   readonly tokenProvider?: ServiceAccountTokenProvider;
   readonly ttlSeconds?: number;
+  readonly versionCheckIntervalSeconds?: number;
+  readonly initialContentVersion?: string | number | null;
   readonly fetchFn?: FetchFunction;
   readonly nowFn?: () => number;
   readonly sleepFn?: (ms: number) => Promise<void>;
+  readonly warnFn?: (msg: string) => void;
+}
+
+export interface AliasCollisionWarning {
+  readonly questionId: string;
+  readonly categoryId: string;
+  readonly alias: string;
+  readonly answerDisplay1: string;
+  readonly answerDisplay2: string;
+}
+
+/**
+ * Soruların cevapları arasındaki alias çakışmalarını tespit eder.
+ * Aynı soru içindeki farklı cevapların aynı normalize edilmiş alias'ı
+ * paylaşması durumunda uyarı kaydı üretir.
+ */
+export function findAliasCollisions(questions: readonly Question[]): AliasCollisionWarning[] {
+  const warnings: AliasCollisionWarning[] = [];
+
+  for (const q of questions) {
+    const aliasToAnswer = new Map<string, string>();
+    for (const a of q.answers) {
+      const allAliases = new Set<string>();
+      if (a.id && a.id.trim().length > 0) allAliases.add(a.id);
+      for (const al of a.aliases) {
+        if (al && al.trim().length > 0) allAliases.add(al);
+      }
+
+      for (const alias of allAliases) {
+        const existing = aliasToAnswer.get(alias);
+        if (existing && existing !== a.display) {
+          warnings.push({
+            questionId: q.id,
+            categoryId: q.categoryId,
+            alias,
+            answerDisplay1: existing,
+            answerDisplay2: a.display,
+          });
+        } else {
+          aliasToAnswer.set(alias, a.display);
+        }
+      }
+    }
+  }
+
+  return warnings;
+}
+
+export function logAliasCollisions(
+  warnings: readonly AliasCollisionWarning[],
+  warnFn: (msg: string) => void = (msg) => console.warn(msg)
+): void {
+  for (const w of warnings) {
+    warnFn(
+      JSON.stringify({
+        event: 'content_warning',
+        stage: 'alias_collision',
+        questionId: w.questionId,
+        categoryId: w.categoryId,
+        alias: w.alias,
+        answer1: w.answerDisplay1,
+        answer2: w.answerDisplay2,
+        detail: `Alias collision in question ${w.questionId}: alias '${w.alias}' claimed by both '${w.answerDisplay1}' and '${w.answerDisplay2}'`,
+      })
+    );
+  }
 }
 
 export interface ContentStats {
@@ -167,9 +235,11 @@ export class RealtimeDbContentProvider implements ContentProvider {
   private readonly baseUrl: string;
   private readonly tokenProvider: ServiceAccountTokenProvider | null;
   private readonly ttlMs: number;
+  private readonly versionCheckIntervalMs: number;
   private readonly fetchFn: FetchFunction;
   private readonly nowFn: () => number;
   private readonly sleepFn: (ms: number) => Promise<void>;
+  private readonly warnFn: (msg: string) => void;
   private readonly diagnosticFlags: {
     readonly hasSecret: boolean;
     readonly hasClientEmail: boolean;
@@ -178,8 +248,11 @@ export class RealtimeDbContentProvider implements ContentProvider {
   };
 
   private cachedQuestions: Question[] | null = null;
+  private cachedContentVersion: string | number | null | undefined;
   private cacheExpiresAtMs = 0;
+  private nextVersionCheckAtMs = 0;
   private inFlightFetchPromise: Promise<Question[]> | null = null;
+  private inFlightRefreshPromise: Promise<void> | null = null;
   private isRefreshing = false;
 
   private lastAuthMethodUsed: AuthMethodUsed = 'none';
@@ -188,6 +261,10 @@ export class RealtimeDbContentProvider implements ContentProvider {
   constructor(options: RealtimeDbContentProviderOptions) {
     this.baseUrl = options.databaseUrl.trim().replace(/\/+$/, '');
     this.ttlMs = (options.ttlSeconds ?? 3600) * 1000;
+    this.versionCheckIntervalMs = (options.versionCheckIntervalSeconds ?? 15) * 1000;
+    this.warnFn = options.warnFn ?? ((msg: string) => console.warn(msg));
+    this.cachedContentVersion = options.initialContentVersion;
+
     const injectedFetch = options.fetchFn;
     this.fetchFn = injectedFetch
       ? ((url: string, init?: RequestInit) => injectedFetch(url, init))
@@ -241,20 +318,22 @@ export class RealtimeDbContentProvider implements ContentProvider {
     return this.lastStats;
   }
 
-  /**
-   * Firebase Realtime Database'ten questions_pool.json çeker ve ayrıştırır.
-   */
-  async fetchFromDatabase(): Promise<{
-    readonly questions: Question[];
-    readonly stats: ContentStats;
-    readonly authMethod: AuthMethodUsed;
-  }> {
+  get currentVersion(): string | number | null | undefined {
+    return this.cachedContentVersion;
+  }
+
+  get inFlightRefresh(): Promise<void> | null {
+    return this.inFlightRefreshPromise;
+  }
+
+  private async executeRtdbRequest(path: string): Promise<Response | null> {
     let accessToken: string | null = null;
     if (this.tokenProvider) {
       accessToken = await this.tokenProvider.getAccessToken();
     }
 
-    const endpointUrl = `${this.baseUrl}/questions_pool.json`;
+    const cleanPath = path.replace(/^\/+/, '');
+    const endpointUrl = `${this.baseUrl}/${cleanPath}`;
 
     let lastNetworkErr: unknown = null;
     let res: Response | null = null;
@@ -262,7 +341,6 @@ export class RealtimeDbContentProvider implements ContentProvider {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        // 1. Önce Authorization: Bearer başlığını dene
         if (accessToken) {
           res = await this.fetchFn(endpointUrl, {
             headers: {
@@ -274,7 +352,6 @@ export class RealtimeDbContentProvider implements ContentProvider {
           if (res.ok) {
             authMethod = 'header';
           } else if (res.status === 401 || res.status === 403) {
-            // 2. RTDB başlığı reddederse ?access_token= sorgu parametresiyle dene (URL ASLA loglanmaz)
             const fallbackUrl = `${endpointUrl}?access_token=${encodeURIComponent(accessToken)}`;
             res = await this.fetchFn(fallbackUrl, {
               headers: {
@@ -286,7 +363,6 @@ export class RealtimeDbContentProvider implements ContentProvider {
             }
           }
         } else {
-          // Token yoksa doğrudan dene
           res = await this.fetchFn(endpointUrl, {
             headers: {
               Accept: 'application/json',
@@ -294,13 +370,11 @@ export class RealtimeDbContentProvider implements ContentProvider {
           });
         }
 
-        // 5xx ise ve ilk deneme ise 300 ms bekle ve yeniden dene
         if (res.status >= 500 && attempt === 1) {
           await this.sleepFn(300);
           continue;
         }
 
-        // Başarılı (2xx), 4xx (yeniden denenmez) veya 2. denemedeki 5xx -> çık
         break;
       } catch (networkErr: unknown) {
         lastNetworkErr = networkErr;
@@ -316,13 +390,38 @@ export class RealtimeDbContentProvider implements ContentProvider {
         event: 'content_error',
         stage: 'rtdb_fetch',
         errorName: lastNetworkErr instanceof Error ? lastNetworkErr.name : 'NetworkError',
-        detail: 'Network failure during Realtime Database fetch request',
+        detail: `Network failure during Realtime Database fetch for ${cleanPath}`,
         causeCode: extractCauseCode(lastNetworkErr),
         message: extractErrorMessage(lastNetworkErr),
         ...this.diagnosticFlags,
       });
-      throw lastNetworkErr;
+      if (lastNetworkErr) {
+        throw lastNetworkErr;
+      }
+      return null;
     }
+
+    if (res.ok && authMethod !== 'none') {
+      this.lastAuthMethodUsed = authMethod;
+    }
+
+    return res;
+  }
+
+  /**
+   * Firebase Realtime Database'ten content_version.json çeker.
+   * Düğüm yoksa (null) veya 404 ise null döner.
+   */
+  async fetchContentVersion(): Promise<string | number | null> {
+    let res: Response | null = null;
+    try {
+      res = await this.executeRtdbRequest('content_version.json');
+    } catch {
+      return null;
+    }
+
+    if (!res) return null;
+    if (res.status === 404) return null;
 
     if (!res.ok) {
       let rtdbErrorCode: string | undefined;
@@ -341,11 +440,73 @@ export class RealtimeDbContentProvider implements ContentProvider {
         status: res.status,
         errorName: 'RtdbHttpError',
         code: rtdbErrorCode,
-        detail: rtdbErrorCode || `Realtime Database request failed with HTTP ${res.status}`,
+        detail: rtdbErrorCode || `Realtime Database request for content_version failed with HTTP ${res.status}`,
         ...this.diagnosticFlags,
       });
 
-      throw new Error(`Realtime Database request failed with HTTP ${res.status}`);
+      return null;
+    }
+
+    let rawData: unknown;
+    try {
+      rawData = (await res.json()) as unknown;
+    } catch {
+      return null;
+    }
+
+    if (rawData === null || rawData === undefined) {
+      return null;
+    }
+
+    if (typeof rawData === 'number' || typeof rawData === 'string') {
+      return rawData;
+    }
+
+    if (typeof rawData === 'object') {
+      const rec = rawData as Record<string, unknown>;
+      if (typeof rec.version === 'string' || typeof rec.version === 'number') {
+        return rec.version;
+      }
+      return JSON.stringify(rawData);
+    }
+
+    return String(rawData);
+  }
+
+  /**
+   * Firebase Realtime Database'ten questions_pool.json çeker ve ayrıştırır.
+   */
+  async fetchFromDatabase(): Promise<{
+    readonly questions: Question[];
+    readonly stats: ContentStats;
+    readonly authMethod: AuthMethodUsed;
+  }> {
+    const res = await this.executeRtdbRequest('questions_pool.json');
+
+    if (!res || !res.ok) {
+      let rtdbErrorCode: string | undefined;
+      if (res) {
+        try {
+          const errJson = (await res.json()) as Record<string, unknown>;
+          if (typeof errJson.error === 'string') {
+            rtdbErrorCode = errJson.error;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      logContentError({
+        event: 'content_error',
+        stage: 'rtdb_fetch',
+        status: res?.status,
+        errorName: 'RtdbHttpError',
+        code: rtdbErrorCode,
+        detail: rtdbErrorCode || `Realtime Database request failed with HTTP ${res?.status ?? 'unknown'}`,
+        ...this.diagnosticFlags,
+      });
+
+      throw new Error(`Realtime Database request failed with HTTP ${res?.status ?? 'unknown'}`);
     }
 
     let rawData: unknown;
@@ -376,16 +537,88 @@ export class RealtimeDbContentProvider implements ContentProvider {
       });
     }
 
-    this.lastAuthMethodUsed = authMethod;
     this.lastStats = stats;
 
-    return { questions, stats, authMethod };
+    return { questions, stats, authMethod: this.lastAuthMethodUsed };
+  }
+
+  private checkAndLogCollisions(questions: readonly Question[]): void {
+    const warnings = findAliasCollisions(questions);
+    if (warnings.length > 0) {
+      logAliasCollisions(warnings, this.warnFn);
+    }
+  }
+
+  private triggerBackgroundVersionCheck(): void {
+    if (this.isRefreshing) return;
+    this.isRefreshing = true;
+    this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
+
+    this.inFlightRefreshPromise = (async () => {
+      try {
+        const remoteVersion = await this.fetchContentVersion();
+        if (remoteVersion === null) {
+          // content_version düğümü yoksa veya okunamadıysa TTL güvenlik ağına güven
+          return;
+        }
+
+        // Eğer henüz bir versiyon kaydedilmemişse ilk kontrol anındaki versiyonu senkronize et
+        if (this.cachedContentVersion === undefined) {
+          this.cachedContentVersion = remoteVersion;
+          return;
+        }
+
+        // Sürüm değiştiyse tam havuzu çek
+        if (remoteVersion !== this.cachedContentVersion) {
+          const { questions } = await this.fetchFromDatabase();
+          this.cachedQuestions = questions;
+          this.cachedContentVersion = remoteVersion;
+          this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
+          this.checkAndLogCollisions(questions);
+        }
+      } catch (err: unknown) {
+        logContentError({
+          event: 'content_error',
+          stage: 'rtdb_fetch',
+          errorName: err instanceof Error ? err.name : 'RefreshError',
+          detail: 'Background content refresh failed, keeping existing cached questions',
+          causeCode: extractCauseCode(err),
+          message: extractErrorMessage(err),
+          ...this.diagnosticFlags,
+        });
+      } finally {
+        this.isRefreshing = false;
+        this.inFlightRefreshPromise = null;
+      }
+    })();
+  }
+
+  private triggerBackgroundFullRefresh(): void {
+    if (this.isRefreshing) return;
+    this.isRefreshing = true;
+    this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
+
+    this.inFlightRefreshPromise = (async () => {
+      try {
+        const { questions } = await this.fetchFromDatabase();
+        this.cachedQuestions = questions;
+        this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
+        this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
+        this.checkAndLogCollisions(questions);
+      } catch {
+        this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
+      } finally {
+        this.isRefreshing = false;
+        this.inFlightRefreshPromise = null;
+      }
+    })();
   }
 
   /**
    * ContentProvider arayüzünü uygular.
-   * Önbellek yoksa çeker (eşzamanlı çağrılar tek isteği paylaşır);
-   * önbellek varsa süresi dolduğunda arka planda yeniler.
+   * Önbellek yoksa çeker (maç başlaması için ilk yükleme beklenir);
+   * önbellek varsa istek hemen döner, versiyon kontrolü veya TTL dolumu
+   * arka planda single-flight olarak çalıştırılır.
    */
   async getQuestions(): Promise<Question[]> {
     const now = this.nowFn();
@@ -398,6 +631,8 @@ export class RealtimeDbContentProvider implements ContentProvider {
             const { questions } = await this.fetchFromDatabase();
             this.cachedQuestions = questions;
             this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
+            this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
+            this.checkAndLogCollisions(questions);
             return questions;
           } finally {
             this.inFlightFetchPromise = null;
@@ -407,21 +642,11 @@ export class RealtimeDbContentProvider implements ContentProvider {
       return this.inFlightFetchPromise;
     }
 
-    // 2. Önbelleğin süresi dolmuşsa arka planda yenile (stale-while-revalidate)
-    if (now >= this.cacheExpiresAtMs && !this.isRefreshing) {
-      this.isRefreshing = true;
-      this.fetchFromDatabase()
-        .then(({ questions }) => {
-          this.cachedQuestions = questions;
-          this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
-        })
-        .catch(() => {
-          // Yenileme başarısızsa eski önbellek korunur; peş peşe istek yağmasını önlemek için süreyi uzat
-          this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
-        })
-        .finally(() => {
-          this.isRefreshing = false;
-        });
+    // 2. Önbellek zaten dolu -> Eski/mevcut veriyi hemen döndür, yenilemeyi arka planda yap
+    if (now >= this.cacheExpiresAtMs) {
+      this.triggerBackgroundFullRefresh();
+    } else if (now >= this.nextVersionCheckAtMs) {
+      this.triggerBackgroundVersionCheck();
     }
 
     return this.cachedQuestions;

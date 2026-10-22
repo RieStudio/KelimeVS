@@ -84,10 +84,13 @@ export function createContentProvider(env: Env): ContentProvider {
   }
 
   const ttlSeconds = parseInt(env.CONTENT_TTL_SECONDS ?? '3600', 10);
+  const versionCheckSeconds = parseInt(env.CONTENT_VERSION_CHECK_SECONDS ?? '15', 10);
   return new RealtimeDbContentProvider({
     databaseUrl: dbUrl,
     serviceAccountB64,
     ttlSeconds: Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : 3600,
+    versionCheckIntervalSeconds:
+      Number.isFinite(versionCheckSeconds) && versionCheckSeconds > 0 ? versionCheckSeconds : 15,
   });
 }
 

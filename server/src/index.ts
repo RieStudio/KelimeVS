@@ -22,6 +22,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly FIREBASE_DATABASE_URL?: string;
   readonly FIREBASE_SERVICE_ACCOUNT_B64?: string;
   readonly CONTENT_TTL_SECONDS?: string;
+  readonly CONTENT_VERSION_CHECK_SECONDS?: string;
   readonly START_COINS?: string;
   readonly WIN_COINS?: string;
   readonly LOSS_COINS?: string;

@@ -3,8 +3,11 @@ import {
   parseQuestionsPoolWithStats,
   RealtimeDbContentProvider,
   ServiceAccountTokenProvider,
+  findAliasCollisions,
+  logAliasCollisions,
   type FetchFunction,
 } from '../src/content';
+import type { Question } from '../src/engine';
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -322,6 +325,361 @@ describe('RealtimeDbContentProvider (RTDB Sorgusu, Önbellek, TTL ve Hata Yönet
     const q3 = await provider.getQuestions();
     expect(q3.length).toBe(1);
     expect(fetchCount).toBe(2);
+  });
+});
+
+describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve Arka Plan Yenileme)', () => {
+  const poolV1 = {
+    c1: {
+      q1: {
+        question: 'Versiyon 1 Soru',
+        acceptable_answers: { a1: ['a1'] },
+      },
+    },
+  };
+
+  const poolV2 = {
+    c1: {
+      q1: {
+        question: 'Versiyon 2 Soru',
+        acceptable_answers: { a1: ['a1'] },
+      },
+      q2: {
+        question: 'Yeni Eklenen Soru',
+        acceptable_answers: { a2: ['a2'] },
+      },
+    },
+  };
+
+  it('1. Sürüm aynı kaldığında tam havuz ÇEKİLMEZ (Firebase Spark kotası korunur)', async () => {
+    let poolFetchCount = 0;
+    let versionFetchCount = 0;
+    let currentTimeMs = 1000000;
+    const currentVersion = 100;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        versionFetchCount++;
+        return new Response(JSON.stringify(currentVersion), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        poolFetchCount++;
+        return new Response(JSON.stringify(poolV1), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      versionCheckIntervalSeconds: 15,
+      ttlSeconds: 3600,
+      initialContentVersion: currentVersion,
+    });
+
+    // 1. İlk çekme (cache boş) -> havuz çekilir
+    const q1 = await provider.getQuestions();
+    expect(q1.length).toBe(1);
+    expect(q1[0].text).toBe('Versiyon 1 Soru');
+    expect(poolFetchCount).toBe(1);
+    expect(versionFetchCount).toBe(0);
+
+    // 2. 10 saniye sonra çağrı (15 sn eşiği dolmadı) -> sıfır ağ çağrısı
+    currentTimeMs += 10 * 1000;
+    const q2 = await provider.getQuestions();
+    expect(q2.length).toBe(1);
+    expect(poolFetchCount).toBe(1);
+    expect(versionFetchCount).toBe(0);
+
+    // 3. 20 saniye sonra çağrı (15 sn doldu, sürüm kontrolü tetiklenir)
+    currentTimeMs += 10 * 1000; // toplam +20s
+    const q3 = await provider.getQuestions();
+    expect(q3.length).toBe(1);
+
+    // Arka plan versiyon kontrolünün tamamlanmasını bekle
+    if (provider.inFlightRefresh) {
+      await provider.inFlightRefresh;
+    }
+
+    // Sürüm hala 100 olduğu için versiyon kontrolü yapıldı AMA tam havuz ÇEKİLMEDİ
+    expect(versionFetchCount).toBe(1);
+    expect(poolFetchCount).toBe(1);
+  });
+
+  it('2. Sürüm değiştiğinde mevcut çağrı eski veriyi anında döner, arka plan bitince sonraki çağrı yeni veriyi döner', async () => {
+    let poolFetchCount = 0;
+    let versionFetchCount = 0;
+    let currentTimeMs = 1000000;
+    let remoteVersion = 1;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        versionFetchCount++;
+        return new Response(JSON.stringify(remoteVersion), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        poolFetchCount++;
+        const pool = remoteVersion === 1 ? poolV1 : poolV2;
+        return new Response(JSON.stringify(pool), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      versionCheckIntervalSeconds: 15,
+      ttlSeconds: 3600,
+      initialContentVersion: 1,
+    });
+
+    // 1. İlk çekme -> v1 havuzu yüklenir
+    const q1 = await provider.getQuestions();
+    expect(q1.length).toBe(1);
+    expect(q1[0].text).toBe('Versiyon 1 Soru');
+    expect(poolFetchCount).toBe(1);
+
+    // 2. Panel içeriği günceller ve sürümü 2 yapar
+    remoteVersion = 2;
+    currentTimeMs += 20 * 1000; // 15 sn eşiği aşıldı
+
+    // 3. getQuestions çağrısı eski veriyi (v1) ANINDA döner, maçı bekletmez!
+    const q2 = await provider.getQuestions();
+    expect(q2.length).toBe(1);
+    expect(q2[0].text).toBe('Versiyon 1 Soru');
+
+    // 4. Arka plandaki havuz yenileme tamamlanır
+    expect(provider.inFlightRefresh).not.toBeNull();
+    await provider.inFlightRefresh;
+
+    // Sürüm 2 çekilmiş olmalı
+    expect(poolFetchCount).toBe(2);
+    expect(versionFetchCount).toBe(1);
+    expect(provider.currentVersion).toBe(2);
+
+    // 5. Bir sonraki getQuestions çağrısı artık YENİ veriyi (v2) döner
+    const q3 = await provider.getQuestions();
+    expect(q3.length).toBe(2);
+    expect(q3.map((q) => q.text)).toEqual(['Versiyon 2 Soru', 'Yeni Eklenen Soru']);
+  });
+
+  it('3. Eşzamanlı isteklerde tek bir arka plan yenilemesi çalışır (in-flight promise paylaşımı)', async () => {
+    let poolFetchCount = 0;
+    let versionFetchCount = 0;
+    let currentTimeMs = 1000000;
+    let remoteVersion = 1;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        versionFetchCount++;
+        await new Promise((r) => setTimeout(r, 10));
+        return new Response(JSON.stringify(remoteVersion), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        poolFetchCount++;
+        await new Promise((r) => setTimeout(r, 10));
+        const pool = remoteVersion === 1 ? poolV1 : poolV2;
+        return new Response(JSON.stringify(pool), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      versionCheckIntervalSeconds: 15,
+      initialContentVersion: 1,
+    });
+
+    await provider.getQuestions(); // ilk yükleme
+    expect(poolFetchCount).toBe(1);
+
+    // Sürüm değişti ve 15 sn geçti
+    remoteVersion = 2;
+    currentTimeMs += 20 * 1000;
+
+    // Aynı anda 5 eşzamanlı getQuestions çağrısı gelir
+    const results = await Promise.all([
+      provider.getQuestions(),
+      provider.getQuestions(),
+      provider.getQuestions(),
+      provider.getQuestions(),
+      provider.getQuestions(),
+    ]);
+
+    // Hepsi eski cache'i anında alır (arayanlar bloke olmaz)
+    for (const res of results) {
+      expect(res.length).toBe(1);
+    }
+
+    // Arka plan görevinin bitmesini bekle
+    await provider.inFlightRefresh;
+
+    // Yalnızca tek bir versiyon ve tek bir havuz çekimi yapıldı
+    expect(versionFetchCount).toBe(1);
+    expect(poolFetchCount).toBe(2);
+  });
+
+  it('4. Arka plan yenilemesi hata verirse eski cache korunur ve oyun durmaz', async () => {
+    let currentTimeMs = 1000000;
+    let remoteVersion = 1;
+    let poolFail = false;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        return new Response(JSON.stringify(remoteVersion), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        if (poolFail) {
+          return new Response('Internal Server Error', { status: 500 });
+        }
+        return new Response(JSON.stringify(poolV1), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      versionCheckIntervalSeconds: 15,
+      initialContentVersion: 1,
+    });
+
+    const q1 = await provider.getQuestions();
+    expect(q1.length).toBe(1);
+
+    // Sürüm 2 oldu ancak RTDB havuz için 500 veriyor
+    remoteVersion = 2;
+    poolFail = true;
+    currentTimeMs += 20 * 1000;
+
+    // Çağrı anında döner
+    const q2 = await provider.getQuestions();
+    expect(q2.length).toBe(1);
+
+    // Arka plan hatasını bekle
+    await provider.inFlightRefresh;
+
+    // Eski önbellek sapasağlam durmalı
+    const q3 = await provider.getQuestions();
+    expect(q3.length).toBe(1);
+    expect(q3[0].text).toBe('Versiyon 1 Soru');
+    // Sürüm güncellenmemiş olmalı (hata yüzünden eski sürümde kaldı)
+    expect(provider.currentVersion).toBe(1);
+  });
+
+  it('5. content_version düğümü yoksa (null) TTL süresine kadar havuz tekrar çekilmez', async () => {
+    let poolFetchCount = 0;
+    let versionFetchCount = 0;
+    let currentTimeMs = 1000000;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        versionFetchCount++;
+        return new Response('null', { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        poolFetchCount++;
+        return new Response(JSON.stringify(poolV1), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      versionCheckIntervalSeconds: 15,
+      ttlSeconds: 3600,
+    });
+
+    await provider.getQuestions();
+    expect(poolFetchCount).toBe(1);
+
+    // 20 sn sonra çağrı -> versiyon kontrolü null döner
+    currentTimeMs += 20 * 1000;
+    await provider.getQuestions();
+    if (provider.inFlightRefresh) {
+      await provider.inFlightRefresh;
+    }
+
+    expect(versionFetchCount).toBe(1);
+    expect(poolFetchCount).toBe(1); // Havuz çekilmedi
+
+    // 40 sn sonra çağrı -> yine null döner, havuz yine çekilmez
+    currentTimeMs += 20 * 1000;
+    await provider.getQuestions();
+    if (provider.inFlightRefresh) {
+      await provider.inFlightRefresh;
+    }
+
+    expect(versionFetchCount).toBe(2);
+    expect(poolFetchCount).toBe(1);
+  });
+});
+
+describe('findAliasCollisions & logAliasCollisions (Alias Çakışma Uyarı Raporu)', () => {
+  it('aynı soru içinde farklı cevaplar aynı normalize alias’ı paylaştığında çakışmayı tespit eder', () => {
+    const questions: Question[] = [
+      {
+        id: 'q1',
+        categoryId: 'c1',
+        text: 'Meyveler',
+        answers: [
+          { id: 'elma', display: 'Elma', aliases: ['elma', 'amasya'] },
+          { id: 'armut', display: 'Armut', aliases: ['armut', 'amasya'] },
+        ],
+      },
+      {
+        id: 'q2',
+        categoryId: 'c1',
+        text: 'Ülkeler',
+        answers: [
+          { id: 'kore', display: 'Kore', aliases: ['kore'] },
+          { id: 'guney_kore', display: 'Güney Kore', aliases: ['guney kore', 'kore'] },
+        ],
+      },
+      {
+        id: 'q3_temiz',
+        categoryId: 'c1',
+        text: 'Renkler',
+        answers: [
+          { id: 'mavi', display: 'Mavi', aliases: ['mavi'] },
+          { id: 'kirmizi', display: 'Kırmızı', aliases: ['kirmizi', 'al'] },
+        ],
+      },
+    ];
+
+    const collisions = findAliasCollisions(questions);
+    expect(collisions.length).toBe(2);
+
+    expect(collisions[0]).toEqual({
+      questionId: 'q1',
+      categoryId: 'c1',
+      alias: 'amasya',
+      answerDisplay1: 'Elma',
+      answerDisplay2: 'Armut',
+    });
+
+    expect(collisions[1]).toEqual({
+      questionId: 'q2',
+      categoryId: 'c1',
+      alias: 'kore',
+      answerDisplay1: 'Kore',
+      answerDisplay2: 'Güney Kore',
+    });
+
+    const logged: string[] = [];
+    logAliasCollisions(collisions, (msg) => logged.push(msg));
+    expect(logged.length).toBe(2);
+    const parsed = JSON.parse(logged[0]);
+    expect(parsed.event).toBe('content_warning');
+    expect(parsed.stage).toBe('alias_collision');
+    expect(parsed.questionId).toBe('q1');
   });
 });
 
