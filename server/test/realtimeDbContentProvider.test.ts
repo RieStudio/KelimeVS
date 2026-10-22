@@ -683,3 +683,74 @@ describe('findAliasCollisions & logAliasCollisions (Alias Çakışma Uyarı Rapo
   });
 });
 
+describe('RealtimeDbContentProvider (content_refreshed Loglama)', () => {
+  const pool = {
+    c1: {
+      q1: {
+        question: 'Soru 1',
+        acceptable_answers: { a1: ['a1'] },
+      },
+      q2: {
+        question: 'Soru 2',
+        acceptable_answers: { a2: ['a2'] },
+      },
+    },
+    c2: {
+      q3: {
+        question: 'Soru 3',
+        acceptable_answers: { a3: ['a3'] },
+      },
+    },
+  };
+
+  it('havuz başarıyla yüklendiğinde (initial ve version_change) yapılandırılmış content_refreshed log basar', async () => {
+    const logs: string[] = [];
+    let version = 1;
+    let currentTimeMs = 1000000;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        return new Response(JSON.stringify(version), { status: 200 });
+      }
+      return new Response(JSON.stringify(pool), { status: 200 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      logFn: (msg) => logs.push(msg),
+      initialContentVersion: 1,
+      versionCheckIntervalSeconds: 15,
+    });
+
+    // 1. İlk yükleme -> reason: "initial"
+    await provider.getQuestions();
+    expect(logs.length).toBe(1);
+    const initialLog = JSON.parse(logs[0]);
+    expect(initialLog).toEqual({
+      event: 'content_refreshed',
+      reason: 'initial',
+      version: 1,
+      questionCount: 3,
+      categoryCount: 2,
+    });
+
+    // 2. Sürüm değişimi sonrası arka plan yenileme -> reason: "version_change"
+    version = 2;
+    currentTimeMs += 20 * 1000;
+    await provider.getQuestions();
+    await provider.inFlightRefresh;
+
+    expect(logs.length).toBe(2);
+    const versionChangeLog = JSON.parse(logs[1]);
+    expect(versionChangeLog).toEqual({
+      event: 'content_refreshed',
+      reason: 'version_change',
+      version: 2,
+      questionCount: 3,
+      categoryCount: 2,
+    });
+  });
+});
+

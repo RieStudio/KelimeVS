@@ -22,6 +22,7 @@ export interface RealtimeDbContentProviderOptions {
   readonly nowFn?: () => number;
   readonly sleepFn?: (ms: number) => Promise<void>;
   readonly warnFn?: (msg: string) => void;
+  readonly logFn?: (msg: string) => void;
 }
 
 export interface AliasCollisionWarning {
@@ -240,6 +241,7 @@ export class RealtimeDbContentProvider implements ContentProvider {
   private readonly nowFn: () => number;
   private readonly sleepFn: (ms: number) => Promise<void>;
   private readonly warnFn: (msg: string) => void;
+  private readonly logFn: (msg: string) => void;
   private readonly diagnosticFlags: {
     readonly hasSecret: boolean;
     readonly hasClientEmail: boolean;
@@ -263,6 +265,7 @@ export class RealtimeDbContentProvider implements ContentProvider {
     this.ttlMs = (options.ttlSeconds ?? 3600) * 1000;
     this.versionCheckIntervalMs = (options.versionCheckIntervalSeconds ?? 15) * 1000;
     this.warnFn = options.warnFn ?? ((msg: string) => console.warn(msg));
+    this.logFn = options.logFn ?? ((msg: string) => console.log(msg));
     this.cachedContentVersion = options.initialContentVersion;
 
     const injectedFetch = options.fetchFn;
@@ -549,6 +552,22 @@ export class RealtimeDbContentProvider implements ContentProvider {
     }
   }
 
+  private logContentRefreshed(
+    reason: 'initial' | 'version_change' | 'ttl',
+    version: string | number | null,
+    questionCount: number,
+    categoryCount: number
+  ): void {
+    const payload = {
+      event: 'content_refreshed',
+      reason,
+      version: version ?? null,
+      questionCount,
+      categoryCount,
+    };
+    this.logFn(JSON.stringify(payload));
+  }
+
   private triggerBackgroundVersionCheck(): void {
     if (this.isRefreshing) return;
     this.isRefreshing = true;
@@ -570,11 +589,17 @@ export class RealtimeDbContentProvider implements ContentProvider {
 
         // Sürüm değiştiyse tam havuzu çek
         if (remoteVersion !== this.cachedContentVersion) {
-          const { questions } = await this.fetchFromDatabase();
+          const { questions, stats } = await this.fetchFromDatabase();
           this.cachedQuestions = questions;
           this.cachedContentVersion = remoteVersion;
           this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
           this.checkAndLogCollisions(questions);
+          this.logContentRefreshed(
+            'version_change',
+            this.cachedContentVersion ?? null,
+            questions.length,
+            stats.categoriesCount
+          );
         }
       } catch (err: unknown) {
         logContentError({
@@ -600,11 +625,17 @@ export class RealtimeDbContentProvider implements ContentProvider {
 
     this.inFlightRefreshPromise = (async () => {
       try {
-        const { questions } = await this.fetchFromDatabase();
+        const { questions, stats } = await this.fetchFromDatabase();
         this.cachedQuestions = questions;
         this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
         this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
         this.checkAndLogCollisions(questions);
+        this.logContentRefreshed(
+          'ttl',
+          this.cachedContentVersion ?? null,
+          questions.length,
+          stats.categoriesCount
+        );
       } catch {
         this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
       } finally {
@@ -628,11 +659,17 @@ export class RealtimeDbContentProvider implements ContentProvider {
       if (!this.inFlightFetchPromise) {
         this.inFlightFetchPromise = (async () => {
           try {
-            const { questions } = await this.fetchFromDatabase();
+            const { questions, stats } = await this.fetchFromDatabase();
             this.cachedQuestions = questions;
             this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
             this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
             this.checkAndLogCollisions(questions);
+            this.logContentRefreshed(
+              'initial',
+              this.cachedContentVersion ?? null,
+              questions.length,
+              stats.categoriesCount
+            );
             return questions;
           } finally {
             this.inFlightFetchPromise = null;
