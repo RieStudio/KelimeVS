@@ -1,5 +1,10 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../profile/domain/energy_state.dart';
+
+/// Mağaza sekmeleri (DESIGN.md 9a: Jeton · Enerji · Çerçeve)
+enum StoreTab { coins, energy, frames }
+
 /// Mağaza kataloğundaki bir avatar çerçevesi öğesi.
 @immutable
 class StoreItem {
@@ -67,6 +72,9 @@ class StoreState {
   final bool isLoading;
   final String? errorMessage;
   final String? actionInProgressItemId;
+  final EnergyState? energy;
+  final int? serverNowMs;
+  final StoreTab selectedTab;
 
   const StoreState({
     this.coins = 0,
@@ -75,6 +83,9 @@ class StoreState {
     this.isLoading = false,
     this.errorMessage,
     this.actionInProgressItemId,
+    this.energy,
+    this.serverNowMs,
+    this.selectedTab = StoreTab.frames,
   });
 
   StoreState copyWith({
@@ -86,6 +97,9 @@ class StoreState {
     bool clearError = false,
     String? actionInProgressItemId,
     bool clearActionInProgress = false,
+    EnergyState? energy,
+    int? serverNowMs,
+    StoreTab? selectedTab,
   }) {
     return StoreState(
       coins: coins ?? this.coins,
@@ -96,7 +110,9 @@ class StoreState {
       actionInProgressItemId: clearActionInProgress
           ? null
           : (actionInProgressItemId ?? this.actionInProgressItemId),
+      energy: energy ?? this.energy,
+      serverNowMs: serverNowMs ?? this.serverNowMs,
+      selectedTab: selectedTab ?? this.selectedTab,
     );
   }
 }
-

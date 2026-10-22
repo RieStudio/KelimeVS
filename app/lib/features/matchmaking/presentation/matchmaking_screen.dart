@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +19,7 @@ import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/domain/energy_state.dart';
 
 /// DESIGN.md Bölüm 7: 2) Eşleşme Bekleme Ekranı
 ///
@@ -79,9 +81,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   void initState() {
     super.initState();
     final rng = widget.random ?? math.Random();
-    _fallbackOpponentName = widget.initialOpponentName ??
-        MatchmakingScreen
-            .opponentNames[rng.nextInt(MatchmakingScreen.opponentNames.length)];
+    _fallbackOpponentName =
+        widget.initialOpponentName ??
+        MatchmakingScreen.opponentNames[rng.nextInt(
+          MatchmakingScreen.opponentNames.length,
+        )];
     _opponentName = _fallbackOpponentName;
 
     // Üç noktanın periyodik animasyonu
@@ -110,7 +114,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
   void _startOnlineMatchmaking() {
     final client =
-        widget.matchmakingClient ?? ref.read(matchmakingClientFactoryProvider)();
+        widget.matchmakingClient ??
+        ref.read(matchmakingClientFactoryProvider)();
     _client = client;
 
     _subscription = client.events.listen((event) {
@@ -123,7 +128,40 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
             ? event.opponentName
             : _fallbackOpponentName;
         _opponentFrame = event.opponentFrame;
+
+        // DESIGN.md 9b: Sunucu matched mesajıyla güncel enerjiyi bildirdiğinde anında güncelle
+        if (event.energy != null) {
+          final currentEnergy = ref.read(profileProvider).energy;
+          final updatedEnergy = (currentEnergy ??
+                  EnergyState(
+                    enabled: true,
+                    current: event.energy!.current,
+                    max: event.energy!.max,
+                  ))
+              .copyWith(
+            enabled: true,
+            current: event.energy!.current,
+            max: event.energy!.max,
+            nextEnergyAtMs: event.energy!.nextEnergyAtMs,
+          );
+          ref
+              .read(profileProvider.notifier)
+              .updateEnergy(updatedEnergy, event.serverNowMs);
+        }
+
         _handleOpponentFound();
+      } else if (event is MatchmakingNoEnergy) {
+        _cancelAllTimers();
+        _cancelMatchmakingClient();
+        if (mounted) {
+          Navigator.of(context).pop();
+          final currentProfile = ref.read(profileProvider);
+          if (currentProfile.energy != null) {
+            ref
+                .read(profileProvider.notifier)
+                .updateEnergy(currentProfile.energy!.copyWith(current: 0));
+          }
+        }
       } else if (event is MatchmakingNoOpponent ||
           event is MatchmakingUnavailable ||
           event is MatchmakingFailed) {
@@ -154,8 +192,10 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     });
 
     // 800 ms sonra maç ekranına geç ve maçı başlat
-    _transitionTimer =
-        Timer(const Duration(milliseconds: 800), _navigateToMatch);
+    _transitionTimer = Timer(
+      const Duration(milliseconds: 800),
+      _navigateToMatch,
+    );
   }
 
   void _navigateToMatch() {
@@ -171,14 +211,14 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
           .read(activeMatchSessionModeProvider.notifier)
           .setMode(MatchSessionMode.online);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const MatchScreen(),
-        ),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MatchScreen()));
 
       unawaited(
-        ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
+        ref
+            .read(onlineMatchSessionProvider.notifier)
+            .startOnlineMatch(
               matchId: matchId,
               opponentName: oppName,
               opponentFrame: _opponentFrame,
@@ -189,16 +229,14 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
           .read(activeMatchSessionModeProvider.notifier)
           .setMode(MatchSessionMode.bot);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const MatchScreen(),
-        ),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MatchScreen()));
 
       unawaited(
-        ref.read(matchControllerProvider.notifier).startMatch(
-              opponentName: oppName,
-            ),
+        ref
+            .read(matchControllerProvider.notifier)
+            .startMatch(opponentName: oppName),
       );
     }
   }
@@ -285,8 +323,13 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                 children: [
                   // Kendi Avatarım (92 px, primary zemin, beyaz harf)
                   PlayerAvatar.selfMatch(
-                    name: (ref.watch(profileProvider).nickname != null &&
-                            ref.watch(profileProvider).nickname!.trim().isNotEmpty)
+                    name:
+                        (ref.watch(profileProvider).nickname != null &&
+                            ref
+                                .watch(profileProvider)
+                                .nickname!
+                                .trim()
+                                .isNotEmpty)
                         ? ref.watch(profileProvider).nickname!.trim()
                         : 'S',
                     frame: ref.watch(profileProvider).equippedFrame,
@@ -311,9 +354,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
                   // Rakip Avatarı
                   if (!_isOpponentFound)
-                    const PlayerAvatar.unknown(
-                      size: AppDimens.avatarSearch,
-                    )
+                    const PlayerAvatar.unknown(size: AppDimens.avatarSearch)
                   else
                     Column(
                       mainAxisSize: MainAxisSize.min,
@@ -443,13 +484,9 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         child: Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
       ),
     );
   }
 }
-

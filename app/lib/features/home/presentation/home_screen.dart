@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_pill.dart';
+import '../../../core/widgets/energy_pill.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
 import '../../../core/widgets/match_card.dart';
 import '../../../core/widgets/player_avatar.dart';
@@ -17,6 +19,7 @@ import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/section_label.dart';
 import '../../../gallery/component_gallery.dart';
+import '../../../main.dart';
 import '../../friend_match/presentation/friend_duel_bottom_sheet.dart';
 import '../../game/application/match_history_provider.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
@@ -24,6 +27,9 @@ import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../leaderboard/presentation/leaderboard_screen.dart';
+import '../../store/application/store_notifier.dart';
+import '../../store/domain/models/store_item.dart';
+import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
 
 /// DESIGN.md Bölüm 7: 1) Ana Ekran
 ///
@@ -38,7 +44,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(matchHistoryProvider);
     final profile = ref.watch(profileProvider);
-    final nickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
+    final nickname =
+        (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
         ? profile.nickname!.trim()
         : AppStrings.defaultPlayerName;
 
@@ -99,6 +106,20 @@ class HomeScreen extends ConsumerWidget {
                   // Jeton Hapı
                   CoinPill(amount: profile.coins),
 
+                  if (profile.energy != null && profile.energy!.enabled) ...[
+                    const SizedBox(width: AppDimens.space8),
+                    EnergyPill(
+                      current: profile.energy!.current,
+                      max: profile.energy!.max,
+                      onTap: () {
+                        ref.read(bottomNavIndexProvider.notifier).setIndex(2);
+                        ref
+                            .read(storeNotifierProvider.notifier)
+                            .setTab(StoreTab.energy);
+                      },
+                    ),
+                  ],
+
                   const SizedBox(width: AppDimens.space8),
 
                   // Sıralama (Kupa) İkon Butonu
@@ -137,9 +158,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: AppDimens.space20),
 
               // 2. Logo ve Slogan
-              const Center(
-                child: KelimeVSLogo(),
-              ),
+              const Center(child: KelimeVSLogo()),
               const SizedBox(height: AppDimens.space8),
               Center(
                 child: Text(
@@ -160,6 +179,37 @@ class HomeScreen extends ConsumerWidget {
                 subtitle: AppStrings.quickMatchSubtitle,
                 isLarge: true,
                 onPressed: () {
+                  final energy = profile.energy;
+                  if (energy != null && energy.enabled && energy.current <= 0) {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => EnergyDepletedBottomSheet(
+                        energy: energy,
+                        userCoins: profile.coins,
+                        serverNowMs: profile.serverNowMs,
+                        onPlayWithBot: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MatchmakingScreen(
+                                forceBotFallback: true,
+                              ),
+                            ),
+                          );
+                        },
+                        onEnergyPurchased: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MatchmakingScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                    return;
+                  }
+
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const MatchmakingScreen(),
@@ -205,16 +255,22 @@ class HomeScreen extends ConsumerWidget {
                     // Sıralama: finishedAtMs azalan; eşitlikte sonradan eklenen üstte (gelen listedeki index küçük olan üstte)
                     final indexedEntries = entries.asMap().entries.toList();
                     indexedEntries.sort((a, b) {
-                      final cmp = b.value.finishedAtMs.compareTo(a.value.finishedAtMs);
+                      final cmp = b.value.finishedAtMs.compareTo(
+                        a.value.finishedAtMs,
+                      );
                       if (cmp != 0) return cmp;
                       return a.key.compareTo(b.key);
                     });
-                    final sortedEntries = indexedEntries.map((e) => e.value).toList();
+                    final sortedEntries = indexedEntries
+                        .map((e) => e.value)
+                        .toList();
 
                     final count = math.min(10, sortedEntries.length);
 
                     return ScrollConfiguration(
-                      behavior: const ScrollBehavior().copyWith(scrollbars: false),
+                      behavior: const ScrollBehavior().copyWith(
+                        scrollbars: false,
+                      ),
                       child: ListView.builder(
                         itemCount: count,
                         itemBuilder: (context, index) {
@@ -228,7 +284,8 @@ class HomeScreen extends ConsumerWidget {
                               onTap: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => MatchDetailScreen(match: entry),
+                                    builder: (_) =>
+                                        MatchDetailScreen(match: entry),
                                   ),
                                 );
                               },
@@ -257,10 +314,7 @@ class HomeScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppDimens.borderRadiusListCard,
-        border: Border.all(
-          color: AppColors.mint,
-          width: AppDimens.borderThin,
-        ),
+        border: Border.all(color: AppColors.mint, width: AppDimens.borderThin),
       ),
       child: Text(
         AppStrings.noMatchesYet,

@@ -105,6 +105,18 @@ class FakeStoreApiClient implements StoreApiClient {
     equippedFrame = frameId;
     return StoreEquipSuccess(frameId);
   }
+
+  @override
+  Future<StorePurchaseEnergyResult> purchaseEnergy(String pack) async {
+    return StorePurchaseEnergySuccess(
+      coins: coins,
+      energy: 5,
+      max: 5,
+      nextEnergyAtMs: null,
+      serverNowMs: DateTime.now().millisecondsSinceEpoch,
+      pack: pack,
+    );
+  }
 }
 
 class FakeProfileApiClient implements ProfileApiClient {
@@ -168,6 +180,13 @@ void main() {
   group('StoreScreen Tests', () {
     testWidgets('renders title, CoinPill and all catalog items',
         (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       final fakeClient = FakeStoreApiClient(coins: 500);
       await tester.pumpWidget(createStoreScreen(storeClient: fakeClient));
       await tester.pumpAndSettle();

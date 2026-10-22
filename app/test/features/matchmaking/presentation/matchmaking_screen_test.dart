@@ -16,6 +16,9 @@ import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 import 'package:app/features/online/application/online_match_session.dart';
 import 'package:app/features/online/data/matchmaking_client.dart';
 import 'package:app/features/online/data/online_match_client.dart';
+import 'package:app/features/online/domain/models/online_messages.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
+import 'package:app/features/profile/domain/energy_state.dart';
 
 class FakeMatchmakingClient extends MatchmakingClient {
   final StreamController<MatchmakingEvent> controller =
@@ -68,10 +71,7 @@ class FakeMatchController extends MatchController {
   }) async {
     startMatchCalled = true;
     startedWithOpponentName = opponentName;
-    state = state.copyWith(
-      opponentName: opponentName ?? '',
-      isLoading: true,
-    );
+    state = state.copyWith(opponentName: opponentName ?? '', isLoading: true);
   }
 }
 
@@ -94,10 +94,7 @@ class FakeOnlineMatchSession extends OnlineMatchSession {
     startOnlineMatchCalled = true;
     startedWithMatchId = matchId;
     startedWithOpponentName = opponentName;
-    state = state.copyWith(
-      opponentName: opponentName,
-      isLoading: true,
-    );
+    state = state.copyWith(opponentName: opponentName, isLoading: true);
   }
 }
 
@@ -113,7 +110,9 @@ Widget _buildTestApp({
     overrides: [
       matchControllerProvider.overrideWith(() => botController),
       onlineMatchSessionProvider.overrideWith(() => onlineSession),
-      matchmakingClientFactoryProvider.overrideWithValue(() => matchmakingClient),
+      matchmakingClientFactoryProvider.overrideWithValue(
+        () => matchmakingClient,
+      ),
       onlineMatchmakingEnabledProvider.overrideWithValue(onlineEnabled),
     ],
     child: MaterialApp(
@@ -188,9 +187,8 @@ void main() {
                 onPressed: () {
                   Navigator.of(ctx).push(
                     MaterialPageRoute(
-                      builder: (_) => const MatchmakingScreen(
-                        initialOpponentName: 'Deniz',
-                      ),
+                      builder: (_) =>
+                          const MatchmakingScreen(initialOpponentName: 'Deniz'),
                     ),
                   );
                 },
@@ -295,12 +293,12 @@ void main() {
             overrides: [
               matchControllerProvider.overrideWith(() => botController),
               onlineMatchSessionProvider.overrideWith(() => onlineSession),
-              matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+              matchmakingClientFactoryProvider.overrideWithValue(
+                () => mmClient,
+              ),
             ],
             child: const MaterialApp(
-              home: MatchmakingScreen(
-                initialOpponentName: 'Deniz',
-              ),
+              home: MatchmakingScreen(initialOpponentName: 'Deniz'),
             ),
           ),
         );
@@ -368,6 +366,58 @@ void main() {
       expect(botController.startMatchCalled, isTrue);
       expect(botController.startedWithOpponentName, 'Zeynep');
       expect(onlineSession.startOnlineMatchCalled, isFalse);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '6. MatchmakingMatched mesajında energy geldiğinde profileProvider enerjiyi anında günceller',
+    (tester) async {
+      final mmClient = FakeMatchmakingClient();
+      final container = ProviderContainer(
+        overrides: [
+          matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: MatchmakingScreen()),
+        ),
+      );
+      await tester.pump();
+
+      // Başlangıçta enerji 5
+      container
+          .read(profileProvider.notifier)
+          .updateEnergy(const EnergyState(enabled: true, current: 5, max: 5));
+      expect(container.read(profileProvider).energy?.current, 5);
+
+      // Sunucudan matched mesajı ve güncel enerji (4) gelir
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_999',
+          opponentName: 'Ahmet',
+          opponentFrame: 'gold',
+          energy: MatchedEnergyInfo(
+            current: 4,
+            max: 5,
+            nextEnergyAtMs: 1729556400000,
+          ),
+          serverNowMs: 1729555200000,
+        ),
+      );
+      await tester.pump();
+
+      // Profil durumu anında 4'e güncellenmeli
+      final profile = container.read(profileProvider);
+      expect(profile.energy, isNotNull);
+      expect(profile.energy!.current, 4);
+      expect(profile.energy!.max, 5);
+      expect(profile.energy!.nextEnergyAtMs, 1729556400000);
+      expect(profile.serverNowMs, 1729555200000);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "description": "Energy HTTP API & WebSocket contract test vectors between Cloudflare Worker and Flutter client",
+  "get_me_energy_enabled": {
+    "serverNowMs": 1729555200000,
+    "energy": {
+      "enabled": true,
+      "current": 3,
+      "max": 5,
+      "nextEnergyAtMs": 1729556400000,
+      "regenSeconds": 1200,
+      "packs": [
+        { "id": "one", "cost": 20, "energy": 1 },
+        { "id": "full", "cost": 80, "energy": 5 }
+      ]
+    }
+  },
+  "get_me_energy_disabled": {
+    "serverNowMs": 1729555200000,
+    "energy": {
+      "enabled": false,
+      "current": 5,
+      "max": 5,
+      "nextEnergyAtMs": null,
+      "regenSeconds": 1200,
+      "packs": []
+    }
+  },
+  "post_store_energy": {
+    "method": "POST",
+    "path": "/store/energy",
+    "request_pack_one": {
+      "pack": "one"
+    },
+    "request_pack_full": {
+      "pack": "full"
+    },
+    "response_200": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "pack": "one",
+        "coins": 180,
+        "energy": 4,
+        "max": 5,
+        "nextEnergyAtMs": 1729556400000,
+        "serverNowMs": 1729555200000
+      }
+    },
+    "response_400_energy_full": {
+      "status": 400,
+      "body": {
+        "error": "energy_full",
+        "message": "Enerjiniz zaten dolu"
+      }
+    },
+    "response_400_energy_disabled": {
+      "status": 400,
+      "body": {
+        "error": "energy_disabled",
+        "message": "Enerji sistemi şu anda aktif değil"
+      }
+    },
+    "response_402_not_enough_coins": {
+      "status": 402,
+      "body": {
+        "error": "not_enough_coins",
+        "message": "Yetersiz jeton",
+        "coins": 10
+      }
+    }
+  },
+  "matchmaker_no_energy": {
+    "status": 1008,
+    "message": {
+      "t": "error",
+      "code": "no_energy",
+      "message": "Enerjin bitti"
+    }
+  },
+  "matchmaker_matched_with_energy": {
+    "message": {
+      "t": "matched",
+      "matchId": "match_12345",
+      "opponentName": "Ahmet",
+      "opponentFrame": "gold",
+      "serverNowMs": 1729555200000,
+      "energy": {
+        "current": 4,
+        "max": 5,
+        "nextEnergyAtMs": 1729556400000
+      }
+    }
+  },
+  "matchmaker_matched_without_energy": {
+    "message": {
+      "t": "matched",
+      "matchId": "match_67890",
+      "opponentName": "Mehmet",
+      "opponentFrame": "classic"
+    }
+  }
+}
+

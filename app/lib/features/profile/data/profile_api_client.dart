@@ -4,6 +4,7 @@ import 'dart:io';
 
 import '../../../core/config/server_config.dart';
 import '../../online/data/auth_token_provider.dart';
+import '../domain/energy_state.dart';
 
 class UserProfileModel {
   final String uid;
@@ -14,6 +15,8 @@ class UserProfileModel {
   final int lost;
   final int createdAt;
   final String equippedFrame;
+  final EnergyState? energy;
+  final int? serverNowMs;
 
   const UserProfileModel({
     required this.uid,
@@ -24,10 +27,13 @@ class UserProfileModel {
     this.lost = 0,
     this.createdAt = 0,
     this.equippedFrame = 'classic',
+    this.energy,
+    this.serverNowMs,
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     final stats = json['stats'] as Map<String, dynamic>?;
+    final energyJson = json['energy'] as Map<String, dynamic>?;
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
       nickname: json['nickname'] as String?,
@@ -37,6 +43,8 @@ class UserProfileModel {
       lost: (stats?['lost'] as num?)?.toInt() ?? 0,
       createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
       equippedFrame: json['equippedFrame'] as String? ?? 'classic',
+      energy: energyJson != null ? EnergyState.fromJson(energyJson) : null,
+      serverNowMs: (json['serverNowMs'] as num?)?.toInt(),
     );
   }
 }
@@ -91,13 +99,15 @@ class HttpProfileApiClient implements ProfileApiClient {
     final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request =
-          await client.getUrl(uri).timeout(const Duration(seconds: 8));
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 8));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
       final responseBody = await response
           .transform(utf8.decoder)
           .join()
@@ -130,18 +140,22 @@ class HttpProfileApiClient implements ProfileApiClient {
     final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request =
-          await client.putUrl(uri).timeout(const Duration(seconds: 8));
+      final request = await client
+          .putUrl(uri)
+          .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(
-          HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+        HttpHeaders.contentTypeHeader,
+        'application/json; charset=utf-8',
+      );
 
       final bodyBytes = utf8.encode(jsonEncode({'nickname': nickname}));
       request.contentLength = bodyBytes.length;
       request.add(bodyBytes);
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 8));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
       final responseBody = await response
           .transform(utf8.decoder)
           .join()
@@ -163,7 +177,8 @@ class HttpProfileApiClient implements ProfileApiClient {
         return ProfileUpdateInvalidNickname(msg);
       } else {
         return ProfileUpdateNetworkError(
-            'HTTP ${response.statusCode}: $responseBody');
+          'HTTP ${response.statusCode}: $responseBody',
+        );
       }
     } catch (e) {
       return ProfileUpdateNetworkError(e);
@@ -171,6 +186,7 @@ class HttpProfileApiClient implements ProfileApiClient {
       client.close();
     }
   }
+
   @override
   Future<bool> deleteProfile() async {
     final token = await authTokenProvider.getIdToken();
@@ -182,13 +198,15 @@ class HttpProfileApiClient implements ProfileApiClient {
     final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request =
-          await client.deleteUrl(uri).timeout(const Duration(seconds: 8));
+      final request = await client
+          .deleteUrl(uri)
+          .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
 
-      final response =
-          await request.close().timeout(const Duration(seconds: 8));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
       final responseBody = await response
           .transform(utf8.decoder)
           .join()

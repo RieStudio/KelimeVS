@@ -1,10 +1,13 @@
 import '../../auth/application/auth_notifier.dart';
+
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../online/data/auth_token_provider.dart';
 import '../data/profile_api_client.dart';
 import '../data/profile_repository.dart';
+import '../domain/energy_state.dart';
 
 class ProfileState {
   final String? nickname;
@@ -13,6 +16,8 @@ class ProfileState {
   final bool isSyncing;
   final String? syncError;
   final String equippedFrame;
+  final EnergyState? energy;
+  final int? serverNowMs;
 
   const ProfileState({
     this.nickname,
@@ -21,6 +26,8 @@ class ProfileState {
     this.isSyncing = false,
     this.syncError,
     this.equippedFrame = 'classic',
+    this.energy,
+    this.serverNowMs,
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -33,6 +40,8 @@ class ProfileState {
     String? syncError,
     String? equippedFrame,
     bool clearSyncError = false,
+    EnergyState? energy,
+    int? serverNowMs,
   }) {
     return ProfileState(
       nickname: nickname ?? this.nickname,
@@ -41,6 +50,8 @@ class ProfileState {
       isSyncing: isSyncing ?? this.isSyncing,
       syncError: clearSyncError ? null : (syncError ?? this.syncError),
       equippedFrame: equippedFrame ?? this.equippedFrame,
+      energy: energy ?? this.energy,
+      serverNowMs: serverNowMs ?? this.serverNowMs,
     );
   }
 }
@@ -77,6 +88,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
     final coins = await repo.getCoins(defaultCoins: 100);
     final frame = await repo.getEquippedFrame(defaultFrame: 'classic');
 
+    if (!ref.mounted) return;
     state = state.copyWith(
       nickname: state.nickname ?? nick,
       coins: state.coins == 100 ? coins : state.coins,
@@ -92,39 +104,56 @@ class ProfileNotifier extends Notifier<ProfileState> {
   Future<void> syncWithServer() async {
     if (_isSyncing) return;
     _isSyncing = true;
-    state = state.copyWith(isSyncing: true);
+    if (ref.mounted) {
+      state = state.copyWith(isSyncing: true);
+    }
 
     try {
       final repo = ref.read(profileRepositoryProvider);
       final apiClient = ref.read(profileApiClientProvider);
 
       final remote = await apiClient.getProfile();
+      if (!ref.mounted) return;
       if (remote != null) {
-        // 1. Jeton bakiyesini senkronla
+        // 1. Jeton bakiyesini ve enerjiyi senkronla
         await repo.setCoins(remote.coins);
         await repo.setEquippedFrame(remote.equippedFrame);
-        state = state.copyWith(coins: remote.coins, equippedFrame: remote.equippedFrame);
+        if (!ref.mounted) return;
+        state = state.copyWith(
+          coins: remote.coins,
+          equippedFrame: remote.equippedFrame,
+          energy: remote.energy,
+          serverNowMs: remote.serverNowMs,
+        );
 
         // 2. Takma ad senkronizasyonu (Kural 2)
         final localNick = state.nickname ?? await repo.getNickname();
+        if (!ref.mounted) return;
         if (remote.nickname != null && remote.nickname!.trim().isNotEmpty) {
           // Bulutta ad varsa bulut esas alınır, yerel güncellenir
           final cloudNick = remote.nickname!.trim();
           await repo.setNickname(cloudNick);
           await repo.setNicknameSyncPending(false);
-          state = state.copyWith(nickname: cloudNick);
+          if (ref.mounted) {
+            state = state.copyWith(nickname: cloudNick);
+          }
         } else if (localNick != null && localNick.trim().isNotEmpty) {
           // Bulutta ad yok ama yerelde geçerli takma ad varsa (Mevcut yerel takma ad göçü)
           final uploadRes = await apiClient.updateNickname(localNick.trim());
+          if (!ref.mounted) return;
           if (uploadRes is ProfileUpdateSuccess) {
             await repo.setNickname(uploadRes.nickname);
             await repo.setNicknameSyncPending(false);
-            state = state.copyWith(nickname: uploadRes.nickname);
+            if (ref.mounted) {
+              state = state.copyWith(nickname: uploadRes.nickname);
+            }
           } else if (uploadRes is ProfileUpdateNetworkError) {
             await repo.setNicknameSyncPending(true);
           } else if (uploadRes is ProfileUpdateInvalidNickname) {
             await repo.setNicknameSyncPending(false);
-            state = state.copyWith(syncError: uploadRes.message);
+            if (ref.mounted) {
+              state = state.copyWith(syncError: uploadRes.message);
+            }
           }
         }
       } else {
@@ -136,7 +165,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
       }
     } finally {
       _isSyncing = false;
-      state = state.copyWith(isSyncing: false);
+      if (ref.mounted) {
+        state = state.copyWith(isSyncing: false);
+      }
     }
   }
 
@@ -194,6 +225,14 @@ class ProfileNotifier extends Notifier<ProfileState> {
     state = state.copyWith(coins: newTotal);
   }
 
+  /// Enerji durumunu günceller.
+  void updateEnergy(EnergyState energy, [int? serverNowMs]) {
+    state = state.copyWith(
+      energy: energy,
+      serverNowMs: serverNowMs ?? state.serverNowMs,
+    );
+  }
+
   /// Kuşanılan avatar çerçevesini yerelde ve durumda günceller.
   Future<void> setEquippedFrame(String frame) async {
     final repo = ref.read(profileRepositoryProvider);
@@ -204,11 +243,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
   Future<void> clearNickname() async {
     final repo = ref.read(profileRepositoryProvider);
     await repo.clear();
-    state = const ProfileState(
-      nickname: null,
-      coins: 100,
-      isLoaded: true,
-    );
+    state = const ProfileState(nickname: null, coins: 100, isLoaded: true);
   }
 }
 

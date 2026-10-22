@@ -1,8 +1,10 @@
 import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'core/icons/app_icons.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
@@ -51,6 +53,19 @@ class KelimeVSApp extends StatelessWidget {
   }
 }
 
+class BottomNavIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void setIndex(int index) {
+    state = index;
+  }
+}
+
+final bottomNavIndexProvider = NotifierProvider<BottomNavIndexNotifier, int>(
+  BottomNavIndexNotifier.new,
+);
+
 class MainShell extends ConsumerStatefulWidget {
   final String? initialAuthError;
 
@@ -62,7 +77,6 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
-  int _currentIndex = 0;
   String? _authError;
   StreamSubscription<User?>? _authSubscription;
 
@@ -95,7 +109,9 @@ class _MainShellState extends ConsumerState<MainShell>
         if (FirebaseAuth.instance.currentUser == null && _authError == null) {
           await FirebaseAuth.instance.signInAnonymously();
         }
-        _authSubscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+        _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+          _,
+        ) {
           if (mounted) setState(() {});
         });
       }
@@ -116,22 +132,10 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   static const List<AppNavItem> _navItems = [
-    AppNavItem(
-      icon: AppIcons.home,
-      label: AppStrings.navHome,
-    ),
-    AppNavItem(
-      icon: AppIcons.leaderboard,
-      label: AppStrings.navLeaderboard,
-    ),
-    AppNavItem(
-      icon: AppIcons.shop,
-      label: AppStrings.navShop,
-    ),
-    AppNavItem(
-      icon: AppIcons.profile,
-      label: AppStrings.navProfile,
-    ),
+    AppNavItem(icon: AppIcons.home, label: AppStrings.navHome),
+    AppNavItem(icon: AppIcons.leaderboard, label: AppStrings.navLeaderboard),
+    AppNavItem(icon: AppIcons.shop, label: AppStrings.navShop),
+    AppNavItem(icon: AppIcons.profile, label: AppStrings.navProfile),
   ];
 
   @override
@@ -148,10 +152,12 @@ class _MainShellState extends ConsumerState<MainShell>
       return const OnboardingNicknameScreen();
     }
 
+    final currentIndex = ref.watch(bottomNavIndexProvider);
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: IndexedStack(
-        index: _currentIndex,
+        index: currentIndex,
         children: [
           const HomeScreen(),
           const _TabPlaceholder(title: AppStrings.navLeaderboard),
@@ -160,11 +166,9 @@ class _MainShellState extends ConsumerState<MainShell>
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _currentIndex,
+        currentIndex: currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
         },
         items: _navItems,
       ),
@@ -181,15 +185,8 @@ class _TabPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Text(title, style: AppTextStyles.screenTitle),
-      ),
-      body: Center(
-        child: Text(
-          title,
-          style: AppTextStyles.cardTitle,
-        ),
-      ),
+      appBar: AppBar(title: Text(title, style: AppTextStyles.screenTitle)),
+      body: Center(child: Text(title, style: AppTextStyles.cardTitle)),
     );
   }
 }

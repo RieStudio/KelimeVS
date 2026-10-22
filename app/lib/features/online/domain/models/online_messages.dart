@@ -1,6 +1,7 @@
 // Saf Dart - Flutter veya harici paket bağımlılığı yoktur.
 
 import 'dart:convert';
+
 import 'online_match_state.dart';
 
 /// Maç sonundaki tur dökümü (final mesajında gelir).
@@ -20,7 +21,8 @@ class OnlineRoundRecord {
   factory OnlineRoundRecord.fromJson(Map<String, dynamic> json) {
     return OnlineRoundRecord(
       questionId: json['questionId'] as String? ?? '',
-      attempts: (json['attempts'] as List<dynamic>?)
+      attempts:
+          (json['attempts'] as List<dynamic>?)
               ?.map((e) => OnlineAttempt.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -30,11 +32,11 @@ class OnlineRoundRecord {
   }
 
   Map<String, dynamic> toJson() => {
-        'questionId': questionId,
-        'attempts': attempts.map((e) => e.toJson()).toList(),
-        'winnerIsMe': winnerIsMe,
-        'reason': reason,
-      };
+    'questionId': questionId,
+    'attempts': attempts.map((e) => e.toJson()).toList(),
+    'winnerIsMe': winnerIsMe,
+    'reason': reason,
+  };
 }
 
 /// Sunucudan istemciye gelen tüm mesajların temel sealed sınıfı.
@@ -67,23 +69,48 @@ class CancelledServerMessage extends ServerMessage {
   String toString() => 'CancelledServerMessage()';
 }
 
+/// matched mesajı içinde gelen enerji durumu.
+class MatchedEnergyInfo {
+  final int current;
+  final int max;
+  final int? nextEnergyAtMs;
+
+  const MatchedEnergyInfo({
+    required this.current,
+    required this.max,
+    this.nextEnergyAtMs,
+  });
+
+  factory MatchedEnergyInfo.fromJson(Map<String, dynamic> json) {
+    return MatchedEnergyInfo(
+      current: (json['current'] as num?)?.toInt() ?? 0,
+      max: (json['max'] as num?)?.toInt() ?? 5,
+      nextEnergyAtMs: (json['nextEnergyAtMs'] as num?)?.toInt(),
+    );
+  }
+}
+
 /// Eşleşme bulundu bildirimi (`matched`).
 class MatchedServerMessage extends ServerMessage {
   final String matchId;
   final String opponentName;
   final bool isFriendly;
   final String opponentFrame;
+  final MatchedEnergyInfo? energy;
+  final int? serverNowMs;
 
   const MatchedServerMessage({
     required this.matchId,
     required this.opponentName,
     this.isFriendly = false,
     this.opponentFrame = 'classic',
+    this.energy,
+    this.serverNowMs,
   });
 
   @override
   String toString() =>
-      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly)';
+      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly, energy: $energy)';
 }
 
 /// Arkadaş odası kuruldu bildirimi (`room_created`).
@@ -91,10 +118,7 @@ class RoomCreatedServerMessage extends ServerMessage {
   final String code;
   final int expiresAt;
 
-  const RoomCreatedServerMessage({
-    required this.code,
-    required this.expiresAt,
-  });
+  const RoomCreatedServerMessage({required this.code, required this.expiresAt});
 
   @override
   String toString() =>
@@ -106,10 +130,7 @@ class RoomResumedServerMessage extends ServerMessage {
   final String code;
   final int expiresAt;
 
-  const RoomResumedServerMessage({
-    required this.code,
-    required this.expiresAt,
-  });
+  const RoomResumedServerMessage({required this.code, required this.expiresAt});
 
   @override
   String toString() =>
@@ -267,11 +288,18 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         if (matchId is! String || opponentName is! String) {
           return UnknownServerMessage(raw);
         }
+        final energyRaw = json['energy'];
+        final energy = energyRaw is Map<String, dynamic>
+            ? MatchedEnergyInfo.fromJson(energyRaw)
+            : null;
+        final serverNowMs = (json['serverNowMs'] as num?)?.toInt();
         return MatchedServerMessage(
           matchId: matchId,
           opponentName: opponentName,
           isFriendly: isFriendly,
           opponentFrame: opponentFrame,
+          energy: energy,
+          serverNowMs: serverNowMs,
         );
       case 'room_created':
         final code = json['code'] as String?;
@@ -303,9 +331,11 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           reason: json['reason'] as String?,
         );
       case 'final':
-        final roundsList = (json['rounds'] as List<dynamic>?)
-                ?.map((e) =>
-                    OnlineRoundRecord.fromJson(e as Map<String, dynamic>))
+        final roundsList =
+            (json['rounds'] as List<dynamic>?)
+                ?.map(
+                  (e) => OnlineRoundRecord.fromJson(e as Map<String, dynamic>),
+                )
                 .toList() ??
             const [];
         final scores = json['scores'] as Map<String, dynamic>?;
@@ -374,56 +404,42 @@ String sanitizeSubmitText(String? raw) {
 /// Kuyruğa girme istemci mesajı oluşturur (JSON string).
 String createQueueMessage(String name) {
   final cleanName = sanitizePlayerName(name);
-  return jsonEncode({
-    't': 'queue',
-    'name': cleanName,
-  });
+  return jsonEncode({'t': 'queue', 'name': cleanName});
 }
 
 /// Kuyruktan çıkma istemci mesajı oluşturur (JSON string).
 String createCancelMessage() {
-  return jsonEncode({
-    't': 'cancel',
-  });
+  return jsonEncode({'t': 'cancel'});
 }
 
 /// Cevap denemesi gönderme istemci mesajı oluşturur (JSON string).
 String createSubmitMessage(String text) {
   final cleanText = sanitizeSubmitText(text);
-  return jsonEncode({
-    't': 'submit',
-    'text': cleanText,
-  });
+  return jsonEncode({'t': 'submit', 'text': cleanText});
 }
 
 /// Maçı terk etme istemci mesajı oluşturur (JSON string).
 String createLeaveMessage() {
-  return jsonEncode({
-    't': 'leave',
-  });
+  return jsonEncode({'t': 'leave'});
 }
 
 /// Durum senkronizasyonu isteme istemci mesajı oluşturur (JSON string).
 String createSyncMessage() {
-  return jsonEncode({
-    't': 'sync',
-  });
+  return jsonEncode({'t': 'sync'});
 }
 
 /// Arkadaş odası oluşturma istemci mesajı (`create_room`).
 String createRoomMessage({String? name}) {
   return jsonEncode({
     't': 'create_room',
-    if (name != null && name.trim().isNotEmpty) 'name': sanitizePlayerName(name),
+    if (name != null && name.trim().isNotEmpty)
+      'name': sanitizePlayerName(name),
   });
 }
 
 /// Askıdaki arkadaş odasına yeniden bağlanma istemci mesajı (`resume_room`).
 String createResumeRoomMessage(String code) {
-  return jsonEncode({
-    't': 'resume_room',
-    'code': code.trim().toUpperCase(),
-  });
+  return jsonEncode({'t': 'resume_room', 'code': code.trim().toUpperCase()});
 }
 
 /// Arkadaş odasına katılma istemci mesajı (`join_room`).
@@ -431,7 +447,8 @@ String createJoinRoomMessage(String code, {String? name}) {
   return jsonEncode({
     't': 'join_room',
     'code': code.trim().toUpperCase(),
-    if (name != null && name.trim().isNotEmpty) 'name': sanitizePlayerName(name),
+    if (name != null && name.trim().isNotEmpty)
+      'name': sanitizePlayerName(name),
   });
 }
 
@@ -439,15 +456,12 @@ String createJoinRoomMessage(String code, {String? name}) {
 String createCancelRoomMessage({String? code}) {
   return jsonEncode({
     't': 'cancel_room',
-    if (code != null && code.trim().isNotEmpty) 'code': code.trim().toUpperCase(),
+    if (code != null && code.trim().isNotEmpty)
+      'code': code.trim().toUpperCase(),
   });
 }
 
 /// Güçlendirici kullanma istemci mesajı (`use_powerup`).
 String createUsePowerupMessage(String type) {
-  return jsonEncode({
-    't': 'use_powerup',
-    'type': type,
-  });
+  return jsonEncode({'t': 'use_powerup', 'type': type});
 }
-

@@ -40,6 +40,7 @@ export interface MatchRoomInitParams {
   readonly questions: readonly Question[];
   readonly questionOrder: readonly string[];
   readonly matchType?: 'ranked' | 'friendly';
+  readonly energyChargedUids?: readonly string[];
 }
 
 export interface PlayerRewardInfo {
@@ -75,6 +76,9 @@ interface StoredRoomData {
   readonly powerupsUsed?: Record<string, { extraTime?: boolean }>;
   readonly pendingRefunds?: readonly PendingRefund[];
   readonly refundRetryCount?: number;
+  readonly energyChargedUids?: readonly string[];
+  readonly pendingEnergyRefundUid?: string;
+  readonly energyRefundRetryCount?: number;
 }
 
 export class MatchRoom extends DurableObject<Env> {
@@ -108,6 +112,7 @@ export class MatchRoom extends DurableObject<Env> {
       questionOrder: [...params.questionOrder],
       status: 'waiting_for_players',
       matchType: params.matchType ?? 'ranked',
+      energyChargedUids: params.energyChargedUids ? [...params.energyChargedUids] : [],
       schedule: { connectTimeoutAtMs },
     };
 
@@ -461,6 +466,8 @@ export class MatchRoom extends DurableObject<Env> {
         }
       } else if (action === 'refundRetry') {
         await this.processPendingRefunds();
+      } else if (action === 'energyRefundRetry') {
+        await this.processPendingEnergyRefund();
       } else if (action === 'cleanup') {
         await this.ctx.storage.deleteAll();
         this.data = null;
@@ -574,6 +581,10 @@ export class MatchRoom extends DurableObject<Env> {
       await this.applyMatchRewards();
       if (this.data.leaderboardPending) {
         await this.applyLeaderboard();
+      }
+      const endedBy = state?.endedBy;
+      if (endedBy === 'forfeit' && winnerId && this.data.energyChargedUids?.includes(winnerId)) {
+        await this.applyForfeitEnergyRefund(winnerId);
       }
     }
     await this.persist();
@@ -1107,6 +1118,63 @@ export class MatchRoom extends DurableObject<Env> {
       await this.persist();
       await this.updateAlarm();
     }
+  }
+
+  private async applyForfeitEnergyRefund(winnerUid: string): Promise<void> {
+    if (!this.data) return;
+    try {
+      const userProfileStub = this.env.USER_PROFILE.get(
+        this.env.USER_PROFILE.idFromName(winnerUid)
+      );
+      const res = await userProfileStub.refundEnergy({
+        matchId: this.data.matchId,
+        amount: 1,
+        uid: winnerUid,
+      });
+      console.log(`Forfeit energy refund applied for ${winnerUid}: refunded=${res.refunded}`);
+      this.data = {
+        ...this.data,
+        pendingEnergyRefundUid: undefined,
+        energyRefundRetryCount: 0,
+        schedule: {
+          ...this.data.schedule,
+          energyRefundRetryAtMs: undefined,
+        },
+      };
+    } catch (err) {
+      console.error(`applyForfeitEnergyRefund transient error for ${winnerUid}:`, err);
+      const nowMs = Date.now();
+      const retryCount = (this.data.energyRefundRetryCount ?? 0) + 1;
+      if (retryCount <= 5) {
+        const delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        this.data = {
+          ...this.data,
+          pendingEnergyRefundUid: winnerUid,
+          energyRefundRetryCount: retryCount,
+          schedule: {
+            ...this.data.schedule,
+            energyRefundRetryAtMs: nowMs + delayMs,
+          },
+        };
+      } else {
+        this.data = {
+          ...this.data,
+          pendingEnergyRefundUid: undefined,
+          energyRefundRetryCount: retryCount,
+          schedule: {
+            ...this.data.schedule,
+            energyRefundRetryAtMs: undefined,
+          },
+        };
+      }
+    }
+  }
+
+  private async processPendingEnergyRefund(): Promise<void> {
+    if (!this.data || !this.data.pendingEnergyRefundUid) return;
+    await this.applyForfeitEnergyRefund(this.data.pendingEnergyRefundUid);
+    await this.persist();
+    await this.updateAlarm();
   }
 
   private broadcastState(): void {

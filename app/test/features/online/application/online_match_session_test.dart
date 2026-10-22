@@ -121,6 +121,10 @@ class FakeOnlineMatchClient extends OnlineMatchClient {
 }
 
 void main() {
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+  });
   test(
     '1. state -> MatchUiState dönüşümü: tur, skor, soru, sıra, clockOffsetMs ile kalan süre ve deneme balonları',
     () async {

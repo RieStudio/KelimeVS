@@ -45,6 +45,12 @@ export type MatchmakerServerMessage =
       readonly opponentName: string;
       readonly opponentFrame?: string;
       readonly isFriendly?: boolean;
+      readonly serverNowMs?: number;
+      readonly energy?: {
+        readonly current: number;
+        readonly max: number;
+        readonly nextEnergyAtMs: number | null;
+      };
     }
   | {
       readonly t: 'error';

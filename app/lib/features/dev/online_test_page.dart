@@ -2,6 +2,7 @@
 // Düz metin arayüz: DESIGN.md bileşenleri ve stil tokenları kullanılmaz.
 
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../online/data/matchmaking_client.dart';
@@ -13,19 +14,16 @@ class OnlineTestPage extends StatefulWidget {
   final MatchmakingClient? matchmakingClient;
   final OnlineMatchClient? matchClient;
 
-  const OnlineTestPage({
-    super.key,
-    this.matchmakingClient,
-    this.matchClient,
-  });
+  const OnlineTestPage({super.key, this.matchmakingClient, this.matchClient});
 
   @override
   State<OnlineTestPage> createState() => _OnlineTestPageState();
 }
 
 class _OnlineTestPageState extends State<OnlineTestPage> {
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Test');
+  final TextEditingController _nameController = TextEditingController(
+    text: 'Test',
+  );
   final TextEditingController _answerController = TextEditingController();
   final ScrollController _logScrollController = ScrollController();
 
@@ -149,6 +147,11 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
         setState(() {
           _isQueueing = false;
         });
+      case MatchmakingNoEnergy():
+        _addLog('noEnergy: Yetersiz enerji, enerjin bitti');
+        setState(() {
+          _isQueueing = false;
+        });
     }
   }
 
@@ -193,9 +196,13 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
       case OnlineMatchDisconnected(:final reason):
         _addLog('disconnected: Bağlantı koptu ($reason)');
       case OnlineMatchPowerupAck(:final message):
-        _addLog('powerup_ack: success=${message.success}, code=${message.code}');
+        _addLog(
+          'powerup_ack: success=${message.success}, code=${message.code}',
+        );
       case OnlineMatchOpponentPowerup(:final message):
-        _addLog('opponent_powerup: ${message.powerupType} (+${message.seconds} sn)');
+        _addLog(
+          'opponent_powerup: ${message.powerupType} (+${message.seconds} sn)',
+        );
       case OnlineMatchError(:final message):
         _addLog('error: $message');
     }
@@ -229,9 +236,7 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Online Test (Protokol v1)'),
-      ),
+      appBar: AppBar(title: const Text('Online Test (Protokol v1)')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -371,4 +376,3 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
     );
   }
 }
-

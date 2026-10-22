@@ -9,7 +9,8 @@ abstract final class AppStrings {
   static const String quickMatch = 'Hızlı Maç';
   static const String quickMatchSubtitle = 'Rastgele bir rakiple eşleş';
   static const String playWithFriend = 'Arkadaşınla Oyna';
-  static const String playWithFriendComingSoon = 'Arkadaşınla Oyna modu yakında eklenecek.';
+  static const String playWithFriendComingSoon =
+      'Arkadaşınla Oyna modu yakında eklenecek.';
   static const String comingSoon = 'Yakında';
   static const String recentMatches = 'SON MAÇLARIM';
   static const String noMatchesYet = 'Henüz maç oynamadın. İlk maçını oyna!';
@@ -51,7 +52,8 @@ abstract final class AppStrings {
   static const String startingSoon = 'Birazdan başlıyoruz';
   static const String vs = 'VS';
   static const String searchTipTitle = 'İPUCU';
-  static const String searchTipContent = 'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
+  static const String searchTipContent =
+      'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
 
   // Maç İçi
   static const String you = 'Sen';
@@ -83,7 +85,8 @@ abstract final class AppStrings {
   // Maç Test Sayfası (Geçici)
   static const String matchTest = 'Maç Testi';
   static const String matchTestTitle = 'Maç Test Sayfası';
-  static const String matchTestNotice = 'Bu sayfa geçicidir, sonraki adımlarda gerçek ekranlarla değiştirilecek.';
+  static const String matchTestNotice =
+      'Bu sayfa geçicidir, sonraki adımlarda gerçek ekranlarla değiştirilecek.';
   static const String roundPrefix = 'Tur ';
   static const String roundTemplate = 'Tur {n}';
   static String round(int n) => roundTemplate.replaceAll('{n}', '$n');
@@ -100,7 +103,8 @@ abstract final class AppStrings {
   static const String nearMissExclamation = 'Çok yakın!';
   static const String leaveMatch = 'Maçtan Çık';
   static const String leaveMatchConfirmTitle = 'Maçtan çıkmak istiyor musun?';
-  static const String leaveMatchConfirmMessage = 'Maçı terk edersen maçı kaybedeceksin. Devam etmek istiyor musun?';
+  static const String leaveMatchConfirmMessage =
+      'Maçı terk edersen maçı kaybedeceksin. Devam etmek istiyor musun?';
   static const String leaveMatchConfirm = 'Çık ve Terk Et';
   static const String eventWrongAnswer = 'Yanlış cevap';
   static const String eventAlreadySaid = 'Daha önce söylendi';
@@ -118,7 +122,8 @@ abstract final class AppStrings {
   static const String nearMiss = 'Çok yakın!';
   static const String timeLeftLabel = 'Kalan süre';
   static const String roundEndedTitle = 'Tur bitti';
-  static const String temporaryTodoNotice = 'TODO: sonraki adımda gerçek ekranla değişecek';
+  static const String temporaryTodoNotice =
+      'TODO: sonraki adımda gerçek ekranla değişecek';
   static const String close = 'Kapat';
 
   // Maç Detayı ve İtiraz
@@ -135,7 +140,8 @@ abstract final class AppStrings {
   static const String roundLabelDraw = 'BERABERE';
   static const String roundLabelIncomplete = 'YARIM KALDI';
   static const String dotSeparator = ' · ';
-  static String objectionPrompt(String text) => '“$text” kabul edilmedi. Sence doğru muydu?';
+  static String objectionPrompt(String text) =>
+      '“$text” kabul edilmedi. Sence doğru muydu?';
 
   // Sunucu Bağlantı Testi (Debug)
   static const String serverTestButton = 'Sunucu Testi';
@@ -153,19 +159,23 @@ abstract final class AppStrings {
   static const String onlineTestButton = 'Online test';
 
   // Çevrimiçi Maç Bağlantı Durumu
-  static const String connectionLostNotice = 'Bağlantı koptu. Ana ekrana dönülüyor.';
-  static const String connectionReconnecting = 'Bağlantı koptu, yeniden bağlanılıyor…';
+  static const String connectionLostNotice =
+      'Bağlantı koptu. Ana ekrana dönülüyor.';
+  static const String connectionReconnecting =
+      'Bağlantı koptu, yeniden bağlanılıyor…';
   static const String connectionRestored = 'Bağlandı';
   static const String matchReplacedNotice = 'Maçı başka bir cihazda açtın';
   static const String yourConnectionLost = 'Bağlantın koptu';
   static const String opponentConnectionLost = 'Rakibin bağlantısı koptu';
-  static const String scoreBeforeDisconnectNote = 'Skor, bağlantı kopmadan önceki duruma göredir.';
+  static const String scoreBeforeDisconnectNote =
+      'Skor, bağlantı kopmadan önceki duruma göredir.';
 
   // Profil ve Onboarding
   static const String welcomeTitle = 'Hoş Geldin!';
   static const String welcomePrompt = 'KelimeVS’de seni nasıl çağıralım?';
   static const String nicknameHint = 'Takma adın';
-  static const String nicknameRuleHint = '3–16 karakter. Harf, rakam ve alt çizgi.';
+  static const String nicknameRuleHint =
+      '3–16 karakter. Harf, rakam ve alt çizgi.';
   static const String continueAction = 'Devam';
   static const String profileTitle = 'Profil';
   static const String changeNickname = 'Adı Değiştir';
@@ -182,8 +192,10 @@ abstract final class AppStrings {
   static const String signOutDialogTitle = 'Çıkış Yap';
   static const String signOutDialogMessage =
       'Hesabından çıkmak istediğinden emin misin?\nBulut yedeklemesi henüz bulunmadığı için çıkış yaptığında cihazındaki maç geçmişin ve takma adın silinecektir.';
-  static const String networkError = 'İnternet bağlantını kontrol edip tekrar dene.';
-  static const String authGenericError = 'İşlem gerçekleştirilemedi. Lütfen tekrar dene.';
+  static const String networkError =
+      'İnternet bağlantını kontrol edip tekrar dene.';
+  static const String authGenericError =
+      'İşlem gerçekleştirilemedi. Lütfen tekrar dene.';
 
   // Haftalık Liderlik Tablosu
   static const String leaderboardTitle = 'Haftalık Sıralama';
@@ -193,7 +205,8 @@ abstract final class AppStrings {
       'Hızlı Maç oynayarak haftanın ilk galibiyetini sen al!';
   static const String winsSuffix = ' galibiyet';
   static const String yourRankLabel = 'Senin Sıran';
-  static String yourRank(int rank, int wins) => 'Senin sıran: #$rank ($wins$winsSuffix)';
+  static String yourRank(int rank, int wins) =>
+      'Senin sıran: #$rank ($wins$winsSuffix)';
   static const String notRankedYet = 'Sıralamada değilsin';
   static const String remainingTimePrefix = 'Kalan süre: ';
   static const String leaderboardLoading = 'Sıralama yükleniyor…';
@@ -216,6 +229,7 @@ abstract final class AppStrings {
       'Hesap silinirken bir bağlantı hatası oluştu. Lütfen internetini kontrol edip tekrar dene.';
   static const String accountDeletedNotice =
       'Hesabın silindiği için oturumun sonlandırıldı.';
+  static const String accountDeleted = 'Hesap silinmiş';
   static const String deleteAccountGoogleReauthNote =
       'Güvenlik için Google hesabını bir kez daha seçmen istenecek.';
   static const String reauthWrongAccountError =
@@ -233,30 +247,38 @@ abstract final class AppStrings {
   static const String reasonCheating = 'Hile veya kötüye kullanım';
   static const String reasonOther = 'Diğer';
   static const String reportSuccess = 'Bildirimin alındı. Teşekkür ederiz.';
-  static const String reportAlreadyReported = 'Bu maç için zaten bildirim yaptın.';
+  static const String reportAlreadyReported =
+      'Bu maç için zaten bildirim yaptın.';
   static const String reportDailyLimit = 'Günlük bildirim sınırına ulaştın.';
-  static const String reportMatchExpired = 'Maç süresi dolduğu için bildirim yapılamadı.';
-  static const String reportGenericError = 'Bildirim gönderilemedi. Lütfen internetini kontrol et.';
+  static const String reportMatchExpired =
+      'Maç süresi dolduğu için bildirim yapılamadı.';
+  static const String reportGenericError =
+      'Bildirim gönderilemedi. Lütfen internetini kontrol et.';
 
   static const String blockDialogTitle = 'Oyuncuyu Engelle';
   static String blockDialogMessage(String nickname) =>
       ' adlı oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.';
   static const String blockConfirm = 'Engelle';
   static String blockSuccess(String nickname) => ' engellendi.';
-  static const String blockLimitReached = 'En fazla 100 oyuncu engelleyebilirsin.';
-  static const String blockMatchExpired = 'Maç süresi dolduğu için engelleme yapılamadı.';
-  static const String blockGenericError = 'Engelleme işlemi gerçekleştirilemedi.';
+  static const String blockLimitReached =
+      'En fazla 100 oyuncu engelleyebilirsin.';
+  static const String blockMatchExpired =
+      'Maç süresi dolduğu için engelleme yapılamadı.';
+  static const String blockGenericError =
+      'Engelleme işlemi gerçekleştirilemedi.';
 
   // Engellenen Oyuncular Ekranı (Profil)
   static const String blockedUsersTitle = 'Engellenenler';
   static const String blockedUsersTileTitle = 'Engellenen Oyuncular';
-  static const String blockedUsersTileSubtitle = 'Engellediğin oyuncularla eşleşmezsin';
+  static const String blockedUsersTileSubtitle =
+      'Engellediğin oyuncularla eşleşmezsin';
   static const String emptyBlockedUsers = 'Henüz engellenen oyuncu yok';
   static const String emptyBlockedUsersSubtitle =
       'Maç sonu ekranından uygunsuz oyuncuları engelleyebilirsin.';
   static const String unblockAction = 'Kaldır';
   static const String unblockSuccess = 'Engel kaldırıldı.';
-  static const String unblockGenericError = 'Engel kaldırılırken bir hata oluştu.';
+  static const String unblockGenericError =
+      'Engel kaldırılırken bir hata oluştu.';
   static const String blockedUsersLoading = 'Engellenenler yükleniyor…';
   static const String blockedUsersError = 'Engellenenler yüklenemedi';
 
@@ -290,8 +312,7 @@ abstract final class AppStrings {
   static const String roomFull = 'Bu odaya zaten başka bir oyuncu katılmış.';
   static const String cannotJoinOwnRoom =
       'Kendi oluşturduğun odaya katılamazsın.';
-  static const String friendRoomUnavailable =
-      'Bu odaya şu anda katılınamıyor.';
+  static const String friendRoomUnavailable = 'Bu odaya şu anda katılınamıyor.';
   static const String friendRoomRateLimited =
       'Çok fazla hatalı deneme yaptın. Lütfen biraz bekleyip tekrar dene.';
   static const String friendRoomLobbyBusy =
@@ -307,11 +328,16 @@ abstract final class AppStrings {
   static const String opponentUsedExtraTime = 'Rakip +5 sn ek süre kullandı';
   static String opponentUsedExtraTimeSec(int seconds) =>
       'Rakip +$seconds sn ek süre kullandı';
-  static String notEnoughCoinsForExtraTime(int cost) => 'Yetersiz jeton ($cost gerekli)';
-  static const String extraTimeAlreadyUsed = 'Bu maçta ek süre hakkını zaten kullandın.';
-  static const String notYourTurnPowerup = 'Ek süre sadece kendi cevabında kullanılabilir.';
-  static const String powerupGenericError = 'Güçlendirici şu anda kullanılamıyor.';
-  static const String powerupTemporaryError = 'Şu anda kullanılamıyor, tekrar dene.';
+  static String notEnoughCoinsForExtraTime(int cost) =>
+      'Yetersiz jeton ($cost gerekli)';
+  static const String extraTimeAlreadyUsed =
+      'Bu maçta ek süre hakkını zaten kullandın.';
+  static const String notYourTurnPowerup =
+      'Ek süre sadece kendi cevabında kullanılabilir.';
+  static const String powerupGenericError =
+      'Güçlendirici şu anda kullanılamıyor.';
+  static const String powerupTemporaryError =
+      'Şu anda kullanılamıyor, tekrar dene.';
 
   // İleride Play Store linki açıldığında buraya URL yazılacak:
   static const String storeShareUrl = '';
@@ -336,9 +362,12 @@ abstract final class AppStrings {
   static const String alreadyOwnedError = 'Bu çerçeveye zaten sahipsin.';
   static const String itemNotOwnedError = 'Bu çerçeveye henüz sahip değilsin.';
   static const String storeInvalidFrameError = 'Geçersiz çerçeve seçildi.';
-  static const String storeServerError = 'Sunucu hatası oluştu, lütfen daha sonra tekrar dene.';
-  static const String storeNetworkError = 'Bağlantı hatası. Lütfen internetini kontrol et.';
-  static const String storeGenericError = 'İşlem gerçekleştirilemedi, lütfen tekrar dene.';
+  static const String storeServerError =
+      'Sunucu hatası oluştu, lütfen daha sonra tekrar dene.';
+  static const String storeNetworkError =
+      'Bağlantı hatası. Lütfen internetini kontrol et.';
+  static const String storeGenericError =
+      'İşlem gerçekleştirilemedi, lütfen tekrar dene.';
 
   // Çerçeve adları
   static const String frameClassic = 'Klasik';
@@ -379,5 +408,32 @@ abstract final class AppStrings {
     }
     return '$frameName çerçeveli avatar';
   }
-}
 
+  // Mağaza Sekmeleri & Enerji Sistemi (DESIGN.md 9a & 9b)
+  static const String tabCoins = 'Jeton';
+  static const String tabEnergy = 'Enerji';
+  static const String tabFrames = 'Çerçeve';
+
+  static const String coinsTabTitle = 'Jeton paketleri çok yakında';
+  static const String coinsTabDescription =
+      'Gerçek parayla jeton satın alma ve özel teklifler yakında burada olacak!';
+
+  static const String energyTitle = 'Enerji';
+  static const String energyFull = 'Tüm enerjin doldu';
+  static const String energyFullButton = 'Enerjin dolu';
+  static const String nextEnergyPrefix = 'Sonraki enerji: ';
+  static const String energyRegenInfo = 'Her 20 dakikada 1 enerji yenilenir.';
+  static const String energyPackOneTitle = '+1 Enerji';
+  static const String energyPackOneDesc = 'Hemen 1 enerji doldur';
+  static const String energyPackFullTitle = 'Tam Doldur';
+  static const String energyPackFullDesc = 'Tüm enerjini anında 5/5 yap';
+  static const String energyPackPurchased =
+      'Enerji paketi başarıyla satın alındı!';
+  static const String energyAlreadyFull = 'Enerjiniz zaten dolu';
+  static const String energyDisabled = 'Enerji sistemi şu anda aktif değil';
+
+  static const String energyDepletedTitle = 'Enerjin bitti';
+  static const String energyDepletedSubtitle =
+      'Sıralı online maç oynamak için en az 1 enerjiye ihtiyacın var.';
+  static const String playWithBotEnergyFree = 'Botla Oyna';
+}

@@ -12,16 +12,57 @@ import '../../profile/application/profile_notifier.dart';
 import '../application/store_notifier.dart';
 import '../data/store_api_client.dart';
 import '../domain/models/store_item.dart';
+import 'widgets/coins_tab_view.dart';
+import 'widgets/energy_tab_view.dart';
 import 'widgets/purchase_bottom_sheet.dart';
 import 'widgets/store_frame_card.dart';
 
-/// DESIGN.md Bölüm 7: 9) Mağaza Ekranı
+/// DESIGN.md Bölüm 7: 9) Mağaza Ekranı & 9a) Mağaza Sekmeleri
 ///
 /// Üst çubukta başlık ("Mağaza") ve sağda CoinPill.
-/// Altında "AVATAR ÇERÇEVELERİ" bölüm etiketi.
-/// 2 sütunlu kart ızgarası: her çerçeve için önizleme, ad ve durum butonu.
-class StoreScreen extends ConsumerWidget {
+/// Altında sekme şeridi: **Jeton · Enerji · Çerçeve**.
+/// (Enerji kapalıyken Enerji sekmesi gösterilmez; varsayılan açılış Çerçeve sekmesidir).
+class StoreScreen extends ConsumerStatefulWidget {
   const StoreScreen({super.key});
+
+  @override
+  ConsumerState<StoreScreen> createState() => _StoreScreenState();
+}
+
+class _StoreScreenState extends ConsumerState<StoreScreen> {
+  final ScrollController _tabsScrollController = ScrollController();
+  final Map<StoreTab, GlobalKey> _tabKeys = {
+    StoreTab.coins: GlobalKey(),
+    StoreTab.energy: GlobalKey(),
+    StoreTab.frames: GlobalKey(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedTab();
+    });
+  }
+
+  void _scrollToSelectedTab() {
+    final currentTab = ref.read(storeNotifierProvider).selectedTab;
+    final key = _tabKeys[currentTab];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        alignment: 0.5,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabsScrollController.dispose();
+    super.dispose();
+  }
 
   void _showSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -73,8 +114,9 @@ class StoreScreen extends ConsumerWidget {
         userCoins: userCoins,
         playerName: playerName,
         onBuy: () async {
-          final res =
-              await ref.read(storeNotifierProvider.notifier).purchase(item.id);
+          final res = await ref
+              .read(storeNotifierProvider.notifier)
+              .purchase(item.id);
           if (res is StorePurchaseSuccess) {
             HapticFeedback.lightImpact();
             if (context.mounted) {
@@ -95,8 +137,9 @@ class StoreScreen extends ConsumerWidget {
           }
         },
         onEquip: () async {
-          final res =
-              await ref.read(storeNotifierProvider.notifier).equip(item.id);
+          final res = await ref
+              .read(storeNotifierProvider.notifier)
+              .equip(item.id);
           if (context.mounted) {
             _handleEquipResult(context, res);
           }
@@ -106,12 +149,27 @@ class StoreScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final storeState = ref.watch(storeNotifierProvider);
     final profile = ref.watch(profileProvider);
-    final playerName = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
+    final playerName =
+        (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
         ? profile.nickname!.trim()
         : 'S';
+
+    final isEnergyEnabled = storeState.energy?.enabled ?? false;
+
+    // DESIGN.md 9a: Enerji kapalıyken sekme hiç gösterilmez
+    final availableTabs = [
+      StoreTab.coins,
+      if (isEnergyEnabled) StoreTab.energy,
+      StoreTab.frames,
+    ];
+
+    // Eğer seçili sekme mevcut sekmelerde yoksa (örn. enerji kapandıysa) Çerçeve'ye al
+    final effectiveTab = availableTabs.contains(storeState.selectedTab)
+        ? storeState.selectedTab
+        : StoreTab.frames;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -146,42 +204,121 @@ class StoreScreen extends ConsumerWidget {
                 ),
               ),
 
-              // 2. Bölüm Etiketi: "AVATAR ÇERÇEVELERİ"
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppDimens.screenPaddingHorizontal,
-                  vertical: AppDimens.space6,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: SectionLabel(AppStrings.avatarFramesSection),
+              // 2. Yatay Sekme Şeridi: Jeton · Enerji · Çerçeve
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    controller: _tabsScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.screenPaddingHorizontal,
+                    ),
+                    itemCount: availableTabs.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: AppDimens.space8),
+                    itemBuilder: (context, index) {
+                      final tab = availableTabs[index];
+                      final isSelected = tab == effectiveTab;
+                      final label = switch (tab) {
+                        StoreTab.coins => AppStrings.tabCoins,
+                        StoreTab.energy => AppStrings.tabEnergy,
+                        StoreTab.frames => AppStrings.tabFrames,
+                      };
+
+                      return GestureDetector(
+                        key: _tabKeys[tab],
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          ref.read(storeNotifierProvider.notifier).setTab(tab);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _scrollToSelectedTab();
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDimens.space16,
+                          ),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.card,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.ink,
+                              width: AppDimens.borderThin,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontNunito,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: isSelected ? Colors.white : AppColors.ink,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
 
-              // 3. Yükleme veya Kart Izgarası
-              if (storeState.isLoading && storeState.items.isEmpty)
-                const SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.ink),
-                    ),
+              const SliverToBoxAdapter(
+                child: SizedBox(height: AppDimens.space12),
+              ),
+
+              // 3. Sekme İçeriği
+              if (effectiveTab == StoreTab.coins)
+                const SliverToBoxAdapter(child: CoinsTabView())
+              else if (effectiveTab == StoreTab.energy && isEnergyEnabled)
+                SliverToBoxAdapter(
+                  child: EnergyTabView(
+                    energy: storeState.energy!,
+                    userCoins: storeState.coins,
+                    serverNowMs: storeState.serverNowMs,
                   ),
                 )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
+              else ...[
+                // Çerçeve Sekmesi
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(
                     horizontal: AppDimens.screenPaddingHorizontal,
-                    vertical: AppDimens.space12,
+                    vertical: AppDimens.space6,
                   ),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: AppDimens.space12,
-                      crossAxisSpacing: AppDimens.space12,
-                      childAspectRatio: 0.82,
+                  sliver: SliverToBoxAdapter(
+                    child: SectionLabel(AppStrings.avatarFramesSection),
+                  ),
+                ),
+
+                if (storeState.isLoading && storeState.items.isEmpty)
+                  const SliverFillRemaining(
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.ink,
+                        ),
+                      ),
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.screenPaddingHorizontal,
+                      vertical: AppDimens.space12,
+                    ),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: AppDimens.space12,
+                            crossAxisSpacing: AppDimens.space12,
+                            childAspectRatio: 0.82,
+                          ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
                         final item = storeState.items[index];
                         final isItemLoading =
                             storeState.actionInProgressItemId == item.id;
@@ -210,7 +347,9 @@ class StoreScreen extends ConsumerWidget {
                           onBuy: () {
                             if (storeState.coins < item.price) {
                               _showSnackBar(
-                                  context, AppStrings.insufficientCoins);
+                                context,
+                                AppStrings.insufficientCoins,
+                              );
                               return;
                             }
                             _openPurchaseSheet(
@@ -222,11 +361,10 @@ class StoreScreen extends ConsumerWidget {
                             );
                           },
                         );
-                      },
-                      childCount: storeState.items.length,
+                      }, childCount: storeState.items.length),
                     ),
                   ),
-                ),
+              ],
             ],
           ),
         ),
@@ -234,4 +372,3 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 }
-

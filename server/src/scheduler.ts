@@ -9,6 +9,7 @@ export interface TimersSchedule {
   readonly rewardRetryAtMs?: number;
   readonly leaderboardRetryAtMs?: number;
   readonly refundRetryAtMs?: number;
+  readonly energyRefundRetryAtMs?: number;
 }
 
 export type DueActionType =
@@ -19,7 +20,8 @@ export type DueActionType =
   | 'cleanup'
   | 'rewardRetry'
   | 'leaderboardRetry'
-  | 'refundRetry';
+  | 'refundRetry'
+  | 'energyRefundRetry';
 
 export interface RoomDurations {
   readonly answerSeconds: number;
@@ -61,6 +63,7 @@ export function computeNextAlarm(schedule: TimersSchedule): number | null {
   if (schedule.rewardRetryAtMs !== undefined) times.push(schedule.rewardRetryAtMs);
   if (schedule.leaderboardRetryAtMs !== undefined) times.push(schedule.leaderboardRetryAtMs);
   if (schedule.refundRetryAtMs !== undefined) times.push(schedule.refundRetryAtMs);
+  if (schedule.energyRefundRetryAtMs !== undefined) times.push(schedule.energyRefundRetryAtMs);
 
   if (times.length === 0) return null;
   return Math.min(...times);
@@ -118,6 +121,12 @@ export function processDueTimers(
   if (schedule.refundRetryAtMs !== undefined && nowMs >= schedule.refundRetryAtMs) {
     dueActions.push('refundRetry');
     const { refundRetryAtMs, ...rest } = remaining;
+    remaining = rest;
+  }
+
+  if (schedule.energyRefundRetryAtMs !== undefined && nowMs >= schedule.energyRefundRetryAtMs) {
+    dueActions.push('energyRefundRetry');
+    const { energyRefundRetryAtMs, ...rest } = remaining;
     remaining = rest;
   }
 

@@ -50,6 +50,9 @@ abstract final class ServerConfig {
   /// Satın alma yolu.
   static const String purchasePath = '/store/purchase';
 
+  /// Enerji satın alma yolu.
+  static const String energyPath = '/store/energy';
+
   /// Liderlik tablosu yolu.
   static const String leaderboardPath = '/leaderboard';
 
@@ -77,6 +80,9 @@ abstract final class ServerConfig {
   /// Tam Satın Alma HTTP URL'si.
   static String get purchaseUrl => joinUrl(serverUrl, purchasePath);
 
+  /// Tam Enerji Satın Alma HTTP URL'si.
+  static String get energyUrl => joinUrl(serverUrl, energyPath);
+
   /// Tam Liderlik Tablosu HTTP URL'si.
   static String get leaderboardUrl => joinUrl(serverUrl, leaderboardPath);
 
@@ -89,10 +95,10 @@ abstract final class ServerConfig {
 
   /// İki URL parçasını güvenle birleştirir.
   static String joinUrl(String base, String path) {
-    final cleanBase =
-        base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final cleanBase = base.endsWith('/')
+        ? base.substring(0, base.length - 1)
+        : base;
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return '$cleanBase$cleanPath';
   }
 }
-

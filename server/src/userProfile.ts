@@ -1,6 +1,18 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validateNickname } from './engine/nicknameValidator';
 import { FRAME_CATALOG, getFrameCatalogItem, isValidFrameId } from './frames';
+import {
+  calculateRegeneratedEnergy,
+  getEnergyMax,
+  getEnergyRegenMinutes,
+  getEnergyCostPerMatch,
+  getEnergyPackOneCost,
+  getEnergyPackFullCost,
+  buildEnergyPacks,
+  isEnergyEnabledForUser,
+  type EnergyState,
+  type EnergyPack,
+} from './energy';
 import type { Env } from './index';
 
 export type MatchRewardOutcome =
@@ -74,8 +86,40 @@ export type EquipFrameResult =
   | { readonly success: true; readonly equippedFrame: string }
   | { readonly success: false; readonly error: 'item_not_owned' | 'invalid_frame' };
 
+export interface SpendEnergyResult {
+  readonly success: boolean;
+  readonly energy: number;
+  readonly max?: number;
+  readonly nextEnergyAtMs?: number | null;
+  readonly alreadySpent?: boolean;
+  readonly error?: 'not_enough_energy' | 'account_deleted';
+}
+
+export interface RefundEnergyResult {
+  readonly ok: true;
+  readonly refunded: boolean;
+  readonly energy: number;
+}
+
+export type PurchaseEnergyResult =
+  | {
+      readonly success: true;
+      readonly pack: 'one' | 'full';
+      readonly coins: number;
+      readonly energy: number;
+      readonly max: number;
+      readonly nextEnergyAtMs: number | null;
+      readonly serverNowMs: number;
+    }
+  | {
+      readonly success: false;
+      readonly error: 'not_enough_coins' | 'energy_full' | 'energy_disabled' | 'invalid_pack';
+      readonly coins?: number;
+      readonly energy?: number;
+    };
+
 export type AdminGrantResult =
-  | { readonly success: true; readonly coins: number; readonly grantedFrames: readonly string[] }
+  | { readonly success: true; readonly coins: number; readonly grantedFrames: readonly string[]; readonly energy?: number }
   | { readonly success: false; readonly error: 'account_deleted' | string };
 
 interface ProfileRow extends Record<string, string | number | null> {
@@ -86,7 +130,9 @@ interface ProfileRow extends Record<string, string | number | null> {
   won: number;
   lost: number;
   created_at: number;
-  equipped_frame?: string | null;
+  equipped_frame: string | null;
+  energy: number | null;
+  energy_updated_at: number | null;
 }
 
 interface DailyCoinsRow extends Record<string, string | number | null> {
@@ -187,6 +233,24 @@ export class UserProfile extends DurableObject<Env> {
         item_id TEXT PRIMARY KEY,
         purchased_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS energy_spends (
+        match_id TEXT NOT NULL,
+        uid TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        refunded_at INTEGER,
+        PRIMARY KEY (match_id, uid)
+      );
+
+      CREATE TABLE IF NOT EXISTS energy_purchases (
+        id TEXT PRIMARY KEY,
+        uid TEXT NOT NULL,
+        pack TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        cost INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
     `);
 
     // PRAGMA ile equipped_frame sütununun varlığı kontrol edilir, yoksa ALTER çalıştırılır
@@ -197,6 +261,20 @@ export class UserProfile extends DurableObject<Env> {
     if (!hasEquippedFrame) {
       this.ctx.storage.sql.exec(
         "ALTER TABLE profiles ADD COLUMN equipped_frame TEXT NOT NULL DEFAULT 'classic'"
+      );
+    }
+
+    const hasEnergy = profileCols.some((c) => c.name === 'energy');
+    if (!hasEnergy) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN energy INTEGER NOT NULL DEFAULT 5'
+      );
+    }
+
+    const hasEnergyUpdatedAt = profileCols.some((c) => c.name === 'energy_updated_at');
+    if (!hasEnergyUpdatedAt) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN energy_updated_at INTEGER NOT NULL DEFAULT 0'
       );
     }
 
@@ -238,6 +316,8 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM blocked_users;
       DELETE FROM powerup_purchases;
       DELETE FROM owned_items;
+      DELETE FROM energy_spends;
+      DELETE FROM energy_purchases;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -297,13 +377,15 @@ export class UserProfile extends DurableObject<Env> {
     const startCoins = parseInt(this.env.START_COINS ?? '100', 10);
     const initialCoins = Number.isFinite(startCoins) && startCoins >= 0 ? startCoins : 100;
     const nowMs = Date.now();
+    const maxEnergy = getEnergyMax(this.env);
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at, equipped_frame)
-       VALUES (?, NULL, ?, 0, 0, 0, ?, 'classic')`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at, equipped_frame, energy, energy_updated_at)
+       VALUES (?, NULL, ?, 0, 0, 0, ?, 'classic', ?, 0)`,
       effectiveUid,
       initialCoins,
-      nowMs
+      nowMs,
+      maxEnergy
     );
 
     return {
@@ -880,13 +962,403 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   /**
-   * Yönetici tarafından kullanıcıya jeton ve/veya çerçeve tanımlar.
+   * Kullanıcının güncel enerji durumunu hesaplar ve döndürür.
+   * Tembel (lazy) yenilenme hesabı ile zaman geçişinde kazanılan enerjiyi veritabanına yansıtır.
+   */
+  async getEnergyState(uid?: string, nowMs = Date.now()): Promise<EnergyState> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const profile = await this.getProfile(uid);
+    const effectiveUid = profile.uid;
+    const enabled = isEnergyEnabledForUser(this.env, effectiveUid);
+
+    const maxEnergy = getEnergyMax(this.env);
+    const regenMinutes = getEnergyRegenMinutes(this.env);
+
+    const rows = this.ctx.storage.sql
+      .exec<{ energy?: number; energy_updated_at?: number }>(
+        'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+      )
+      .toArray();
+
+    const savedEnergy =
+      rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+        ? Number(rows[0].energy)
+        : maxEnergy;
+    const savedUpdatedAt =
+      rows.length > 0 &&
+      rows[0].energy_updated_at !== undefined &&
+      rows[0].energy_updated_at !== null
+        ? Number(rows[0].energy_updated_at)
+        : 0;
+
+    const regen = calculateRegeneratedEnergy(
+      savedEnergy,
+      savedUpdatedAt,
+      nowMs,
+      maxEnergy,
+      regenMinutes
+    );
+
+    if (regen.gained > 0) {
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+        regen.current,
+        regen.updatedAtMs
+      );
+    }
+
+    if (!enabled) {
+      return {
+        enabled: false,
+        current: maxEnergy,
+        max: maxEnergy,
+        nextEnergyAtMs: null,
+        regenSeconds: regenMinutes * 60,
+        packs: [],
+      };
+    }
+
+    return {
+      enabled: true,
+      current: regen.current,
+      max: maxEnergy,
+      nextEnergyAtMs: regen.nextEnergyAtMs,
+      regenSeconds: regenMinutes * 60,
+      packs: buildEnergyPacks(this.env),
+    };
+  }
+
+  /**
+   * Hızlı maç başlangıcında enerji harcamasını atomik ve idempotent olarak uygular.
+   * Kural: Enerji tam iken (max) ilk harcamada yenilenme sayacı harcama anına (nowMs) ayarlanır.
+   */
+  async spendEnergy(params: {
+    readonly matchId: string;
+    readonly amount?: number;
+    readonly uid?: string;
+    readonly nowMs?: number;
+  }): Promise<SpendEnergyResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { success: false, error: 'account_deleted', energy: 0 };
+    }
+
+    const profile = await this.getProfile(params.uid);
+    const effectiveUid = profile.uid;
+    const nowMs = params.nowMs ?? Date.now();
+    const cost = params.amount ?? getEnergyCostPerMatch(this.env);
+
+    return this.ctx.storage.transactionSync(() => {
+      // 1. İdempotentlik kontrolü: bu maç için zaten enerji düşüldü mü?
+      const existing = this.ctx.storage.sql
+        .exec<{ match_id: string; amount: number }>(
+          'SELECT match_id, amount FROM energy_spends WHERE match_id = ? AND uid = ? LIMIT 1',
+          params.matchId,
+          effectiveUid
+        )
+        .toArray();
+
+      const maxEnergy = getEnergyMax(this.env);
+      const regenMinutes = getEnergyRegenMinutes(this.env);
+
+      const rows = this.ctx.storage.sql
+        .exec<{ energy?: number; energy_updated_at?: number }>(
+          'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+        )
+        .toArray();
+
+      const savedEnergy =
+        rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+          ? Number(rows[0].energy)
+          : maxEnergy;
+      const savedUpdatedAt =
+        rows.length > 0 &&
+        rows[0].energy_updated_at !== undefined &&
+        rows[0].energy_updated_at !== null
+          ? Number(rows[0].energy_updated_at)
+          : 0;
+
+      const regen = calculateRegeneratedEnergy(
+        savedEnergy,
+        savedUpdatedAt,
+        nowMs,
+        maxEnergy,
+        regenMinutes
+      );
+
+      if (existing.length > 0) {
+        return {
+          success: true,
+          alreadySpent: true,
+          energy: regen.current,
+          max: maxEnergy,
+          nextEnergyAtMs: regen.current < maxEnergy ? regen.nextEnergyAtMs : null,
+        };
+      }
+
+      // 2. Yeterli enerji var mı?
+      if (regen.current < cost) {
+        return {
+          success: false,
+          error: 'not_enough_energy',
+          energy: regen.current,
+          max: maxEnergy,
+          nextEnergyAtMs: regen.nextEnergyAtMs,
+        };
+      }
+
+      // 3. Enerji düşme & yenilenme zaman damgası belirleme:
+      // KURAL: Eğer mevcut enerji tam enerji (max) idiyse veya tam dolduysa, sayaç harcama anına (nowMs) ayarlanır.
+      // Eğer enerji zaten tamın altındaysa ve yenilenme döngüsü sürüyorsa, döngü ankeri (regen.updatedAtMs) korunur.
+      const newEnergy = regen.current - cost;
+      const newUpdatedAtMs = regen.current >= maxEnergy ? nowMs : regen.updatedAtMs;
+
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+        newEnergy,
+        newUpdatedAtMs
+      );
+
+      this.ctx.storage.sql.exec(
+        'INSERT INTO energy_spends (match_id, uid, amount, created_at) VALUES (?, ?, ?, ?)',
+        params.matchId,
+        effectiveUid,
+        cost,
+        nowMs
+      );
+
+      const nextEnergyAtMs =
+        newEnergy < maxEnergy ? newUpdatedAtMs + regenMinutes * 60 * 1000 : null;
+
+      return {
+        success: true,
+        energy: newEnergy,
+        max: maxEnergy,
+        nextEnergyAtMs,
+      };
+    });
+  }
+
+  /**
+   * İptal veya eşleşme hatasında enerjiyi idempotent olarak iade eder.
+   */
+  async refundEnergy(params: {
+    readonly matchId: string;
+    readonly amount?: number;
+    readonly uid?: string;
+    readonly nowMs?: number;
+  }): Promise<RefundEnergyResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { ok: true, refunded: false, energy: 0 };
+    }
+
+    const profile = await this.getProfile(params.uid);
+    const effectiveUid = profile.uid;
+    const nowMs = params.nowMs ?? Date.now();
+
+    return this.ctx.storage.transactionSync(() => {
+      const existing = this.ctx.storage.sql
+        .exec<{ amount: number; refunded_at: number | null }>(
+          'SELECT amount, refunded_at FROM energy_spends WHERE match_id = ? AND uid = ? LIMIT 1',
+          params.matchId,
+          effectiveUid
+        )
+        .toArray();
+
+      const maxEnergy = getEnergyMax(this.env);
+      const regenMinutes = getEnergyRegenMinutes(this.env);
+
+      const rows = this.ctx.storage.sql
+        .exec<{ energy?: number; energy_updated_at?: number }>(
+          'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+        )
+        .toArray();
+
+      const savedEnergy =
+        rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+          ? Number(rows[0].energy)
+          : maxEnergy;
+      const savedUpdatedAt =
+        rows.length > 0 &&
+        rows[0].energy_updated_at !== undefined &&
+        rows[0].energy_updated_at !== null
+          ? Number(rows[0].energy_updated_at)
+          : 0;
+
+      const regen = calculateRegeneratedEnergy(
+        savedEnergy,
+        savedUpdatedAt,
+        nowMs,
+        maxEnergy,
+        regenMinutes
+      );
+
+      if (existing.length === 0 || existing[0].refunded_at !== null) {
+        return { ok: true, refunded: false, energy: regen.current };
+      }
+
+      const refundAmount = existing[0].amount ?? params.amount ?? 1;
+
+      this.ctx.storage.sql.exec(
+        'UPDATE energy_spends SET refunded_at = ? WHERE match_id = ? AND uid = ?',
+        nowMs,
+        params.matchId,
+        effectiveUid
+      );
+
+      const newEnergy = Math.min(maxEnergy, regen.current + refundAmount);
+      const newUpdatedAtMs = newEnergy >= maxEnergy ? nowMs : regen.updatedAtMs;
+
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+        newEnergy,
+        newUpdatedAtMs
+      );
+
+      return {
+        ok: true,
+        refunded: true,
+        energy: newEnergy,
+      };
+    });
+  }
+
+  /**
+   * Jetonla enerji paketi satın alır.
+   * Atomik olarak jeton düşer ve enerjiyi günceller.
+   */
+  async purchaseEnergy(params: {
+    readonly pack: 'one' | 'full';
+    readonly uid?: string;
+    readonly nowMs?: number;
+  }): Promise<PurchaseEnergyResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const profile = await this.getProfile(params.uid);
+    const effectiveUid = profile.uid;
+    const nowMs = params.nowMs ?? Date.now();
+
+    if (!isEnergyEnabledForUser(this.env, effectiveUid)) {
+      return { success: false, error: 'energy_disabled' };
+    }
+
+    if (params.pack !== 'one' && params.pack !== 'full') {
+      return { success: false, error: 'invalid_pack' };
+    }
+
+    const maxEnergy = getEnergyMax(this.env);
+    const regenMinutes = getEnergyRegenMinutes(this.env);
+
+    return this.ctx.storage.transactionSync(() => {
+      const rows = this.ctx.storage.sql
+        .exec<{ coins: number; energy: number; energy_updated_at: number }>(
+          'SELECT coins, energy, energy_updated_at FROM profiles LIMIT 1'
+        )
+        .toArray();
+
+      const currentCoins = rows.length > 0 ? rows[0].coins : 0;
+      const savedEnergy =
+        rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+          ? Number(rows[0].energy)
+          : maxEnergy;
+      const savedUpdatedAt =
+        rows.length > 0 &&
+        rows[0].energy_updated_at !== undefined &&
+        rows[0].energy_updated_at !== null
+          ? Number(rows[0].energy_updated_at)
+          : 0;
+
+      const regen = calculateRegeneratedEnergy(
+        savedEnergy,
+        savedUpdatedAt,
+        nowMs,
+        maxEnergy,
+        regenMinutes
+      );
+
+      if (regen.current >= maxEnergy) {
+        return {
+          success: false,
+          error: 'energy_full',
+          energy: regen.current,
+        };
+      }
+
+      const cost =
+        params.pack === 'one'
+          ? getEnergyPackOneCost(this.env)
+          : getEnergyPackFullCost(this.env);
+
+      if (currentCoins < cost) {
+        return {
+          success: false,
+          error: 'not_enough_coins',
+          coins: currentCoins,
+          energy: regen.current,
+        };
+      }
+
+      const energyToAdd =
+        params.pack === 'one' ? 1 : maxEnergy - regen.current;
+
+      const newEnergy = Math.min(maxEnergy, regen.current + energyToAdd);
+      const newUpdatedAtMs = newEnergy >= maxEnergy ? nowMs : regen.updatedAtMs;
+
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins - ?, energy = ?, energy_updated_at = ? WHERE coins >= ?',
+        cost,
+        newEnergy,
+        newUpdatedAtMs,
+        cost
+      );
+
+      const purchaseId = crypto.randomUUID();
+      this.ctx.storage.sql.exec(
+        'INSERT INTO energy_purchases (id, uid, pack, amount, cost, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        purchaseId,
+        effectiveUid,
+        params.pack,
+        energyToAdd,
+        cost,
+        nowMs
+      );
+
+      const nextEnergyAtMs =
+        newEnergy >= maxEnergy ? null : newUpdatedAtMs + regenMinutes * 60 * 1000;
+
+      return {
+        success: true,
+        pack: params.pack,
+        coins: currentCoins - cost,
+        energy: newEnergy,
+        max: maxEnergy,
+        nextEnergyAtMs,
+        serverNowMs: nowMs,
+      };
+    });
+  }
+
+  /**
+   * Yönetici tarafından kullanıcıya jeton, çerçeve ve/veya enerji tanımlar.
    * Atomik (transactionSync), idempotent (INSERT OR IGNORE) ve silinmiş hesaplara kapalıdır.
    */
   async adminGrant(params: {
     uid?: string;
     coins?: number;
     frameIds?: readonly string[];
+    energy?: number;
   }): Promise<AdminGrantResult> {
     this.ensureSchema();
 
@@ -920,15 +1392,30 @@ export class UserProfile extends DurableObject<Env> {
         }
       }
 
+      let finalEnergy: number | undefined;
+      if (typeof params.energy === 'number' && Number.isFinite(params.energy)) {
+        const maxEnergy = getEnergyMax(this.env);
+        finalEnergy = Math.max(0, Math.min(maxEnergy, Math.floor(params.energy)));
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+          finalEnergy,
+          Date.now()
+        );
+      }
+
       const rows = this.ctx.storage.sql
-        .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+        .exec<{ coins: number; energy: number }>('SELECT coins, energy FROM profiles LIMIT 1')
         .toArray();
       const finalCoins = rows.length > 0 ? rows[0].coins : 0;
+      if (finalEnergy === undefined && rows.length > 0 && rows[0].energy !== undefined) {
+        finalEnergy = Number(rows[0].energy);
+      }
 
       return {
         success: true,
         coins: finalCoins,
         grantedFrames,
+        ...(finalEnergy !== undefined ? { energy: finalEnergy } : {}),
       };
     });
   }
@@ -1038,11 +1525,13 @@ export class UserProfile extends DurableObject<Env> {
           uid?: unknown;
           coins?: unknown;
           frameIds?: unknown;
+          energy?: unknown;
         };
         const res = await this.adminGrant({
           uid: typeof body.uid === 'string' ? body.uid : uid,
           coins: typeof body.coins === 'number' ? body.coins : undefined,
           frameIds: Array.isArray(body.frameIds) ? (body.frameIds as string[]) : undefined,
+          energy: typeof body.energy === 'number' ? body.energy : undefined,
         });
         if (!res.success) {
           if (res.error === 'account_deleted') {

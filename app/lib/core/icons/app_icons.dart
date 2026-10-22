@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
 import '../theme/app_colors.dart';
 
 /// DESIGN.md Bölüm 5'teki SVG yol verilerini taşıyan model
 class AppIconData {
   final String path;
   final bool isTrophy;
+  final bool isBolt;
 
-  const AppIconData(this.path) : isTrophy = false;
-  const AppIconData._trophy(this.path) : isTrophy = true;
+  const AppIconData(this.path) : isTrophy = false, isBolt = false;
+  const AppIconData._trophy(this.path) : isTrophy = true, isBolt = false;
+  const AppIconData._bolt() : path = '', isTrophy = false, isBolt = true;
 
   String toSvgString({required Color strokeColor}) {
     final strokeHex = _toHex(strokeColor);
@@ -22,6 +25,13 @@ class AppIconData {
 </svg>''';
     }
 
+    if (isBolt) {
+      return '''
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M13 2L3 14h8l-1 8 11-12h-8l1-8z" fill="$strokeHex" stroke="$strokeHex" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>''';
+    }
+
     return '''
 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="$path" stroke="$strokeHex" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -29,7 +39,9 @@ class AppIconData {
   }
 
   static String _toHex(Color color) {
-    final rgb = (color.toARGB32() & 0x00FFFFFF).toRadixString(16).padLeft(6, '0');
+    final rgb = (color.toARGB32() & 0x00FFFFFF)
+        .toRadixString(16)
+        .padLeft(6, '0');
     return '#$rgb';
   }
 }
@@ -40,16 +52,24 @@ abstract final class AppIcons {
   static const AppIconData home = AppIconData('M3 11l9-8 9 8M5 10v10h14V10');
 
   // 2. Sıralama
-  static const AppIconData leaderboard = AppIconData('M5 20V12M12 20V4M19 20V9');
+  static const AppIconData leaderboard = AppIconData(
+    'M5 20V12M12 20V4M19 20V9',
+  );
 
   // 3. Mağaza
-  static const AppIconData shop = AppIconData('M5 8h14l-1 12H6zM9 8a3 3 0 016 0');
+  static const AppIconData shop = AppIconData(
+    'M5 8h14l-1 12H6zM9 8a3 3 0 016 0',
+  );
 
   // 4. Profil
-  static const AppIconData profile = AppIconData('M12 12a4 4 0 100-8 4 4 0 000 8M4 21a8 8 0 0116 0');
+  static const AppIconData profile = AppIconData(
+    'M12 12a4 4 0 100-8 4 4 0 000 8M4 21a8 8 0 0116 0',
+  );
 
   // 5. Ayarlar
-  static const AppIconData settings = AppIconData('M4 7h16M4 17h16M9 4v6M15 14v6');
+  static const AppIconData settings = AppIconData(
+    'M4 7h16M4 17h16M9 4v6M15 14v6',
+  );
 
   // 6. Kapat
   static const AppIconData close = AppIconData('M6 6l12 12M18 6L6 18');
@@ -70,10 +90,15 @@ abstract final class AppIcons {
   static const AppIconData trophy = AppIconData._trophy('');
 
   // 12. Tekrar (yenile)
-  static const AppIconData refresh = AppIconData('M20 12a8 8 0 11-2.3-5.7M20 4v5h-5');
+  static const AppIconData refresh = AppIconData(
+    'M20 12a8 8 0 11-2.3-5.7M20 4v5h-5',
+  );
 
   // 13. Eşit (beraberlik)
   static const AppIconData equal = AppIconData('M5 9h14M5 15h14');
+
+  // 14. Yıldırım (enerji)
+  static const AppIconData bolt = AppIconData._bolt();
 }
 
 /// DESIGN.md Bölüm 5 standartlarına uygun İkon Widget'ı
@@ -99,4 +124,3 @@ class AppIcon extends StatelessWidget {
     );
   }
 }
-

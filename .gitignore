@@ -1,10 +1,18 @@
 server/.wrangler/
 .dev.vars
+**/.dev.vars*
+!.dev.vars.example
+!**/.dev.vars.example
 server/.ghost-session.json
 .ghost-session.json
 
-# Android keystore & release secrets
+# Android keystore & release secrets & bundles
 **/key.properties
+!**/key.properties.example
 *.jks
+**/*.jks
 *.keystore
+**/*.keystore
+*.aab
+**/*.aab
 

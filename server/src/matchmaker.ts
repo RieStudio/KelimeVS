@@ -13,7 +13,16 @@ import {
   generateFriendCode,
   sanitizePlayerName,
 } from './protocol';
+import { isEnergyEnabledForUser, getEnergyCostPerMatch, getEnergyMax } from './energy';
 import type { Env } from './index';
+
+export interface PendingEnergyRefund {
+  readonly uid: string;
+  readonly matchId: string;
+  readonly amount: number;
+  attempts: number;
+  nextRetryAt: number;
+}
 
 export interface QueueEntry {
   readonly uid: string;
@@ -121,6 +130,7 @@ export class Matchmaker extends DurableObject<Env> {
   >();
   private failedAttemptsByUid = new Map<string, RateLimitEntry>();
   private failedAttemptsByIp = new Map<string, IpRateLimitEntry>();
+  private pendingEnergyRefunds: PendingEnergyRefund[] = [];
   private contentProvider: ContentProvider;
 
   constructor(ctx: DurableObjectState, env: Env, customProvider?: ContentProvider) {
@@ -139,6 +149,10 @@ export class Matchmaker extends DurableObject<Env> {
             this.friendRooms.set(r.code, r);
           }
         }
+      }
+      const storedRefunds = await this.ctx.storage.get<PendingEnergyRefund[]>('pending_energy_refunds');
+      if (storedRefunds) {
+        this.pendingEnergyRefunds = storedRefunds;
       }
     });
   }
@@ -193,13 +207,30 @@ export class Matchmaker extends DurableObject<Env> {
       // İçerik önbelleği geçerli değilse arka planda yüklemeye başla (önden ısıt)
       this.prewarmContent();
 
-      // Kullanıcının profil bilgilerini ve engel listesini çek
+      // Kullanıcının profil bilgilerini, enerji durumunu ve engel listesini çek
       // NOT: Kuyruktayken eklenen engelin o kuyruk oturumunda geçerli olmayabileceği kabul edilen bir sınırlamadır.
       let blockedUids: string[] = [];
       let playerInfo = { name: parsed.name, frame: 'classic' };
       try {
         if (this.env.USER_PROFILE) {
           const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(uid));
+          if (isEnergyEnabledForUser(this.env, uid)) {
+            const cost = getEnergyCostPerMatch(this.env);
+            const energyState = await profileStub.getEnergyState(uid);
+            if (energyState.current < cost) {
+              try {
+                ws.send(
+                  JSON.stringify({
+                    t: 'error',
+                    code: 'no_energy',
+                    message: 'Enerjin bitti',
+                  })
+                );
+                ws.close(1008, 'no_energy');
+              } catch {}
+              return;
+            }
+          }
           blockedUids = await profileStub.getBlockedUids();
           playerInfo = await this.getPlayerInfo(uid, parsed.name);
         }
@@ -280,7 +311,8 @@ export class Matchmaker extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.pruneExpiredFriendRooms();
-    await this.scheduleFriendRoomAlarm();
+    await this.processPendingEnergyRefunds();
+    await this.scheduleCombinedAlarm();
   }
 
   private async handleCreateRoom(
@@ -342,7 +374,7 @@ export class Matchmaker extends DurableObject<Env> {
 
     this.friendRooms.set(code, room);
     await this.persistFriendRooms();
-    await this.scheduleFriendRoomAlarm();
+    await this.scheduleCombinedAlarm();
 
     try {
       ws.send(
@@ -688,12 +720,88 @@ export class Matchmaker extends DurableObject<Env> {
     }
   }
 
-  private async scheduleFriendRoomAlarm(): Promise<void> {
+  private async refundEnergyWithRetry(
+    uid: string,
+    matchId: string,
+    amount: number
+  ): Promise<void> {
+    try {
+      if (this.env.USER_PROFILE) {
+        const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.refundEnergy({ matchId, amount, uid });
+        if (res.ok) return;
+      }
+    } catch (err) {
+      console.error('Immediate refundEnergy failed, scheduling persistent retry:', err);
+    }
+
+    const now = Date.now();
+    this.pendingEnergyRefunds.push({
+      uid,
+      matchId,
+      amount,
+      attempts: 1,
+      nextRetryAt: now + 5000,
+    });
+    await this.ctx.storage.put('pending_energy_refunds', this.pendingEnergyRefunds);
+    await this.scheduleCombinedAlarm();
+  }
+
+  private async processPendingEnergyRefunds(): Promise<void> {
+    if (this.pendingEnergyRefunds.length === 0) return;
+    const now = Date.now();
+    const remaining: PendingEnergyRefund[] = [];
+
+    for (const item of this.pendingEnergyRefunds) {
+      if (item.nextRetryAt > now) {
+        remaining.push(item);
+        continue;
+      }
+
+      let succeeded = false;
+      try {
+        if (this.env.USER_PROFILE) {
+          const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(item.uid));
+          const res = await profileStub.refundEnergy({
+            matchId: item.matchId,
+            amount: item.amount,
+            uid: item.uid,
+          });
+          if (res.ok) succeeded = true;
+        }
+      } catch (err) {
+        console.error('Retry refundEnergy failed:', err);
+      }
+
+      if (!succeeded) {
+        if (item.attempts < 10) {
+          const delayMs = Math.min(300_000, 5000 * Math.pow(2, item.attempts));
+          remaining.push({
+            ...item,
+            attempts: item.attempts + 1,
+            nextRetryAt: now + delayMs,
+          });
+        } else {
+          console.error('Giving up on energy refund after 10 attempts:', item);
+        }
+      }
+    }
+
+    this.pendingEnergyRefunds = remaining;
+    await this.ctx.storage.put('pending_energy_refunds', this.pendingEnergyRefunds);
+  }
+
+  private async scheduleCombinedAlarm(): Promise<void> {
     const now = Date.now();
     let earliest = Infinity;
     for (const room of this.friendRooms.values()) {
       if (room.expiresAt > now && room.expiresAt < earliest) {
         earliest = room.expiresAt;
+      }
+    }
+    for (const refund of this.pendingEnergyRefunds) {
+      if (refund.nextRetryAt < earliest) {
+        earliest = refund.nextRetryAt;
       }
     }
     if (earliest !== Infinity) {
@@ -963,34 +1071,123 @@ export class Matchmaker extends DurableObject<Env> {
       }
 
       const matchId = crypto.randomUUID();
+
+      // Enerji kesintisi (Karışık durum: yalnızca enerjisi açık olan oyuncudan düşülür)
+      const p1EnergyEnabled = isEnergyEnabledForUser(this.env, p1.uid);
+      const p2EnergyEnabled = isEnergyEnabledForUser(this.env, p2.uid);
+      const energyCost = getEnergyCostPerMatch(this.env);
+
+      let p1EnergySpent = false;
+      let p2EnergySpent = false;
+      let p1EnergyData: { current: number; max: number; nextEnergyAtMs: number | null } | undefined;
+      let p2EnergyData: { current: number; max: number; nextEnergyAtMs: number | null } | undefined;
+
+      if (p1EnergyEnabled && this.env.USER_PROFILE) {
+        const p1Profile = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1.uid));
+        const res1 = await p1Profile.spendEnergy({ matchId, amount: energyCost, uid: p1.uid });
+        if (!res1.success) {
+          const p1Sockets = this.ctx.getWebSockets(p1.uid);
+          for (const s of p1Sockets) {
+            try {
+              s.send(JSON.stringify({ t: 'error', code: 'no_energy', message: 'Enerjin bitti' }));
+              s.close(1008, 'no_energy');
+            } catch {}
+          }
+          // p2'yi kuyruğun başına geri koy
+          this.queue.unshift(p2);
+          await this.ctx.storage.put('queue', this.queue);
+          continue;
+        }
+        p1EnergySpent = true;
+        p1EnergyData = {
+          current: res1.energy,
+          max: res1.max ?? getEnergyMax(this.env),
+          nextEnergyAtMs: res1.nextEnergyAtMs ?? null,
+        };
+      }
+
+      if (p2EnergyEnabled && this.env.USER_PROFILE) {
+        const p2Profile = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2.uid));
+        const res2 = await p2Profile.spendEnergy({ matchId, amount: energyCost, uid: p2.uid });
+        if (!res2.success) {
+          if (p1EnergySpent) {
+            await this.refundEnergyWithRetry(p1.uid, matchId, energyCost);
+          }
+          const p2Sockets = this.ctx.getWebSockets(p2.uid);
+          for (const s of p2Sockets) {
+            try {
+              s.send(JSON.stringify({ t: 'error', code: 'no_energy', message: 'Enerjin bitti' }));
+              s.close(1008, 'no_energy');
+            } catch {}
+          }
+          // p1'i kuyruğun başına geri koy
+          this.queue.unshift(p1);
+          await this.ctx.storage.put('queue', this.queue);
+          continue;
+        }
+        p2EnergySpent = true;
+        p2EnergyData = {
+          current: res2.energy,
+          max: res2.max ?? getEnergyMax(this.env),
+          nextEnergyAtMs: res2.nextEnergyAtMs ?? null,
+        };
+      }
+
       const selectedQuestions = selectAndShuffleEightQuestions(allQuestions);
       const questionOrder = selectedQuestions.map((q) => q.id);
 
       // MatchRoom'u başlat (yalnızca seçilen 8 soru tam verisiyle aktarılır)
       const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
-      await roomStub.initMatch({
-        matchId,
-        p1: { uid: p1.uid, name: p1.name, frame: p1.frame || 'classic' },
-        p2: { uid: p2.uid, name: p2.name, frame: p2.frame || 'classic' },
-        questions: selectedQuestions,
-        questionOrder,
-      });
+      const energyChargedUids: string[] = [];
+      if (p1EnergySpent) energyChargedUids.push(p1.uid);
+      if (p2EnergySpent) energyChargedUids.push(p2.uid);
+
+      try {
+        await roomStub.initMatch({
+          matchId,
+          p1: { uid: p1.uid, name: p1.name, frame: p1.frame || 'classic' },
+          p2: { uid: p2.uid, name: p2.name, frame: p2.frame || 'classic' },
+          questions: selectedQuestions,
+          questionOrder,
+          energyChargedUids,
+        });
+      } catch (initErr) {
+        console.error('roomStub.initMatch failed:', initErr);
+        if (p1EnergySpent) {
+          await this.refundEnergyWithRetry(p1.uid, matchId, energyCost);
+        }
+        if (p2EnergySpent) {
+          await this.refundEnergyWithRetry(p2.uid, matchId, energyCost);
+        }
+        const p1Sockets = this.ctx.getWebSockets(p1.uid);
+        const p2Sockets = this.ctx.getWebSockets(p2.uid);
+        for (const s of [...p1Sockets, ...p2Sockets]) {
+          try {
+            s.send(JSON.stringify({ t: 'error', code: 'match_failed' }));
+            s.close(1011, 'match_failed');
+          } catch {}
+        }
+        continue;
+      }
 
       // İki oyuncuya bildirim gönder ve bağlantılarını kapat
       const p1Sockets = this.ctx.getWebSockets(p1.uid);
       const p2Sockets = this.ctx.getWebSockets(p2.uid);
+      const nowMs = Date.now();
 
       const p1Matched: MatchmakerServerMessage = {
         t: 'matched',
         matchId,
         opponentName: p2.name,
         opponentFrame: p2.frame || 'classic',
+        ...(p1EnergyData ? { energy: p1EnergyData, serverNowMs: nowMs } : {}),
       };
       const p2Matched: MatchmakerServerMessage = {
         t: 'matched',
         matchId,
         opponentName: p1.name,
         opponentFrame: p1.frame || 'classic',
+        ...(p2EnergyData ? { energy: p2EnergyData, serverNowMs: nowMs } : {}),
       };
 
       for (const s of p1Sockets) {

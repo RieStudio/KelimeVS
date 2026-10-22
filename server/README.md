@@ -40,6 +40,29 @@ FIREBASE_SERVICE_ACCOUNT_B64=<base64-encoded-service-account-json>
 - **`CONTENT_TTL_SECONDS`**: Bellek içi soru havuzu önbellek süresi (saniye cinsinden, varsayılan 3600).
 - **`FIREBASE_SERVICE_ACCOUNT_B64`**: Sunucunun Realtime Database REST API'sine erişmek için kullandığı Google servis hesabı JSON dosyasının Base64 hali.
 
+### 🔐 Canlı Ortam Gizli Değişkenleri (Cloudflare Secrets)
+
+Depo herkese açık (public) olduğu için hassas bilgiler, yönetici anahtarları ve kişisel test UID'leri ASLA `wrangler.jsonc` içine yazılmaz ve versiyon kontrolüne dahil edilmez. Canlı ortamda bu değişkenler Cloudflare Secrets olarak yapılandırılır:
+
+1. **`ENERGY_TEST_UIDS`**: Canlı ortamda genel enerji anahtarı kapalıyken (`ENERGY_ENABLED="false"`), enerji akışını yalnızca kendi test hesabınızda denemek için virgülle ayrılmış Firebase UID listesi gizli değişken olarak verilir:
+   ```bash
+   npx wrangler secret put ENERGY_TEST_UIDS
+   # İstendiğinde virgülle ayrılmış UID listesini girin (örn: uid1,uid2)
+   ```
+   *(Yerel geliştirmede ise `server/.dev.vars` içine `ENERGY_TEST_UIDS=uid1,uid2` şeklinde eklenebilir.)*
+
+2. **`ADMIN_TOKEN`**: `/admin/*` uç noktalarına (çerçeve/jeton/enerji hibesi `grant`, şikayet ve engel listesi `reports`) yetkili erişim sağlayan yönetici anahtarı canlıda mutlaka secret olmalıdır:
+   ```bash
+   npx wrangler secret put ADMIN_TOKEN
+   # İstendiğinde güçlü ve rastgele bir anahtar girin
+   ```
+   *(Yerel geliştirmede ise `server/.dev.vars` içine `ADMIN_TOKEN=...` şeklinde eklenebilir.)*
+
+3. **`FIREBASE_SERVICE_ACCOUNT_B64`**: Firebase Realtime Database REST erişimi için gereken Google servis hesabı anahtarı da canlıda benzer şekilde secret olarak tanımlanır:
+   ```bash
+   npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_B64
+   ```
+
 ### 🔒 Güvenlik İlkeleri ve IAM Rolleri (Adım 4.4)
 - **Loglama Güvenliği:** Servis hesabı içeriği, access token'lar, JWT assertion'lar ve soru/cevap metinleri ASLA loglara yazılmaz.
 - **En Az Yetki İlkesi (Least Privilege):** İleride Google Cloud IAM üzerinde üretim için yalnızca **"Firebase Realtime Database Viewer"** rolüne sahip, yazma yetkisi olmayan ayrı ve kısıtlı bir servis hesabına geçilecektir.

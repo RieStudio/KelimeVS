@@ -31,16 +31,20 @@ class MatchmakingMatched extends MatchmakingEvent {
   final String matchId;
   final String opponentName;
   final String opponentFrame;
+  final MatchedEnergyInfo? energy;
+  final int? serverNowMs;
 
   const MatchmakingMatched({
     required this.matchId,
     required this.opponentName,
     this.opponentFrame = 'classic',
+    this.energy,
+    this.serverNowMs,
   });
 
   @override
   String toString() =>
-      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame)';
+      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame, energy: $energy)';
 }
 
 /// Kullanıcı veya sistem tarafından eşleştirme iptal edildi.
@@ -79,6 +83,14 @@ class MatchmakingFailed extends MatchmakingEvent {
   String toString() => 'MatchmakingFailed(reason: $reason)';
 }
 
+/// Oyuncunun yeterli enerjisi yok (kod 1008 / no_energy).
+class MatchmakingNoEnergy extends MatchmakingEvent {
+  const MatchmakingNoEnergy();
+
+  @override
+  String toString() => 'MatchmakingNoEnergy()';
+}
+
 /// Sunucu eşleştirme havuzuyla (`/ws/matchmaking`) iletişimi yöneten istemci.
 class MatchmakingClient {
   final WebSocketConnector _connector;
@@ -87,7 +99,7 @@ class MatchmakingClient {
   final Duration _connectTimeout;
   final Duration _matchWindowDuration;
   final Timer Function(Duration duration, void Function() callback)?
-      _timerFactory;
+  _timerFactory;
 
   final StreamController<MatchmakingEvent> _controller =
       StreamController<MatchmakingEvent>.broadcast(sync: true);
@@ -107,9 +119,9 @@ class MatchmakingClient {
     this._connectTimeout = const Duration(seconds: 8),
     this._matchWindowDuration = const Duration(seconds: 10),
     this._timerFactory,
-  })  : _connector = connector ?? const IoWebSocketConnector(),
-        _tokenProvider = tokenProvider ?? FirebaseAuthTokenProvider(),
-        _customServerWsUrl = serverWsUrl;
+  }) : _connector = connector ?? const IoWebSocketConnector(),
+       _tokenProvider = tokenProvider ?? FirebaseAuthTokenProvider(),
+       _customServerWsUrl = serverWsUrl;
 
   /// Eşleştirme olay akışı.
   Stream<MatchmakingEvent> get events => _controller.stream;
@@ -127,9 +139,7 @@ class MatchmakingClient {
     // 1. Firebase kimlik jetonunu al
     final String? token;
     try {
-      token = await _tokenProvider
-          .getIdToken()
-          .timeout(_connectTimeout);
+      token = await _tokenProvider.getIdToken().timeout(_connectTimeout);
     } catch (e) {
       if (!_isCancelled) {
         _finishWith(MatchmakingUnavailable('token_error: $e'));
@@ -176,9 +186,15 @@ class MatchmakingClient {
       },
       onDone: () {
         if (!_isFinished && !_isCancelled) {
-          _finishWith(
-            const MatchmakingFailed('connection_closed_unexpectedly'),
-          );
+          final code = _connection?.closeCode;
+          final reason = _connection?.closeReason;
+          if (code == 1008 && reason == 'no_energy') {
+            _finishWith(const MatchmakingNoEnergy());
+          } else {
+            _finishWith(
+              const MatchmakingFailed('connection_closed_unexpectedly'),
+            );
+          }
         }
       },
     );
@@ -217,17 +233,23 @@ class MatchmakingClient {
     } else if (msg is MatchedServerMessage) {
       _matchTimer?.cancel();
       _matchTimer = null;
-      _emit(MatchmakingMatched(
-        matchId: msg.matchId,
-        opponentName: msg.opponentName,
-        opponentFrame: msg.opponentFrame,
-      ));
+      _emit(
+        MatchmakingMatched(
+          matchId: msg.matchId,
+          opponentName: msg.opponentName,
+          opponentFrame: msg.opponentFrame,
+          energy: msg.energy,
+          serverNowMs: msg.serverNowMs,
+        ),
+      );
       _finishAndClose();
     } else if (msg is ErrorServerMessage) {
       _matchTimer?.cancel();
       _matchTimer = null;
       if (msg.code == 'content_unavailable') {
         _finishWith(const MatchmakingUnavailable('content_unavailable'));
+      } else if (msg.code == 'no_energy') {
+        _finishWith(const MatchmakingNoEnergy());
       } else {
         _finishWith(MatchmakingFailed(msg.code));
       }

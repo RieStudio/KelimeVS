@@ -24,6 +24,7 @@ import '../data/online_match_client.dart';
 import '../domain/models/online_match_state.dart';
 import '../domain/models/online_messages.dart';
 import '../../leaderboard/application/leaderboard_providers.dart';
+import '../../store/application/store_notifier.dart';
 
 /// Sunucudan gelen `final` mesajını yerel [MatchHistoryEntry] ve [RoundRecord]
 /// modellerine dönüştüren yardımcı sınıf.
@@ -117,7 +118,8 @@ abstract final class OnlineMatchHistoryMapper {
     final isForfeit = finalMessage.endedBy == 'forfeit';
     final forfeitedPlayerId = isForfeit ? (isWinner ? 'bot' : 'me') : null;
 
-    final resolvedEndReason = endReason ??
+    final resolvedEndReason =
+        endReason ??
         (isForfeit
             ? (isWinner ? MatchEndReason.rakipTerk : MatchEndReason.terk)
             : MatchEndReason.normal);
@@ -125,8 +127,9 @@ abstract final class OnlineMatchHistoryMapper {
     return MatchHistoryEntry(
       id: matchId,
       matchId: matchId,
-      opponentName:
-          opponentName.isNotEmpty ? opponentName : AppStrings.opponent,
+      opponentName: opponentName.isNotEmpty
+          ? opponentName
+          : AppStrings.opponent,
       finishedAtMs: finishedAtMs,
       myScore: finalMessage.myScore,
       opponentScore: finalMessage.opponentScore,
@@ -152,7 +155,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   final TextFilter? _injectedTextFilter;
   final Duration leaveTimeoutDuration;
   final Timer Function(Duration duration, void Function() callback)?
-      _injectedTimerFactory;
+  _injectedTimerFactory;
 
   OnlineMatchSession({
     GameClock? clock,
@@ -160,10 +163,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     TextFilter? textFilter,
     this.leaveTimeoutDuration = const Duration(seconds: 3),
     Timer Function(Duration duration, void Function() callback)? timerFactory,
-  })  : _injectedClock = clock,
-        _injectedRandom = random,
-        _injectedTextFilter = textFilter,
-        _injectedTimerFactory = timerFactory;
+  }) : _injectedClock = clock,
+       _injectedRandom = random,
+       _injectedTextFilter = textFilter,
+       _injectedTimerFactory = timerFactory;
 
   OnlineMatchClient? _client;
   StreamSubscription<OnlineMatchEvent>? _subscription;
@@ -261,8 +264,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       opponentFrame: opponentFrame,
     );
 
-    final activeClient =
-        client ?? ref.read(onlineMatchClientFactoryProvider)();
+    final activeClient = client ?? ref.read(onlineMatchClientFactoryProvider)();
     _client = activeClient;
 
     _subscription = activeClient.events.listen(_handleEvent);
@@ -412,7 +414,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       if (onlineState.winnerIsMe != null) {
         winnerId = onlineState.winnerIsMe! ? 'me' : 'bot';
       } else {
-        winnerId = state.matchState?.winnerId ??
+        winnerId =
+            state.matchState?.winnerId ??
             (onlineState.myScore >= onlineState.opponentScore ? 'me' : 'bot');
       }
     } else {
@@ -428,10 +431,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final mappedMatchState = MatchState(
       config: MatchConfig(answerSeconds: onlineState.answerSeconds),
       playerIds: const ['me', 'bot'],
-      scores: {
-        'me': onlineState.myScore,
-        'bot': onlineState.opponentScore,
-      },
+      scores: {'me': onlineState.myScore, 'bot': onlineState.opponentScore},
       decisiveRounds: decisiveRounds,
       totalRoundsPlayed: decisiveRounds,
       phase: mappedPhase,
@@ -441,10 +441,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
           ? (onlineState.turnIsMine ? 'me' : 'bot')
           : null,
       deadlineMs: onlineState.deadlineMs,
-      remainingNearMisses: {
-        'me': onlineState.myHintsLeft,
-        'bot': 0,
-      },
+      remainingNearMisses: {'me': onlineState.myHintsLeft, 'bot': 0},
       usedQuestionIds: const {},
       currentRoundAttempts: const [],
       roundHistory: roundHistory,
@@ -461,8 +458,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     if (mappedPhase == MatchPhase.roundEnded &&
         onlineState.nextRoundAtMs != null) {
       final estimatedServerNow = nowLocalMs + onlineState.clockOffsetMs;
-      transitionRemainingMs =
-          math.max(0, onlineState.nextRoundAtMs! - estimatedServerNow);
+      transitionRemainingMs = math.max(
+        0,
+        onlineState.nextRoundAtMs! - estimatedServerNow,
+      );
       final totalFromServer =
           onlineState.nextRoundAtMs! - onlineState.serverNowMs;
       if (totalFromServer > 0) {
@@ -540,8 +539,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         if (_isLeaving) {
           endReason = MatchEndReason.terk;
         } else if (_wasReconnecting ||
-            state.connectionStatus ==
-                ConnectionStatus.permanentDisconnected) {
+            state.connectionStatus == ConnectionStatus.permanentDisconnected) {
           endReason = MatchEndReason.baglantiKoptu;
         } else {
           endReason = MatchEndReason.baglantiKoptu;
@@ -564,11 +562,12 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final matchId =
         _currentMatchId ?? 'online_${finishedAtMs}_${_random.nextInt(100000)}';
     final resolvedOpponentName =
-        (finalMsg.opponentName != null && finalMsg.opponentName!.trim().isNotEmpty)
-            ? finalMsg.opponentName!.trim()
-            : (state.opponentName.trim().isNotEmpty
-                ? state.opponentName.trim()
-                : AppStrings.opponent);
+        (finalMsg.opponentName != null &&
+            finalMsg.opponentName!.trim().isNotEmpty)
+        ? finalMsg.opponentName!.trim()
+        : (state.opponentName.trim().isNotEmpty
+              ? state.opponentName.trim()
+              : AppStrings.opponent);
     final resolvedOpponentFrame = finalMsg.opponentFrame;
     final entry = OnlineMatchHistoryMapper.toHistoryEntry(
       finalMessage: finalMsg,
@@ -582,10 +581,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     );
 
     final winnerId = finalMsg.winnerIsMe ? 'me' : 'bot';
-    final scores = {
-      'me': finalMsg.myScore,
-      'bot': finalMsg.opponentScore,
-    };
+    final scores = {'me': finalMsg.myScore, 'bot': finalMsg.opponentScore};
 
     final prevMatchState = state.matchState;
     final finishedMatchState = MatchState(
@@ -625,8 +621,13 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     );
 
     if (finalMsg.coins != null) {
-      unawaited(ref.read(profileProvider.notifier).updateCoins(finalMsg.coins!));
+      unawaited(
+        ref.read(profileProvider.notifier).updateCoins(finalMsg.coins!),
+      );
     }
+    // Maç bittiğinde profil ve mağaza durumunu sunucudan tazele (iade durumları dahil)
+    unawaited(ref.read(profileProvider.notifier).syncWithServer());
+    ref.invalidate(storeNotifierProvider);
     ref.invalidate(leaderboardNotifierProvider);
 
     if (!_hasReceivedFinal) {
@@ -669,10 +670,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       unawaited(client.close());
     }
 
-    state = state.copyWith(
-      isLoading: false,
-      isVoided: true,
-    );
+    state = state.copyWith(isLoading: false, isVoided: true);
   }
 
   void _saveLocalDisconnectLoss() {
@@ -686,8 +684,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final matchId =
         _currentMatchId ?? 'online_${finishedAtMs}_${_random.nextInt(100000)}';
     final lastOnline = _lastOnlineState;
-    final myScore =
-        state.matchState?.scores['me'] ?? lastOnline?.myScore ?? 0;
+    final myScore = state.matchState?.scores['me'] ?? lastOnline?.myScore ?? 0;
     final opponentScore =
         state.matchState?.scores['bot'] ?? lastOnline?.opponentScore ?? 0;
 
@@ -795,8 +792,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         case 'temporary_error':
           errorMsg = AppStrings.powerupTemporaryError;
         case 'not_enough_coins':
-          errorMsg =
-              AppStrings.notEnoughCoinsForExtraTime(state.extraTimeCost ?? 30);
+          errorMsg = AppStrings.notEnoughCoinsForExtraTime(
+            state.extraTimeCost ?? 30,
+          );
         case 'already_used':
           errorMsg = AppStrings.extraTimeAlreadyUsed;
         case 'not_your_turn':
@@ -879,8 +877,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     }
 
     if (_injectedTimerFactory != null) {
-      _leaveTimeoutTimer =
-          _injectedTimerFactory(leaveTimeoutDuration, onLeaveTimeout);
+      _leaveTimeoutTimer = _injectedTimerFactory(
+        leaveTimeoutDuration,
+        onLeaveTimeout,
+      );
     } else {
       _leaveTimeoutTimer = Timer(leaveTimeoutDuration, onLeaveTimeout);
     }
@@ -906,8 +906,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       );
     }
 
-    final myScore =
-        state.matchState?.scores['me'] ?? lastOnline?.myScore ?? 0;
+    final myScore = state.matchState?.scores['me'] ?? lastOnline?.myScore ?? 0;
     final opponentScore =
         state.matchState?.scores['bot'] ?? lastOnline?.opponentScore ?? 0;
 
@@ -948,8 +947,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       } else if (match.phase == MatchPhase.roundEnded &&
           onlineState.nextRoundAtMs != null) {
         final estimatedServerNow = nowLocalMs + onlineState.clockOffsetMs;
-        final transitionRemaining =
-            math.max(0, onlineState.nextRoundAtMs! - estimatedServerNow);
+        final transitionRemaining = math.max(
+          0,
+          onlineState.nextRoundAtMs! - estimatedServerNow,
+        );
         if (transitionRemaining != state.roundTransitionRemainingMs) {
           state = state.copyWith(
             roundTransitionRemainingMs: transitionRemaining,
@@ -998,4 +999,3 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     _cleanupSession();
   }
 }
-

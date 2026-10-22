@@ -1,4 +1,5 @@
 import { authenticateRequest, type AuthEnv } from './auth';
+import type { EnergyEnv } from './energy';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile } from './userProfile';
@@ -7,7 +8,7 @@ import { ReportStore } from './reportStore';
 
 export { Matchmaker, MatchRoom, UserProfile, Leaderboard, ReportStore };
 
-export interface Env extends AuthEnv {
+export interface Env extends AuthEnv, EnergyEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly USER_PROFILE: DurableObjectNamespace<UserProfile>;
@@ -86,10 +87,19 @@ export default {
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
         const profile = await profileStub.getProfile(uid);
-        return new Response(JSON.stringify(profile), {
-          status: 200,
-          headers: jsonHeaders,
-        });
+        const serverNowMs = Date.now();
+        const energyState = await profileStub.getEnergyState(uid, serverNowMs);
+        return new Response(
+          JSON.stringify({
+            ...profile,
+            serverNowMs,
+            energy: energyState,
+          }),
+          {
+            status: 200,
+            headers: jsonHeaders,
+          }
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === 'account_deleted') {
@@ -276,10 +286,19 @@ export default {
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
         const storeData = await profileStub.getStoreState(uid);
-        return new Response(JSON.stringify(storeData), {
-          status: 200,
-          headers: jsonHeaders,
-        });
+        const serverNowMs = Date.now();
+        const energyState = await profileStub.getEnergyState(uid, serverNowMs);
+        return new Response(
+          JSON.stringify({
+            ...storeData,
+            serverNowMs,
+            energy: energyState,
+          }),
+          {
+            status: 200,
+            headers: jsonHeaders,
+          }
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === 'account_deleted') {
@@ -343,6 +362,80 @@ export default {
           }
           return new Response(
             JSON.stringify({ error: 'invalid_item', message: 'Geçersiz çerçeve öğesi' }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Enerji paketi satın alma: POST /store/energy
+    if (request.method === 'POST' && pathname === '/store/energy') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let body: { pack?: unknown };
+      try {
+        body = (await request.json()) as { pack?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (body?.pack !== 'one' && body?.pack !== 'full') {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pack', message: "pack alanı 'one' veya 'full' olmalıdır" }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.purchaseEnergy({ pack: body.pack, uid });
+        if (!res.success) {
+          if (res.error === 'energy_disabled') {
+            return new Response(
+              JSON.stringify({ error: 'energy_disabled', message: 'Enerji sistemi şu anda aktif değil' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'energy_full') {
+            return new Response(
+              JSON.stringify({ error: 'energy_full', message: 'Enerjiniz zaten dolu' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'not_enough_coins') {
+            return new Response(
+              JSON.stringify({ error: 'not_enough_coins', message: 'Yetersiz jeton', coins: res.coins }),
+              { status: 402, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: 'invalid_pack', message: 'Geçersiz paket' }),
             { status: 400, headers: jsonHeaders }
           );
         }
@@ -726,6 +819,80 @@ export default {
       }
     }
 
+    // Enerji paketi satın alma: POST /store/energy
+    if (request.method === 'POST' && pathname === '/store/energy') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let body: { pack?: unknown };
+      try {
+        body = (await request.json()) as { pack?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (body?.pack !== 'one' && body?.pack !== 'full') {
+        return new Response(
+          JSON.stringify({ error: 'invalid_pack', message: "pack alanı 'one' veya 'full' olmalıdır" }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.purchaseEnergy({ pack: body.pack, uid });
+        if (!res.success) {
+          if (res.error === 'energy_disabled') {
+            return new Response(
+              JSON.stringify({ error: 'energy_disabled', message: 'Enerji sistemi şu anda aktif değil' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'energy_full') {
+            return new Response(
+              JSON.stringify({ error: 'energy_full', message: 'Enerjiniz zaten dolu' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'not_enough_coins') {
+            return new Response(
+              JSON.stringify({ error: 'not_enough_coins', message: 'Yetersiz jeton', coins: res.coins }),
+              { status: 402, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: 'invalid_pack', message: 'Geçersiz paket' }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
     // Yönetici Bildirimleri İnceleme: GET /admin/reports
     if (request.method === 'GET' && pathname === '/admin/reports') {
       const authHeader = request.headers.get('Authorization') ?? '';
@@ -791,6 +958,7 @@ export default {
         uid?: unknown;
         coins?: unknown;
         frameIds?: unknown;
+        energy?: unknown;
       };
 
       const targetUid = typeof body.uid === 'string' ? body.uid.trim() : '';
@@ -807,6 +975,7 @@ export default {
           uid: targetUid,
           coins: typeof body.coins === 'number' ? body.coins : undefined,
           frameIds: Array.isArray(body.frameIds) ? (body.frameIds as string[]) : undefined,
+          energy: typeof body.energy === 'number' ? body.energy : undefined,
         });
 
         if (!res.success) {
