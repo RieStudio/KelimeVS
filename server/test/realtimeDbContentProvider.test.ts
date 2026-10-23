@@ -287,12 +287,15 @@ describe('RealtimeDbContentProvider (RTDB Sorgusu, Önbellek, TTL ve Hata Yönet
   });
 
   it('TTL süresi dolunca eski önbellekle döner ve arka planda yeniler, yenileme hatasında eskiyi korur', async () => {
-    let fetchCount = 0;
+    let poolFetchCount = 0;
     let currentTimeMs = 1000000;
 
-    const mockFetch: FetchFunction = async () => {
-      fetchCount++;
-      if (fetchCount === 1) {
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        return new Response('null', { status: 200 });
+      }
+      poolFetchCount++;
+      if (poolFetchCount === 1) {
         return new Response(JSON.stringify(samplePool), { status: 200 });
       }
       // Arka plan yenilemesinde hata al
@@ -309,7 +312,7 @@ describe('RealtimeDbContentProvider (RTDB Sorgusu, Önbellek, TTL ve Hata Yönet
     // 1. İlk çekme -> başarılı
     const q1 = await provider.getQuestions();
     expect(q1.length).toBe(1);
-    expect(fetchCount).toBe(1);
+    expect(poolFetchCount).toBe(1);
 
     // 2. TTL süresi geçti (70 saniye sonra)
     currentTimeMs += 70 * 1000;
@@ -324,7 +327,7 @@ describe('RealtimeDbContentProvider (RTDB Sorgusu, Önbellek, TTL ve Hata Yönet
     // Yenileme 503 ile patlamış olsa dahi eski önbellek sağlam kalır
     const q3 = await provider.getQuestions();
     expect(q3.length).toBe(1);
-    expect(fetchCount).toBe(2);
+    expect(poolFetchCount).toBe(2);
   });
 });
 
@@ -378,19 +381,19 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
       initialContentVersion: currentVersion,
     });
 
-    // 1. İlk çekme (cache boş) -> havuz çekilir
+    // 1. İlk çekme (cache boş) -> havuz ve versiyon çekilir
     const q1 = await provider.getQuestions();
     expect(q1.length).toBe(1);
     expect(q1[0].text).toBe('Versiyon 1 Soru');
     expect(poolFetchCount).toBe(1);
-    expect(versionFetchCount).toBe(0);
+    expect(versionFetchCount).toBe(1);
 
     // 2. 10 saniye sonra çağrı (15 sn eşiği dolmadı) -> sıfır ağ çağrısı
     currentTimeMs += 10 * 1000;
     const q2 = await provider.getQuestions();
     expect(q2.length).toBe(1);
     expect(poolFetchCount).toBe(1);
-    expect(versionFetchCount).toBe(0);
+    expect(versionFetchCount).toBe(1);
 
     // 3. 20 saniye sonra çağrı (15 sn doldu, sürüm kontrolü tetiklenir)
     currentTimeMs += 10 * 1000; // toplam +20s
@@ -403,7 +406,7 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
     }
 
     // Sürüm hala 100 olduğu için versiyon kontrolü yapıldı AMA tam havuz ÇEKİLMEDİ
-    expect(versionFetchCount).toBe(1);
+    expect(versionFetchCount).toBe(2);
     expect(poolFetchCount).toBe(1);
   });
 
@@ -456,7 +459,7 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
 
     // Sürüm 2 çekilmiş olmalı
     expect(poolFetchCount).toBe(2);
-    expect(versionFetchCount).toBe(1);
+    expect(versionFetchCount).toBe(2);
     expect(provider.currentVersion).toBe(2);
 
     // 5. Bir sonraki getQuestions çağrısı artık YENİ veriyi (v2) döner
@@ -518,8 +521,8 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
     // Arka plan görevinin bitmesini bekle
     await provider.inFlightRefresh;
 
-    // Yalnızca tek bir versiyon ve tek bir havuz çekimi yapıldı
-    expect(versionFetchCount).toBe(1);
+    // Yalnızca tek bir versiyon ve tek bir havuz çekimi yapıldı (initial 1 + background 1)
+    expect(versionFetchCount).toBe(2);
     expect(poolFetchCount).toBe(2);
   });
 
@@ -607,7 +610,7 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
       await provider.inFlightRefresh;
     }
 
-    expect(versionFetchCount).toBe(1);
+    expect(versionFetchCount).toBe(2);
     expect(poolFetchCount).toBe(1); // Havuz çekilmedi
 
     // 40 sn sonra çağrı -> yine null döner, havuz yine çekilmez
@@ -617,7 +620,7 @@ describe('RealtimeDbContentProvider (content_version Hızlı Senkronizasyon ve A
       await provider.inFlightRefresh;
     }
 
-    expect(versionFetchCount).toBe(2);
+    expect(versionFetchCount).toBe(3);
     expect(poolFetchCount).toBe(1);
   });
 });
@@ -751,6 +754,280 @@ describe('RealtimeDbContentProvider (content_refreshed Loglama)', () => {
       questionCount: 3,
       categoryCount: 2,
     });
+  });
+});
+
+describe('fetchContentVersion & content_version Teşhis, Ayrıştırma ve Hata Loglama', () => {
+  const pool = {
+    c1: {
+      q1: {
+        question: 'Soru 1',
+        acceptable_answers: { a1: ['a1'] },
+      },
+    },
+  };
+
+  it('13 haneli sayısal timestamp versiyonu (1792708977290) doğru okunur, ilk yüklemede cachedContentVersion kaydedilir ve logda görünür', async () => {
+    const logs: string[] = [];
+    const timestampVersion = 1792708977290;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        return new Response(JSON.stringify(timestampVersion), { status: 200 });
+      }
+      return new Response(JSON.stringify(pool), { status: 200 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+    });
+
+    const parsedVersion = await provider.fetchContentVersion();
+    expect(parsedVersion).toBe(timestampVersion);
+    expect(typeof parsedVersion).toBe('number');
+
+    // İlk yüklemede getQuestions() çağrısı cachedContentVersion'ı doldurmalı
+    const questions = await provider.getQuestions();
+    expect(questions.length).toBe(1);
+    expect(provider.currentVersion).toBe(timestampVersion);
+
+    // content_refreshed logunda version 1792708977290 olmalı
+    expect(logs.length).toBe(1);
+    const refreshedLog = JSON.parse(logs[0]);
+    expect(refreshedLog).toEqual({
+      event: 'content_refreshed',
+      reason: 'initial',
+      version: timestampVersion,
+      questionCount: 1,
+      categoryCount: 1,
+    });
+  });
+
+  it('dize formatındaki versiyon ("v2.4.1") doğru ayrıştırılır', async () => {
+    const mockFetch: FetchFunction = async () => {
+      return new Response(JSON.stringify('v2.4.1'), { status: 200 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBe('v2.4.1');
+  });
+
+  it('content_version düğümü yoksa (null) content_version_missing logu basılır ve null döner', async () => {
+    const logs: string[] = [];
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        return new Response(JSON.stringify(null), { status: 200 });
+      }
+      return new Response(JSON.stringify(pool), { status: 200 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBeNull();
+
+    expect(logs.length).toBe(1);
+    const missingLog = JSON.parse(logs[0]);
+    expect(missingLog).toEqual({
+      event: 'content_version_missing',
+    });
+
+    // İlk yüklemede questions yine çekilir, missing + initial refresh (version: null) logları basılır
+    await provider.getQuestions();
+    expect(logs.length).toBe(3); // 1. fetchContentVersion doğrudan çağrısı, 2. getQuestions içindeki missing, 3. content_refreshed
+    const refreshLog = JSON.parse(logs[2]);
+    expect(refreshLog).toEqual({
+      event: 'content_refreshed',
+      reason: 'initial',
+      version: null,
+      questionCount: 1,
+      categoryCount: 1,
+    });
+  });
+
+  it('HTTP 401/403 yetki hatasında content_version_fetch_failed logu basılır ve null döner', async () => {
+    const logs: string[] = [];
+
+    const mockFetch: FetchFunction = async () => {
+      return new Response(JSON.stringify({ error: 'Permission denied' }), { status: 403 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBeNull();
+
+    expect(logs.length).toBe(1);
+    const failedLog = JSON.parse(logs[0]);
+    expect(failedLog).toEqual({
+      event: 'content_version_fetch_failed',
+      status: 403,
+      reason: 'Permission denied',
+    });
+  });
+
+  it('HTTP 500 sunucu hatasında content_version_fetch_failed logu basılır ve null döner', async () => {
+    const logs: string[] = [];
+
+    const mockFetch: FetchFunction = async () => {
+      return new Response('Internal Server Error', { status: 500 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+      sleepFn: async () => {}, // Hızlı tekrar deneme
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBeNull();
+
+    expect(logs.length).toBe(1);
+    const failedLog = JSON.parse(logs[0]);
+    expect(failedLog).toEqual({
+      event: 'content_version_fetch_failed',
+      status: 500,
+      reason: 'HTTP 500',
+    });
+  });
+
+  it('ağ hatası (network error) durumunda content_version_fetch_failed (status: undefined) logu basılır', async () => {
+    const logs: string[] = [];
+
+    const mockFetch: FetchFunction = async () => {
+      throw new Error('ECONNRESET: connection reset by peer');
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+      sleepFn: async () => {},
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBeNull();
+
+    // logs array'inde content_version_fetch_failed logu olmalı
+    const fetchFailedLog = logs.map((l) => JSON.parse(l)).find((l) => l.event === 'content_version_fetch_failed');
+    expect(fetchFailedLog).toBeDefined();
+    expect(fetchFailedLog).toEqual({
+      event: 'content_version_fetch_failed',
+      status: undefined,
+      reason: 'ECONNRESET: connection reset by peer',
+    });
+  });
+
+  it('bozuk JSON yanıtında content_version_fetch_failed logu basılır', async () => {
+    const logs: string[] = [];
+
+    const mockFetch: FetchFunction = async () => {
+      return new Response('{ not-valid-json', { status: 200 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      logFn: (msg) => logs.push(msg),
+    });
+
+    const version = await provider.fetchContentVersion();
+    expect(version).toBeNull();
+
+    expect(logs.length).toBe(1);
+    const failedLog = JSON.parse(logs[0]);
+    expect(failedLog.event).toBe('content_version_fetch_failed');
+    expect(failedLog.status).toBe(200);
+    expect(failedLog.reason).toBeTruthy();
+  });
+
+  it('ilk yüklemede content_version.json çağrısı questions_pool.json çağrısından ÖNCE tamamlanır', async () => {
+    const callOrder: string[] = [];
+    let versionCompleted = false;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        callOrder.push('version_start');
+        await new Promise((r) => setTimeout(r, 10));
+        versionCompleted = true;
+        callOrder.push('version_end');
+        return new Response(JSON.stringify(1792708977290), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        callOrder.push('pool_start');
+        expect(versionCompleted).toBe(true);
+        callOrder.push('pool_end');
+        return new Response(JSON.stringify(pool), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+    });
+
+    await provider.getQuestions();
+
+    expect(callOrder).toEqual([
+      'version_start',
+      'version_end',
+      'pool_start',
+      'pool_end',
+    ]);
+    expect(provider.currentVersion).toBe(1792708977290);
+  });
+
+  it('TTL dolumu sonrası tam yenilemede (triggerBackgroundFullRefresh) content_version havuzdan ÖNCE tamamlanır', async () => {
+    const callOrder: string[] = [];
+    let currentTimeMs = 1000;
+
+    const mockFetch: FetchFunction = async (url) => {
+      if (url.includes('content_version.json')) {
+        callOrder.push('version');
+        return new Response(JSON.stringify(100), { status: 200 });
+      }
+      if (url.includes('questions_pool.json')) {
+        callOrder.push('pool');
+        return new Response(JSON.stringify(pool), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const provider = new RealtimeDbContentProvider({
+      databaseUrl: 'https://test-db.firebaseio.com',
+      fetchFn: mockFetch,
+      nowFn: () => currentTimeMs,
+      ttlSeconds: 60,
+    });
+
+    // 1. İlk yükleme
+    await provider.getQuestions();
+    callOrder.length = 0;
+
+    // 2. TTL dolsun
+    currentTimeMs += 70 * 1000;
+    await provider.getQuestions();
+    await provider.inFlightRefresh;
+
+    expect(callOrder).toEqual(['version', 'pool']);
   });
 });
 

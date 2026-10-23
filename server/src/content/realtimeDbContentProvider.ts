@@ -413,18 +413,35 @@ export class RealtimeDbContentProvider implements ContentProvider {
 
   /**
    * Firebase Realtime Database'ten content_version.json çeker.
-   * Düğüm yoksa (null) veya 404 ise null döner.
+   * - Başarılı sayı/dize -> değeri döner (13 haneli timestamp dahil).
+   * - Gerçek null (düğüm yok) -> { event: "content_version_missing" } loglar ve null döner.
+   * - Hata (ağ, 401/403, 5xx, parse) -> { event: "content_version_fetch_failed", status, reason } loglar ve null döner.
    */
   async fetchContentVersion(): Promise<string | number | null> {
     let res: Response | null = null;
     try {
       res = await this.executeRtdbRequest('content_version.json');
-    } catch {
+    } catch (networkErr: unknown) {
+      this.logFn(
+        JSON.stringify({
+          event: 'content_version_fetch_failed',
+          status: undefined,
+          reason: networkErr instanceof Error ? networkErr.message : 'Network failure',
+        })
+      );
       return null;
     }
 
-    if (!res) return null;
-    if (res.status === 404) return null;
+    if (!res) {
+      this.logFn(
+        JSON.stringify({
+          event: 'content_version_fetch_failed',
+          status: undefined,
+          reason: 'No response received from Realtime Database',
+        })
+      );
+      return null;
+    }
 
     if (!res.ok) {
       let rtdbErrorCode: string | undefined;
@@ -437,37 +454,52 @@ export class RealtimeDbContentProvider implements ContentProvider {
         // ignore
       }
 
-      logContentError({
-        event: 'content_error',
-        stage: 'rtdb_fetch',
-        status: res.status,
-        errorName: 'RtdbHttpError',
-        code: rtdbErrorCode,
-        detail: rtdbErrorCode || `Realtime Database request for content_version failed with HTTP ${res.status}`,
-        ...this.diagnosticFlags,
-      });
-
+      const reason = rtdbErrorCode || `HTTP ${res.status}`;
+      this.logFn(
+        JSON.stringify({
+          event: 'content_version_fetch_failed',
+          status: res.status,
+          reason,
+        })
+      );
       return null;
     }
 
     let rawData: unknown;
     try {
       rawData = (await res.json()) as unknown;
-    } catch {
+    } catch (parseErr: unknown) {
+      this.logFn(
+        JSON.stringify({
+          event: 'content_version_fetch_failed',
+          status: res.status,
+          reason: parseErr instanceof Error ? parseErr.message : 'JSON parse error',
+        })
+      );
       return null;
     }
 
     if (rawData === null || rawData === undefined) {
+      this.logFn(
+        JSON.stringify({
+          event: 'content_version_missing',
+        })
+      );
       return null;
     }
 
-    if (typeof rawData === 'number' || typeof rawData === 'string') {
-      return rawData;
+    if (typeof rawData === 'number') {
+      return Number.isFinite(rawData) ? rawData : String(rawData);
     }
 
-    if (typeof rawData === 'object') {
+    if (typeof rawData === 'string') {
+      const trimmed = rawData.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+
+    if (typeof rawData === 'object' && rawData !== null) {
       const rec = rawData as Record<string, unknown>;
-      if (typeof rec.version === 'string' || typeof rec.version === 'number') {
+      if (typeof rec.version === 'number' || typeof rec.version === 'string') {
         return rec.version;
       }
       return JSON.stringify(rawData);
@@ -625,8 +657,12 @@ export class RealtimeDbContentProvider implements ContentProvider {
 
     this.inFlightRefreshPromise = (async () => {
       try {
+        const remoteVersion = await this.fetchContentVersion();
         const { questions, stats } = await this.fetchFromDatabase();
         this.cachedQuestions = questions;
+        if (remoteVersion !== null) {
+          this.cachedContentVersion = remoteVersion;
+        }
         this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
         this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
         this.checkAndLogCollisions(questions);
@@ -655,12 +691,16 @@ export class RealtimeDbContentProvider implements ContentProvider {
     const now = this.nowFn();
 
     // 1. İlk çekme (önbellek boş) -> Başarısız olursa hata fırlat (Single-flight)
+    // Önce fetchContentVersion() bitsin, sonra fetchFromDatabase() çalışsın;
+    // havuzdan ÖNCE okunan sürüm kaydedilir (panel iki okuma arasında yazarsa bir sonraki kontrolde yeniden çekilsin).
     if (this.cachedQuestions === null) {
       if (!this.inFlightFetchPromise) {
         this.inFlightFetchPromise = (async () => {
           try {
+            const version = await this.fetchContentVersion();
             const { questions, stats } = await this.fetchFromDatabase();
             this.cachedQuestions = questions;
+            this.cachedContentVersion = version ?? this.cachedContentVersion ?? null;
             this.cacheExpiresAtMs = this.nowFn() + this.ttlMs;
             this.nextVersionCheckAtMs = this.nowFn() + this.versionCheckIntervalMs;
             this.checkAndLogCollisions(questions);

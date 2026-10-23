@@ -280,8 +280,8 @@ describe('Matchmaker Content Pre-warming (İçeriği Önden Isıtma)', () => {
     // Arka plan waitUntils tamamlanır
     await Promise.all(mockState.waitUntils);
 
-    // Tek bir fetch yapılmış olmalı (single-flight)
-    expect(fetchCount).toBe(1);
+    // Tek bir initial fetch (version + pool) yapılmış olmalı (single-flight)
+    expect(fetchCount).toBe(2);
   });
 });
 

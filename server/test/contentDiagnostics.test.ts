@@ -616,7 +616,7 @@ describe('İçerik Hattı Tanılama ve Güvenli Loglama (contentDiagnostics)', (
 
       expect(res1).toBe(res2);
       expect(res2).toBe(res3);
-      expect(fetchCount).toBe(1); // Yalnızca tek bir ağ isteği yapıldı
+      expect(fetchCount).toBe(2); // Tek bir initial yükleme (version + pool) yapıldı (3 eşzamanlı çağrı tek promise'i paylaştı)
     });
   });
 
