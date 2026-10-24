@@ -170,6 +170,17 @@ abstract final class AppStrings {
   static const String scoreBeforeDisconnectNote =
       'Skor, bağlantı kopmadan önceki duruma göredir.';
 
+  // Global Ağ & Çevrimdışı Durumu (DESIGN.md 6b)
+  static const String noInternetTitle = 'İnternet Bağlantısı Yok';
+  static const String noInternetMessage =
+      'KelimeVS oynamak için aktif bir internet bağlantısı gerekiyor. Lütfen bağlantını kontrol et.';
+  static const String noInternetBanner =
+      'İnternet bağlantısı kesildi. Yeniden bağlanılıyor…';
+  static const String noInternetConnected = 'İnternet bağlantısı sağlandı';
+  static const String retryConnection = 'Tekrar Dene';
+  static const String noInternetActionError =
+      'Bu işlem için internet bağlantısı gerekiyor.';
+
   // Profil ve Onboarding
   static const String welcomeTitle = 'Hoş Geldin!';
   static const String welcomePrompt = 'KelimeVS’de seni nasıl çağıralım?';

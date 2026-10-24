@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -41,6 +42,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(networkStatusProvider);
     final historyAsync = ref.watch(matchHistoryProvider);
     final profile = ref.watch(profileProvider);
     final nickname =
@@ -174,6 +176,8 @@ class HomeScreen extends ConsumerWidget {
                 subtitle: AppStrings.quickMatchSubtitle,
                 isLarge: true,
                 onPressed: () {
+                  if (!ensureNetworkConnected(context, ref)) return;
+
                   final energy = profile.energy;
                   if (energy != null && energy.enabled && energy.current <= 0) {
                     showModalBottomSheet<void>(
@@ -219,6 +223,8 @@ class HomeScreen extends ConsumerWidget {
               SecondaryButton(
                 text: AppStrings.playWithFriend,
                 onPressed: () {
+                  if (!ensureNetworkConnected(context, ref)) return;
+
                   showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,

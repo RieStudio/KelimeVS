@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -26,12 +27,15 @@ class MatchScreen extends ConsumerStatefulWidget {
 
 class _MatchScreenState extends ConsumerState<MatchScreen> {
   final ScrollController _scrollController = ScrollController();
+  late final BannerSuppressionNotifier _suppressionNotifier;
 
   @override
   void initState() {
     super.initState();
+    _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        _suppressionNotifier.suppress();
         final mode = ref.read(activeMatchSessionModeProvider);
         if (mode == MatchSessionMode.bot) {
           final current = ref.read(matchControllerProvider);
@@ -47,6 +51,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
 
   @override
   void dispose() {
+    _suppressionNotifier.unsuppress();
     _scrollController.dispose();
     super.dispose();
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -8,11 +10,11 @@ import 'friend_host_screen.dart';
 import 'friend_join_screen.dart';
 
 /// "Arkadaşla Düello" modunda "Oda Kur" veya "Koda Katıl" seçimi sunan alt sayfa modalı.
-class FriendDuelBottomSheet extends StatelessWidget {
+class FriendDuelBottomSheet extends ConsumerWidget {
   const FriendDuelBottomSheet({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -72,6 +74,7 @@ class FriendDuelBottomSheet extends StatelessWidget {
             title: AppStrings.createRoom,
             subtitle: AppStrings.createRoomSubtitle,
             onTap: () {
+              if (!ensureNetworkConnected(context, ref)) return;
               Navigator.of(context).pop();
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -90,6 +93,7 @@ class FriendDuelBottomSheet extends StatelessWidget {
             title: AppStrings.joinRoom,
             subtitle: AppStrings.joinRoomSubtitle,
             onTap: () {
+              if (!ensureNetworkConnected(context, ref)) return;
               Navigator.of(context).pop();
               Navigator.of(context).push(
                 MaterialPageRoute(

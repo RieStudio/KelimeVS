@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -43,11 +44,18 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
   bool _isLoading = true;
   String? _errorMessage;
   bool _isMatched = false;
+  late final BannerSuppressionNotifier _suppressionNotifier;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _suppressionNotifier.suppress();
+      }
+    });
     _client = widget.client ?? FriendMatchClient();
     _subscription = _client.events.listen(_handleEvent);
 
@@ -222,6 +230,7 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
 
   @override
   void dispose() {
+    _suppressionNotifier.unsuppress();
     WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     _dotsTimer?.cancel();

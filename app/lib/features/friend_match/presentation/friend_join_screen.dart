@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -35,10 +36,17 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isMatched = false;
+  late final BannerSuppressionNotifier _suppressionNotifier;
 
   @override
   void initState() {
     super.initState();
+    _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _suppressionNotifier.suppress();
+      }
+    });
     _client = widget.client ?? FriendMatchClient();
     _subscription = _client.events.listen(_handleEvent);
     _controller.addListener(() {
@@ -139,6 +147,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
 
   @override
   void dispose() {
+    _suppressionNotifier.unsuppress();
     _subscription?.cancel();
     _controller.dispose();
     if (!_isMatched) {

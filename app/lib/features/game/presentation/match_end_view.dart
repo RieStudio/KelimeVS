@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -61,6 +62,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   }
 
   void _showReportBottomSheet(BuildContext context, String matchId, String opponentName) {
+    if (!ensureNetworkConnected(context, ref)) return;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -93,6 +95,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   }
 
   void _showBlockDialog(BuildContext context, String matchId, String opponentName) {
+    if (!ensureNetworkConnected(context, ref)) return;
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -506,6 +509,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
               PrimaryButton(
                 text: AppStrings.playAgain,
                 onPressed: () {
+                  if (!ensureNetworkConnected(context, ref)) return;
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (_) => const MatchmakingScreen(),

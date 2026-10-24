@@ -139,6 +139,13 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Kaydırılan liste** – Kaydırma çubuğu **gösterilmez** (mobil varsayılanı; masaüstü/web derlemesinde gizlenir). Kaydırılabilir olduğunu belli etmek için listenin son görünen kartı **yarım** görünecek biçimde ekran düzenlenir.
 
+### 6b) Global Ağ ve Çevrimdışı (Offline) Durum Yönetimi
+1. **Açılışta İnternet Yoksa:** Uygulama normal menüleriyle açılmaz; tam ekran `OfflineSplashScreen` gösterilir. Wi-Fi kapalı ikonu, `noInternetTitle` ("İnternet Bağlantısı Yok"), `noInternetMessage` ve `PrimaryButton` ile `retryConnection` ("Tekrar Dene"). Bağlantı geldiğinde ekran kendiliğinden kapanır; Firebase anonim giriş ve profil senkron adımları otomatik olarak baştan çalıştırılır. "Çevrimdışı Alıştırma Yap" seçeneği bulunmaz (KelimeVS online odaklı bir oyundur).
+2. **Menülerde Bağlantı Koparsa:** `MaterialApp.builder` katmanında `GlobalOfflineBanner` şeridi (`dangerSurface` zemin, `dangerSoft` 2 px alt kenarlık, `dangerText` yazı ve mini "Tekrar Dene" butonu) içeriğin üstüne binmez; `Column` içinde içeriği aşağı iter ve üst çubuktaki buton dokunuşlarını kapatmaz (`SafeArea(bottom: false)`). Sinyal dalgalanmalarını (flapping) önlemek için kopma anında 2 sn debounce uygulanır; 2 sn'den kısa süren kopmalarda şerit gösterilmez. Bağlantı gelince şerit kendiliğinden kapanır; profil, mağaza ve sıralama yükleme çarkına düşmeden arka planda güncellenir.
+3. **Maç İzolasyonu:** Aktif maç ve lobi ekranlarında (`MatchScreen`, `MatchmakingScreen`, `FriendHostScreen`, `FriendJoinScreen`) global şerit bastırılır (`isOfflineBannerSuppressed`). Online maçta mevcut `ConnectionBanner` ve sunucunun 30 sn yeniden bağlanma akışı aynen korunur; bot maçında da ekran düzeni bozulmaz.
+4. **Ağ Gerektiren Eylemler:** Ağ bağlantısı yokken Hızlı Maç, Arkadaşınla Oyna (Oda Kur/Katıl), Mağaza satın alma/kuşanma, Enerji paketi alma, Hesap silme ve Engelle/Bildir gibi eylemler başlatılmaz; kullanıcıya kayan SnackBar ile `noInternetActionError` ("Bu işlem için internet bağlantısı gerekiyor.") gösterilir. Hızlı Maç internetsizken gizlice bot maçına düşürmez (yalnızca online eşleşme zaman aşımı/circuit breaker durumunda bot fallback çalışır).
+5. **Sunucu Sağlık Kontrolü (`GET /health`):** Cihaz Wi-Fi/hücresel ağa bağlıyken internet çıkışı olup olmadığını (captive portal vb.) doğrulamak için sunucunun `/health` uç noktasına hafif bir probe atılır. Sürekli polling yapılmaz; yalnızca ağ geçişlerinde, kullanıcı tekrar dene butonuna bastığında ve uygulama ön plana geldiğinde (`resumed`) 5 sn throttle ile kontrol edilir. Bağlantı veya zaman aşımı hatası haricinde HTTP yanıtı (404 dahil) gelirse cihaz çevrimiçi kabul edilir.
+
 ## 7. Ekranlar
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.

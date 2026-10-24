@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -31,6 +32,7 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     String currentNickname,
   ) {
+    if (!ensureNetworkConnected(context, ref)) return;
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -48,6 +50,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _handleLinkGoogle(BuildContext context, WidgetRef ref) async {
+    if (!ensureNetworkConnected(context, ref)) return;
     final result = await ref.read(authNotifierProvider.notifier).linkGoogle();
 
     if (!context.mounted) return;
@@ -208,6 +211,7 @@ class ProfileScreen extends ConsumerWidget {
               backgroundColor: AppColors.danger,
               shadowColor: AppColors.dangerDark,
               onPressed: () async {
+                if (!ensureNetworkConnected(context, ref)) return;
                 Navigator.of(dialogContext).pop();
                 await _handleDeleteAccount(context, ref);
               },

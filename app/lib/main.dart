@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/icons/app_icons.dart';
+import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -38,17 +39,49 @@ Future<void> main() async {
   runApp(ProviderScope(child: KelimeVSApp(authError: authError)));
 }
 
-class KelimeVSApp extends StatelessWidget {
+class KelimeVSApp extends ConsumerWidget {
   final String? authError;
 
   const KelimeVSApp({super.key, this.authError});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final networkState = ref.watch(networkStatusProvider);
+    final isSuppressed = ref.watch(isOfflineBannerSuppressedProvider);
+    final showBanner =
+        networkState.status == NetworkStatus.offline && !isSuppressed;
+
     return MaterialApp(
       title: 'KelimeVS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      builder: (context, child) {
+        if (!showBanner) {
+          return child ?? const SizedBox.shrink();
+        }
+
+        // DESIGN.md 6b: Şerit içeriğin üstüne binmez, içeriği aşağı iter ve butonları kapatmaz
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          backgroundColor: AppColors.surface,
+          body: Column(
+            children: [
+              GlobalOfflineBanner(
+                isChecking: networkState.status == NetworkStatus.checking,
+                onRetry: () =>
+                    ref.read(networkStatusProvider.notifier).refresh(),
+              ),
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeTop: true,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
       home: MainShell(initialAuthError: authError),
     );
   }
@@ -81,6 +114,7 @@ class _MainShellState extends ConsumerState<MainShell>
   String? _authError;
   StreamSubscription<User?>? _authSubscription;
   bool _hasVisitedLeaderboard = false;
+  bool _hasInitialOnline = false;
 
   @override
   void initState() {
@@ -96,6 +130,7 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      ref.read(networkStatusProvider.notifier).onAppResumed();
       _reconcilePendingMatches();
       ref.read(profileProvider.notifier).retryPendingNicknameSync();
     }
@@ -111,7 +146,7 @@ class _MainShellState extends ConsumerState<MainShell>
         if (FirebaseAuth.instance.currentUser == null && _authError == null) {
           await FirebaseAuth.instance.signInAnonymously();
         }
-        _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+        _authSubscription ??= FirebaseAuth.instance.authStateChanges().listen((
           _,
         ) {
           if (mounted) setState(() {});
@@ -124,6 +159,21 @@ class _MainShellState extends ConsumerState<MainShell>
         });
       }
     }
+  }
+
+  Future<void> _retryStartupSequence() async {
+    _authError = null;
+    await _initAuth();
+    if (mounted) {
+      ref.read(profileProvider.notifier).syncWithServer();
+      ref.read(matchReconcilerProvider).reconcile();
+    }
+  }
+
+  void _onNetworkRestored() {
+    ref.read(profileProvider.notifier).syncWithServer();
+    ref.invalidate(leaderboardNotifierProvider);
+    ref.read(matchReconcilerProvider).reconcile();
   }
 
   @override
@@ -142,6 +192,33 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   Widget build(BuildContext context) {
+    final networkState = ref.watch(networkStatusProvider);
+
+    // Ağ bağlantısı değişimlerini dinle
+    ref.listen<NetworkState>(networkStatusProvider, (prev, next) {
+      if (next.status == NetworkStatus.online) {
+        if (!_hasInitialOnline) {
+          setState(() {
+            _hasInitialOnline = true;
+          });
+          _retryStartupSequence();
+        } else if (prev?.status == NetworkStatus.offline) {
+          _onNetworkRestored();
+        }
+      }
+    });
+
+    if (networkState.status == NetworkStatus.online && !_hasInitialOnline) {
+      _hasInitialOnline = true;
+    }
+
+    // DESIGN.md 6b: Açılışta internet yoksa tam ekran OfflineSplashScreen
+    if (!_hasInitialOnline && networkState.status == NetworkStatus.offline) {
+      return OfflineSplashScreen(
+        isChecking: networkState.status == NetworkStatus.checking,
+        onRetry: () => ref.read(networkStatusProvider.notifier).refresh(),
+      );
+    }
     final profile = ref.watch(profileProvider);
     if (!profile.isLoaded) {
       return const Scaffold(

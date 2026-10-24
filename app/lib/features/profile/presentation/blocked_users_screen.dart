@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -134,6 +135,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                         user: user,
                         formattedDate: _formatDate(user.blockedAt),
                         onUnblock: () async {
+                          if (!ensureNetworkConnected(context, ref)) return;
                           final success = await ref
                               .read(blockedUsersProvider.notifier)
                               .unblock(user.id);

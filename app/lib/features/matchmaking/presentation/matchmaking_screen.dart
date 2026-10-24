@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/icons/app_icons.dart';
+import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -76,10 +77,17 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   Timer? _transitionTimer;
   Timer? _dotsTimer;
   int _activeDotIndex = 0;
+  late final BannerSuppressionNotifier _suppressionNotifier;
 
   @override
   void initState() {
     super.initState();
+    _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _suppressionNotifier.suppress();
+      }
+    });
     final rng = widget.random ?? math.Random();
     _fallbackOpponentName =
         widget.initialOpponentName ??
@@ -275,6 +283,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
   @override
   void dispose() {
+    _suppressionNotifier.unsuppress();
     _cancelAllTimers();
     if (!_isOpponentFound) {
       _cancelMatchmakingClient();

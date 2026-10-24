@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/icons/app_icons.dart';
+import '../../../../core/network/network_guard.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
@@ -114,6 +115,8 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
       _showSnackBar(AppStrings.insufficientCoins);
       return;
     }
+
+    if (!ensureNetworkConnected(context, ref)) return;
 
     final res = await ref
         .read(storeNotifierProvider.notifier)
