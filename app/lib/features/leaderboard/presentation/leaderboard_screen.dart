@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,6 +22,7 @@ class LeaderboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leaderboardAsync = ref.watch(leaderboardNotifierProvider);
+    final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
       key: const Key('leaderboard_screen'),
@@ -30,20 +32,22 @@ class LeaderboardScreen extends ConsumerWidget {
           children: [
             const SizedBox(height: AppDimens.space12),
 
-            // 1. Üst Çubuk: Geri butonu, Başlık ve Kalan Süre Rozeti
+            // 1. Üst Çubuk: Geri butonu (yalnızca canPop ise), Başlık ve Kalan Süre Rozeti
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimens.screenPaddingHorizontal,
               ),
               child: Row(
                 children: [
-                  AppIconButton(
-                    key: const Key('leaderboard_back_button'),
-                    icon: AppIcons.back,
-                    semanticLabel: AppStrings.back,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                  const SizedBox(width: AppDimens.space12),
+                  if (canPop) ...[
+                    AppIconButton(
+                      key: const Key('leaderboard_back_button'),
+                      icon: AppIcons.back,
+                      semanticLabel: AppStrings.back,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: AppDimens.space12),
+                  ],
                   const Expanded(
                     child: Text(
                       AppStrings.leaderboardTitle,
@@ -55,7 +59,9 @@ class LeaderboardScreen extends ConsumerWidget {
                   // Kalan Süre Rozeti (Pazartesi 00:00'a kadar)
                   leaderboardAsync.maybeWhen(
                     data: (data) => _CountdownPill(data: data),
-                    orElse: () => const SizedBox.shrink(),
+                    orElse: () => leaderboardAsync.value != null
+                        ? _CountdownPill(data: leaderboardAsync.value!)
+                        : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -65,92 +71,230 @@ class LeaderboardScreen extends ConsumerWidget {
 
             // 2. Ana Gövde (Durumlara göre)
             Expanded(
-              child: leaderboardAsync.when(
-                loading: () => const Center(
-                  key: Key('leaderboard_loading'),
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-                error: (error, _) => _ErrorView(
-                  onRetry: () => ref
-                      .read(leaderboardNotifierProvider.notifier)
-                      .refresh(),
-                ),
-                data: (data) {
-                  if (data.top.isEmpty) {
-                    return _EmptyView(
-                      onPlay: () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => const MatchmakingScreen(),
-                          ),
-                        );
-                      },
-                    );
-                  }
-
-                  final isMeInTop = data.top.any((entry) => entry.isMe);
-                  final showStickyMe = data.me != null && !isMeInTop;
-
-                  return Stack(
-                    children: [
-                      // Kaydırılabilir Sıralama Listesi
-                      RefreshIndicator(
-                        color: AppColors.primary,
-                        onRefresh: () => ref
-                            .read(leaderboardNotifierProvider.notifier)
-                            .refresh(),
-                        child: ListView.separated(
-                          key: const Key('leaderboard_list'),
-                          padding: EdgeInsets.only(
-                            left: AppDimens.screenPaddingHorizontal,
-                            right: AppDimens.screenPaddingHorizontal,
-                            top: AppDimens.space8,
-                            bottom: showStickyMe
-                                ? 88.0
-                                : AppDimens.screenPaddingHorizontal,
-                          ),
-                          itemCount: data.top.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: AppDimens.space10),
-                          itemBuilder: (context, index) {
-                            final entry = data.top[index];
-                            return _LeaderboardItemCard(
-                              key: Key('leaderboard_item_${entry.rank}'),
-                              entry: entry,
-                            );
-                          },
-                        ),
-                      ),
-
-                      // İlk 50 dışındaki oyuncu için alt yapışkan "Senin Sıran" çubuğu
-                      if (showStickyMe)
-                        Positioned(
-                          left: AppDimens.screenPaddingHorizontal,
-                          right: AppDimens.screenPaddingHorizontal,
-                          bottom: AppDimens.space12,
-                          child: _StickyMeBar(me: data.me!),
-                        ),
-                    ],
-                  );
-                },
-              ),
+              child: _buildBody(context, ref, leaderboardAsync),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildBody(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<LeaderboardData> leaderboardAsync,
+  ) {
+    // 1. İlk yükleme durumları (henüz hafızada hiç veri yokken)
+    if (!leaderboardAsync.hasValue) {
+      if (leaderboardAsync.isLoading) {
+        return const Center(
+          key: Key('leaderboard_loading'),
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      }
+      if (leaderboardAsync.hasError) {
+        return _ErrorView(
+          onRetry: () => ref
+              .read(leaderboardNotifierProvider.notifier)
+              .refresh(),
+        );
+      }
+      return const Center(
+        key: Key('leaderboard_loading'),
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    // 2. Veri mevcut (ilk yükleme tamamlanmış, sonraki ziyaret veya arka plan tazelemesi)
+    final data = leaderboardAsync.value!;
+
+    if (data.top.isEmpty) {
+      return _EmptyView(
+        onPlay: () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const MatchmakingScreen(),
+            ),
+          );
+        },
+      );
+    }
+
+    final isMeInTop = data.top.any((entry) => entry.isMe);
+    final showStickyMe = data.me != null && !isMeInTop;
+
+    final syncError = ref.watch(leaderboardSyncErrorProvider);
+    final hasSyncError = syncError != null;
+
+    return Stack(
+      children: [
+        // Kaydırılabilir Sıralama Listesi (yenileme anında liste korunur, çark gösterilmez)
+        RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => ref
+              .read(leaderboardNotifierProvider.notifier)
+              .refresh(),
+          child: ListView.separated(
+            key: const Key('leaderboard_list'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: AppDimens.screenPaddingHorizontal,
+              right: AppDimens.screenPaddingHorizontal,
+              top: AppDimens.space8,
+              bottom: showStickyMe
+                  ? 88.0
+                  : AppDimens.screenPaddingHorizontal,
+            ),
+            itemCount: data.top.length + (hasSyncError ? 1 : 0),
+            separatorBuilder: (_, index) =>
+                const SizedBox(height: AppDimens.space10),
+            itemBuilder: (context, index) {
+              if (hasSyncError) {
+                if (index == 0) {
+                  return _SyncErrorBanner(
+                    onRetry: () => ref
+                        .read(leaderboardNotifierProvider.notifier)
+                        .refresh(),
+                  );
+                }
+                final entry = data.top[index - 1];
+                return _LeaderboardItemCard(
+                  key: Key('leaderboard_item_${entry.rank}'),
+                  entry: entry,
+                );
+              }
+              final entry = data.top[index];
+              return _LeaderboardItemCard(
+                key: Key('leaderboard_item_${entry.rank}'),
+                entry: entry,
+              );
+            },
+          ),
+        ),
+
+        // İlk 50 dışındaki oyuncu için alt yapışkan "Senin Sıran" çubuğu
+        if (showStickyMe)
+          Positioned(
+            left: AppDimens.screenPaddingHorizontal,
+            right: AppDimens.screenPaddingHorizontal,
+            bottom: AppDimens.space12,
+            child: _StickyMeBar(me: data.me!),
+          ),
+      ],
+    );
+  }
+}
+
+/// Arka plan tazeleme başarısız olduğunda listenin üstünde beliren küçük uyarı şeridi
+class _SyncErrorBanner extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _SyncErrorBanner({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('leaderboard_sync_error_banner'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space12,
+        vertical: AppDimens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.dangerSurface,
+        borderRadius: AppDimens.borderRadiusListCard,
+        border: Border.all(
+          color: AppColors.dangerSoft,
+          width: AppDimens.borderThin,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 16,
+            color: AppColors.dangerText,
+          ),
+          const SizedBox(width: AppDimens.space8),
+          Expanded(
+            child: Text(
+              AppStrings.leaderboardError,
+              style: AppTextStyles.secondaryText.copyWith(
+                color: AppColors.dangerText,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onRetry,
+            child: Text(
+              AppStrings.retry,
+              style: AppTextStyles.secondaryText.copyWith(
+                color: AppColors.dangerText,
+                fontWeight: FontWeight.w800,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Kalan süreyi gösteren rozet (Pazartesi 00:00 Europe/Istanbul)
-class _CountdownPill extends StatelessWidget {
+class _CountdownPill extends StatefulWidget {
   final LeaderboardData data;
 
   const _CountdownPill({required this.data});
 
   @override
+  State<_CountdownPill> createState() => _CountdownPillState();
+}
+
+class _CountdownPillState extends State<_CountdownPill> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      // TickerMode kapalıysa (sekme görünür değilken) gereksiz yeniden çizim yapma
+      if (!TickerMode.valuesOf(context).enabled) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (mounted && TickerMode.valuesOf(context).enabled) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CountdownPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data.endsAt != widget.data.endsAt) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final remainingText = data.formatRemainingTime();
+    final remainingText = widget.data.formatRemainingTime();
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -459,7 +603,7 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
-/// Hata durumu görünümü
+/// Hata durumu görünümü (yalnızca ilk yüklemede veri yokken)
 class _ErrorView extends StatelessWidget {
   final VoidCallback onRetry;
 

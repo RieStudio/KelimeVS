@@ -26,7 +26,6 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/presentation/profile_screen.dart';
-import '../../leaderboard/presentation/leaderboard_screen.dart';
 import '../../store/application/store_notifier.dart';
 import '../../store/domain/models/store_item.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
@@ -122,17 +121,13 @@ class HomeScreen extends ConsumerWidget {
 
                   const SizedBox(width: AppDimens.space8),
 
-                  // Sıralama (Kupa) İkon Butonu
+                  // Sıralama (Kupa) İkon Butonu: Sekme 1'e geçiş
                   AppIconButton(
                     key: const Key('leaderboard_button'),
                     icon: AppIcons.trophy,
                     semanticLabel: AppStrings.leaderboard,
                     onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const LeaderboardScreen(),
-                        ),
-                      );
+                      ref.read(bottomNavIndexProvider.notifier).setIndex(1);
                     },
                   ),
 

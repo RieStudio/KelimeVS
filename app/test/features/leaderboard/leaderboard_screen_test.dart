@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,12 +13,16 @@ class FakeLeaderboardApiClient implements LeaderboardApiClient {
   LeaderboardData? dataToReturn;
   Object? errorToThrow;
   int fetchCallCount = 0;
+  Completer<LeaderboardData>? pendingCompleter;
 
   FakeLeaderboardApiClient({this.dataToReturn, this.errorToThrow});
 
   @override
   Future<LeaderboardData> fetchLeaderboard() async {
     fetchCallCount++;
+    if (pendingCompleter != null) {
+      return pendingCompleter!.future;
+    }
     if (errorToThrow != null) throw errorToThrow!;
     return dataToReturn ??
         const LeaderboardData(
@@ -145,6 +150,183 @@ void main() {
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
       expect(find.text('Senin sıran: #74 (3 galibiyet)'), findsOneWidget);
     });
+
+    testWidgets('5. Sekme modunda (canPop == false) geri butonu gizlidir',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'Oyuncu1', wins: 10, isMe: false),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+      await tester.pumpAndSettle();
+
+      // canPop false olduğundan geri butonu olmamalıdır
+      expect(find.byKey(const Key('leaderboard_back_button')), findsNothing);
+    });
+
+    testWidgets('6. Navigator.push ile açıldığında (canPop == true) geri butonu görünür ve pop eder',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'Oyuncu1', wins: 10, isMe: false),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            leaderboardApiClientProvider.overrideWithValue(fakeClient),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+                    );
+                  },
+                  child: const Text('Aç'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Push et
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      // Geri butonu görünür olmalı
+      final backButton = find.byKey(const Key('leaderboard_back_button'));
+      expect(backButton, findsOneWidget);
+
+      // Dokununca pop etmeli
+      await tester.tap(backButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aç'), findsOneWidget);
+      expect(find.byType(LeaderboardScreen), findsNothing);
+    });
+
+    testWidgets('7. Tazelemede (refresh) liste çarka dönmez, eski veri ekranda kalır',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'EskiLider', wins: 10, isMe: false),
+          ],
+        ),
+      );
+
+      late WidgetRef savedRef;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            leaderboardApiClientProvider.overrideWithValue(fakeClient),
+          ],
+          child: MaterialApp(
+            home: Consumer(
+              builder: (context, ref, _) {
+                savedRef = ref;
+                return const LeaderboardScreen();
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('EskiLider'), findsOneWidget);
+
+      // İkinci istek beklemede kalsın (async in-flight)
+      final completer = Completer<LeaderboardData>();
+      fakeClient.pendingCompleter = completer;
+
+      // Arka plan yenilemesini tetikle
+      unawaited(savedRef.read(leaderboardNotifierProvider.notifier).refresh());
+      await tester.pump();
+
+      // Yükleme çarkı çıkmamalı, liste ve eski veri ekranda kalmalı
+      expect(find.byKey(const Key('leaderboard_loading')), findsNothing);
+      expect(find.byKey(const Key('leaderboard_list')), findsOneWidget);
+      expect(find.text('EskiLider'), findsOneWidget);
+
+      // Yanıt gelsin
+      completer.complete(
+        const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'YeniLider', wins: 15, isMe: false),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('YeniLider'), findsOneWidget);
+    });
+
+    testWidgets('8. Arka plan tazelemesi hata verirse eski liste kalır ve küçük uyarı gösterilir',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'MevcutOyuncu', wins: 8, isMe: false),
+          ],
+        ),
+      );
+
+      late WidgetRef savedRef;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            leaderboardApiClientProvider.overrideWithValue(fakeClient),
+          ],
+          child: MaterialApp(
+            home: Consumer(
+              builder: (context, ref, _) {
+                savedRef = ref;
+                return const LeaderboardScreen();
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('MevcutOyuncu'), findsOneWidget);
+
+      // Hata döndür
+      fakeClient.errorToThrow = Exception('Ağ koptu');
+      await savedRef.read(leaderboardNotifierProvider.notifier).refresh();
+      await tester.pumpAndSettle();
+
+      // Tam ekran hata sayfasına düşmemeli, liste korunmalı
+      expect(find.byKey(const Key('leaderboard_error')), findsNothing);
+      expect(find.byKey(const Key('leaderboard_list')), findsOneWidget);
+      expect(find.text('MevcutOyuncu'), findsOneWidget);
+
+      // Küçük senkronizasyon uyarı şeridi çıkmalı
+      expect(find.byKey(const Key('leaderboard_sync_error_banner')), findsOneWidget);
+    });
   });
 }
-

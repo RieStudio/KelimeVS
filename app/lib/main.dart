@@ -8,11 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/icons/app_icons.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
-import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/app_widgets.dart';
 import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
+import 'features/leaderboard/application/leaderboard_providers.dart';
+import 'features/leaderboard/presentation/leaderboard_screen.dart';
 import 'features/profile/application/profile_notifier.dart';
 import 'features/profile/presentation/onboarding_nickname_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
@@ -79,6 +80,7 @@ class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
   String? _authError;
   StreamSubscription<User?>? _authSubscription;
+  bool _hasVisitedLeaderboard = false;
 
   @override
   void initState() {
@@ -152,7 +154,16 @@ class _MainShellState extends ConsumerState<MainShell>
       return const OnboardingNicknameScreen();
     }
 
+    ref.listen<int>(bottomNavIndexProvider, (prev, next) {
+      if (next == 1 && _hasVisitedLeaderboard) {
+        ref.read(leaderboardNotifierProvider.notifier).refresh();
+      }
+    });
+
     final currentIndex = ref.watch(bottomNavIndexProvider);
+    if (currentIndex == 1 && !_hasVisitedLeaderboard) {
+      _hasVisitedLeaderboard = true;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -160,7 +171,11 @@ class _MainShellState extends ConsumerState<MainShell>
         index: currentIndex,
         children: [
           const HomeScreen(),
-          const _TabPlaceholder(title: AppStrings.navLeaderboard),
+          _hasVisitedLeaderboard
+              ? const LeaderboardScreen()
+              : const SizedBox.shrink(
+                  key: Key('leaderboard_unvisited_placeholder'),
+                ),
           const StoreScreen(),
           const ProfileScreen(),
         ],
@@ -168,25 +183,13 @@ class _MainShellState extends ConsumerState<MainShell>
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: currentIndex,
         onTap: (index) {
+          if (index == 1 && currentIndex == 1 && _hasVisitedLeaderboard) {
+            ref.read(leaderboardNotifierProvider.notifier).refresh();
+          }
           ref.read(bottomNavIndexProvider.notifier).setIndex(index);
         },
         items: _navItems,
       ),
-    );
-  }
-}
-
-class _TabPlaceholder extends StatelessWidget {
-  final String title;
-
-  const _TabPlaceholder({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(title: Text(title, style: AppTextStyles.screenTitle)),
-      body: Center(child: Text(title, style: AppTextStyles.cardTitle)),
     );
   }
 }
