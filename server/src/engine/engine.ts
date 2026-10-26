@@ -274,6 +274,7 @@ export abstract class MatchEngine {
           rawInput,
           resultType: 'correct',
           answerId: matchResult.answer.id,
+          displayText: matchResult.answer.display,
           nowMs,
           isClose: false,
           hintShown: false,

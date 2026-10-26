@@ -131,7 +131,7 @@ export function filterStateForPlayer(params: {
 
   const clientAttempts: ClientAttempt[] = filteredAttempts.map((a) => ({
     mine: a.playerId === playerUid,
-    text: a.rawInput,
+    text: a.displayText ?? a.rawInput,
     result: a.resultType,
     ...(a.hintShown ? { hintShown: true } : {}),
   }));
@@ -205,7 +205,7 @@ export function buildFinalMessage(params: {
     questionId: r.questionId,
     attempts: r.attempts.map((a) => ({
       mine: a.playerId === playerUid,
-      text: a.rawInput,
+      text: a.displayText ?? a.rawInput,
       result: a.resultType,
       ...(a.hintShown ? { hintShown: true } : {}),
     })),

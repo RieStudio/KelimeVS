@@ -575,7 +575,10 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
   }) {
     final isMe = attempt.playerId == 'me';
     final isRejected = attempt.resultType != AttemptResultType.correct;
-    final sanitizedInput = AttemptTextSanitizer.sanitize(attempt.rawInput);
+    final textSource = attempt.resultType == AttemptResultType.correct
+        ? (attempt.displayText ?? attempt.rawInput)
+        : attempt.rawInput;
+    final sanitizedInput = AttemptTextSanitizer.sanitize(textSource);
     final displayText = isMe ? sanitizedInput : textFilter.apply(sanitizedInput);
 
     // Sadece kendi reddedilen ve boş olmayan cevaplarıma dokununca seçim aktifleşir

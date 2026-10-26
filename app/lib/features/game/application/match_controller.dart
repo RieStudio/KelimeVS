@@ -295,11 +295,11 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
           .where((att) => att.resultType != AttemptResultType.timeout)
           .map((att) {
         String text;
-        if (att.resultType == AttemptResultType.correct && att.answerId != null) {
+        if (att.resultType == AttemptResultType.correct) {
           final matched = nextState.currentQuestion?.answers
               .where((a) => a.id == att.answerId)
               .firstOrNull;
-          text = matched?.display ?? att.rawInput;
+          text = att.displayText ?? matched?.display ?? att.rawInput;
         } else {
           text = att.rawInput;
         }

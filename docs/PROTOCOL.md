@@ -288,7 +288,7 @@ Her hamle, tur geçişi veya durum değişikliğinde (veya `sync` istendiğinde)
 - `turnIsMine`: Sıranın bu istemcide olup olmadığı.
 - `deadlineMs`: Sıradaki oyuncunun hamle yapması gereken son zaman (Unix ms).
 - `myHintsLeft`: Oyuncunun bu tur kalan "çok yakın" ipucu hakkı (başlangıçta 1).
-- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik ve görünürlük kurallarına göre filtrelenmiş; aktif turda tekrarlanan cevaplar dahil edilmez).
+- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik ve görünürlük kurallarına göre filtrelenmiş; aktif turda tekrarlanan cevaplar dahil edilmez). Doğru (`correct`) kabul edilen denemelerde `text` alanı eşleşen ana cevabı (`answer.display`) taşır; böylece kullanıcı alias (ör. `"bjk"`) yazsa bile chat balonunda ana cevap (ör. `"Beşiktaş"`) görünür. Yanlış (`wrong`) denemelerde `text` kullanıcının girdiği ham metni korur.
 - `opponentConnected`: Rakibin bağlantısının aktif olup olmadığı (`false` ise bağlantı koptu ve geri dönüş sayacı çalışıyor).
 - `nextRoundAtMs`: Tur arası geçişte bir sonraki turun başlama zamanı.
 

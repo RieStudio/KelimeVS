@@ -65,6 +65,8 @@ abstract final class OnlineMatchHistoryMapper {
       rawInput: attempt.text,
       resultType: resultType,
       answerId: null,
+      displayText: attempt.displayText ??
+          (resultType == AttemptResultType.correct ? attempt.text : null),
       nowMs: 0,
       isClose: attempt.result == 'nearMiss' || attempt.hintShown,
       hintShown: attempt.hintShown,
@@ -365,7 +367,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     // Sunucu visibleAttempts kurallarını zaten uyguladığı için yeniden filtreleme yapılmaz;
     // yalnızca görüntü metin temizliği uygulanır.
     final roundAttempts = onlineState.attempts.map((a) {
-      var cleanText = AttemptTextSanitizer.sanitize(a.text);
+      final textSource = a.displayText ?? a.text;
+      var cleanText = AttemptTextSanitizer.sanitize(textSource);
       if (!a.mine) {
         cleanText = _textFilter.apply(cleanText);
       }
@@ -381,7 +384,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final acceptedAnswers = onlineState.attempts
         .where((a) => a.result == 'correct')
         .map((a) {
-          var cleanText = AttemptTextSanitizer.sanitize(a.text);
+          final textSource = a.displayText ?? a.text;
+          var cleanText = AttemptTextSanitizer.sanitize(textSource);
           if (!a.mine) {
             cleanText = _textFilter.apply(cleanText);
           }

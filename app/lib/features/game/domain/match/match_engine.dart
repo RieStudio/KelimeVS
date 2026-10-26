@@ -145,6 +145,7 @@ abstract final class MatchEngine {
           rawInput: rawInput,
           resultType: AttemptResultType.correct,
           answerId: answer.id,
+          displayText: answer.display,
           nowMs: nowMs,
         );
 

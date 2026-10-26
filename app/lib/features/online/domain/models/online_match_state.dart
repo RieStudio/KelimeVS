@@ -27,12 +27,14 @@ class OnlineAttempt {
   final String text;
   final String result; // 'correct', 'repeated', 'wrong', 'nearMiss', 'timeout'
   final bool hintShown;
+  final String? displayText;
 
   const OnlineAttempt({
     required this.mine,
     required this.text,
     required this.result,
     this.hintShown = false,
+    this.displayText,
   });
 
   factory OnlineAttempt.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class OnlineAttempt {
       text: json['text'] as String? ?? '',
       result: json['result'] as String? ?? 'wrong',
       hintShown: json['hintShown'] as bool? ?? false,
+      displayText: json['displayText'] as String?,
     );
   }
 
@@ -49,6 +52,7 @@ class OnlineAttempt {
     'text': text,
     'result': result,
     if (hintShown) 'hintShown': true,
+    if (displayText != null) 'displayText': displayText,
   };
 }
 

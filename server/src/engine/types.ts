@@ -16,6 +16,7 @@ export interface TurnAttempt {
   readonly rawInput: string;
   readonly resultType: AttemptResultType;
   readonly answerId?: string;
+  readonly displayText?: string;
   readonly nowMs: number;
   readonly isClose: boolean;
   readonly hintShown: boolean;

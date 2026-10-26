@@ -890,5 +890,97 @@ void main() {
         container.dispose();
       });
     });
+
+    test('Alias ile verilen doğru cevap roundAttempts içinde ana cevap (answer.display) olarak gösterilir, yanlış cevap yazıldığı gibi kalır, alias sonrası tekrar girişler gizlenir', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1500,
+                thinkMaxMs: 1500,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
+              ),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+                nearMissPerRound: 1,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        final customQ = Question(
+          id: 'q_teams',
+          categoryId: 'futbol',
+          text: 'Futbol Takımları',
+          answers: const [
+            Answer(id: 'besiktas', display: 'Beşiktaş', aliases: ['besiktas', 'bjk']),
+            Answer(id: 'galatasaray', display: 'Galatasaray', aliases: ['galatasaray', 'gs']),
+            Answer(id: 'fenerbahce', display: 'Fenerbahçe', aliases: ['fenerbahce', 'fb']),
+          ],
+        );
+        controller.startMatch(questions: [customQ], opponentName: 'TestBot');
+
+        var state = container.read(matchControllerProvider);
+
+        // 1. Yanlış cevap girildiğinde balon kullanıcının yazdığı metni korumalıdır
+        controller.submit('yanlis_takim');
+        state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 1);
+        expect(state.roundAttempts.first.text, 'yanlis_takim');
+        expect(state.roundAttempts.first.isCorrect, isFalse);
+
+        // Cooldown süresi kadar ilerlet
+        async.elapse(const Duration(milliseconds: 600));
+
+        // 2. Alias ile doğru cevap ("bjk") girildiğinde displayText ("Beşiktaş") gösterilmelidir
+        controller.submit('bjk');
+        state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 2);
+        final correctAttempt = state.roundAttempts.last;
+        expect(correctAttempt.isCorrect, isTrue);
+        expect(correctAttempt.text, 'Beşiktaş');
+
+        // Sıra bota geçti
+        expect(state.matchState!.turnPlayerId, 'bot');
+
+        // Bot 1500 ms sonra kalan cevaplardan birini ("Galatasaray" veya "Fenerbahçe") verir
+        async.elapse(const Duration(milliseconds: 1500));
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.turnPlayerId, 'me');
+        expect(state.roundAttempts.length, 3);
+        final botAttempt = state.roundAttempts.last;
+        expect(botAttempt.isCorrect, isTrue);
+
+        // 3. Kullanıcı kendi daha önce verdiği cevabın ana yazımını ("Beşiktaş") tekrar yazar
+        controller.submit('Beşiktaş');
+        state = container.read(matchControllerProvider);
+
+        // Doğrulama: Geri bildirim alreadySaid tetiklendi
+        expect(state.lastFeedback, MatchFeedbackType.alreadySaid);
+        // Doğrulama: Tekrarlanan cevap aktif turda roundAttempts listesine eklenmez (uzunluk 3 kalır)
+        expect(state.roundAttempts.length, 3);
+        expect(state.displayAttempts.length, 3);
+        expect(state.roundAttempts.any((a) => a.isRepeated), isFalse);
+
+        // Cooldown sonrası başka bir alias ("besiktas") ile tekrar denenirse de gizli kalmalı
+        async.elapse(const Duration(milliseconds: 600));
+        controller.submit('besiktas');
+        state = container.read(matchControllerProvider);
+        expect(state.lastFeedback, MatchFeedbackType.alreadySaid);
+        expect(state.roundAttempts.length, 3);
+
+        container.dispose();
+      });
+    });
   });
 }

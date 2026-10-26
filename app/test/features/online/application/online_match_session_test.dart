@@ -1191,6 +1191,81 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
+
+  test(
+    'OnlineMatchSession displayText testi: doğru cevapta displayText, yanlış cevapta text kullanılır, geriye dönük displayText yoksa text fallback olur',
+    () async {
+      final client = FakeOnlineMatchClient();
+      final container = ProviderContainer(
+        overrides: [
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_alias_test',
+        opponentName: 'Ahmet',
+      );
+
+      // Sunucudan state mesajı gelir:
+      // 1. Doğru cevap: displayText = "Beşiktaş", text = "Beşiktaş"
+      // 2. Doğru cevap (eski sunucu fallback): displayText = null, text = "Fenerbahçe"
+      // 3. Yanlış cevap: displayText = null, text = "yanlis_girdi"
+      final onlineState = OnlineMatchState(
+        serverNowMs: 50000,
+        receivedLocalMs: 10000,
+        phase: OnlineMatchPhase.roundActive,
+        roundNumber: 1,
+        myScore: 0,
+        opponentScore: 0,
+        question: const OnlineQuestion(
+          id: 'q_futbol',
+          text: 'Futbol Takımları',
+        ),
+        turnIsMine: true,
+        deadlineMs: 65000,
+        myHintsLeft: 1,
+        attempts: const [
+          OnlineAttempt(
+            mine: true,
+            text: 'Beşiktaş',
+            displayText: 'Beşiktaş',
+            result: 'correct',
+          ),
+          OnlineAttempt(
+            mine: false,
+            text: 'Fenerbahçe',
+            displayText: null,
+            result: 'correct',
+          ),
+          OnlineAttempt(
+            mine: true,
+            text: 'yanlis_girdi',
+            displayText: null,
+            result: 'wrong',
+          ),
+        ],
+        opponentName: 'Ahmet',
+        opponentConnected: true,
+      );
+
+      client.emit(OnlineMatchStateUpdate(onlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(onlineMatchSessionProvider);
+      expect(state.roundAttempts.length, 3);
+      expect(state.roundAttempts[0].text, 'Beşiktaş');
+      expect(state.roundAttempts[0].isCorrect, isTrue);
+
+      expect(state.roundAttempts[1].text, 'Fenerbahçe');
+      expect(state.roundAttempts[1].isCorrect, isTrue);
+
+      expect(state.roundAttempts[2].text, 'yanlis_girdi');
+      expect(state.roundAttempts[2].isCorrect, isFalse);
+    },
+  );
 }
 
 

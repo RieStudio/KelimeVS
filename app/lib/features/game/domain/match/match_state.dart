@@ -23,6 +23,7 @@ class TurnAttempt {
   final String rawInput;
   final AttemptResultType resultType;
   final String? answerId;
+  final String? displayText;
   final int nowMs;
   final bool isClose;
   final bool hintShown;
@@ -32,6 +33,7 @@ class TurnAttempt {
     required this.rawInput,
     required this.resultType,
     this.answerId,
+    this.displayText,
     required this.nowMs,
     this.isClose = false,
     this.hintShown = false,
