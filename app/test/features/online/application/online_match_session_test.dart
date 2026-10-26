@@ -259,6 +259,67 @@ void main() {
   );
 
   test(
+    '2b. Aktif turda gelen repeated denemeler displayAttempts içinde filtrelenir; feedback: alreadySaid uyarısı çalışır',
+    () async {
+      final clock = FakeManualClock(10000);
+      final repo = FakeHistoryRepo();
+      final client = FakeOnlineMatchClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          gameClockProvider.overrideWithValue(clock),
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(matchId: 'm_rep', opponentName: 'Zeynep');
+
+      // Aktif tur state'i: bir correct, bir wrong, bir repeated attempt içeriyor (eski sunucu ya da senkronizasyon)
+      final stateWithRepeated = OnlineMatchState(
+        serverNowMs: 50000,
+        receivedLocalMs: 10000,
+        phase: OnlineMatchPhase.roundActive,
+        roundNumber: 1,
+        myScore: 0,
+        opponentScore: 0,
+        question: const OnlineQuestion(id: 'q1', text: 'Meyveler'),
+        turnIsMine: true,
+        deadlineMs: 65000,
+        myHintsLeft: 1,
+        attempts: const [
+          OnlineAttempt(mine: true, text: 'elma', result: 'correct'),
+          OnlineAttempt(mine: false, text: 'yanlis', result: 'wrong'),
+          OnlineAttempt(mine: true, text: 'elma', result: 'repeated'),
+        ],
+        opponentName: 'Zeynep',
+        opponentConnected: true,
+      );
+
+      client.emit(OnlineMatchStateUpdate(stateWithRepeated));
+
+      var uiState = container.read(onlineMatchSessionProvider);
+      expect(uiState.isRoundActive, isTrue);
+
+      // Doğrulama: displayAttempts içinde repeated elenir; correct ve wrong kalır
+      expect(uiState.displayAttempts.length, 2);
+      expect(uiState.displayAttempts[0].text, 'elma');
+      expect(uiState.displayAttempts[0].isCorrect, isTrue);
+      expect(uiState.displayAttempts[1].text, 'yanlis');
+      expect(uiState.displayAttempts[1].isCorrect, isFalse);
+
+      // Doğrulama: alreadySaid feedback'i kutu uyarısı için feedbackCounter artırır
+      client.emit(const OnlineMatchFeedback(kind: 'alreadySaid'));
+      uiState = container.read(onlineMatchSessionProvider);
+      expect(uiState.lastFeedback, MatchFeedbackType.alreadySaid);
+      expect(uiState.feedbackCounter, 1);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  test(
     '3. Tur sonu (roundEnded): lastRound ve nextRoundAtMs ile geri sayım hesaplanır',
     () async {
       final clock = FakeManualClock(20000);

@@ -288,7 +288,7 @@ Her hamle, tur geçişi veya durum değişikliğinde (veya `sync` istendiğinde)
 - `turnIsMine`: Sıranın bu istemcide olup olmadığı.
 - `deadlineMs`: Sıradaki oyuncunun hamle yapması gereken son zaman (Unix ms).
 - `myHintsLeft`: Oyuncunun bu tur kalan "çok yakın" ipucu hakkı (başlangıçta 1).
-- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik kurallarına göre filtrelenmiş).
+- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik ve görünürlük kurallarına göre filtrelenmiş; aktif turda tekrarlanan cevaplar dahil edilmez).
 - `opponentConnected`: Rakibin bağlantısının aktif olup olmadığı (`false` ise bağlantı koptu ve geri dönüş sayacı çalışıyor).
 - `nextRoundAtMs`: Tur arası geçişte bir sonraki turun başlama zamanı.
 
@@ -372,14 +372,20 @@ Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
 
 ---
 
-## 4. Yakın Deneme Gizlilik Kuralları (Near-Miss Secrecy)
+## 4. Deneme Görünürlük ve Gizlilik Kuralları (Attempt Visibility)
 
-- **Aktif Tur Sırasında (`roundActive`):**
-  - Henüz söylenmemiş bir cevaba yakın olan tüm yanlış denemeler (`isClose === true`), tur bitene kadar **yalnızca sahibine** gösterilir.
-  - İpucu verilmişse (`hintShown === true`): Balon olarak gizlenir, sadece sahibine "Çok yakın!" ipucu kutusu görünür.
-  - İpucu hakkı bittiği için ipucu verilmemişse (`hintShown === false`): Sahibine normal kırmızı yanlış balon görünür, rakibe **hiç gösterilmez** (rakibin ipucu / kopya alması engellenir).
-- **Tur Bittikten Sonra ve Maç Detayında:**
-  - Tüm denemeler her iki oyuncuya da açıkça görünür.
+- **Tekrarlanan Cevaplar (`repeated` / `alreadySaid`):**
+  - Kendisinin veya rakibin daha önce verdiği bir cevabı tekrar yazan oyuncuya `{ "t": "feedback", "kind": "alreadySaid" }` iletilir.
+  - Aktif tur sırasında (`roundActive: true`) tekrarlanan cevaplar `state.attempts` listesine eklenmez; böylece chat akışına balon olarak girmez.
+  - Tur bittikten sonra (`roundEnded`) ve maç detayında (`final.rounds`) ham deneme kaydı korunur.
+
+- **Yakın Deneme Gizlilik Kuralları (Near-Miss Secrecy):**
+  - **Aktif Tur Sırasında (`roundActive`):**
+    - Henüz söylenmemiş bir cevaba yakın olan tüm yanlış denemeler (`isClose === true`), tur bitene kadar **yalnızca sahibine** gösterilir.
+    - İpucu verilmişse (`hintShown === true`): Balon olarak gizlenir, sadece sahibine "Çok yakın!" ipucu kutusu görünür.
+    - İpucu hakkı bittiği için ipucu verilmemişse (`hintShown === false`): Sahibine normal kırmızı yanlış balon görünür, rakibe **hiç gösterilmez** (rakibin ipucu / kopya alması engellenir).
+  - **Tur Bittikten Sonra ve Maç Detayında:**
+    - Tüm denemeler her iki oyuncuya da açıkça görünür.
 
 ---
 

@@ -29,12 +29,14 @@ class RoundAttemptUiModel {
   final String text;
   final bool isCorrect;
   final bool isClose;
+  final bool isRepeated;
 
   const RoundAttemptUiModel({
     required this.playerId,
     required this.text,
     required this.isCorrect,
     this.isClose = false,
+    this.isRepeated = false,
   });
 }
 
@@ -140,16 +142,19 @@ class MatchUiState {
       (matchState?.phase == MatchPhase.roundEnded) || isFinalReveal;
 
   List<RoundAttemptUiModel> get displayAttempts {
-    if (roundAttempts.isNotEmpty) {
-      return roundAttempts;
+    final list = roundAttempts.isNotEmpty
+        ? roundAttempts
+        : acceptedAnswers
+            .map((a) => RoundAttemptUiModel(
+                  playerId: a.playerId,
+                  text: a.display,
+                  isCorrect: true,
+                ))
+            .toList();
+    if (isRoundActive) {
+      return list.where((a) => !a.isRepeated).toList();
     }
-    return acceptedAnswers
-        .map((a) => RoundAttemptUiModel(
-              playerId: a.playerId,
-              text: a.display,
-              isCorrect: true,
-            ))
-        .toList();
+    return list;
   }
 
   MatchUiState copyWith({

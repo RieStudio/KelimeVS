@@ -55,6 +55,7 @@ class RoundRecord {
 }
 
 /// Saf fonksiyon: Tur aktifken (`roundActive == true`):
+/// - Tekrarlanan deneme (`resultType == AttemptResultType.repeated`): HERKESE gizlidir (ne rakip ne sahibi balon olarak görür).
 /// - İpucu verilen yakın deneme (`hintShown == true`): HERKESE gizlidir (ne rakip ne sahibi balon olarak görür).
 /// - İpucu verilmemiş yakın deneme (`isClose == true, hintShown == false`): rakibe gizlidir, sahibine normal kırmızı balon olarak görünür.
 /// - Yakın olmayan yanlış denemeler (`isClose == false`): herkese görünür.
@@ -68,6 +69,9 @@ List<TurnAttempt> visibleAttempts(
     return round.attempts;
   }
   return round.attempts.where((attempt) {
+    if (attempt.resultType == AttemptResultType.repeated) {
+      return false; // Tekrarlanan cevap aktif turda chat akışına girmez (herkese gizli)
+    }
     if (attempt.hintShown) {
       return false; // İpucu verilen yakın deneme aktif turda HERKESE gizli
     }

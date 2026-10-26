@@ -81,3 +81,83 @@ describe('visibleAttempts (shared test vectors)', () => {
   }
 });
 
+describe('visibleAttempts - repeated and wrong attempt visibility rules', () => {
+  const repeatedAttempt: TurnAttempt = {
+    playerId: 'p1',
+    rawInput: 'ankara',
+    resultType: 'repeated',
+    answerId: 'ans_ankara',
+    nowMs: 1000,
+    isClose: false,
+    hintShown: false,
+  };
+
+  const wrongAttempt: TurnAttempt = {
+    playerId: 'p1',
+    rawInput: 'yanliscevap',
+    resultType: 'wrong',
+    nowMs: 1200,
+    isClose: false,
+    hintShown: false,
+  };
+
+  const correctAttempt: TurnAttempt = {
+    playerId: 'p2',
+    rawInput: 'izmir',
+    resultType: 'correct',
+    answerId: 'ans_izmir',
+    nowMs: 2000,
+    isClose: false,
+    hintShown: false,
+  };
+
+  const round: RoundRecord = {
+    questionId: 'q_cities',
+    starterPlayerId: 'p1',
+    attempts: [repeatedAttempt, wrongAttempt, correctAttempt],
+    winnerId: null,
+    reason: 'timeout',
+  };
+
+  it('aktif turda repeated denemeler yazan oyuncuya da rakibe de gizlidir', () => {
+    const visibleForAuthor = visibleAttempts(round, 'p1', true);
+    const visibleForOpponent = visibleAttempts(round, 'p2', true);
+
+    expect(visibleForAuthor.some((a) => a.resultType === 'repeated')).toBe(false);
+    expect(visibleForOpponent.some((a) => a.resultType === 'repeated')).toBe(false);
+  });
+
+  it('aktif turda wrong (yanlış) denemeler kırmızı balon olarak iki oyuncuya da görünür kalır', () => {
+    const visibleForAuthor = visibleAttempts(round, 'p1', true);
+    const visibleForOpponent = visibleAttempts(round, 'p2', true);
+
+    expect(visibleForAuthor.some((a) => a.resultType === 'wrong')).toBe(true);
+    expect(visibleForOpponent.some((a) => a.resultType === 'wrong')).toBe(true);
+  });
+
+  it('aktif turda correct denemeler iki oyuncuya da görünür', () => {
+    const visibleForAuthor = visibleAttempts(round, 'p1', true);
+    const visibleForOpponent = visibleAttempts(round, 'p2', true);
+
+    expect(visibleForAuthor.some((a) => a.resultType === 'correct')).toBe(true);
+    expect(visibleForOpponent.some((a) => a.resultType === 'correct')).toBe(true);
+  });
+
+  it('tur bittiğinde (roundActive: false) ham kayıttaki repeated dahil tüm denemeler görünür', () => {
+    const visibleEndedForAuthor = visibleAttempts(round, 'p1', false);
+    const visibleEndedForOpponent = visibleAttempts(round, 'p2', false);
+
+    expect(visibleEndedForAuthor).toHaveLength(3);
+    expect(visibleEndedForOpponent).toHaveLength(3);
+    expect(visibleEndedForAuthor.some((a) => a.resultType === 'repeated')).toBe(true);
+    expect(visibleEndedForOpponent.some((a) => a.resultType === 'repeated')).toBe(true);
+  });
+
+  it('visibleAttempts ham round.attempts listesini mutasyona uğratmaz', () => {
+    const originalLength = round.attempts.length;
+    visibleAttempts(round, 'p1', true);
+    expect(round.attempts.length).toBe(originalLength);
+    expect(round.attempts[0].resultType).toBe('repeated');
+  });
+});
+

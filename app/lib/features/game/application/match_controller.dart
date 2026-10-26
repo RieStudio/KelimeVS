@@ -312,6 +312,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
           text: text,
           isCorrect: att.resultType == AttemptResultType.correct,
           isClose: att.isClose,
+          isRepeated: att.resultType == AttemptResultType.repeated,
         );
       }).toList();
     }

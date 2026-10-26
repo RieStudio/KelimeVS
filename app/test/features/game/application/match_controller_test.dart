@@ -625,6 +625,98 @@ void main() {
       });
     });
 
+    test('Tekrarlanan cevap (alreadySaid) aktif turda roundAttempts ve displayAttempts içine girmez, lastFeedback alreadySaid olur, ham motor kaydı korunur', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1500,
+                thinkMaxMs: 1500,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 0.0,
+              ),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                totalDecisiveRounds: 3,
+                minSubmitIntervalMs: 600,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+
+        var state = container.read(matchControllerProvider);
+        expect(state.isMyTurn, isTrue);
+
+        // 1. Kullanıcı kendi doğru cevabını verir ('elma')
+        controller.submit('elma');
+        state = container.read(matchControllerProvider);
+        expect(state.roundAttempts.length, 1);
+        expect(state.roundAttempts.last.text, 'elma');
+        expect(state.roundAttempts.last.isCorrect, isTrue);
+        expect(state.isMyTurn, isFalse);
+
+        // 2. Bot 1500 ms sonra kendi doğru cevabını verir
+        async.elapse(const Duration(milliseconds: 1500));
+        state = container.read(matchControllerProvider);
+        expect(state.isMyTurn, isTrue);
+        expect(state.roundAttempts.length, 2);
+        final botAnswerText = state.roundAttempts.last.text;
+
+        final currentVisibleCount = state.roundAttempts.length; // 2
+        final currentEngineCount = state.matchState!.currentRoundAttempts.length; // 2
+
+        // 3. Kullanıcı kendi daha önce verdiği cevabı ('elma') tekrar yazar
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('elma');
+        state = container.read(matchControllerProvider);
+
+        // Doğrulama: Geri bildirim tetiklendi
+        expect(state.lastFeedback, MatchFeedbackType.alreadySaid);
+        // Doğrulama: roundAttempts ve displayAttempts uzunluğu ARTMAZ (chat akışına girmez)
+        expect(state.roundAttempts.length, currentVisibleCount);
+        expect(state.displayAttempts.length, currentVisibleCount);
+        expect(state.roundAttempts.any((a) => a.isRepeated), isFalse);
+        // Doğrulama: Sıra ve süre korunur
+        expect(state.isMyTurn, isTrue);
+        // Doğrulama: Ham motor kaydında ise deneme saklanır
+        expect(state.matchState!.currentRoundAttempts.length, currentEngineCount + 1);
+        expect(state.matchState!.currentRoundAttempts.last.resultType, AttemptResultType.repeated);
+
+        // 4. Kullanıcı rakibin verdiği cevabı (botAnswerText) tekrar yazar
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit(botAnswerText);
+        state = container.read(matchControllerProvider);
+
+        expect(state.lastFeedback, MatchFeedbackType.alreadySaid);
+        expect(state.roundAttempts.length, currentVisibleCount);
+        expect(state.displayAttempts.length, currentVisibleCount);
+        expect(state.matchState!.currentRoundAttempts.length, currentEngineCount + 2);
+
+        // 5. Yanlış cevap yazıldığında ise kırmızı balon olarak eklenmeye devam eder
+        async.elapse(const Duration(milliseconds: 700));
+        controller.submit('tamamen_yanlis_cevap');
+        state = container.read(matchControllerProvider);
+
+        expect(state.lastFeedback, MatchFeedbackType.wrong);
+        expect(state.roundAttempts.length, currentVisibleCount + 1);
+        expect(state.displayAttempts.length, currentVisibleCount + 1);
+        expect(state.roundAttempts.last.isCorrect, isFalse);
+
+        container.dispose();
+      });
+    });
+
     test('Rakibin denemeleri TextFilter filtresinden geçirilir', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);

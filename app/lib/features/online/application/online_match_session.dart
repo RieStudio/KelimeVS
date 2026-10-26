@@ -374,6 +374,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         text: cleanText,
         isCorrect: a.result == 'correct',
         isClose: a.result == 'nearMiss' || a.hintShown,
+        isRepeated: a.result == 'repeated',
       );
     }).toList();
 

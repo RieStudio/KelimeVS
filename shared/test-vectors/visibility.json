@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "visibleAttempts test vectors for client-side attempt visibility filtering",
-  "totalCases": 25,
+  "totalCases": 27,
   "cases": [
     {
       "id": "vis_001",
@@ -659,7 +659,7 @@
     },
     {
       "id": "vis_023",
-      "description": "Repeated answer visible to author p1",
+      "description": "Repeated answer hidden from author p1 during active round",
       "attempts": [
         {
           "playerId": "p1",
@@ -673,13 +673,11 @@
       ],
       "viewerId": "p1",
       "roundActive": true,
-      "expectedVisibleIndices": [
-        0
-      ]
+      "expectedVisibleIndices": []
     },
     {
       "id": "vis_024",
-      "description": "Repeated answer visible to opponent p2",
+      "description": "Repeated answer hidden from opponent p2 during active round",
       "attempts": [
         {
           "playerId": "p1",
@@ -693,13 +691,11 @@
       ],
       "viewerId": "p2",
       "roundActive": true,
-      "expectedVisibleIndices": [
-        0
-      ]
+      "expectedVisibleIndices": []
     },
     {
       "id": "vis_025",
-      "description": "Repeated and close mix for p1",
+      "description": "Repeated hidden, close mix for p1",
       "attempts": [
         {
           "playerId": "p1",
@@ -730,8 +726,47 @@
       "viewerId": "p1",
       "roundActive": true,
       "expectedVisibleIndices": [
-        0,
         1
+      ]
+    },
+    {
+      "id": "vis_026",
+      "description": "Repeated answer visible to p1 after round ends",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "repeated",
+          "answerId": "elma",
+          "nowMs": 9000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p1",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0
+      ]
+    },
+    {
+      "id": "vis_027",
+      "description": "Repeated answer visible to opponent p2 after round ends",
+      "attempts": [
+        {
+          "playerId": "p1",
+          "rawInput": "elma",
+          "resultType": "repeated",
+          "answerId": "elma",
+          "nowMs": 9000,
+          "isClose": false,
+          "hintShown": false
+        }
+      ],
+      "viewerId": "p2",
+      "roundActive": false,
+      "expectedVisibleIndices": [
+        0
       ]
     }
   ]
