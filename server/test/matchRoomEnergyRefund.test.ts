@@ -323,7 +323,7 @@ describe('MatchRoom Forfeit Energy Refund Tests', () => {
     // İlk deneme başarısız olunca alarm kurulmuş olmalı
     expect(callCount).toBe(1);
     const roomData = store.get('roomData');
-    expect(roomData.pendingEnergyRefundUid).toBe('p1');
+    expect(roomData.pendingEnergyRefundUids).toEqual(['p1']);
     expect(roomData.schedule.energyRefundRetryAtMs).toBeDefined();
 
     // Alarm süresi ilerletilir ve tetiklenir
@@ -333,7 +333,7 @@ describe('MatchRoom Forfeit Energy Refund Tests', () => {
     // İkinci deneme başarılı olmalı
     expect(callCount).toBe(2);
     const updatedRoomData = store.get('roomData');
-    expect(updatedRoomData.pendingEnergyRefundUid).toBeUndefined();
+    expect(updatedRoomData.pendingEnergyRefundUids).toBeUndefined();
     expect(updatedRoomData.schedule.energyRefundRetryAtMs).toBeUndefined();
   });
 });

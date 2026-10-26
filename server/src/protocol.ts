@@ -131,7 +131,7 @@ export interface ClientFeedbackMessage {
 
 export interface ClientVoidedMessage {
   readonly t: 'voided';
-  readonly reason: 'opponent_absent';
+  readonly reason: 'opponent_absent' | 'both_disconnected';
 }
 
 export interface ClientPowerupAckMessage {

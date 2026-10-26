@@ -54,6 +54,16 @@ interface PendingRefund {
   readonly powerup: string;
 }
 
+interface LegacyRoomData {
+  readonly matchId?: string;
+  readonly disconnectedUid?: string;
+  readonly disconnectedUids?: Record<string, number>;
+  readonly pendingEnergyRefundUid?: string;
+  readonly pendingEnergyRefundUids?: readonly string[];
+  readonly schedule?: TimersSchedule;
+  readonly [key: string]: unknown;
+}
+
 interface StoredRoomData {
   readonly matchId: string;
   readonly p1: PlayerInfo;
@@ -61,10 +71,12 @@ interface StoredRoomData {
   readonly questions: Question[];
   readonly questionOrder: string[];
   readonly status: 'waiting_for_players' | 'active' | 'finished' | 'voided';
+  readonly voidedReason?: 'opponent_absent' | 'both_disconnected';
   readonly matchType?: 'ranked' | 'friendly';
   readonly engineState?: SerializedMatchState;
   readonly schedule: TimersSchedule;
-  readonly disconnectedUid?: string;
+  readonly disconnectedUids?: Record<string, number>;
+  readonly frozenTurnRemainingMs?: number;
   readonly rewards?: Record<string, PlayerRewardInfo>;
   readonly rewardRetryCount?: number;
   readonly leaderboardPending?: boolean;
@@ -77,8 +89,52 @@ interface StoredRoomData {
   readonly pendingRefunds?: readonly PendingRefund[];
   readonly refundRetryCount?: number;
   readonly energyChargedUids?: readonly string[];
-  readonly pendingEnergyRefundUid?: string;
+  readonly pendingEnergyRefundUids?: readonly string[];
   readonly energyRefundRetryCount?: number;
+}
+
+export function migrateStoredRoomData(raw: unknown): StoredRoomData | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const legacy = raw as LegacyRoomData;
+
+  let disconnectedUids = legacy.disconnectedUids;
+  if (!disconnectedUids && typeof legacy.disconnectedUid === 'string' && legacy.disconnectedUid.length > 0) {
+    const legacyTimeout = legacy.schedule?.disconnectTimeoutAtMs ?? (Date.now() + 30000);
+    disconnectedUids = { [legacy.disconnectedUid]: legacyTimeout };
+  }
+
+  let pendingEnergyRefundUids = legacy.pendingEnergyRefundUids
+    ? [...legacy.pendingEnergyRefundUids]
+    : undefined;
+  if (
+    !pendingEnergyRefundUids &&
+    typeof legacy.pendingEnergyRefundUid === 'string' &&
+    legacy.pendingEnergyRefundUid.length > 0
+  ) {
+    pendingEnergyRefundUids = [legacy.pendingEnergyRefundUid];
+  }
+
+  const {
+    disconnectedUid: _legacyDisconnectedUid,
+    pendingEnergyRefundUid: _legacyPendingEnergyRefundUid,
+    ...rest
+  } = legacy;
+
+  return {
+    ...rest,
+    disconnectedUids,
+    pendingEnergyRefundUids,
+  } as unknown as StoredRoomData;
+}
+
+export function computeNextDisconnectTimeout(
+  disconnectedUids: Record<string, number> | undefined,
+  nowMs: number
+): number | undefined {
+  if (!disconnectedUids) return undefined;
+  const unexpired = Object.values(disconnectedUids).filter((t) => t > nowMs);
+  if (unexpired.length === 0) return undefined;
+  return Math.min(...unexpired);
 }
 
 export class MatchRoom extends DurableObject<Env> {
@@ -87,9 +143,9 @@ export class MatchRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
-      const stored = await this.ctx.storage.get<StoredRoomData>('roomData');
+      const stored = await this.ctx.storage.get<unknown>('roomData');
       if (stored) {
-        this.data = stored;
+        this.data = migrateStoredRoomData(stored);
       }
     });
   }
@@ -190,7 +246,18 @@ export class MatchRoom extends DurableObject<Env> {
     }
 
     if (this.data.status === 'voided') {
-      return new Response('Match voided', { status: 410 });
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+      this.ctx.acceptWebSocket(server, [uid]);
+
+      const voidedMsg: ClientVoidedMessage = {
+        t: 'voided',
+        reason: this.data.voidedReason ?? 'opponent_absent',
+      };
+      server.send(JSON.stringify(voidedMsg));
+      server.close(1000, 'voided');
+
+      return new Response(null, { status: 101, webSocket: client });
     }
 
     // Aynı UID için eski bağlantı varsa kapat (kod 4000, "replaced")
@@ -342,17 +409,51 @@ export class MatchRoom extends DurableObject<Env> {
     const uid = tags[0];
     if (!uid || !this.data) return;
 
+    // Oyuncunun başka açık soketi kalmış mı kontrol et
+    const remainingSockets = this.ctx.getWebSockets(uid).filter((s) => s !== ws);
+    if (remainingSockets.length > 0) return;
+
     if (this.data.status === 'active') {
       const nowMs = Date.now();
-      const disconnectTimeoutAtMs = nowMs + this.durations.disconnectTimeoutMs;
+      const playerTimeoutAtMs = nowMs + this.durations.disconnectTimeoutMs;
+      const nextDisconnectedUids: Record<string, number> = {
+        ...(this.data.disconnectedUids ?? {}),
+        [uid]: playerTimeoutAtMs,
+      };
+
+      const p1Uid = this.data.p1.uid;
+      const p2Uid = this.data.p2.uid;
+      const bothDisconnected =
+        nextDisconnectedUids[p1Uid] !== undefined &&
+        nextDisconnectedUids[p2Uid] !== undefined;
+
+      let frozenTurnRemainingMs = this.data.frozenTurnRemainingMs;
+      let turnDeadlineMs = this.data.schedule.turnDeadlineMs;
+
+      if (bothDisconnected) {
+        // EK ŞART: İki oyuncu da odada yokken turnTimeout alarmı tur/maç sonucu üretmesin
+        if (turnDeadlineMs !== undefined) {
+          frozenTurnRemainingMs = Math.max(0, turnDeadlineMs - nowMs);
+          turnDeadlineMs = undefined;
+        }
+      }
+
+      const disconnectTimeoutAtMs = computeNextDisconnectTimeout(
+        nextDisconnectedUids,
+        nowMs
+      );
+
+      const nextSchedule: TimersSchedule = {
+        ...this.data.schedule,
+        turnDeadlineMs,
+        disconnectTimeoutAtMs,
+      };
 
       this.data = {
         ...this.data,
-        disconnectedUid: uid,
-        schedule: {
-          ...this.data.schedule,
-          disconnectTimeoutAtMs,
-        },
+        disconnectedUids: nextDisconnectedUids,
+        frozenTurnRemainingMs,
+        schedule: nextSchedule,
       };
 
       await this.persist();
@@ -379,31 +480,130 @@ export class MatchRoom extends DurableObject<Env> {
     for (const action of dueActions) {
       if (action === 'connectTimeout') {
         if (this.data.status === 'waiting_for_players') {
+          console.log(
+            JSON.stringify({
+              event: 'match_voided',
+              reason: 'opponent_absent',
+              matchId: this.data.matchId,
+              roundsPlayed: 0,
+            })
+          );
           this.data = {
             ...this.data,
             status: 'voided',
-            schedule: { cleanupAtMs: nowMs + 5000 },
+            voidedReason: 'opponent_absent',
+            schedule: { cleanupAtMs: nowMs + this.durations.cleanupMs },
           };
           const voidedMsg: ClientVoidedMessage = { t: 'voided', reason: 'opponent_absent' };
           this.broadcastAll(JSON.stringify(voidedMsg));
           this.closeAllSockets(1000, 'voided');
+
+          if (this.data.energyChargedUids && this.data.energyChargedUids.length > 0) {
+            await this.applyEnergyRefunds(this.data.energyChargedUids);
+          }
         }
       } else if (action === 'disconnectForfeit') {
-        if (this.data.status === 'active' && this.data.disconnectedUid && this.data.engineState) {
-          const state = deserializeMatchState(this.data.engineState);
-          const res = MatchEngine.forfeit({
-            state,
-            playerId: this.data.disconnectedUid,
-            nowMs,
-          });
-          this.data = {
-            ...this.data,
-            engineState: serializeMatchState(res.state),
-          };
-          await this.handleMatchFinished();
+        if (this.data.status === 'active' && this.data.disconnectedUids && this.data.engineState) {
+          const p1Uid = this.data.p1.uid;
+          const p2Uid = this.data.p2.uid;
+          const p1Deadline = this.data.disconnectedUids[p1Uid];
+          const p2Deadline = this.data.disconnectedUids[p2Uid];
+
+          const p1Disconnected = p1Deadline !== undefined;
+          const p2Disconnected = p2Deadline !== undefined;
+          const p1Expired = p1Disconnected && nowMs >= p1Deadline;
+          const p2Expired = p2Disconnected && nowMs >= p2Deadline;
+
+          if (p1Expired && p2Expired) {
+            // İki oyuncunun da vadesi dolmuş ve ikisi de kopuk -> Maç iptal (voided)
+            const state = deserializeMatchState(this.data.engineState);
+            const roundsPlayed = state.totalRoundsPlayed;
+            console.log(
+              JSON.stringify({
+                event: 'match_voided',
+                reason: 'both_disconnected',
+                matchId: this.data.matchId,
+                roundsPlayed,
+              })
+            );
+            this.data = {
+              ...this.data,
+              status: 'voided',
+              voidedReason: 'both_disconnected',
+              schedule: { cleanupAtMs: nowMs + this.durations.cleanupMs },
+            };
+            const voidedMsg: ClientVoidedMessage = { t: 'voided', reason: 'both_disconnected' };
+            this.broadcastAll(JSON.stringify(voidedMsg));
+            this.closeAllSockets(1000, 'voided');
+
+            if (this.data.energyChargedUids && this.data.energyChargedUids.length > 0) {
+              await this.applyEnergyRefunds(this.data.energyChargedUids);
+            }
+          } else if (p1Expired && !p2Disconnected) {
+            // P1 vadesi doldu, P2 bağlı -> P1 hükmen yenik
+            console.log(
+              JSON.stringify({
+                event: 'disconnect_forfeit',
+                matchId: this.data.matchId,
+                forfeiterIndex: 1,
+              })
+            );
+            const state = deserializeMatchState(this.data.engineState);
+            const res = MatchEngine.forfeit({
+              state,
+              playerId: p1Uid,
+              nowMs,
+            });
+            this.data = {
+              ...this.data,
+              engineState: serializeMatchState(res.state),
+            };
+            await this.handleMatchFinished();
+          } else if (p2Expired && !p1Disconnected) {
+            // P2 vadesi doldu, P1 bağlı -> P2 hükmen yenik
+            console.log(
+              JSON.stringify({
+                event: 'disconnect_forfeit',
+                matchId: this.data.matchId,
+                forfeiterIndex: 2,
+              })
+            );
+            const state = deserializeMatchState(this.data.engineState);
+            const res = MatchEngine.forfeit({
+              state,
+              playerId: p2Uid,
+              nowMs,
+            });
+            this.data = {
+              ...this.data,
+              engineState: serializeMatchState(res.state),
+            };
+            await this.handleMatchFinished();
+          } else {
+            // Biri doldu ama diğeri de kopuk ve vadesi henüz dolmadı: bekle!
+            // Dolmamış olan vadeye alarm kurulur.
+            const nextDisconnectAtMs = computeNextDisconnectTimeout(
+              this.data.disconnectedUids,
+              nowMs
+            );
+            this.data = {
+              ...this.data,
+              schedule: {
+                ...this.data.schedule,
+                disconnectTimeoutAtMs: nextDisconnectAtMs,
+              },
+            };
+          }
         }
       } else if (action === 'turnTimeout') {
         if (this.data.status === 'active' && this.data.engineState) {
+          const p1Disconnected = this.data.disconnectedUids?.[this.data.p1.uid] !== undefined;
+          const p2Disconnected = this.data.disconnectedUids?.[this.data.p2.uid] !== undefined;
+          if (p1Disconnected && p2Disconnected) {
+            // EK ŞART savunma: iki oyuncu da yokken turnTimeout tur/maç sonucu üretmez!
+            continue;
+          }
+
           const state = deserializeMatchState(this.data.engineState);
           const res = MatchEngine.checkTimeout({
             state,
@@ -435,6 +635,10 @@ export class MatchRoom extends DurableObject<Env> {
         }
       } else if (action === 'startNextRound') {
         if (this.data.status === 'active' && this.data.engineState) {
+          const p1Disconnected = this.data.disconnectedUids?.[this.data.p1.uid] !== undefined;
+          const p2Disconnected = this.data.disconnectedUids?.[this.data.p2.uid] !== undefined;
+          const bothDisconnected = p1Disconnected && p2Disconnected;
+
           const state = deserializeMatchState(this.data.engineState);
           const questions = this.data.questions;
           const res = MatchEngine.startNextRound({
@@ -443,15 +647,31 @@ export class MatchRoom extends DurableObject<Env> {
             nowMs,
             questionOrder: this.data.questionOrder,
           });
-          this.data = {
-            ...this.data,
-            engineState: serializeMatchState(res.state),
-            schedule: {
-              ...this.data.schedule,
-              nextRoundAtMs: undefined,
-              turnDeadlineMs: res.state.deadlineMs,
-            },
-          };
+
+          if (bothDisconnected) {
+            // İkisi de yokken yeni turun süresi dondurulur
+            const answerMs = this.durations.answerSeconds * 1000;
+            this.data = {
+              ...this.data,
+              engineState: serializeMatchState(res.state),
+              frozenTurnRemainingMs: answerMs,
+              schedule: {
+                ...this.data.schedule,
+                nextRoundAtMs: undefined,
+                turnDeadlineMs: undefined,
+              },
+            };
+          } else {
+            this.data = {
+              ...this.data,
+              engineState: serializeMatchState(res.state),
+              schedule: {
+                ...this.data.schedule,
+                nextRoundAtMs: undefined,
+                turnDeadlineMs: res.state.deadlineMs,
+              },
+            };
+          }
           await this.persist();
           await this.updateAlarm();
           this.broadcastState();
@@ -523,23 +743,91 @@ export class MatchRoom extends DurableObject<Env> {
         this.broadcastState();
       }
     } else if (this.data.status === 'active') {
-      // Kopan oyuncu geri bağlandıysa sayacı iptal et
-      if (this.data.disconnectedUid === uid) {
+      const nowMs = Date.now();
+      const p1Uid = this.data.p1.uid;
+      const p2Uid = this.data.p2.uid;
+      const isP1 = uid === p1Uid;
+      const opponentUid = isP1 ? p2Uid : p1Uid;
+
+      const nextDisconnectedUids: Record<string, number> = {
+        ...(this.data.disconnectedUids ?? {}),
+      };
+      delete nextDisconnectedUids[uid];
+
+      const opponentTimeout = nextDisconnectedUids[opponentUid];
+      const opponentDisconnected = opponentTimeout !== undefined;
+      const opponentExpired = opponentDisconnected && nowMs >= opponentTimeout;
+
+      if (opponentExpired && this.data.engineState) {
+        // Dönen oyuncunun rakibi kopuk ve vadesi zaten dolmuş -> Rakip hükmen yenik!
+        const forfeiterIndex = opponentUid === p1Uid ? 1 : 2;
+        console.log(
+          JSON.stringify({
+            event: 'disconnect_forfeit',
+            matchId: this.data.matchId,
+            forfeiterIndex,
+          })
+        );
+        const state = deserializeMatchState(this.data.engineState);
+        const res = MatchEngine.forfeit({
+          state,
+          playerId: opponentUid,
+          nowMs,
+        });
         this.data = {
           ...this.data,
-          disconnectedUid: undefined,
-          schedule: {
-            ...this.data.schedule,
-            disconnectTimeoutAtMs: undefined,
-          },
+          engineState: serializeMatchState(res.state),
+          disconnectedUids: nextDisconnectedUids,
         };
-        await this.persist();
-        await this.updateAlarm();
+        await this.handleMatchFinished();
+        return;
       }
+
+      // Rakibin süresi dolmamış veya rakip bağlı: maç devam eder
+      let engineState = this.data.engineState;
+      let turnDeadlineMs = this.data.schedule.turnDeadlineMs;
+      let frozenTurnRemainingMs = this.data.frozenTurnRemainingMs;
+
+      if (frozenTurnRemainingMs !== undefined && engineState) {
+        // İki oyuncu kopukken dondurulan süre geri dönen oyuncuyla devam eder
+        const state = deserializeMatchState(engineState);
+        const resumedRemaining = Math.max(1000, frozenTurnRemainingMs);
+        const newDeadlineMs = nowMs + resumedRemaining;
+        const updatedState: MatchState = { ...state, deadlineMs: newDeadlineMs };
+        engineState = serializeMatchState(updatedState);
+        turnDeadlineMs = newDeadlineMs;
+        frozenTurnRemainingMs = undefined;
+      }
+
+      const disconnectTimeoutAtMs = computeNextDisconnectTimeout(
+        nextDisconnectedUids,
+        nowMs
+      );
+
+      this.data = {
+        ...this.data,
+        engineState,
+        disconnectedUids: nextDisconnectedUids,
+        frozenTurnRemainingMs,
+        schedule: {
+          ...this.data.schedule,
+          turnDeadlineMs,
+          disconnectTimeoutAtMs,
+        },
+      };
+
+      await this.persist();
+      await this.updateAlarm();
       this.broadcastState();
     } else if (this.data.status === 'finished') {
       this.sendStateToPlayer(uid);
       this.sendFinalToPlayer(uid);
+    } else if (this.data.status === 'voided') {
+      const voidedMsg: ClientVoidedMessage = {
+        t: 'voided',
+        reason: this.data.voidedReason ?? 'opponent_absent',
+      };
+      this.sendToUid(uid, JSON.stringify(voidedMsg));
     }
   }
 
@@ -584,7 +872,7 @@ export class MatchRoom extends DurableObject<Env> {
       }
       const endedBy = state?.endedBy;
       if (endedBy === 'forfeit' && winnerId && this.data.energyChargedUids?.includes(winnerId)) {
-        await this.applyForfeitEnergyRefund(winnerId);
+        await this.applyEnergyRefunds([winnerId]);
       }
     }
     await this.persist();
@@ -1120,59 +1408,78 @@ export class MatchRoom extends DurableObject<Env> {
     }
   }
 
-  private async applyForfeitEnergyRefund(winnerUid: string): Promise<void> {
-    if (!this.data) return;
-    try {
-      const userProfileStub = this.env.USER_PROFILE.get(
-        this.env.USER_PROFILE.idFromName(winnerUid)
-      );
-      const res = await userProfileStub.refundEnergy({
-        matchId: this.data.matchId,
-        amount: 1,
-        uid: winnerUid,
-      });
-      console.log(`Forfeit energy refund applied for ${winnerUid}: refunded=${res.refunded}`);
+  private async applyEnergyRefunds(targetUids: readonly string[]): Promise<void> {
+    if (!this.data || targetUids.length === 0) return;
+
+    const remainingUids: string[] = [];
+    let hasTransientError = false;
+
+    for (const uid of targetUids) {
+      try {
+        const userProfileStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(uid)
+        );
+        const res = await userProfileStub.refundEnergy({
+          matchId: this.data.matchId,
+          amount: 1,
+          uid,
+        });
+        console.log(`Energy refund applied for uid: refunded=${res.refunded}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('account_deleted')) {
+          // Kalıcı hata: silinmiş hesap, tekrar denenmez
+        } else {
+          console.error('refundEnergy transient error for uid:', err);
+          remainingUids.push(uid);
+          hasTransientError = true;
+        }
+      }
+    }
+
+    const retryCount = (this.data.energyRefundRetryCount ?? 0) + 1;
+    const nowMs = Date.now();
+
+    if (hasTransientError && remainingUids.length > 0 && retryCount <= 5) {
+      const delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
       this.data = {
         ...this.data,
-        pendingEnergyRefundUid: undefined,
+        pendingEnergyRefundUids: remainingUids,
+        energyRefundRetryCount: retryCount,
+        schedule: {
+          ...this.data.schedule,
+          energyRefundRetryAtMs: nowMs + delayMs,
+        },
+      };
+    } else {
+      this.data = {
+        ...this.data,
+        pendingEnergyRefundUids: undefined,
         energyRefundRetryCount: 0,
         schedule: {
           ...this.data.schedule,
           energyRefundRetryAtMs: undefined,
         },
       };
-    } catch (err) {
-      console.error(`applyForfeitEnergyRefund transient error for ${winnerUid}:`, err);
-      const nowMs = Date.now();
-      const retryCount = (this.data.energyRefundRetryCount ?? 0) + 1;
-      if (retryCount <= 5) {
-        const delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+    }
+  }
+
+  private async processPendingEnergyRefund(): Promise<void> {
+    if (!this.data || !this.data.pendingEnergyRefundUids || this.data.pendingEnergyRefundUids.length === 0) {
+      if (this.data?.schedule.energyRefundRetryAtMs) {
         this.data = {
           ...this.data,
-          pendingEnergyRefundUid: winnerUid,
-          energyRefundRetryCount: retryCount,
-          schedule: {
-            ...this.data.schedule,
-            energyRefundRetryAtMs: nowMs + delayMs,
-          },
-        };
-      } else {
-        this.data = {
-          ...this.data,
-          pendingEnergyRefundUid: undefined,
-          energyRefundRetryCount: retryCount,
           schedule: {
             ...this.data.schedule,
             energyRefundRetryAtMs: undefined,
           },
         };
+        await this.persist();
+        await this.updateAlarm();
       }
+      return;
     }
-  }
-
-  private async processPendingEnergyRefund(): Promise<void> {
-    if (!this.data || !this.data.pendingEnergyRefundUid) return;
-    await this.applyForfeitEnergyRefund(this.data.pendingEnergyRefundUid);
+    await this.applyEnergyRefunds(this.data.pendingEnergyRefundUids);
     await this.persist();
     await this.updateAlarm();
   }
@@ -1188,7 +1495,7 @@ export class MatchRoom extends DurableObject<Env> {
 
     const isP1 = uid === this.data.p1.uid;
     const opponent = isP1 ? this.data.p2 : this.data.p1;
-    const isDisconnected = this.data.disconnectedUid === opponent.uid;
+    const isDisconnected = this.data.disconnectedUids?.[opponent.uid] !== undefined;
     const opponentConnected =
       !isDisconnected &&
       this.ctx

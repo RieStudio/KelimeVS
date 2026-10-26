@@ -329,13 +329,42 @@ Maç sonuçlandığında her iki oyuncuya gönderilir. Maç detay ekranı ve ge�
 ```
 
 #### İptal Edilen Maç (`voided`)
-Rakip oyuncu belirlenen süre içinde maç odasına hiç bağlanmazsa gönderilir:
+Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton verilmez, lig/istatistik kaydı yapılmaz ve maça enerji harcamış tüm oyunculara enerjileri iade edilir:
 ```json
 {
   "t": "voided",
-  "reason": "opponent_absent"
+  "reason": "opponent_absent" | "both_disconnected"
 }
 ```
+##### İptal Nedenleri (`reason`):
+- `"opponent_absent"`: Eşleşme sağlandıktan sonra bir oyuncu odaya bağlanır, diğeri belirlenen süre içinde (Normal: 10 sn, Hızlı: 3 sn) hiç bağlanmazsa.
+- `"both_disconnected"`: Aktif maç sırasında her iki oyuncunun da bağlantısı kopar ve her ikisinin de kopma süresi (Normal: 30 sn, Hızlı: 3 sn) geri dönmeden dolarsa.
+
+> **İptal Edilmiş Odaya Yeniden Bağlanma:** İstemci önceden `voided` olmuş bir odaya bağlandığında WebSocket el sıkışması kabul edilir (HTTP 101), derhal güncel `{ "t": "voided", "reason": ... }` mesajı gönderilir ve soket 1000 koduyla kapatılır.
+
+---
+
+### 3.1. Kopma Durum Makinesi ve İki Oyuncu Kopukken Tur Süresi (Disconnect State Machine)
+
+1. **Bağımsız Kopma Vadesi (`disconnectedUids`):**
+   - Her oyuncunun kopma anı ve vadesi (`nowMs + disconnectTimeoutMs`) ayrı saklanır.
+   - Cloudflare Durable Object alarmı her zaman bekleyen en yakın dolmamış vadeye kurulur (Tek Alarm Kuralı).
+
+2. **Hükmen Mağlubiyet (Forfeit):**
+   - Bir oyuncunun kopma vadesi dolduğunda rakibi **o anda bağlıysa**: vadesi dolan oyuncu hükmen yenik (`endedBy: 'forfeit'`) sayılır; bağlı kalan galip oyuncuya enerji iade edilir.
+
+3. **İki Oyuncu da Kopukken Tur Süresinin Dondurulması (EK ŞART):**
+   - Her iki oyuncu da aynı anda odada yokken turn timeout süresi dondurulur (`turnDeadlineMs` temizlenir, `frozenTurnRemainingMs` saklanır).
+   - Odada hiç oyuncu yokken turnTimeout alarmı asla tur sonucu (1-0, 2-0 vb.) veya maç sonucu üretmez.
+
+4. **Karşılıklı Kopmada İptal (Voided):**
+   - Bir oyuncunun vadesi dolduğunda rakibi de kopuksa ve rakibin vadesi henüz dolmadıysa beklenir.
+   - İkinci oyuncunun da vadesi dolduğunda ikisi de dönmemişse maç `both_disconnected` sebebiyle `voided` ilan edilir ve her iki oyuncuya enerjileri iade edilir.
+
+5. **Geri Dönüş (Reconnect):**
+   - Oyuncu geri döndüğünde yalnızca kendi kopma kaydı silinir.
+   - Rakip kopuk ve vadesi **zaten dolmuşsa**: o anda rakip hükmen yenik sayılır ve dönen oyuncu kazanır.
+   - Rakip bağlıysa veya vadesi henüz dolmamışsa: dondurulan tur süresi (`Math.max(1000, frozenTurnRemainingMs)`) üzerinden devam eder.
 
 #### Güçlendirici Onayı / Yanıtı (`powerup_ack`)
 Yalnızca güçlendiriciyi kullanmak isteyen oyuncuya gönderilir:
