@@ -195,8 +195,8 @@ abstract final class AppStrings {
 
   // Oyuncu İstatistikleri
   static const String statsTitle = 'İstatistikler';
-  static const String statsPlayed = 'Oynanan';
-  static const String statsCorrectAnswers = 'Doğru';
+  static const String statsPlayed = 'Oynanan Maç';
+  static const String statsCorrectAnswers = 'Doğru Cevap';
   static const String statsWinRate = 'Kazanma';
   static const String statsNoData = '—';
 

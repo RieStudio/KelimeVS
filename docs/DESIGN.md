@@ -178,10 +178,10 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 
 **7) Profil** – Ana ekrandaki avatara dokununca açılır. Üstte geri butonu ve "Profil" başlığı. Ortada büyük harf avatarı (takma adın ilk harfi), altında takma ad (Fredoka 22/600) ve "Adı Değiştir" ikincil butonu.
 - **Oyuncu İstatistikleri:** "Adı Değiştir" butonunun hemen altında 3'lü kart satırı (`card` zemin, `mint` 2 px kenarlık, `borderRadiusListCard` 16 px, dikey 12 dp dolgu):
-  1. **Oynanan:** `${stats.played}` (Fredoka 22/700 `ink`, Nunito 12/700 `muted`).
-  2. **Doğru:** `${stats.correctAnswers}` (Fredoka 22/700 `ink`, Nunito 12/700 `muted`).
+  1. **Oynanan Maç:** `${stats.played}` (Fredoka 24/700 `ink`, Nunito 12/700 `muted`).
+  2. **Doğru Cevap:** `${stats.correctAnswers}` (Fredoka 24/700 `ink`, Nunito 12/700 `muted`).
   3. **Kazanma:** `%${round(won/played * 100)}` (played == 0 ise "—").
-  Yalnızca ranked online maçlar sayılır (bot ve arkadaş düellosu sayılmaz). Kartlar 320 dp ve 1.5 textScaler altında `FittedBox` ile taşma yapmadan ölçeklenir. İstatistik önbelleği `uid` bazlıdır; hesap silme/çıkışta temizlenir. *(Not: mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir).*
+  Yalnızca ranked online maçlar sayılır (bot ve arkadaş düellosu sayılmaz). Kartlar 360 dp ve 320 dp (1.5 textScaler dahil) altında taşma yapmadan ölçeklenir; etiketler gerekirse 2 satıra sarılır, kart yükseklikleri eşit kalır (`IntrinsicHeight`). İstatistik önbelleği `uid` bazlıdır; hesap silme/çıkışta temizlenir. *(Not: mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir).*
 - **Hesap Kartı:** İstatistiklerin altında yer alır: bağlı değilse "Google ile Bağla" ikincil butonu; bağlıysa Google e-postası, onay rozeti ve `dangerSurface`/`dangerText` stilinde "Çıkış Yap". Çıkış ve hesap değiştirme onay diyalogları veri kaybı uyarısı içerir. En altta Engellenenler ve Hesabı Sil butonları yer alır.
 
 **8) Liderlik tablosu** – Alt gezinmedeki "Sıralama" sekmesinde ya da ana ekrandaki kupa butonuyla açılır (kupa butonu alt çubukta bu sekmeye geçer). Sekmede açıldığında geri butonu bulunmaz (yalnızca harici bir push rotasından açılırsa geri butonu görünür). Üstte "Haftalık Sıralama" başlığı. Altında "Bu hafta" ve kalan süreyi gösteren hap şeklinde şerit (kart zemini, `mint` kenarlık). Liste: ilk 50 oyuncu; satırda sıra, harf avatarı (36), takma ad ve galibiyet sayısı. İlk üç sıra için sade madalya/kupa vurgusu (1. `coin` sarısı). Kendi satırın `surface` zemin ve `mint` kenarlıkla vurgulanır. İlk 50 dışındaysan listenin altında sabit "Senin sıran" çubuğu (kart zemini, sert gölge). Boş durum: "Bu hafta henüz maç yok". Hata durumunda "Tekrar Dene" butonu. Yalnızca haftalık galibiyetler listelenir (GDD bölüm 5.4).

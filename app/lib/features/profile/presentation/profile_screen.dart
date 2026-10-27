@@ -679,29 +679,32 @@ class _ProfileStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: AppStrings.statsPlayed,
-            value: stats.played.toString(),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatCard(
+              label: AppStrings.statsPlayed,
+              value: stats.played.toString(),
+            ),
           ),
-        ),
-        const SizedBox(width: AppDimens.space8),
-        Expanded(
-          child: _StatCard(
-            label: AppStrings.statsCorrectAnswers,
-            value: stats.correctAnswers.toString(),
+          const SizedBox(width: AppDimens.space8),
+          Expanded(
+            child: _StatCard(
+              label: AppStrings.statsCorrectAnswers,
+              value: stats.correctAnswers.toString(),
+            ),
           ),
-        ),
-        const SizedBox(width: AppDimens.space8),
-        Expanded(
-          child: _StatCard(
-            label: AppStrings.statsWinRate,
-            value: stats.winRateDisplay,
+          const SizedBox(width: AppDimens.space8),
+          Expanded(
+            child: _StatCard(
+              label: AppStrings.statsWinRate,
+              value: stats.winRateDisplay,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -732,6 +735,7 @@ class _StatCard extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -748,13 +752,11 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppDimens.space4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              style: AppTextStyles.secondaryText,
-              maxLines: 1,
-            ),
+          Text(
+            label,
+            style: AppTextStyles.secondaryText,
+            textAlign: TextAlign.center,
+            maxLines: 2,
           ),
         ],
       ),

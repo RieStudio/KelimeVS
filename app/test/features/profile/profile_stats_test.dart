@@ -200,7 +200,7 @@ void main() {
   });
 
   group('ProfileScreen Widget Tests - Player Statistics', () {
-    testWidgets('Renders 3 stat cards: Oynanan, Doğru, Kazanma with dash for 0 matches', (tester) async {
+    testWidgets('Renders 3 stat cards: Oynanan Maç, Doğru Cevap, Kazanma with dash for 0 matches', (tester) async {
       SharedPreferences.setMockInitialValues({
         LocalProfileRepository.keyNickname: 'TestPlayer',
       });
@@ -220,7 +220,7 @@ void main() {
 
       // Default state has played: 0, correctAnswers: 0, winRate: "—"
       expect(find.text('—'), findsOneWidget);
-      expect(find.text('0'), findsNWidgets(2)); // Oynanan: 0, Doğru: 0
+      expect(find.text('0'), findsNWidgets(2)); // Oynanan Maç: 0, Doğru Cevap: 0
     });
 
     testWidgets('Renders non-zero stats correctly when loaded in ProfileState', (tester) async {
@@ -255,7 +255,7 @@ void main() {
       expect(find.text(AppStrings.statsWinRate), findsOneWidget);
     });
 
-    testWidgets('Does not overflow at 320 dp width and 1.5 textScaler (Accessibility)', (tester) async {
+    testWidgets('Does not overflow at 320 dp width and 1.5 textScaler (Accessibility) with equal card heights', (tester) async {
       final mockState = const ProfileState(
         isLoaded: true,
         nickname: 'LongPlayerNameHere',
@@ -299,6 +299,82 @@ void main() {
       expect(find.text('9999'), findsOneWidget);
       expect(find.text('12345'), findsOneWidget);
       expect(find.text('%67'), findsOneWidget);
+
+      final playedCardFinder = find.ancestor(
+        of: find.text(AppStrings.statsPlayed),
+        matching: find.byType(Container),
+      ).first;
+      final winRateCardFinder = find.ancestor(
+        of: find.text(AppStrings.statsWinRate),
+        matching: find.byType(Container),
+      ).first;
+
+      final playedHeight = tester.getSize(playedCardFinder).height;
+      final winRateHeight = tester.getSize(winRateCardFinder).height;
+      expect(playedHeight, equals(winRateHeight));
+    });
+
+    testWidgets('Verify card dimensions and equal heights at 360 dp', (tester) async {
+      final mockState = const ProfileState(
+        isLoaded: true,
+        nickname: 'Player',
+        stats: UserStats(
+          played: 10,
+          won: 5,
+          lost: 5,
+          correctAnswers: 25,
+        ),
+      );
+
+      tester.view.physicalSize = const Size(360 * 2.0, 800 * 2.0);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            profileProvider.overrideWith(() => _MockProfileNotifier(mockState)),
+          ],
+          child: const MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(
+                size: Size(360, 800),
+                textScaler: TextScaler.linear(1.0),
+              ),
+              child: ProfileScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(AppStrings.statsPlayed), findsOneWidget);
+      expect(find.text(AppStrings.statsCorrectAnswers), findsOneWidget);
+      expect(find.text(AppStrings.statsWinRate), findsOneWidget);
+
+      final playedCardFinder = find.ancestor(
+        of: find.text(AppStrings.statsPlayed),
+        matching: find.byType(Container),
+      ).first;
+      final correctCardFinder = find.ancestor(
+        of: find.text(AppStrings.statsCorrectAnswers),
+        matching: find.byType(Container),
+      ).first;
+      final winRateCardFinder = find.ancestor(
+        of: find.text(AppStrings.statsWinRate),
+        matching: find.byType(Container),
+      ).first;
+
+      final playedHeight = tester.getSize(playedCardFinder).height;
+      final correctHeight = tester.getSize(correctCardFinder).height;
+      final winRateHeight = tester.getSize(winRateCardFinder).height;
+
+      expect(playedHeight, equals(correctHeight));
+      expect(correctHeight, equals(winRateHeight));
     });
   });
 }
