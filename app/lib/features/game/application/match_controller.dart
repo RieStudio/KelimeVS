@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/bot_frame_resolver.dart';
@@ -42,7 +43,9 @@ class StopwatchClock implements GameClock {
   int nowMs() => _initialEpochMs + _stopwatch.elapsedMilliseconds;
 }
 
-class MatchController extends Notifier<MatchUiState> implements MatchSession {
+class MatchController extends Notifier<MatchUiState>
+    with WidgetsBindingObserver
+    implements MatchSession {
   final GameClock? _injectedClock;
   final math.Random? _injectedRandom;
   final QuestionRepository? _injectedRepo;
@@ -68,12 +71,179 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
 
   Timer? _tickTimer;
   Timer? _botTimer;
+  int? _botDeadlineMs;
   Timer? _transitionTimer;
   int? _transitionDeadlineMs;
   List<BotAction> _pendingBotActions = const [];
   int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
   bool _isMatchSaved = false;
+
+  bool _isObserverRegistered = false;
+  bool _isPaused = false;
+  int? _frozenRemainingTurnMs;
+  int? _frozenRemainingBotDelayMs;
+  int? _frozenRemainingTransitionMs;
+  bool _isDisposed = false;
+
+  @visibleForTesting
+  bool get isObserverRegisteredForTesting => _isObserverRegistered;
+
+  @visibleForTesting
+  bool get isPausedForTesting => _isPaused;
+
+  @visibleForTesting
+  void handleAppLifecycleStateForTesting(AppLifecycleState lifecycleState) {
+    didChangeAppLifecycleState(lifecycleState);
+  }
+
+  void _registerLifecycleObserver() {
+    if (!_isObserverRegistered && !_isDisposed) {
+      try {
+        WidgetsBinding.instance.addObserver(this);
+        _isObserverRegistered = true;
+      } catch (_) {
+        // Test ortamında WidgetsBinding başlatılmamış olabilir (saf Dart / fakeAsync testleri).
+      }
+    }
+  }
+
+  void _unregisterLifecycleObserver() {
+    if (_isObserverRegistered) {
+      try {
+        WidgetsBinding.instance.removeObserver(this);
+      } catch (_) {}
+      _isObserverRegistered = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    if (_isDisposed || !_isObserverRegistered) return;
+    final match = state.matchState;
+    if (match == null || match.phase == MatchPhase.matchFinished) return;
+
+    if (lifecycleState == AppLifecycleState.paused ||
+        lifecycleState == AppLifecycleState.inactive ||
+        lifecycleState == AppLifecycleState.hidden) {
+      _pauseMatch();
+    } else if (lifecycleState == AppLifecycleState.resumed) {
+      _resumeMatch();
+    }
+  }
+
+  void _pauseMatch() {
+    if (_isPaused || _isDisposed) return;
+    final match = state.matchState;
+    if (match == null || match.phase == MatchPhase.matchFinished) return;
+
+    final clock = _clock;
+    final now = clock.nowMs();
+
+    _isPaused = true;
+
+    // 1. Aktif tur süresini dondur
+    if (match.phase == MatchPhase.roundActive) {
+      _frozenRemainingTurnMs = math.max(0, match.deadlineMs - now);
+    } else {
+      _frozenRemainingTurnMs = null;
+    }
+
+    // 2. Bot zamanlayıcısını dondur
+    if (_botTimer != null && _botDeadlineMs != null) {
+      _frozenRemainingBotDelayMs = math.max(0, _botDeadlineMs! - now);
+      _botTimer?.cancel();
+      _botTimer = null;
+    } else {
+      _frozenRemainingBotDelayMs = null;
+    }
+
+    // 3. Geçiş zamanlayıcısını dondur
+    if (_transitionTimer != null && _transitionDeadlineMs != null) {
+      _frozenRemainingTransitionMs = math.max(0, _transitionDeadlineMs! - now);
+      _transitionTimer?.cancel();
+      _transitionTimer = null;
+    } else {
+      _frozenRemainingTransitionMs = null;
+    }
+
+    // 4. Tick timer'ı durdur (arka planda hiçbir şey tetiklenmesin)
+    _tickTimer?.cancel();
+    _tickTimer = null;
+  }
+
+  void _resumeMatch() {
+    if (!_isPaused || _isDisposed) return;
+    final match = state.matchState;
+    if (match == null || match.phase == MatchPhase.matchFinished) {
+      _isPaused = false;
+      return;
+    }
+
+    final clock = _clock;
+    final random = _random;
+    final now = clock.nowMs();
+
+    MatchState updatedMatch = match;
+
+    // 1. Aktif tur vadesini ötele (kaldığı nominal süreyle devam etsin)
+    int remaining = state.remainingMs;
+    if (match.phase == MatchPhase.roundActive && _frozenRemainingTurnMs != null) {
+      final newDeadlineMs = now + _frozenRemainingTurnMs!;
+      updatedMatch = match.copyWith(deadlineMs: newDeadlineMs);
+      remaining = _frozenRemainingTurnMs!;
+      _frozenRemainingTurnMs = null;
+    }
+
+    // 2. Bot zamanlayıcısını yalnızca duraklatılmadan önce aktif idiyse canlandır
+    if (_frozenRemainingBotDelayMs != null &&
+        updatedMatch.phase == MatchPhase.roundActive &&
+        updatedMatch.turnPlayerId == 'bot' &&
+        _botActionIndex < _pendingBotActions.length) {
+      final botRemaining = _frozenRemainingBotDelayMs!;
+      _frozenRemainingBotDelayMs = null;
+      _botDeadlineMs = now + botRemaining;
+      _botTimer = Timer(Duration(milliseconds: botRemaining), () {
+        _executeBotAction(clock, random);
+      });
+    } else {
+      _frozenRemainingBotDelayMs = null;
+    }
+
+    // 3. Geçiş zamanlayıcısını yalnızca duraklatılmadan önce aktif idiyse canlandır
+    int transitionRemaining = state.roundTransitionRemainingMs;
+    if (_frozenRemainingTransitionMs != null) {
+      final transRemaining = _frozenRemainingTransitionMs!;
+      _frozenRemainingTransitionMs = null;
+      _transitionDeadlineMs = now + transRemaining;
+      transitionRemaining = transRemaining;
+
+      if (updatedMatch.phase == MatchPhase.roundEnded) {
+        _transitionTimer = Timer(Duration(milliseconds: transRemaining), () {
+          _startNextRound(clock, random);
+        });
+      } else if (state.isFinalReveal) {
+        _transitionTimer = Timer(Duration(milliseconds: transRemaining), () {
+          _cancelAllTimers();
+          state = state.copyWith(
+            isFinalReveal: false,
+            roundTransitionRemainingMs: 0,
+          );
+        });
+      }
+    }
+
+    _isPaused = false;
+
+    state = state.copyWith(
+      matchState: updatedMatch,
+      remainingMs: remaining,
+      roundTransitionRemainingMs: transitionRemaining,
+    );
+
+    // 4. Tick timer'ı yeniden başlat
+    _startTickTimer(clock);
+  }
 
   static const List<String> _opponentNames = [
     'Ahmet',
@@ -108,9 +278,14 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     List<Question>? questions,
     String? opponentName,
   }) async {
-    // TODO: arka plan davranışı
     _cancelAllTimers();
     _isMatchSaved = false;
+    _isPaused = false;
+    _frozenRemainingTurnMs = null;
+    _frozenRemainingBotDelayMs = null;
+    _botDeadlineMs = null;
+    _frozenRemainingTransitionMs = null;
+    _registerLifecycleObserver();
 
     state = state.copyWith(
       isLoading: true,
@@ -179,7 +354,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
   /// Kullanıcının ('me') cevabını motora iletir.
   @override
   void submit(String text) {
-    // TODO: arka plan davranışı
+    if (_isPaused) return;
     final sanitized = AttemptTextSanitizer.sanitize(text);
     if (sanitized.isEmpty) return;
 
@@ -213,11 +388,11 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
   /// Kullanıcının maçı terk etmesini sağlar.
   @override
   void leaveMatch() {
-    // TODO: arka plan davranışı
     final match = state.matchState;
     if (match == null || match.phase == MatchPhase.matchFinished) return;
 
     _cancelAllTimers();
+    _unregisterLifecycleObserver();
     final clock = _clock;
     final random = _random;
     final now = clock.nowMs();
@@ -345,6 +520,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     int transitionRemaining = 0;
 
     if (nextState.phase == MatchPhase.matchFinished) {
+      _unregisterLifecycleObserver();
       if (nextState.endedBy == 'draw_limit_reached') {
         _cancelAllTimers();
         state = state.copyWith(
@@ -443,38 +619,48 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     if (_botActionIndex >= _pendingBotActions.length) return;
     final action = _pendingBotActions[_botActionIndex];
 
+    _botDeadlineMs = clock.nowMs() + action.delayMs;
     _botTimer = Timer(Duration(milliseconds: action.delayMs), () {
-      final currentMatch = state.matchState;
-      if (currentMatch == null ||
-          currentMatch.phase != MatchPhase.roundActive ||
-          currentMatch.turnPlayerId != 'bot') {
-        return;
-      }
-
-      final now = clock.nowMs();
-      final res = MatchEngine.submit(
-        state: currentMatch,
-        playerId: 'bot',
-        rawInput: action.input,
-        nowMs: now,
-      );
-
-      _applyEngineResult(
-        engineResult: res,
-        clock: clock,
-        random: random,
-      );
-
-      // Cevap kabul edilmediyse (yanlış, tekrar, yakın ipucu) sıra hala botta kalır;
-      // Bu durumda sıradaki bot eylemini zamanla
-      final updatedMatch = state.matchState;
-      if (updatedMatch != null &&
-          updatedMatch.phase == MatchPhase.roundActive &&
-          updatedMatch.turnPlayerId == 'bot') {
-        _botActionIndex++;
-        _scheduleNextBotAction(clock, random);
-      }
+      _executeBotAction(clock, random);
     });
+  }
+
+  void _executeBotAction(GameClock clock, math.Random random) {
+    _botTimer = null;
+    _botDeadlineMs = null;
+    final currentMatch = state.matchState;
+    if (currentMatch == null ||
+        currentMatch.phase != MatchPhase.roundActive ||
+        currentMatch.turnPlayerId != 'bot') {
+      return;
+    }
+
+    if (_botActionIndex >= _pendingBotActions.length) return;
+    final action = _pendingBotActions[_botActionIndex];
+
+    final now = clock.nowMs();
+    final res = MatchEngine.submit(
+      state: currentMatch,
+      playerId: 'bot',
+      rawInput: action.input,
+      nowMs: now,
+    );
+
+    _applyEngineResult(
+      engineResult: res,
+      clock: clock,
+      random: random,
+    );
+
+    // Cevap kabul edilmediyse (yanlış, tekrar, yakın ipucu) sıra hala botta kalır;
+    // Bu durumda sıradaki bot eylemini zamanla
+    final updatedMatch = state.matchState;
+    if (updatedMatch != null &&
+        updatedMatch.phase == MatchPhase.roundActive &&
+        updatedMatch.turnPlayerId == 'bot') {
+      _botActionIndex++;
+      _scheduleNextBotAction(clock, random);
+    }
   }
 
   void _startNextRound(GameClock clock, math.Random random) {
@@ -499,6 +685,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
   void _startTickTimer(GameClock clock) {
     _tickTimer?.cancel();
     _tickTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (_isPaused) return;
       final match = state.matchState;
       if (match == null) return;
 
@@ -531,7 +718,9 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _cancelAllTimers();
+    _unregisterLifecycleObserver();
   }
 
   void _cancelAllTimers() {
@@ -539,11 +728,14 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     _tickTimer = null;
     _cancelBotTimer();
     _cancelTransitionTimer();
+    _frozenRemainingTurnMs = null;
   }
 
   void _cancelBotTimer() {
     _botTimer?.cancel();
     _botTimer = null;
+    _botDeadlineMs = null;
+    _frozenRemainingBotDelayMs = null;
     _pendingBotActions = const [];
     _botActionIndex = 0;
   }
@@ -552,6 +744,7 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     _transitionTimer?.cancel();
     _transitionTimer = null;
     _transitionDeadlineMs = null;
+    _frozenRemainingTransitionMs = null;
   }
 
   static String _shortErrorMessage(Object error) {
