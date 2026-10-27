@@ -204,6 +204,7 @@ abstract final class AppStrings {
 
   // Google Hesap Bağlama ve Çıkış
   static const String linkGoogle = 'Google ile Bağla';
+  static const String signInWithGoogle = 'Google ile Giriş Yap';
   static const String linkedAccount = 'Bağlı Hesap';
   static const String signOut = 'Çıkış Yap';
   static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
@@ -214,7 +215,7 @@ abstract final class AppStrings {
       'Profil bilgilerin alınamadı. Lütfen internet bağlantını kontrol edip tekrar dene.';
   static const String signOutDialogTitle = 'Çıkış Yap';
   static const String signOutDialogMessage =
-      'Hesabından çıkmak istediğinden emin misin?\nBulut yedeklemesi henüz bulunmadığı için çıkış yaptığında cihazındaki maç geçmişin ve takma adın silinecektir.';
+      'Hesabından çıkmak istediğinden emin misin?\nÇıkış yaptığında bu cihazdaki yerel maç geçmişin sıfırlanır. Google hesabınla tekrar giriş yaparak ilerlemeni sürdürebilirsin.';
   static const String networkError =
       'İnternet bağlantını kontrol edip tekrar dene.';
   static const String authGenericError =

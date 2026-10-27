@@ -94,6 +94,50 @@ class AuthNotifier extends Notifier<AuthUiState> {
     return result;
   }
 
+  Future<AuthLinkResult> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final result = await repo.signInWithGoogle();
+
+      if (result is AuthLinkSuccess) {
+        // Yerel depoları ve önbellekleri sıfırla
+        await ref.read(matchHistoryRepositoryProvider).clear();
+        ref.invalidate(matchHistoryProvider);
+        ref.invalidate(blockedUsersProvider);
+        ref.invalidate(leaderboardNotifierProvider);
+        ref.invalidate(storeNotifierProvider);
+        ref.invalidate(onlineMatchSessionProvider);
+        await ref.read(objectionRepositoryProvider).clear();
+
+        // Yeni hesabın profilini sunucudan yükle
+        await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
+
+        _refresh();
+        state = state.copyWith(
+          isLoading: false,
+          isGoogleLinked: true,
+          linkedEmail: result.email ?? repo.linkedEmail,
+        );
+      } else if (result is AuthLinkError) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: result.message,
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+
+      return result;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
   Future<void> resolveConflict(AuthCredential credential) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {

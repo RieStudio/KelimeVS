@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/application/auth_notifier.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/auth/domain/auth_link_result.dart';
@@ -27,7 +28,9 @@ class FakeAuthRepository implements AuthRepository {
   String? linkedEmail;
 
   AuthLinkResult linkResultToReturn;
+  AuthLinkResult signInResultToReturn = const AuthLinkSuccess(email: 'user@example.com');
   bool signInWithConflictCalled = false;
+  bool signInWithGoogleCalled = false;
   bool signOutCalled = false;
   bool completeAccountDeletionCalled = false;
 
@@ -37,6 +40,7 @@ class FakeAuthRepository implements AuthRepository {
     this.isGoogleLinked = false,
     this.linkedEmail,
     this.linkResultToReturn = const AuthLinkCanceled(),
+    this.signInResultToReturn = const AuthLinkSuccess(email: 'user@example.com'),
   });
 
   @override
@@ -47,6 +51,17 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<AuthLinkResult> linkWithGoogle() async => linkResultToReturn;
+
+  @override
+  Future<AuthLinkResult> signInWithGoogle() async {
+    signInWithGoogleCalled = true;
+    if (signInResultToReturn is AuthLinkSuccess) {
+      isGoogleLinked = true;
+      linkedEmail = (signInResultToReturn as AuthLinkSuccess).email ?? 'user@example.com';
+      _controller.add(null);
+    }
+    return signInResultToReturn;
+  }
 
   @override
   Future<void> signInWithConflictCredential(AuthCredential credential) async {
@@ -345,6 +360,151 @@ void main() {
       // Profil başarıyla yüklendi
       expect(container.read(profileProvider).nickname, 'FreshPlayer');
       expect(authRepo.signInWithConflictCalled, isTrue);
+    });
+
+    testWidgets('7. Onboarding ekranından signInWithGoogle: Mevcut hesaba geçiş (takma ad var) doğrudan HomeScreen açar', (tester) async {
+      final authRepo = FakeAuthRepository(
+        isGoogleLinked: false,
+        signInResultToReturn: const AuthLinkSuccess(email: 'existing@google.com'),
+      );
+      final apiClient = FakeProfileApiClient()
+        ..mockProfile = const UserProfileModel(uid: 'anon_user', nickname: null, coins: 100);
+
+      const repo = LocalProfileRepository();
+      await repo.clear();
+
+      await tester.pumpWidget(createTestApp(
+        authRepo: authRepo,
+        apiClient: apiClient,
+        repo: repo,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
+
+      // Google ile giriş yapıldığında sunucudaki Google profili gelir
+      apiClient.mockProfile = const UserProfileModel(
+        uid: 'google_user_existing',
+        nickname: 'GoogleKral',
+        coins: 750,
+      );
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(MainShell)));
+      expect(container.read(profileProvider).nickname, 'GoogleKral');
+      expect(container.read(profileProvider).coins, 750);
+      expect(authRepo.signInWithGoogleCalled, isTrue);
+    });
+
+    testWidgets('8. Onboarding ekranından signInWithGoogle: Sunucuda takma adı null olan yeni hesap Onboardingde kalır', (tester) async {
+      final authRepo = FakeAuthRepository(
+        isGoogleLinked: false,
+        signInResultToReturn: const AuthLinkSuccess(email: 'brandnew@google.com'),
+      );
+      final apiClient = FakeProfileApiClient()
+        ..mockProfile = const UserProfileModel(
+          uid: 'google_user_new',
+          nickname: null,
+          coins: 100,
+        );
+
+      const repo = LocalProfileRepository();
+      await repo.clear();
+
+      await tester.pumpWidget(createTestApp(
+        authRepo: authRepo,
+        apiClient: apiClient,
+        repo: repo,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
+      expect(authRepo.signInWithGoogleCalled, isTrue);
+      expect(authRepo.isGoogleLinked, isTrue);
+    });
+
+    testWidgets('9. Onboarding ekranından signInWithGoogle: Sunucu hatasında Onboarding yerine Hata/Tekrar Dene ekranı açılır', (tester) async {
+      final authRepo = FakeAuthRepository(
+        isGoogleLinked: false,
+        signInResultToReturn: const AuthLinkSuccess(email: 'error@google.com'),
+      );
+      final apiClient = FakeProfileApiClient()
+        ..mockProfile = const UserProfileModel(uid: 'anon_user', nickname: null, coins: 100);
+
+      const repo = LocalProfileRepository();
+      await repo.clear();
+
+      await tester.pumpWidget(createTestApp(
+        authRepo: authRepo,
+        apiClient: apiClient,
+        repo: repo,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+
+      // Google ile giriş anında sunucu hatası alınıyor
+      apiClient.shouldThrow = true;
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byKey(const Key('profile_load_error_screen')), findsOneWidget);
+
+      apiClient.shouldThrow = false;
+      apiClient.mockProfile = const UserProfileModel(
+        uid: 'google_recovered',
+        nickname: 'KurtarilanKullanici',
+        coins: 300,
+      );
+
+      await tester.tap(find.byKey(const Key('profile_load_retry_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+    });
+
+    test('10. signInWithGoogle: Bağımlı providerlar ve eski depolar temizlenir', () async {
+      final authRepo = FakeAuthRepository(
+        isGoogleLinked: false,
+        signInResultToReturn: const AuthLinkSuccess(email: 'fresh@google.com'),
+      );
+      final apiClient = FakeProfileApiClient()
+        ..mockProfile = const UserProfileModel(
+          uid: 'google_fresh',
+          nickname: 'FreshNick',
+          coins: 200,
+        );
+
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(authRepo),
+          profileApiClientProvider.overrideWithValue(apiClient),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final storeInitial = container.read(storeNotifierProvider);
+      expect(storeInitial, isNotNull);
+
+      await container.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      expect(container.read(profileProvider).nickname, 'FreshNick');
+      expect(authRepo.signInWithGoogleCalled, isTrue);
     });
   });
 }

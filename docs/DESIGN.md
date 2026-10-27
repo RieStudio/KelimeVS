@@ -176,6 +176,8 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 
 Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgili fazlarda bu rehberdeki bileşenlerle tasarlanır.
 
+**6b) İlk açılış / Onboarding (Takma Ad Belirleme)** – Yeni kurulumda veya hesaptan çıkış sonrasında açılır. Logo ortalı, altında "Hoş Geldin!" ve "KelimeVS’de seni nasıl çağıralım?". Tek satır giriş alanı (kart zemin, 3 px `ink` kenarlık, köşe 18), anlık doğrulama, hata/kural ipucu ve 16 karakter sayacı. Butonlar: "Devam" (`PrimaryButton`, yalnızca geçerli ad girildiğinde aktif) ve altında "Google ile Giriş Yap" (`SecondaryButton`). Dönen kullanıcılar doğrudan mevcut hesaplarına giriş yapabilir; sunucuda profili olan kullanıcılar takma ad ekranına hiç düşmeden ana ekrana geçer. Giriş sırasında her iki buton kilitlenir ve çift tıklama/geri gitme engellenir.
+
 **7) Profil** – Ana ekrandaki avatara dokununca açılır. Üstte geri butonu ve "Profil" başlığı. Ortada büyük harf avatarı (takma adın ilk harfi), altında takma ad (Fredoka 22/600) ve "Adı Değiştir" ikincil butonu.
 - **Oyuncu İstatistikleri:** "Adı Değiştir" butonunun hemen altında 3'lü kart satırı (`card` zemin, `mint` 2 px kenarlık, `borderRadiusListCard` 16 px, dikey 12 dp dolgu):
   1. **Oynanan Maç:** `${stats.played}` (Fredoka 24/700 `ink`, Nunito 12/700 `muted`).

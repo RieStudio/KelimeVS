@@ -6,7 +6,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
+import '../../../core/network/network_guard.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/secondary_button.dart';
+import '../../auth/application/auth_notifier.dart';
+import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
 import '../domain/nickname_validator.dart';
 
@@ -34,6 +38,7 @@ class _OnboardingNicknameScreenState
   late final TextEditingController _controller;
   String? _errorMessage;
   bool _isSubmitting = false;
+  bool _isGoogleSigningIn = false;
 
   @override
   void initState() {
@@ -65,7 +70,7 @@ class _OnboardingNicknameScreenState
   }
 
   Future<void> _submit() async {
-    if (!_isValid || _isSubmitting) return;
+    if (!_isValid || _isSubmitting || _isGoogleSigningIn) return;
 
     final validation = NicknameValidator.validate(_controller.text);
     if (!validation.isValid || validation.normalized == null) {
@@ -92,12 +97,57 @@ class _OnboardingNicknameScreenState
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    if (_isSubmitting || _isGoogleSigningIn) return;
+    if (!ensureNetworkConnected(context, ref)) return;
+
+    setState(() {
+      _isGoogleSigningIn = true;
+    });
+
+    try {
+      final result =
+          await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      if (!mounted) return;
+
+      if (result is AuthLinkError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message)),
+        );
+      } else if (result is AuthLinkSuccess) {
+        if (widget.onComplete != null) {
+          widget.onComplete!();
+        } else if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.authGenericError)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleSigningIn = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentLength = _controller.text.length;
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
+    final authState = ref.watch(authNotifierProvider);
+    final isBusy = _isSubmitting || _isGoogleSigningIn || authState.isLoading;
+
+    return PopScope(
+      canPop: !isBusy,
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -205,13 +255,21 @@ class _OnboardingNicknameScreenState
                 // Devam Butonu
                 PrimaryButton(
                   text: AppStrings.continueAction,
-                  onPressed: _isValid && !_isSubmitting ? _submit : null,
+                  onPressed: _isValid && !isBusy ? _submit : null,
+                ),
+                const SizedBox(height: AppDimens.space12),
+
+                // Google ile Giriş Yap Butonu
+                SecondaryButton(
+                  text: AppStrings.signInWithGoogle,
+                  onPressed: isBusy ? null : _handleGoogleSignIn,
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

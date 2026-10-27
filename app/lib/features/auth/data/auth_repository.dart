@@ -15,6 +15,7 @@ abstract interface class AuthRepository {
   String? get linkedEmail;
 
   Future<AuthLinkResult> linkWithGoogle();
+  Future<AuthLinkResult> signInWithGoogle();
   Future<void> signInWithConflictCredential(AuthCredential credential);
   Future<void> signOutAndResetToAnonymous();
 
@@ -103,6 +104,40 @@ class FirebaseAuthRepository implements AuthRepository {
         // Çakışma akışında hazır credential'ı kullan
         return AuthLinkConflict(e.credential ?? credential);
       }
+      if (e.code == 'network-request-failed') {
+        return const AuthLinkError(AppStrings.networkError, isNetworkError: true);
+      }
+      return AuthLinkError(e.message ?? AppStrings.authGenericError);
+    } catch (_) {
+      return const AuthLinkError(AppStrings.authGenericError);
+    }
+  }
+
+  @override
+  Future<AuthLinkResult> signInWithGoogle() async {
+    final a = _auth;
+    if (a == null) throw StateError('Firebase henüz başlatılmadı.');
+
+    final AuthCredential? credential;
+    try {
+      credential = await _googleAuthService.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return const AuthLinkCanceled();
+      }
+      return AuthLinkError('Google girişi başarısız oldu (${e.code.name}).');
+    } catch (_) {
+      return const AuthLinkError(AppStrings.authGenericError);
+    }
+
+    if (credential == null) {
+      return const AuthLinkCanceled();
+    }
+
+    try {
+      final userCredential = await a.signInWithCredential(credential);
+      return AuthLinkSuccess(email: userCredential.user?.email ?? linkedEmail);
+    } on FirebaseAuthException catch (e) {
       if (e.code == 'network-request-failed') {
         return const AuthLinkError(AppStrings.networkError, isNetworkError: true);
       }

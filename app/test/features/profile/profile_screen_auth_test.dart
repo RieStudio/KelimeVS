@@ -45,6 +45,9 @@ class FakeAuthRepository implements AuthRepository {
   Stream<User?> authStateChanges() => _controller.stream;
 
   @override
+  Future<AuthLinkResult> signInWithGoogle() async => const AuthLinkSuccess();
+
+  @override
   Future<AuthLinkResult> linkWithGoogle() async {
     if (linkResultToReturn is AuthLinkSuccess) {
       isGoogleLinked = true;
