@@ -265,7 +265,7 @@ void main() {
     expect(find.byType(ProfileScreen), findsOneWidget);
   });
 
-  testWidgets('7. Son Maçlarım boş durumu: played > 0 ve yerel geçmiş boşsa cihazda kayıtlı maç yok mesajı gösterilir', (tester) async {
+  testWidgets('7. Son Maçlarım boş durumu: played > 0 ve yerel geçmiş boşsa geçmiş sıfırlandı mesajı gösterilir', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
     const state = ProfileState(
       isLoaded: true,
@@ -275,7 +275,7 @@ void main() {
     await tester.pumpWidget(_buildTestApp(repo, profileState: state));
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.noMatchesOnDevice), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesHistoryReset), findsOneWidget);
     expect(find.text(AppStrings.noMatchesYet), findsNothing);
     expect(find.byType(MatchCard), findsNothing);
   });
@@ -291,7 +291,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
-    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+    expect(find.text(AppStrings.noMatchesHistoryReset), findsNothing);
     expect(find.byType(MatchCard), findsNothing);
   });
 
@@ -307,7 +307,7 @@ void main() {
 
     expect(find.byType(MatchCard), findsOneWidget);
     expect(find.text(AppStrings.noMatchesYet), findsNothing);
-    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+    expect(find.text(AppStrings.noMatchesHistoryReset), findsNothing);
   });
 
   testWidgets('10. Son Maçlarım boş durumu: isLoaded false veya hata varsa (played > 0 olsa dahi) mevcut noMatchesYet gösterilir', (tester) async {
@@ -321,7 +321,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
-    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+    expect(find.text(AppStrings.noMatchesHistoryReset), findsNothing);
 
     const errorState = ProfileState(
       isLoaded: true,
@@ -333,6 +333,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
-    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+    expect(find.text(AppStrings.noMatchesHistoryReset), findsNothing);
   });
 }

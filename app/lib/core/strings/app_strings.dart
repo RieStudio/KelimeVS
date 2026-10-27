@@ -14,8 +14,8 @@ abstract final class AppStrings {
   static const String comingSoon = 'Yakında';
   static const String recentMatches = 'SON MAÇLARIM';
   static const String noMatchesYet = 'Henüz maç oynamadın. İlk maçını oyna!';
-  static const String noMatchesOnDevice =
-      'Bu cihazda kayıtlı maç yok. Oynadığın yeni maçlar burada görünecek.';
+  static const String noMatchesHistoryReset =
+      'Maç geçmişi çıkış yapınca veya hesap değiştirince sıfırlanır. Yeni oynadığın maçlar burada görünecek.';
   static const String slogan = 'Hızlı düşün, doğru yaz!';
   static const String defaultPlayerName = 'Oyuncu';
   static const String settings = 'Ayarlar';

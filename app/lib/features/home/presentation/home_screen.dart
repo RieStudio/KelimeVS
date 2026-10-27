@@ -310,7 +310,7 @@ class HomeScreen extends ConsumerWidget {
         profile.syncError == null &&
         profile.stats.played > 0;
     final message = hasRemoteMatches
-        ? AppStrings.noMatchesOnDevice
+        ? AppStrings.noMatchesHistoryReset
         : AppStrings.noMatchesYet;
 
     return Container(
