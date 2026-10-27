@@ -135,11 +135,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               text: AppStrings.continueAction,
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
-                await ref
-                    .read(authNotifierProvider.notifier)
-                    .resolveConflict(credential);
-                if (context.mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                try {
+                  await ref
+                      .read(authNotifierProvider.notifier)
+                      .resolveConflict(credential);
+                  if (context.mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          AppStrings.networkError,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontNunito,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        backgroundColor: AppColors.ink,
+                      ),
+                    );
+                  }
                 }
               },
             ),

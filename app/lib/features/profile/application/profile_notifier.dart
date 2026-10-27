@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/strings/app_strings.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../data/profile_api_client.dart';
 import '../data/profile_repository.dart';
@@ -36,6 +37,7 @@ class ProfileState {
 
   ProfileState copyWith({
     String? nickname,
+    bool clearNickname = false,
     int? coins,
     bool? isLoaded,
     bool? isSyncing,
@@ -47,7 +49,7 @@ class ProfileState {
     UserStats? stats,
   }) {
     return ProfileState(
-      nickname: nickname ?? this.nickname,
+      nickname: clearNickname ? null : (nickname ?? this.nickname),
       coins: coins ?? this.coins,
       isLoaded: isLoaded ?? this.isLoaded,
       isSyncing: isSyncing ?? this.isSyncing,
@@ -118,7 +120,10 @@ class ProfileNotifier extends Notifier<ProfileState> {
       final repo = ref.read(profileRepositoryProvider);
       final apiClient = ref.read(profileApiClientProvider);
 
-      final remote = await apiClient.getProfile();
+      final remote = await apiClient.getProfile().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => null,
+          );
       if (!ref.mounted) return;
       if (remote != null) {
         // 1. Jeton bakiyesini, enerjiyi ve istatistikleri senkronla
@@ -132,6 +137,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           energy: remote.energy,
           serverNowMs: remote.serverNowMs,
           stats: remote.stats,
+          clearSyncError: true,
         );
 
         // 2. Takma ad senkronizasyonu (Kural 2)
@@ -143,7 +149,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           await repo.setNickname(cloudNick);
           await repo.setNicknameSyncPending(false);
           if (ref.mounted) {
-            state = state.copyWith(nickname: cloudNick);
+            state = state.copyWith(nickname: cloudNick, clearSyncError: true);
           }
         } else if (localNick != null && localNick.trim().isNotEmpty) {
           // Bulutta ad yok ama yerelde geçerli takma ad varsa (Mevcut yerel takma ad göçü)
@@ -153,7 +159,10 @@ class ProfileNotifier extends Notifier<ProfileState> {
             await repo.setNickname(uploadRes.nickname);
             await repo.setNicknameSyncPending(false);
             if (ref.mounted) {
-              state = state.copyWith(nickname: uploadRes.nickname);
+              state = state.copyWith(
+                nickname: uploadRes.nickname,
+                clearSyncError: true,
+              );
             }
           } else if (uploadRes is ProfileUpdateNetworkError) {
             await repo.setNicknameSyncPending(true);
@@ -170,12 +179,104 @@ class ProfileNotifier extends Notifier<ProfileState> {
         if (pending && state.hasNickname) {
           // Gelecek bağlantıda tekrar denenecek
         }
+        if (!state.hasNickname) {
+          state = state.copyWith(
+            syncError: AppStrings.profileLoadErrorTitle,
+          );
+        }
+      }
+    } catch (_) {
+      if (!ref.mounted) return;
+      if (!state.hasNickname) {
+        state = state.copyWith(
+          syncError: AppStrings.profileLoadErrorTitle,
+        );
       }
     } finally {
       _isSyncing = false;
       if (ref.mounted) {
         state = state.copyWith(isSyncing: false);
       }
+    }
+  }
+
+  /// Bir Google hesabı çakışması çözüldüğünde (mevcut bir hesaba geçildiğinde) çağrılır.
+  /// 1. Durumu geçici olarak isLoaded: false yapar (ara durumda onboarding ekranı çizilmesini engeller).
+  /// 2. Eski anonim kullanıcının yerel profilini ve istatistiklerini SharedPreferences'tan temizler.
+  /// 3. Sunucudan yeni kullanıcının profilini (zaman aşımlı) çeker:
+  ///    - Profil ve takma ad varsa: takma adı, jetonu, çerçeveyi ve istatistikleri hem depoya hem state'e yazar, isLoaded: true yapar.
+  ///    - Profil var ama takma adı gerçekten boşsa: isLoaded: true, nickname: null yapar (meşru onboarding).
+  ///    - Sunucuya ulaşılamazsa (ağ hatası, zaman aşımı, 5xx): isLoaded: true, syncError ayarlar, nickname null kalır
+  ///      (MainShell OnboardingNicknameScreen YERİNE "Profil yüklenemedi, Tekrar Dene" durumunu gösterir;
+  ///       böylece mevcut hesabın takma adının üzerine yazılamaz).
+  Future<void> loadProfileForSwitchedAccount() async {
+    state = state.copyWith(
+      isLoaded: false,
+      isSyncing: true,
+      clearNickname: true,
+      clearSyncError: true,
+    );
+
+    final repo = ref.read(profileRepositoryProvider);
+    // Eski anonim kullanıcının yerel verisini (takma ad, jeton, çerçeve, istatistikler) sil
+    await repo.clear();
+
+    try {
+      final apiClient = ref.read(profileApiClientProvider);
+      final remote = await apiClient.getProfile().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => null,
+          );
+
+      if (!ref.mounted) return;
+
+      if (remote != null) {
+        await repo.setCoins(remote.coins);
+        await repo.setEquippedFrame(remote.equippedFrame);
+        await repo.setStats(remote.uid, remote.stats);
+
+        final cloudNick = remote.nickname?.trim();
+        if (cloudNick != null && cloudNick.isNotEmpty) {
+          await repo.setNickname(cloudNick);
+          await repo.setNicknameSyncPending(false);
+          state = ProfileState(
+            nickname: cloudNick,
+            coins: remote.coins,
+            equippedFrame: remote.equippedFrame,
+            energy: remote.energy,
+            serverNowMs: remote.serverNowMs,
+            stats: remote.stats,
+            isLoaded: true,
+            isSyncing: false,
+          );
+        } else {
+          // Sunucuda profil var ama takma ad meşru olarak boş
+          state = ProfileState(
+            nickname: null,
+            coins: remote.coins,
+            equippedFrame: remote.equippedFrame,
+            energy: remote.energy,
+            serverNowMs: remote.serverNowMs,
+            stats: remote.stats,
+            isLoaded: true,
+            isSyncing: false,
+          );
+        }
+      } else {
+        // Sunucudan profil alınamadı (ağ hatası, zaman aşımı veya 5xx)
+        state = state.copyWith(
+          isLoaded: true,
+          isSyncing: false,
+          syncError: AppStrings.profileLoadErrorTitle,
+        );
+      }
+    } catch (_) {
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        isLoaded: true,
+        isSyncing: false,
+        syncError: AppStrings.profileLoadErrorTitle,
+      );
     }
   }
 

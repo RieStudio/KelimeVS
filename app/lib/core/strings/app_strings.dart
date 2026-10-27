@@ -206,7 +206,10 @@ abstract final class AppStrings {
   static const String signOut = 'Çıkış Yap';
   static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
   static const String linkConflictDialogMessage =
-      'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu hesaba geçersen şu anki anonim ilerlemen (maç geçmişi, takma ad) silinir. Devam edilsin mi?';
+      'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu hesaba geçersen şu anki anonim ilerlemen (takma ad, jeton, maç geçmişi) silinir. Devam edilsin mi?';
+  static const String profileLoadErrorTitle = 'Profil yüklenemedi';
+  static const String profileLoadErrorMessage =
+      'Profil bilgilerin alınamadı. Lütfen internet bağlantını kontrol edip tekrar dene.';
   static const String signOutDialogTitle = 'Çıkış Yap';
   static const String signOutDialogMessage =
       'Hesabından çıkmak istediğinden emin misin?\nBulut yedeklemesi henüz bulunmadığı için çıkış yaptığında cihazındaki maç geçmişin ve takma adın silinecektir.';

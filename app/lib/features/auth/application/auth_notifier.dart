@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../game/application/match_history_provider.dart';
+import '../../game/application/match_providers.dart';
 import '../../game/application/objection_provider.dart';
+import '../../leaderboard/application/leaderboard_providers.dart';
 import '../../profile/application/blocked_users_notifier.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../store/application/store_notifier.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_link_result.dart';
 
@@ -97,12 +100,15 @@ class AuthNotifier extends Notifier<AuthUiState> {
       final repo = ref.read(authRepositoryProvider);
       await repo.signInWithConflictCredential(credential);
 
-      // Yerel maç geçmişi, itirazlar ve takma adı sıfırla
+      // Yerel depoları ve önbellekleri sıfırla
       await ref.read(matchHistoryRepositoryProvider).clear();
       ref.invalidate(matchHistoryProvider);
       ref.invalidate(blockedUsersProvider);
+      ref.invalidate(leaderboardNotifierProvider);
+      ref.invalidate(storeNotifierProvider);
+      ref.invalidate(onlineMatchSessionProvider);
       await ref.read(objectionRepositoryProvider).clear();
-      await ref.read(profileProvider.notifier).clearNickname();
+      await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
 
       _refresh();
       state = state.copyWith(isLoading: false);
@@ -121,10 +127,13 @@ class AuthNotifier extends Notifier<AuthUiState> {
       final repo = ref.read(authRepositoryProvider);
       await repo.signOutAndResetToAnonymous();
 
-      // Yerel maç geçmişi, itirazlar ve takma adı sıfırla
+      // Yerel depoları ve önbellekleri sıfırla
       await ref.read(matchHistoryRepositoryProvider).clear();
       ref.invalidate(matchHistoryProvider);
       ref.invalidate(blockedUsersProvider);
+      ref.invalidate(leaderboardNotifierProvider);
+      ref.invalidate(storeNotifierProvider);
+      ref.invalidate(onlineMatchSessionProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).clearNickname();
 
@@ -189,6 +198,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
     await ref.read(matchHistoryRepositoryProvider).clear();
     ref.invalidate(matchHistoryProvider);
     ref.invalidate(blockedUsersProvider);
+    ref.invalidate(leaderboardNotifierProvider);
+    ref.invalidate(storeNotifierProvider);
+    ref.invalidate(onlineMatchSessionProvider);
     await ref.read(objectionRepositoryProvider).clear();
     await ref.read(profileProvider.notifier).clearNickname();
 
@@ -212,6 +224,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
       await ref.read(matchHistoryRepositoryProvider).clear();
       ref.invalidate(matchHistoryProvider);
       ref.invalidate(blockedUsersProvider);
+      ref.invalidate(leaderboardNotifierProvider);
+      ref.invalidate(storeNotifierProvider);
+      ref.invalidate(onlineMatchSessionProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).clearNickname();
 

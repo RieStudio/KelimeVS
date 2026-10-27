@@ -9,6 +9,8 @@ import 'core/icons/app_icons.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
+import 'core/theme/app_dimens.dart';
+import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/app_widgets.dart';
 import 'features/game/application/match_providers.dart';
@@ -223,7 +225,79 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!profile.isLoaded) {
       return const Scaffold(
         backgroundColor: AppColors.surface,
-        body: SizedBox.shrink(),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
+    if (profile.syncError != null && !profile.hasNickname) {
+      return Scaffold(
+        key: const Key('profile_load_error_screen'),
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.screenPaddingHorizontal,
+            ),
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerSurface,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.dangerSoft,
+                      width: AppDimens.borderThin,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.cloud_off_rounded,
+                      size: 48,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppDimens.space24),
+                Text(
+                  AppStrings.profileLoadErrorTitle,
+                  style: AppTextStyles.screenTitle.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppDimens.space12),
+                Text(
+                  AppStrings.profileLoadErrorMessage,
+                  style: AppTextStyles.bodyText.copyWith(
+                    color: AppColors.muted,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const Spacer(flex: 3),
+                PrimaryButton(
+                  key: const Key('profile_load_retry_button'),
+                  text: AppStrings.retry,
+                  onPressed: profile.isSyncing
+                      ? null
+                      : () =>
+                          ref.read(profileProvider.notifier).syncWithServer(),
+                ),
+                const SizedBox(height: AppDimens.space24),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
