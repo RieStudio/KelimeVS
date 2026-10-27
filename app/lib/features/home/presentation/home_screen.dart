@@ -247,10 +247,10 @@ class HomeScreen extends ConsumerWidget {
                   loading: () => const Center(
                     child: CircularProgressIndicator(color: AppColors.primary),
                   ),
-                  error: (err, stack) => _buildEmptyState(),
+                  error: (err, stack) => _buildEmptyState(profile),
                   data: (entries) {
                     if (entries.isEmpty) {
-                      return _buildEmptyState();
+                      return _buildEmptyState(profile);
                     }
 
                     // Sıralama: finishedAtMs azalan; eşitlikte sonradan eklenen üstte (gelen listedeki index küçük olan üstte)
@@ -305,7 +305,14 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ProfileState profile) {
+    final hasRemoteMatches = profile.isLoaded &&
+        profile.syncError == null &&
+        profile.stats.played > 0;
+    final message = hasRemoteMatches
+        ? AppStrings.noMatchesOnDevice
+        : AppStrings.noMatchesYet;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -318,7 +325,7 @@ class HomeScreen extends ConsumerWidget {
         border: Border.all(color: AppColors.mint, width: AppDimens.borderThin),
       ),
       child: Text(
-        AppStrings.noMatchesYet,
+        message,
         style: AppTextStyles.bodyText.copyWith(
           color: AppColors.muted,
           fontWeight: FontWeight.w700,

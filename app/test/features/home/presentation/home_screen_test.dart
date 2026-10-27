@@ -15,6 +15,8 @@ import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
+import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
@@ -33,10 +35,20 @@ class FakeMatchHistoryRepository implements MatchHistoryRepository {
   Future<void> clear() async {}
 }
 
-Widget _buildTestApp(MatchHistoryRepository repo) {
+class _MockProfileNotifier extends ProfileNotifier {
+  final ProfileState _state;
+  _MockProfileNotifier(this._state);
+
+  @override
+  ProfileState build() => _state;
+}
+
+Widget _buildTestApp(MatchHistoryRepository repo, {ProfileState? profileState}) {
   return ProviderScope(
     overrides: [
       matchHistoryRepositoryProvider.overrideWithValue(repo),
+      if (profileState != null)
+        profileProvider.overrideWith(() => _MockProfileNotifier(profileState)),
     ],
     child: const MaterialApp(
       home: HomeScreen(),
@@ -251,5 +263,76 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ProfileScreen), findsOneWidget);
+  });
+
+  testWidgets('7. Son Maçlarım boş durumu: played > 0 ve yerel geçmiş boşsa cihazda kayıtlı maç yok mesajı gösterilir', (tester) async {
+    final repo = FakeMatchHistoryRepository([]);
+    const state = ProfileState(
+      isLoaded: true,
+      stats: UserStats(played: 3, won: 2, lost: 1, correctAnswers: 8),
+    );
+
+    await tester.pumpWidget(_buildTestApp(repo, profileState: state));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.noMatchesOnDevice), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesYet), findsNothing);
+    expect(find.byType(MatchCard), findsNothing);
+  });
+
+  testWidgets('8. Son Maçlarım boş durumu: played == 0 ve yerel geçmiş boşsa henüz maç oynamadın mesajı gösterilir', (tester) async {
+    final repo = FakeMatchHistoryRepository([]);
+    const state = ProfileState(
+      isLoaded: true,
+      stats: UserStats(played: 0, won: 0, lost: 0, correctAnswers: 0),
+    );
+
+    await tester.pumpWidget(_buildTestApp(repo, profileState: state));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+    expect(find.byType(MatchCard), findsNothing);
+  });
+
+  testWidgets('9. Son Maçlarım: geçmiş dolu olduğunda (played > 0 olsa bile) maç kartları listelenir, boş durum gösterilmez', (tester) async {
+    final repo = FakeMatchHistoryRepository([wonEntry]);
+    const state = ProfileState(
+      isLoaded: true,
+      stats: UserStats(played: 10, won: 8, lost: 2, correctAnswers: 25),
+    );
+
+    await tester.pumpWidget(_buildTestApp(repo, profileState: state));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MatchCard), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesYet), findsNothing);
+    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+  });
+
+  testWidgets('10. Son Maçlarım boş durumu: isLoaded false veya hata varsa (played > 0 olsa dahi) mevcut noMatchesYet gösterilir', (tester) async {
+    final repo = FakeMatchHistoryRepository([]);
+    const notLoadedState = ProfileState(
+      isLoaded: false,
+      stats: UserStats(played: 5, won: 3, lost: 2),
+    );
+
+    await tester.pumpWidget(_buildTestApp(repo, profileState: notLoadedState));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
+
+    const errorState = ProfileState(
+      isLoaded: true,
+      syncError: 'Profil yüklenemedi',
+      stats: UserStats(played: 5, won: 3, lost: 2),
+    );
+
+    await tester.pumpWidget(_buildTestApp(repo, profileState: errorState));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
+    expect(find.text(AppStrings.noMatchesOnDevice), findsNothing);
   });
 }
