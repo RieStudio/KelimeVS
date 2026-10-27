@@ -345,6 +345,15 @@ class MatchController extends Notifier<MatchUiState> implements MatchSession {
     int transitionRemaining = 0;
 
     if (nextState.phase == MatchPhase.matchFinished) {
+      if (nextState.endedBy == 'draw_limit_reached') {
+        _cancelAllTimers();
+        state = state.copyWith(
+          isVoided: true,
+          isLoading: false,
+        );
+        return;
+      }
+
       if (!_isMatchSaved) {
         _isMatchSaved = true;
         _saveMatchToHistory(nextState, clock, opponentName ?? state.opponentName);

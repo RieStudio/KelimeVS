@@ -18,6 +18,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly MAX_REPORTS_PER_DAY?: string;
   readonly MAX_BLOCKS_PER_USER?: string;
   readonly FAST_TIMERS?: string;
+  readonly TURN_GRACE_MS?: string;
   readonly CONTENT_SOURCE?: string;
   readonly FIREBASE_DATABASE_URL?: string;
   readonly FIREBASE_SERVICE_ACCOUNT_B64?: string;

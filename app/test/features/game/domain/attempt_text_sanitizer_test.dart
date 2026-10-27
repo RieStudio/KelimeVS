@@ -1,5 +1,20 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/game/domain/attempt_text_sanitizer.dart';
+
+Directory _resolveSharedVectorsDir() {
+  final candidate1 = Directory('../shared/test-vectors');
+  if (candidate1.existsSync()) return candidate1;
+
+  final candidate2 = Directory('shared/test-vectors');
+  if (candidate2.existsSync()) return candidate2;
+
+  final candidate3 = Directory('../../shared/test-vectors');
+  if (candidate3.existsSync()) return candidate3;
+
+  throw StateError('shared/test-vectors dizini bulunamadı!');
+}
 
 void main() {
   group('AttemptTextSanitizer', () {
@@ -44,6 +59,24 @@ void main() {
       expect(AttemptTextSanitizer.sanitize('kara kartal'), 'kara kartal');
       final exactly40 = 'x' * 40;
       expect(AttemptTextSanitizer.sanitize(exactly40), exactly40);
+    });
+
+    test('shared/test-vectors/sanitizer.json test vektörlerinin tamamı geçer', () {
+      final dir = _resolveSharedVectorsDir();
+      final file = File('${dir.path}/sanitizer.json');
+      expect(file.existsSync(), isTrue);
+      final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      final cases = (json['cases'] as List).cast<Map<String, dynamic>>();
+
+      expect(cases.length, greaterThanOrEqualTo(15));
+
+      for (final tc in cases) {
+        final id = tc['id'] as String;
+        final input = tc['input'] as String;
+        final expected = tc['expected'] as String;
+        final actual = AttemptTextSanitizer.sanitize(input);
+        expect(actual, expected, reason: 'Test case $id failed for input "$input"');
+      }
     });
   });
 }

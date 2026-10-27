@@ -4,6 +4,9 @@ class MatchConfig {
   /// Bir oyuncunun maçı kazanması için gereken galibiyet sayısı (varsayılan 2)
   final int roundsToWin;
 
+  /// Maksimum toplam oynanabilecek tur sayısı (beraberlikler dahil tavan, varsayılan 5)
+  final int maxTotalRounds;
+
   /// Maksimum sonuçlanan (kazananı olan) tur sayısı: 2 * roundsToWin - 1
   int get maxDecisiveRounds => 2 * roundsToWin - 1;
 
@@ -30,6 +33,7 @@ class MatchConfig {
 
   const MatchConfig({
     int roundsToWin = 2,
+    this.maxTotalRounds = 5,
     int? totalDecisiveRounds,
     this.answerSeconds = 15,
     this.graceMs = 0,

@@ -71,7 +71,7 @@ interface StoredRoomData {
   readonly questions: Question[];
   readonly questionOrder: string[];
   readonly status: 'waiting_for_players' | 'active' | 'finished' | 'voided';
-  readonly voidedReason?: 'opponent_absent' | 'both_disconnected';
+  readonly voidedReason?: 'opponent_absent' | 'both_disconnected' | 'draw_limit_reached';
   readonly matchType?: 'ranked' | 'friendly';
   readonly engineState?: SerializedMatchState;
   readonly schedule: TimersSchedule;
@@ -153,6 +153,16 @@ export class MatchRoom extends DurableObject<Env> {
   private get durations(): RoomDurations {
     const isFast = this.env.FAST_TIMERS === 'true';
     return getRoomDurations(isFast);
+  }
+
+  private get turnGraceMs(): number {
+    if (this.env.TURN_GRACE_MS !== undefined) {
+      const parsed = Number(this.env.TURN_GRACE_MS);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        return parsed;
+      }
+    }
+    return this.env.FAST_TIMERS === 'true' ? 100 : 400;
   }
 
   /** Matchmaker tarafından maç başlangıcı verileriyle çağrılır */
@@ -374,7 +384,11 @@ export class MatchRoom extends DurableObject<Env> {
       }
 
       if (res.state.phase === 'matchFinished') {
-        await this.handleMatchFinished();
+        if (res.state.endedBy === 'draw_limit_reached') {
+          await this.handleDrawLimitVoided(res.state.totalRoundsPlayed);
+        } else {
+          await this.handleMatchFinished();
+        }
       } else if (res.state.phase === 'roundEnded') {
         this.data = {
           ...this.data,
@@ -392,7 +406,7 @@ export class MatchRoom extends DurableObject<Env> {
           ...this.data,
           schedule: {
             ...this.data.schedule,
-            turnDeadlineMs: res.state.deadlineMs,
+            turnDeadlineMs: res.state.deadlineMs + this.turnGraceMs,
           },
         };
         await this.persist();
@@ -433,7 +447,12 @@ export class MatchRoom extends DurableObject<Env> {
       if (bothDisconnected) {
         // EK ŞART: İki oyuncu da odada yokken turnTimeout alarmı tur/maç sonucu üretmesin
         if (turnDeadlineMs !== undefined) {
-          frozenTurnRemainingMs = Math.max(0, turnDeadlineMs - nowMs);
+          if (this.data.engineState) {
+            const state = deserializeMatchState(this.data.engineState);
+            frozenTurnRemainingMs = Math.max(0, state.deadlineMs - nowMs);
+          } else {
+            frozenTurnRemainingMs = Math.max(0, turnDeadlineMs - nowMs);
+          }
           turnDeadlineMs = undefined;
         }
       }
@@ -614,7 +633,11 @@ export class MatchRoom extends DurableObject<Env> {
             engineState: serializeMatchState(res.state),
           };
           if (res.state.phase === 'matchFinished') {
-            await this.handleMatchFinished();
+            if (res.state.endedBy === 'draw_limit_reached') {
+              await this.handleDrawLimitVoided(res.state.totalRoundsPlayed);
+            } else {
+              await this.handleMatchFinished();
+            }
           } else if (res.state.phase === 'roundEnded') {
             this.data = {
               ...this.data,
@@ -668,7 +691,7 @@ export class MatchRoom extends DurableObject<Env> {
               schedule: {
                 ...this.data.schedule,
                 nextRoundAtMs: undefined,
-                turnDeadlineMs: res.state.deadlineMs,
+                turnDeadlineMs: res.state.deadlineMs + this.turnGraceMs,
               },
             };
           }
@@ -711,11 +734,12 @@ export class MatchRoom extends DurableObject<Env> {
         const config: MatchConfig = {
           roundsToWin: 2,
           answerSeconds: this.durations.answerSeconds,
-          graceMs: 0,
+          graceMs: this.turnGraceMs,
           nearMissPerRound: 1,
           minAnswersPerQuestion: 0,
           minSubmitIntervalMs: 600,
           maxAttemptsPerTurn: 25,
+          maxTotalRounds: 5,
         };
 
         const nowMs = Date.now();
@@ -734,7 +758,7 @@ export class MatchRoom extends DurableObject<Env> {
           engineState: serializeMatchState(res.state),
           schedule: {
             connectTimeoutAtMs: undefined,
-            turnDeadlineMs: res.state.deadlineMs,
+            turnDeadlineMs: res.state.deadlineMs + this.turnGraceMs,
           },
         };
 
@@ -795,7 +819,7 @@ export class MatchRoom extends DurableObject<Env> {
         const newDeadlineMs = nowMs + resumedRemaining;
         const updatedState: MatchState = { ...state, deadlineMs: newDeadlineMs };
         engineState = serializeMatchState(updatedState);
-        turnDeadlineMs = newDeadlineMs;
+        turnDeadlineMs = newDeadlineMs + this.turnGraceMs;
         frozenTurnRemainingMs = undefined;
       }
 
@@ -831,11 +855,42 @@ export class MatchRoom extends DurableObject<Env> {
     }
   }
 
+  private async handleDrawLimitVoided(totalRounds: number): Promise<void> {
+    if (!this.data) return;
+    console.log(
+      JSON.stringify({
+        event: 'match_voided',
+        matchId: this.data.matchId,
+        reason: 'draw_limit_reached',
+        totalRounds,
+      })
+    );
+    this.data = {
+      ...this.data,
+      status: 'voided',
+      voidedReason: 'draw_limit_reached',
+      schedule: {},
+    };
+    const voidedMsg: ClientVoidedMessage = { t: 'voided', reason: 'draw_limit_reached' };
+    this.broadcastAll(JSON.stringify(voidedMsg));
+    this.closeAllSockets(1000, 'voided');
+    await this.persist();
+    await this.updateAlarm();
+    if (this.data.energyChargedUids && this.data.energyChargedUids.length > 0) {
+      await this.applyEnergyRefunds(this.data.energyChargedUids);
+    }
+  }
+
   private async handleMatchFinished(): Promise<void> {
     if (!this.data) return;
 
-    const nowMs = Date.now();
     const state = this.data.engineState ? deserializeMatchState(this.data.engineState) : null;
+    if (state?.endedBy === 'draw_limit_reached') {
+      await this.handleDrawLimitVoided(state.totalRoundsPlayed);
+      return;
+    }
+
+    const nowMs = Date.now();
     const winnerId = state?.winnerId;
     const p1Uid = this.data.p1.uid;
     const p2Uid = this.data.p2.uid;
@@ -1287,7 +1342,7 @@ export class MatchRoom extends DurableObject<Env> {
       engineState: serializeMatchState(updatedState),
       schedule: {
         ...this.data.schedule,
-        turnDeadlineMs: updatedState.deadlineMs,
+        turnDeadlineMs: updatedState.deadlineMs + this.turnGraceMs,
       },
       powerupsUsed: {
         ...this.data.powerupsUsed,

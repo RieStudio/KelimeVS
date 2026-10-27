@@ -4,6 +4,7 @@ import { AnswerMatcher } from './matcher';
 import type { Question } from './models';
 import { isNearMiss } from './nearMiss';
 import { normalize } from './normalizer';
+import { AttemptTextSanitizer } from './sanitizer';
 import type {
   EngineResult,
   MatchConfig,
@@ -106,12 +107,32 @@ function endRound(params: {
   const hasWinner =
     winnerId !== null && (updatedScores[winnerId] ?? 0) >= state.config.roundsToWin;
   const isDecisiveLimitReached = updatedDecisiveRounds >= maxDecisiveRounds;
+  const maxTotalRounds = state.config.maxTotalRounds ?? 5;
+  const isTotalLimitReached = updatedTotalRoundsPlayed >= maxTotalRounds;
 
-  if (hasWinner || isDecisiveLimitReached) {
+  if (hasWinner || isDecisiveLimitReached || isTotalLimitReached) {
     const p1 = state.playerIds[0];
     const p2 = state.playerIds[1];
     const s1 = updatedScores[p1] ?? 0;
     const s2 = updatedScores[p2] ?? 0;
+
+    if (isTotalLimitReached && s1 === s2 && !hasWinner) {
+      events.push({ type: 'MatchFinished', winnerId: '', reason: 'draw_limit_reached' });
+
+      const finishedState: MatchState = {
+        ...state,
+        scores: updatedScores,
+        decisiveRounds: updatedDecisiveRounds,
+        totalRoundsPlayed: updatedTotalRoundsPlayed,
+        phase: 'matchFinished',
+        roundHistory: updatedRoundHistory,
+        currentRoundAttempts: attempts,
+        winnerId: null,
+        endedBy: 'draw_limit_reached',
+      };
+
+      return { state: finishedState, events };
+    }
 
     const matchWinnerId = winnerId ?? (s1 > s2 ? p1 : p2);
 
@@ -251,8 +272,13 @@ export abstract class MatchEngine {
       return { state, events: [{ type: 'Ignored', reason: 'tooManyAttempts' }] };
     }
 
-    // 5. Normalizasyon ve boşluk kontrolü
-    const normalized = normalize(rawInput);
+    // 5. Metin temizliği (sanitization), normalizasyon ve boşluk kontrolü
+    const sanitizedInput = AttemptTextSanitizer.sanitize(rawInput);
+    if (sanitizedInput.length === 0) {
+      return { state, events: [{ type: 'Ignored', reason: 'empty_input' }] };
+    }
+
+    const normalized = normalize(sanitizedInput);
     if (normalized.length === 0) {
       return { state, events: [{ type: 'Ignored', reason: 'empty_input' }] };
     }
@@ -265,13 +291,13 @@ export abstract class MatchEngine {
 
     const question = state.currentQuestion!;
     const matcher = new AnswerMatcher(question);
-    const matchResult = matcher.check(rawInput, state.usedAnswerIds);
+    const matchResult = matcher.check(sanitizedInput, state.usedAnswerIds);
 
     switch (matchResult.type) {
       case 'correct': {
         const attempt: TurnAttempt = {
           playerId,
-          rawInput,
+          rawInput: sanitizedInput,
           resultType: 'correct',
           answerId: matchResult.answer.id,
           displayText: matchResult.answer.display,
@@ -336,7 +362,7 @@ export abstract class MatchEngine {
       case 'repeated': {
         const attempt: TurnAttempt = {
           playerId,
-          rawInput,
+          rawInput: sanitizedInput,
           resultType: 'repeated',
           answerId: matchResult.answer.id,
           nowMs,
@@ -379,7 +405,7 @@ export abstract class MatchEngine {
 
           const attempt: TurnAttempt = {
             playerId,
-            rawInput,
+            rawInput: sanitizedInput,
             resultType: 'nearMiss',
             nowMs,
             isClose: true,
@@ -402,7 +428,7 @@ export abstract class MatchEngine {
 
         const attempt: TurnAttempt = {
           playerId,
-          rawInput,
+          rawInput: sanitizedInput,
           resultType: 'wrong',
           nowMs,
           isClose,
@@ -418,7 +444,7 @@ export abstract class MatchEngine {
 
         return {
           state: nextState,
-          events: [{ type: 'WrongAnswer', playerId, rawInput }],
+          events: [{ type: 'WrongAnswer', playerId, rawInput: sanitizedInput }],
         };
       }
 

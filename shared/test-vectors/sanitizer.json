@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "description": "AttemptTextSanitizer test vectors for free-text cleaning, space collapsing, and 40-char truncation",
+  "cases": [
+    {
+      "id": "san_001",
+      "description": "Basic trim with leading and trailing spaces",
+      "input": "  elma  ",
+      "expected": "elma"
+    },
+    {
+      "id": "san_002",
+      "description": "Tabs and newline characters trimmed from boundaries",
+      "input": "\t\n armut \r\n",
+      "expected": "armut"
+    },
+    {
+      "id": "san_003",
+      "description": "Internal consecutive spaces collapsed to single space",
+      "input": "kırmızı   elma",
+      "expected": "kırmızı elma"
+    },
+    {
+      "id": "san_004",
+      "description": "Multiple spaced words collapsed",
+      "input": "bir    iki   üç   dört",
+      "expected": "bir iki üç dört"
+    },
+    {
+      "id": "san_005",
+      "description": "Tabs and newlines inside text collapsed to single space",
+      "input": "boşluk \t\t\n ayırma",
+      "expected": "boşluk ayırma"
+    },
+    {
+      "id": "san_006",
+      "description": "Empty input returns empty string",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "id": "san_007",
+      "description": "Spaces-only input returns empty string",
+      "input": "   ",
+      "expected": ""
+    },
+    {
+      "id": "san_008",
+      "description": "Whitespace-only input with newlines and tabs returns empty string",
+      "input": "\n\t  \r",
+      "expected": ""
+    },
+    {
+      "id": "san_009",
+      "description": "Text under 40 characters preserved",
+      "input": "kara kartal",
+      "expected": "kara kartal"
+    },
+    {
+      "id": "san_010",
+      "description": "Text with exactly 40 characters preserved",
+      "input": "1234567890123456789012345678901234567890",
+      "expected": "1234567890123456789012345678901234567890"
+    },
+    {
+      "id": "san_011",
+      "description": "Text over 40 characters truncated to 40",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "san_012",
+      "description": "Collapsing spaces occurs before length check and truncation",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa          bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbb"
+    },
+    {
+      "id": "san_013",
+      "description": "Turkish characters preserved in free text",
+      "input": "  çağdaş   öğretmen   şampiyon   ümit  ",
+      "expected": "çağdaş öğretmen şampiyon ümit"
+    },
+    {
+      "id": "san_014",
+      "description": "Turkish characters with exact 40 length preserved",
+      "input": "çğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğış",
+      "expected": "çğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğış"
+    },
+    {
+      "id": "san_015",
+      "description": "Turkish characters over 40 length truncated to 40",
+      "input": "çğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖ",
+      "expected": "çğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğışüöÇĞİŞÜÖçğış"
+    },
+    {
+      "id": "san_016",
+      "description": "Emoji within 40 characters preserved",
+      "input": "  tatlı 🍎 elma  ",
+      "expected": "tatlı 🍎 elma"
+    },
+    {
+      "id": "san_017",
+      "description": "Emoji ending exactly at 40 UTF-16 code units (38 ASCII + 2 surrogate code units)",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa🍎",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa🍎"
+    },
+    {
+      "id": "san_018",
+      "description": "Emoji surrogate boundary at 40 chars (39 ASCII + 2 surrogate code units truncated at 40 code units)",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa🍎",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud83c"
+    }
+  ]
+}
+

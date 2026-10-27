@@ -1,5 +1,6 @@
 // JSON Protokol Tanımları ve Ayrıştırıcıları
 import { validateNickname } from './engine/nicknameValidator';
+import { AttemptTextSanitizer } from './engine/sanitizer';
 
 export const FRIEND_CODE_ALPHABET = '23456789BCDFGHJKMNPQRSTVWXYZ';
 
@@ -131,7 +132,7 @@ export interface ClientFeedbackMessage {
 
 export interface ClientVoidedMessage {
   readonly t: 'voided';
-  readonly reason: 'opponent_absent' | 'both_disconnected';
+  readonly reason: 'opponent_absent' | 'both_disconnected' | 'draw_limit_reached';
 }
 
 export interface ClientPowerupAckMessage {
@@ -236,7 +237,7 @@ export function parseMatchRoomMessage(
 
     if (data.t === 'submit') {
       if (typeof data.text !== 'string') return null;
-      const text = data.text.trim().replace(/\s+/g, ' ').slice(0, 40);
+      const text = AttemptTextSanitizer.sanitize(data.text);
       return { t: 'submit', text };
     }
     if (data.t === 'leave') {

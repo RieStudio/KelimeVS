@@ -333,18 +333,19 @@ Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton veril
 ```json
 {
   "t": "voided",
-  "reason": "opponent_absent" | "both_disconnected"
+  "reason": "opponent_absent" | "both_disconnected" | "draw_limit_reached"
 }
 ```
 ##### İptal Nedenleri (`reason`):
 - `"opponent_absent"`: Eşleşme sağlandıktan sonra bir oyuncu odaya bağlanır, diğeri belirlenen süre içinde (Normal: 10 sn, Hızlı: 3 sn) hiç bağlanmazsa.
 - `"both_disconnected"`: Aktif maç sırasında her iki oyuncunun da bağlantısı kopar ve her ikisinin de kopma süresi (Normal: 30 sn, Hızlı: 3 sn) geri dönmeden dolarsa.
+- `"draw_limit_reached"`: Toplam tur tavanına (`maxTotalRounds = 5`) ulaşıldığı halde skorlar eşitse (0-0, 1-1, 2-2) maç iptal edilir ve her iki oyuncuya enerjileri iade edilir. (Tavan dolduğunda skor eşit değilse, örn. 1-0 veya 2-1, lider olan taraf normal galip sayılır).
 
 > **İptal Edilmiş Odaya Yeniden Bağlanma:** İstemci önceden `voided` olmuş bir odaya bağlandığında WebSocket el sıkışması kabul edilir (HTTP 101), derhal güncel `{ "t": "voided", "reason": ... }` mesajı gönderilir ve soket 1000 koduyla kapatılır.
 
 ---
 
-### 3.1. Kopma Durum Makinesi ve İki Oyuncu Kopukken Tur Süresi (Disconnect State Machine)
+### 3.1. Kopma Durum Makinesi, Ağ Toleransı ve Beraberlik Tavanı
 
 1. **Bağımsız Kopma Vadesi (`disconnectedUids`):**
    - Her oyuncunun kopma anı ve vadesi (`nowMs + disconnectTimeoutMs`) ayrı saklanır.
@@ -354,7 +355,7 @@ Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton veril
    - Bir oyuncunun kopma vadesi dolduğunda rakibi **o anda bağlıysa**: vadesi dolan oyuncu hükmen yenik (`endedBy: 'forfeit'`) sayılır; bağlı kalan galip oyuncuya enerji iade edilir.
 
 3. **İki Oyuncu da Kopukken Tur Süresinin Dondurulması (EK ŞART):**
-   - Her iki oyuncu da aynı anda odada yokken turn timeout süresi dondurulur (`turnDeadlineMs` temizlenir, `frozenTurnRemainingMs` saklanır).
+   - Her iki oyuncu da aynı anda odada yokken turn timeout süresi dondurulur (`turnDeadlineMs` temizlenir, nominal kalan süre `frozenTurnRemainingMs` saklanır).
    - Odada hiç oyuncu yokken turnTimeout alarmı asla tur sonucu (1-0, 2-0 vb.) veya maç sonucu üretmez.
 
 4. **Karşılıklı Kopmada İptal (Voided):**
@@ -364,7 +365,18 @@ Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton veril
 5. **Geri Dönüş (Reconnect):**
    - Oyuncu geri döndüğünde yalnızca kendi kopma kaydı silinir.
    - Rakip kopuk ve vadesi **zaten dolmuşsa**: o anda rakip hükmen yenik sayılır ve dönen oyuncu kazanır.
-   - Rakip bağlıysa veya vadesi henüz dolmamışsa: dondurulan tur süresi (`Math.max(1000, frozenTurnRemainingMs)`) üzerinden devam eder.
+   - Rakip bağlıysa veya vadesi henüz dolmamışsa: dondurulan nominal tur süresi (`Math.max(1000, frozenTurnRemainingMs)`) üzerinden devam eder, alarm vadesine ağ toleransı eklenir.
+
+6. **Ağ Gecikmesi Toleransı (`TURN_GRACE_MS`):**
+   - Sunucu tarafında `TURN_GRACE_MS` (varsayılan: 400 ms) ile cevap kabul toleransı uygulanır (`MatchConfig.graceMs`).
+   - İstemciye giden `state.deadlineMs` nominal kalır; böylece istemci arayüzündeki geri sayım çubuğu nominal 15 saniyeyi gösterir.
+   - Durable Object `schedule.turnDeadlineMs` alarmı `state.deadlineMs + turnGraceMs` zamanına kurulur.
+   - Son milisaniyelerde gönderilen cevaplar ağ gecikmesi olsa dahi tolerans dahilinde kabul edilir.
+
+7. **Beraberlik Tavanı (`maxTotalRounds = 5`):**
+   - Peş peşe berabere biten turların sonsuza kadar uzamasını önlemek için azami toplam tur sayısı 5 ile sınırlandırılmıştır.
+   - 5. turun sonunda skor eşit değilse (örn. 1-0), daha yüksek puana sahip olan taraf kazanır (`endedBy: 'points_reached'`).
+   - 5. turun sonunda skor eşitse (örn. 0-0, 1-1, 2-2), maç berabere biter (`endedBy: 'draw_limit_reached'`), oda `voided` (`draw_limit_reached`) durumuna geçer, her iki oyuncuya enerji iade edilir, coin ve lig puanı değişmez. İstemcide bot maçında da aynı tavan geçerlidir ve maç eşleştirmeye yönlendirilir.
 
 #### Güçlendirici Onayı / Yanıtı (`powerup_ack`)
 Yalnızca güçlendiriciyi kullanmak isteyen oyuncuya gönderilir:

@@ -69,7 +69,7 @@ class RoundDrawn extends MatchEvent {
 }
 
 class MatchFinished extends MatchEvent {
-  final String winnerId;
+  final String? winnerId;
   final String reason;
 
   const MatchFinished(this.winnerId, [this.reason = 'normal']);

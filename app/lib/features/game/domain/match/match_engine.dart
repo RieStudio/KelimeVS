@@ -3,6 +3,7 @@
 import 'dart:math' as math;
 
 import '../answer_matcher.dart';
+import '../attempt_text_sanitizer.dart';
 import '../models.dart';
 import '../text_normalizer.dart';
 import 'match_config.dart';
@@ -93,13 +94,19 @@ abstract final class MatchEngine {
     List<Question>? questionsPool,
     math.Random? random,
   }) {
+    // 0. Girdi temizleme (sanitization)
+    final sanitizedInput = AttemptTextSanitizer.sanitize(rawInput);
+    if (sanitizedInput.isEmpty) {
+      return EngineResult(state, const [Ignored('empty_input')]);
+    }
+
     if (state.phase != MatchPhase.roundActive) {
-      return EngineResult(state, [const Ignored('round_not_active')]);
+      return EngineResult(state, const [Ignored('round_not_active')]);
     }
 
     // 1. Sırası olmayan oyuncunun cevabı yoksayılır
     if (playerId != state.turnPlayerId) {
-      return EngineResult(state, [const Ignored('not_player_turn')]);
+      return EngineResult(state, const [Ignored('not_player_turn')]);
     }
 
     // 2. Süre kontrolü (Süre dolmuşsa cevap ne olursa olsun timeout)
@@ -125,9 +132,9 @@ abstract final class MatchEngine {
     }
 
     // 5. Normalizasyon ve boşluk kontrolü
-    final normalized = TextNormalizer.normalize(rawInput);
+    final normalized = TextNormalizer.normalize(sanitizedInput);
     if (normalized.isEmpty) {
-      return EngineResult(state, [const Ignored('empty_input')]);
+      return EngineResult(state, const [Ignored('empty_input')]);
     }
 
     // Geçerli bir deneme yapılıyor -> zamanı ve deneme sayısını güncelle
@@ -136,13 +143,13 @@ abstract final class MatchEngine {
 
     final question = state.currentQuestion!;
     final matcher = AnswerMatcher(question);
-    final matchResult = matcher.check(rawInput, state.usedAnswerIds);
+    final matchResult = matcher.check(sanitizedInput, state.usedAnswerIds);
 
     switch (matchResult) {
       case MatchResultCorrect(:final answer):
         final attempt = TurnAttempt(
           playerId: playerId,
-          rawInput: rawInput,
+          rawInput: sanitizedInput,
           resultType: AttemptResultType.correct,
           answerId: answer.id,
           displayText: answer.display,
@@ -192,7 +199,7 @@ abstract final class MatchEngine {
         // Tekrar cevap turu kaybettirmez: cevap kabul edilmez, sıra ve deadline aynı kalır
         final attempt = TurnAttempt(
           playerId: playerId,
-          rawInput: rawInput,
+          rawInput: sanitizedInput,
           resultType: AttemptResultType.repeated,
           answerId: answer.id,
           nowMs: nowMs,
@@ -214,8 +221,8 @@ abstract final class MatchEngine {
             .map((a) => a.aliases);
 
         final isClose = NearMissCalculator.isNearMiss(
-          normalizedInput: normalized,
-          unusedAnswerAliases: unusedAliases,
+            normalizedInput: normalized,
+            unusedAnswerAliases: unusedAliases,
         );
 
         final playerQuota = state.remainingNearMisses[playerId] ?? 0;
@@ -228,7 +235,7 @@ abstract final class MatchEngine {
 
           final attempt = TurnAttempt(
             playerId: playerId,
-            rawInput: rawInput,
+            rawInput: sanitizedInput,
             resultType: AttemptResultType.nearMiss,
             nowMs: nowMs,
             isClose: true,
@@ -249,7 +256,7 @@ abstract final class MatchEngine {
         // Ancak isClose değeri hesaplandığı gibi (yakınsa true) saklanır
         final attempt = TurnAttempt(
           playerId: playerId,
-          rawInput: rawInput,
+          rawInput: sanitizedInput,
           resultType: AttemptResultType.wrong,
           nowMs: nowMs,
           isClose: isClose,
@@ -262,7 +269,7 @@ abstract final class MatchEngine {
           lastSubmitTimes: updatedLastSubmitTimes,
         );
 
-        return EngineResult(nextState, [WrongAnswer(playerId, rawInput)]);
+        return EngineResult(nextState, [WrongAnswer(playerId, sanitizedInput)]);
 
       case MatchResultEmpty():
         return EngineResult(state, [const Ignored('empty_input')]);
@@ -427,21 +434,36 @@ abstract final class MatchEngine {
     final updatedTotalRoundsPlayed = state.totalRoundsPlayed + 1;
     final updatedRoundHistory = [...state.roundHistory, roundRecord];
 
-    // Bir oyuncu roundsToWin galibiyete ulaştı mı ya da maksimum karar turu doldu mu?
-    final hasWinner = winnerId != null &&
-        (updatedScores[winnerId] ?? 0) >= state.config.roundsToWin;
+    // Bir oyuncu roundsToWin galibiyete ulaştı mı ya da maksimum karar turu / tavan tur doldu mu?
+    final p1 = state.playerIds[0];
+    final p2 = state.playerIds[1];
+    final s1 = updatedScores[p1] ?? 0;
+    final s2 = updatedScores[p2] ?? 0;
+
+    final hasWinner = (s1 >= state.config.roundsToWin && s1 > s2) ||
+        (s2 >= state.config.roundsToWin && s2 > s1);
     final isDecisiveLimitReached =
         updatedDecisiveRounds >= state.config.maxDecisiveRounds;
+    final isTotalLimitReached =
+        updatedTotalRoundsPlayed >= state.config.maxTotalRounds;
 
-    if (hasWinner || isDecisiveLimitReached) {
-      final p1 = state.playerIds[0];
-      final p2 = state.playerIds[1];
-      final s1 = updatedScores[p1] ?? 0;
-      final s2 = updatedScores[p2] ?? 0;
+    if (hasWinner || isDecisiveLimitReached || isTotalLimitReached) {
+      final String? matchWinnerId;
+      final String endedBy;
 
-      final matchWinnerId = winnerId ?? (s1 > s2 ? p1 : p2);
+      if (hasWinner) {
+        matchWinnerId = s1 > s2 ? p1 : p2;
+        endedBy = 'normal';
+      } else if (isTotalLimitReached && s1 == s2) {
+        matchWinnerId = null;
+        endedBy = 'draw_limit_reached';
+      } else {
+        // isDecisiveLimitReached veya (isTotalLimitReached && s1 != s2)
+        matchWinnerId = s1 > s2 ? p1 : (s2 > s1 ? p2 : null);
+        endedBy = 'normal';
+      }
 
-      events.add(MatchFinished(matchWinnerId, 'normal'));
+      events.add(MatchFinished(matchWinnerId, endedBy));
 
       final finishedState = state.copyWith(
         scores: Map.unmodifiable(updatedScores),
@@ -451,7 +473,7 @@ abstract final class MatchEngine {
         roundHistory: updatedRoundHistory,
         currentRoundAttempts: attempts,
         winnerId: matchWinnerId,
-        endedBy: 'normal',
+        endedBy: endedBy,
       );
 
       return EngineResult(finishedState, events);

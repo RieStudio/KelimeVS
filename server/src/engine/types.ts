@@ -38,6 +38,7 @@ export interface MatchConfig {
   readonly minAnswersPerQuestion: number;
   readonly minSubmitIntervalMs: number;
   readonly maxAttemptsPerTurn: number;
+  readonly maxTotalRounds?: number;
 }
 
 export type MatchEvent =
