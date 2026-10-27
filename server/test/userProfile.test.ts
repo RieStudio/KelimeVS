@@ -100,7 +100,7 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
     expect(profile.uid).toBe('user_alice');
     expect(profile.nickname).toBeNull();
     expect(profile.coins).toBe(100);
-    expect(profile.stats).toEqual({ played: 0, won: 0, lost: 0 });
+    expect(profile.stats).toEqual({ played: 0, won: 0, lost: 0, correctAnswers: 0 });
     expect(profile.createdAt).toBeGreaterThan(0);
   });
 

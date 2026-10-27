@@ -15,6 +15,7 @@ import '../../../core/widgets/secondary_button.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
+import '../data/profile_api_client.dart';
 import '../domain/nickname_validator.dart';
 import 'blocked_users_screen.dart';
 
@@ -23,13 +24,32 @@ import 'blocked_users_screen.dart';
 /// Başlık: "Profil"
 /// Avatar: 88 px selfHome avatarı.
 /// Takma ad görünümü ve "Adı Değiştir" eylemi.
+/// İstatistikler: 3 kart (Oynanan, Doğru, Kazanma Oranı).
 /// Google ile bağlama, bağlı hesap kartı ve çıkış yap eylemleri.
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    try {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(profileProvider.notifier).syncWithServer();
+        }
+      });
+    } catch (_) {
+      // Test ortamında WidgetsBinding başlatılmamış olabilir.
+    }
+  }
 
   void _showChangeNicknameDialog(
     BuildContext context,
-    WidgetRef ref,
     String currentNickname,
   ) {
     if (!ensureNetworkConnected(context, ref)) return;
@@ -49,7 +69,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleLinkGoogle(BuildContext context, WidgetRef ref) async {
+  Future<void> _handleLinkGoogle(BuildContext context) async {
     if (!ensureNetworkConnected(context, ref)) return;
     final result = await ref.read(authNotifierProvider.notifier).linkGoogle();
 
@@ -267,7 +287,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     final authState = ref.watch(authNotifierProvider);
 
@@ -341,8 +361,13 @@ class ProfileScreen extends ConsumerWidget {
               // Adı Değiştir Butonu
               SecondaryButton(
                 text: AppStrings.changeNickname,
-                onPressed: () => _showChangeNicknameDialog(context, ref, nickname),
+                onPressed: () => _showChangeNicknameDialog(context, nickname),
               ),
+
+              const SizedBox(height: AppDimens.space16),
+
+              // Oyuncu İstatistikleri (3 Kart: Oynanan, Doğru, Kazanma Oranı)
+              _ProfileStatsRow(stats: profile.stats),
 
               const SizedBox(height: AppDimens.space16),
 
@@ -352,7 +377,7 @@ class ProfileScreen extends ConsumerWidget {
                   text: AppStrings.linkGoogle,
                   onPressed: authState.isLoading
                       ? null
-                      : () => _handleLinkGoogle(context, ref),
+                      : () => _handleLinkGoogle(context),
                 )
               else ...[
                 // Bağlı Hesap Kartı
@@ -646,3 +671,94 @@ class _ChangeNicknameDialogState extends State<_ChangeNicknameDialog> {
     );
   }
 }
+
+class _ProfileStatsRow extends StatelessWidget {
+  final UserStats stats;
+
+  const _ProfileStatsRow({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            label: AppStrings.statsPlayed,
+            value: stats.played.toString(),
+          ),
+        ),
+        const SizedBox(width: AppDimens.space8),
+        Expanded(
+          child: _StatCard(
+            label: AppStrings.statsCorrectAnswers,
+            value: stats.correctAnswers.toString(),
+          ),
+        ),
+        const SizedBox(width: AppDimens.space8),
+        Expanded(
+          child: _StatCard(
+            label: AppStrings.statsWinRate,
+            value: stats.winRateDisplay,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space8,
+        vertical: AppDimens.space12,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: AppDimens.borderRadiusListCard,
+        border: Border.all(
+          color: AppColors.mint,
+          width: AppDimens.borderThin,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontFredoka,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+                height: 1.1,
+              ),
+              maxLines: 1,
+            ),
+          ),
+          const SizedBox(height: AppDimens.space4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: AppTextStyles.secondaryText,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

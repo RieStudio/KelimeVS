@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_engine.dart';

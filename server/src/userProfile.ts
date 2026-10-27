@@ -25,6 +25,7 @@ export interface UserStats {
   readonly played: number;
   readonly won: number;
   readonly lost: number;
+  readonly correctAnswers: number;
 }
 
 export interface UserProfileData {
@@ -129,6 +130,7 @@ interface ProfileRow extends Record<string, string | number | null> {
   played: number;
   won: number;
   lost: number;
+  correct_answers: number;
   created_at: number;
   equipped_frame: string | null;
   energy: number | null;
@@ -278,6 +280,13 @@ export class UserProfile extends DurableObject<Env> {
       );
     }
 
+    const hasCorrectAnswers = profileCols.some((c) => c.name === 'correct_answers');
+    if (!hasCorrectAnswers) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN correct_answers INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
     this.initialized = true;
   }
 
@@ -353,7 +362,7 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
-      'SELECT uid, nickname, coins, played, won, lost, created_at, equipped_frame FROM profiles LIMIT 1'
+      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame FROM profiles LIMIT 1'
     );
     const rows = cursor.toArray();
 
@@ -367,6 +376,7 @@ export class UserProfile extends DurableObject<Env> {
           played: row.played,
           won: row.won,
           lost: row.lost,
+          correctAnswers: row.correct_answers ?? 0,
         },
         createdAt: row.created_at,
         equippedFrame: (row.equipped_frame as string) || 'classic',
@@ -380,8 +390,8 @@ export class UserProfile extends DurableObject<Env> {
     const maxEnergy = getEnergyMax(this.env);
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at, equipped_frame, energy, energy_updated_at)
-       VALUES (?, NULL, ?, 0, 0, 0, ?, 'classic', ?, 0)`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at)
+       VALUES (?, NULL, ?, 0, 0, 0, 0, ?, 'classic', ?, 0)`,
       effectiveUid,
       initialCoins,
       nowMs,
@@ -392,7 +402,7 @@ export class UserProfile extends DurableObject<Env> {
       uid: effectiveUid,
       nickname: null,
       coins: initialCoins,
-      stats: { played: 0, won: 0, lost: 0 },
+      stats: { played: 0, won: 0, lost: 0, correctAnswers: 0 },
       createdAt: nowMs,
       equippedFrame: 'classic',
     };
@@ -433,6 +443,7 @@ export class UserProfile extends DurableObject<Env> {
     readonly matchId: string;
     readonly outcome: MatchRewardOutcome;
     readonly uid?: string;
+    readonly correctAnswers?: number;
   }): Promise<MatchRewardResult> {
     this.ensureSchema();
 
@@ -513,16 +524,19 @@ export class UserProfile extends DurableObject<Env> {
       params.outcome === 'win' || params.outcome === 'win_by_opponent_disconnect';
     const isLoss =
       params.outcome === 'loss' || params.outcome === 'loss_by_disconnect';
+    const correctCount = Math.max(0, params.correctAnswers ?? 0);
 
     this.ctx.storage.sql.exec(
       `UPDATE profiles
        SET coins = coins + ?,
            played = played + 1,
            won = won + ?,
-           lost = lost + ?`,
+           lost = lost + ?,
+           correct_answers = correct_answers + ?`,
       actualCoinsAwarded,
       isWin ? 1 : 0,
-      isLoss ? 1 : 0
+      isLoss ? 1 : 0,
+      correctCount
     );
 
     // 6. İşlenen maçı kaydet

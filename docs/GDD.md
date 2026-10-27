@@ -156,7 +156,7 @@ Maç durumu, maç başına bir Durable Object'in belleğinde ve SQLite deposunda
 
 ### 5.3 Kullanıcı verisi (Durable Objects)
 
-Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad, jeton, istatistikler (oynanan/kazanılan/kaybedilen), ayarlar. Envanter, görev ve liderlik sonraki aşamalarda eklenir. Takma ad bulutta tutulur; Google hesabıyla giriş yapılan yeni bir cihazda geri gelir. Jeton değişiklikleri yalnızca sunucudan yapılır ve her maç için en fazla bir kez uygulanır (`matchId` ile tekrar koruması). Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
+Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad, jeton, istatistikler (oynanan/kazanılan/kaybedilen/doğru cevap sayısı; mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir), ayarlar. Envanter, görev ve liderlik sonraki aşamalarda eklenir. Takma ad bulutta tutulur; Google hesabıyla giriş yapılan yeni bir cihazda geri gelir. Jeton değişiklikleri yalnızca sunucudan yapılır ve her maç için en fazla bir kez uygulanır (`matchId` ile tekrar koruması). Son 10 maçın özeti (rakip, skor, sonuç) ana ekranda gösterilir. Her maçın tur ve cevap geçmişi (hangi oyuncu hangi cevabı verdi, kabul edildi mi, turu kim kazandı) **telefonda yerel** saklanır; "Maç Detayı" ekranı bunu okur. Sunucu, maç bitince tur kayıtlarını iki oyuncuya da gönderir.
 
 ### 5.4 Liderlik tablosu
 

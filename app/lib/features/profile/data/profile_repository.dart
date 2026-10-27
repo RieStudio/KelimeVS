@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'profile_api_client.dart';
+
 abstract class ProfileRepository {
   Future<String?> getNickname();
   Future<void> setNickname(String nickname);
@@ -10,7 +12,9 @@ abstract class ProfileRepository {
   Future<void> setEquippedFrame(String frame);
   Future<bool> isNicknameSyncPending();
   Future<void> setNicknameSyncPending(bool pending);
-  Future<void> clear();
+  Future<UserStats> getStats({String? uid});
+  Future<void> setStats(String uid, UserStats stats);
+  Future<void> clear({String? uid});
 }
 
 class LocalProfileRepository implements ProfileRepository {
@@ -18,6 +22,12 @@ class LocalProfileRepository implements ProfileRepository {
   static const String keyCoins = 'user_coins';
   static const String keyEquippedFrame = 'user_equipped_frame';
   static const String keyNicknameSyncPending = 'user_nickname_sync_pending';
+  static const String keyLastStatsUid = 'user_stats_last_uid';
+
+  static String keyStatsPlayed(String uid) => 'user_stats_played_$uid';
+  static String keyStatsWon(String uid) => 'user_stats_won_$uid';
+  static String keyStatsLost(String uid) => 'user_stats_lost_$uid';
+  static String keyStatsCorrectAnswers(String uid) => 'user_stats_correct_$uid';
 
   final SharedPreferences? prefs;
 
@@ -88,11 +98,52 @@ class LocalProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<void> clear() async {
+  Future<UserStats> getStats({String? uid}) async {
+    final p = await _getPrefs();
+    final effectiveUid = uid ?? p.getString(keyLastStatsUid);
+    if (effectiveUid == null || effectiveUid.isEmpty) {
+      return const UserStats();
+    }
+    final played = p.getInt(keyStatsPlayed(effectiveUid));
+    if (played == null) {
+      return const UserStats();
+    }
+    final won = p.getInt(keyStatsWon(effectiveUid)) ?? 0;
+    final lost = p.getInt(keyStatsLost(effectiveUid)) ?? 0;
+    final correct = p.getInt(keyStatsCorrectAnswers(effectiveUid)) ?? 0;
+    return UserStats(
+      played: played,
+      won: won,
+      lost: lost,
+      correctAnswers: correct,
+    );
+  }
+
+  @override
+  Future<void> setStats(String uid, UserStats stats) async {
+    final p = await _getPrefs();
+    await p.setString(keyLastStatsUid, uid);
+    await p.setInt(keyStatsPlayed(uid), stats.played);
+    await p.setInt(keyStatsWon(uid), stats.won);
+    await p.setInt(keyStatsLost(uid), stats.lost);
+    await p.setInt(keyStatsCorrectAnswers(uid), stats.correctAnswers);
+  }
+
+  @override
+  Future<void> clear({String? uid}) async {
     final p = await _getPrefs();
     await p.remove(keyNickname);
     await p.remove(keyCoins);
     await p.remove(keyEquippedFrame);
     await p.remove(keyNicknameSyncPending);
+
+    final targetUid = uid ?? p.getString(keyLastStatsUid);
+    if (targetUid != null && targetUid.isNotEmpty) {
+      await p.remove(keyStatsPlayed(targetUid));
+      await p.remove(keyStatsWon(targetUid));
+      await p.remove(keyStatsLost(targetUid));
+      await p.remove(keyStatsCorrectAnswers(targetUid));
+    }
+    await p.remove(keyLastStatsUid);
   }
 }

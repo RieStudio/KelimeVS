@@ -193,6 +193,13 @@ abstract final class AppStrings {
   static const String newNicknamePrompt = 'Yeni Takma Ad';
   static const String save = 'Kaydet';
 
+  // Oyuncu İstatistikleri
+  static const String statsTitle = 'İstatistikler';
+  static const String statsPlayed = 'Oynanan';
+  static const String statsCorrectAnswers = 'Doğru';
+  static const String statsWinRate = 'Kazanma';
+  static const String statsNoData = '—';
+
   // Google Hesap Bağlama ve Çıkış
   static const String linkGoogle = 'Google ile Bağla';
   static const String linkedAccount = 'Bağlı Hesap';

@@ -18,6 +18,7 @@ class ProfileState {
   final String equippedFrame;
   final EnergyState? energy;
   final int? serverNowMs;
+  final UserStats stats;
 
   const ProfileState({
     this.nickname,
@@ -28,6 +29,7 @@ class ProfileState {
     this.equippedFrame = 'classic',
     this.energy,
     this.serverNowMs,
+    this.stats = const UserStats(),
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -42,6 +44,7 @@ class ProfileState {
     bool clearSyncError = false,
     EnergyState? energy,
     int? serverNowMs,
+    UserStats? stats,
   }) {
     return ProfileState(
       nickname: nickname ?? this.nickname,
@@ -52,6 +55,7 @@ class ProfileState {
       equippedFrame: equippedFrame ?? this.equippedFrame,
       energy: energy ?? this.energy,
       serverNowMs: serverNowMs ?? this.serverNowMs,
+      stats: stats ?? this.stats,
     );
   }
 }
@@ -87,12 +91,14 @@ class ProfileNotifier extends Notifier<ProfileState> {
     final nick = await repo.getNickname();
     final coins = await repo.getCoins(defaultCoins: 100);
     final frame = await repo.getEquippedFrame(defaultFrame: 'classic');
+    final stats = await repo.getStats();
 
     if (!ref.mounted) return;
     state = state.copyWith(
       nickname: state.nickname ?? nick,
       coins: state.coins == 100 ? coins : state.coins,
       equippedFrame: frame,
+      stats: stats,
       isLoaded: true,
     );
 
@@ -115,15 +121,17 @@ class ProfileNotifier extends Notifier<ProfileState> {
       final remote = await apiClient.getProfile();
       if (!ref.mounted) return;
       if (remote != null) {
-        // 1. Jeton bakiyesini ve enerjiyi senkronla
+        // 1. Jeton bakiyesini, enerjiyi ve istatistikleri senkronla
         await repo.setCoins(remote.coins);
         await repo.setEquippedFrame(remote.equippedFrame);
+        await repo.setStats(remote.uid, remote.stats);
         if (!ref.mounted) return;
         state = state.copyWith(
           coins: remote.coins,
           equippedFrame: remote.equippedFrame,
           energy: remote.energy,
           serverNowMs: remote.serverNowMs,
+          stats: remote.stats,
         );
 
         // 2. Takma ad senkronizasyonu (Kural 2)
@@ -243,7 +251,12 @@ class ProfileNotifier extends Notifier<ProfileState> {
   Future<void> clearNickname() async {
     final repo = ref.read(profileRepositoryProvider);
     await repo.clear();
-    state = const ProfileState(nickname: null, coins: 100, isLoaded: true);
+    state = const ProfileState(
+      nickname: null,
+      coins: 100,
+      isLoaded: true,
+      stats: UserStats(),
+    );
   }
 }
 

@@ -156,7 +156,11 @@ class FakeProfileRepository implements ProfileRepository {
   Future<void> setNicknameSyncPending(bool pending) async =>
       _syncPending = pending;
   @override
-  Future<void> clear() async {}
+  Future<UserStats> getStats({String? uid}) async => const UserStats();
+  @override
+  Future<void> setStats(String uid, UserStats stats) async {}
+  @override
+  Future<void> clear({String? uid}) async {}
 }
 
 Widget createStoreScreen({

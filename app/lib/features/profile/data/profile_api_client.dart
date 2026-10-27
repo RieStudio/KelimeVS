@@ -6,13 +6,71 @@ import '../../../core/config/server_config.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../domain/energy_state.dart';
 
+class UserStats {
+  final int played;
+  final int won;
+  final int lost;
+  final int correctAnswers;
+
+  const UserStats({
+    this.played = 0,
+    this.won = 0,
+    this.lost = 0,
+    this.correctAnswers = 0,
+  });
+
+  /// Kazanma oranı (0.0 - 1.0 aralığında). Hiç maç yoksa (played == 0) null döner.
+  double? get winRateRatio {
+    if (played <= 0) return null;
+    return won / played;
+  }
+
+  /// Tam sayı yüzde olarak biçimlendirilmiş kazanma oranı (örn. %67, %33, %100, %0).
+  /// played == 0 ise "—" döner.
+  String get winRateDisplay {
+    if (played <= 0) return '—';
+    final ratio = won / played;
+    final percentage = (ratio * 100).round();
+    return '%$percentage';
+  }
+
+  factory UserStats.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const UserStats();
+    return UserStats(
+      played: (json['played'] as num?)?.toInt() ?? 0,
+      won: (json['won'] as num?)?.toInt() ?? 0,
+      lost: (json['lost'] as num?)?.toInt() ?? 0,
+      correctAnswers: (json['correctAnswers'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'played': played,
+        'won': won,
+        'lost': lost,
+        'correctAnswers': correctAnswers,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserStats &&
+          runtimeType == other.runtimeType &&
+          played == other.played &&
+          won == other.won &&
+          lost == other.lost &&
+          correctAnswers == other.correctAnswers;
+
+  @override
+  int get hashCode =>
+      played.hashCode ^ won.hashCode ^ lost.hashCode ^ correctAnswers.hashCode;
+}
+
 class UserProfileModel {
   final String uid;
   final String? nickname;
   final int coins;
-  final int played;
-  final int won;
-  final int lost;
+  final UserStats stats;
   final int createdAt;
   final String equippedFrame;
   final EnergyState? energy;
@@ -22,25 +80,28 @@ class UserProfileModel {
     required this.uid,
     required this.nickname,
     required this.coins,
-    this.played = 0,
-    this.won = 0,
-    this.lost = 0,
+    this.stats = const UserStats(),
     this.createdAt = 0,
     this.equippedFrame = 'classic',
     this.energy,
     this.serverNowMs,
   });
 
+  int get played => stats.played;
+  int get won => stats.won;
+  int get lost => stats.lost;
+  int get correctAnswers => stats.correctAnswers;
+  double? get winRateRatio => stats.winRateRatio;
+  String get winRateDisplay => stats.winRateDisplay;
+
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
-    final stats = json['stats'] as Map<String, dynamic>?;
+    final statsJson = json['stats'] as Map<String, dynamic>?;
     final energyJson = json['energy'] as Map<String, dynamic>?;
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
       nickname: json['nickname'] as String?,
       coins: (json['coins'] as num?)?.toInt() ?? 100,
-      played: (stats?['played'] as num?)?.toInt() ?? 0,
-      won: (stats?['won'] as num?)?.toInt() ?? 0,
-      lost: (stats?['lost'] as num?)?.toInt() ?? 0,
+      stats: UserStats.fromJson(statsJson),
       createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
       equippedFrame: json['equippedFrame'] as String? ?? 'classic',
       energy: energyJson != null ? EnergyState.fromJson(energyJson) : null,

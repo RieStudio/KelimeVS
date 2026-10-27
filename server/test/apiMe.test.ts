@@ -128,7 +128,7 @@ describe('API Routes: /me & /me/nickname (auth & validation)', () => {
     expect(body.uid).toBe('alice');
     expect(body.nickname).toBeNull();
     expect(body.coins).toBe(100);
-    expect(body.stats).toEqual({ played: 0, won: 0, lost: 0 });
+    expect(body.stats).toEqual({ played: 0, won: 0, lost: 0, correctAnswers: 0 });
   });
 
   it('4. PUT /me/nickname geçerli adla çağrılınca günceller ve 200 döner', async () => {

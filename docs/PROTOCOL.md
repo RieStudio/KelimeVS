@@ -474,7 +474,7 @@ Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
 Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmiş hesaplar tüm uçlardan `410 Gone` alır.
 
 ### Profil ve Hesap
-- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`, `createdAt`, `equippedFrame`) döndürür.
+- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `createdAt`, `equippedFrame`, `energy`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
 - `PUT /me/nickname`: Takma ad günceller (`{ "nickname": "..." }`).
 - `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
 - `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller.

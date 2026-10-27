@@ -137,6 +137,18 @@ export function computeNextDisconnectTimeout(
   return Math.min(...unexpired);
 }
 
+function countPlayerCorrectAnswers(state: MatchState, playerId: string): number {
+  let count = 0;
+  for (const round of state.roundHistory) {
+    for (const attempt of round.attempts) {
+      if (attempt.playerId === playerId && attempt.resultType === 'correct') {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
 export class MatchRoom extends DurableObject<Env> {
   private data: StoredRoomData | null = null;
 
@@ -956,6 +968,9 @@ export class MatchRoom extends DurableObject<Env> {
     const p1Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1Uid));
     const p2Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2Uid));
 
+    const p1CorrectAnswers = countPlayerCorrectAnswers(state, p1Uid);
+    const p2CorrectAnswers = countPlayerCorrectAnswers(state, p2Uid);
+
     const existingRewards = this.data.rewards ?? {};
     let p1Reward = existingRewards[p1Uid];
     let p2Reward = existingRewards[p2Uid];
@@ -969,6 +984,7 @@ export class MatchRoom extends DurableObject<Env> {
           matchId: this.data.matchId,
           outcome: getOutcome(p1Uid),
           uid: p1Uid,
+          correctAnswers: p1CorrectAnswers,
         });
         p1Reward = { coinsAwarded: r1.coinsAwarded, coins: r1.coins };
         p1Nick = r1.nickname;
@@ -990,6 +1006,7 @@ export class MatchRoom extends DurableObject<Env> {
           matchId: this.data.matchId,
           outcome: getOutcome(p2Uid),
           uid: p2Uid,
+          correctAnswers: p2CorrectAnswers,
         });
         p2Reward = { coinsAwarded: r2.coinsAwarded, coins: r2.coins };
         p2Nick = r2.nickname;

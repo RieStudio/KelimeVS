@@ -280,7 +280,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
@@ -293,7 +296,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
@@ -310,7 +316,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
@@ -332,7 +341,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
@@ -374,7 +386,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));
@@ -399,7 +414,10 @@ void main() {
     await tester.pumpWidget(buildTestScreen(repo, apiClient: fakeApi));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.deleteAccount));
+    final deleteBtn = find.widgetWithText(SecondaryButton, AppStrings.deleteAccount);
+    await tester.ensureVisible(deleteBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteBtn);
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.deleteAccountConfirm));

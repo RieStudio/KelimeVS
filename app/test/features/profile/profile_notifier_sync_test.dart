@@ -51,11 +51,22 @@ class FakeProfileRepository implements ProfileRepository {
     _syncPending = pending;
   }
 
+  UserStats _stats = const UserStats();
+
   @override
-  Future<void> clear() async {
+  Future<UserStats> getStats({String? uid}) async => _stats;
+
+  @override
+  Future<void> setStats(String uid, UserStats stats) async {
+    _stats = stats;
+  }
+
+  @override
+  Future<void> clear({String? uid}) async {
     _nickname = null;
     _coins = 100;
     _syncPending = false;
+    _stats = const UserStats();
   }
 }
 

@@ -118,16 +118,16 @@ class MatchController extends Notifier<MatchUiState>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_isDisposed || !_isObserverRegistered) return;
-    final match = state.matchState;
+    final match = this.state.matchState;
     if (match == null || match.phase == MatchPhase.matchFinished) return;
 
-    if (lifecycleState == AppLifecycleState.paused ||
-        lifecycleState == AppLifecycleState.inactive ||
-        lifecycleState == AppLifecycleState.hidden) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
       _pauseMatch();
-    } else if (lifecycleState == AppLifecycleState.resumed) {
+    } else if (state == AppLifecycleState.resumed) {
       _resumeMatch();
     }
   }
