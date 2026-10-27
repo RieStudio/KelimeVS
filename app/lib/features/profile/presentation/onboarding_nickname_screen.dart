@@ -116,10 +116,13 @@ class _OnboardingNicknameScreenState
           SnackBar(content: Text(result.message)),
         );
       } else if (result is AuthLinkSuccess) {
-        if (widget.onComplete != null) {
-          widget.onComplete!();
-        } else if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        final profile = ref.read(profileProvider);
+        if (profile.hasNickname) {
+          if (widget.onComplete != null) {
+            widget.onComplete!();
+          } else if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
         }
       }
     } catch (_) {
@@ -142,7 +145,9 @@ class _OnboardingNicknameScreenState
     final currentLength = _controller.text.length;
 
     final authState = ref.watch(authNotifierProvider);
+    final profile = ref.watch(profileProvider);
     final isBusy = _isSubmitting || _isGoogleSigningIn || authState.isLoading;
+    final showGoogleNotice = authState.isGoogleLinked && !profile.hasNickname;
 
     return PopScope(
       canPop: !isBusy,
@@ -178,6 +183,62 @@ class _OnboardingNicknameScreenState
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (showGoogleNotice) ...[
+                  const SizedBox(height: AppDimens.space16),
+                  Container(
+                    key: const Key('google_linked_no_profile_notice'),
+                    padding: const EdgeInsets.all(AppDimens.space12),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: AppDimens.borderRadiusAlertBox,
+                      border: Border.all(
+                        color: AppColors.mint,
+                        width: AppDimens.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppDimens.space10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                AppStrings.googleLinkedNoProfileNotice,
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.fontNunito,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ink,
+                                  height: 1.35,
+                                ),
+                              ),
+                              if (authState.linkedEmail != null &&
+                                  authState.linkedEmail!.isNotEmpty) ...[
+                                const SizedBox(height: AppDimens.space4),
+                                Text(
+                                  authState.linkedEmail!,
+                                  style: const TextStyle(
+                                    fontFamily: AppTextStyles.fontNunito,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppDimens.space24),
 
                 // Giriş Kutusu (kart zemin, 3 px ink kenarlık, köşe 18)
@@ -259,10 +320,21 @@ class _OnboardingNicknameScreenState
                 ),
                 const SizedBox(height: AppDimens.space12),
 
-                // Google ile Giriş Yap Butonu
+                // Google ile Devam Et Butonu
                 SecondaryButton(
                   text: AppStrings.signInWithGoogle,
                   onPressed: isBusy ? null : _handleGoogleSignIn,
+                ),
+                const SizedBox(height: AppDimens.space8),
+                const Text(
+                  AppStrings.signInWithGoogleHint,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontNunito,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.muted,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),

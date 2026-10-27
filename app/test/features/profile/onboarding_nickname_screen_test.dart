@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -11,8 +12,31 @@ import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/auth/domain/auth_link_result.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
+import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
 import 'package:app/features/profile/presentation/onboarding_nickname_screen.dart';
+
+class FakeProfileApiClient implements ProfileApiClient {
+  UserProfileModel? mockProfile;
+  bool shouldThrow = false;
+  void Function()? onAccountDeleted;
+
+  @override
+  Future<UserProfileModel?> getProfile() async {
+    if (shouldThrow) {
+      throw const SocketException('Connection failed');
+    }
+    return mockProfile;
+  }
+
+  @override
+  Future<ProfileUpdateResult> updateNickname(String nickname) async =>
+      ProfileUpdateSuccess(nickname);
+
+  @override
+  Future<bool> deleteProfile() async => true;
+}
 
 class FakeAuthRepository implements AuthRepository {
   @override
@@ -78,10 +102,12 @@ void main() {
   Widget buildTestScreen({
     VoidCallback? onComplete,
     AuthRepository? authRepo,
+    ProfileApiClient? apiClient,
   }) {
     return ProviderScope(
       overrides: [
         if (authRepo != null) authRepositoryProvider.overrideWithValue(authRepo),
+        if (apiClient != null) profileApiClientProvider.overrideWithValue(apiClient),
       ],
       child: MaterialApp(
         home: OnboardingNicknameScreen(onComplete: onComplete),
@@ -89,7 +115,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Başlangıç durumu: başlık, ipucu ve devre dışı Devam butonu, Google butonu aktif', (tester) async {
+  testWidgets('1. Başlangıç durumu: başlık, ipucu, devre dışı Devam butonu, Google butonu, alt açıklama ve anonimde bilgi kutusu görünmez', (tester) async {
     await tester.pumpWidget(buildTestScreen());
     await tester.pumpAndSettle();
 
@@ -103,11 +129,15 @@ void main() {
     );
     expect(continueButton.onPressed, isNull);
 
-    // Google ile Giriş Yap butonu mevcut ve tıklanabilir
+    // Google ile Devam Et butonu ve açıklama metni mevcut
     final googleButton = tester.widget<SecondaryButton>(
       find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle),
     );
     expect(googleButton.onPressed, isNotNull);
+    expect(find.text(AppStrings.signInWithGoogleHint), findsOneWidget);
+
+    // Normal anonim yeni kullanıcıda kalıcı Google bilgi kutusu görünmez
+    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
   });
 
   testWidgets('2. Geçersiz girdi (kısa ya da küfür): hata mesajı görünür ve Devam butonu kapalı kalır', (tester) async {
@@ -163,7 +193,7 @@ void main() {
     expect(saved, 'Zeynep_01');
   });
 
-  testWidgets('4. Google ile Giriş: Kullanıcı pencereyi iptal ederse onboarding ekranında kalır ve hata çıkmaz', (tester) async {
+  testWidgets('4. Google ile Devam: Kullanıcı pencereyi iptal ederse onboarding ekranında kalır ve hata çıkmaz', (tester) async {
     final authRepo = FakeAuthRepository(
       signInResultToReturn: const AuthLinkCanceled(),
     );
@@ -179,7 +209,7 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('5. Google ile Giriş: Hata dönerse SnackBar ile hata gösterilir ve onboardingde kalır', (tester) async {
+  testWidgets('5. Google ile Devam: Hata dönerse SnackBar ile hata gösterilir ve onboardingde kalır', (tester) async {
     final authRepo = FakeAuthRepository(
       signInResultToReturn: const AuthLinkError('Google servisine ulaşılamadı'),
     );
@@ -195,14 +225,21 @@ void main() {
     expect(find.text('Google servisine ulaşılamadı'), findsOneWidget);
   });
 
-  testWidgets('6. Google ile Giriş başarılı: onComplete veya pop tetiklenir', (tester) async {
+  testWidgets('6. Google ile Devam (Mevcut Hesap): Sunucuda takma adı olan hesapta onComplete tetiklenir', (tester) async {
     bool completed = false;
     final authRepo = FakeAuthRepository(
       signInResultToReturn: const AuthLinkSuccess(email: 'test@gmail.com'),
     );
+    final apiClient = FakeProfileApiClient()
+      ..mockProfile = const UserProfileModel(
+        uid: 'test_uid',
+        nickname: 'EskiKullanici',
+        coins: 100,
+      );
 
     await tester.pumpWidget(buildTestScreen(
       authRepo: authRepo,
+      apiClient: apiClient,
       onComplete: () => completed = true,
     ));
     await tester.pumpAndSettle();
@@ -212,5 +249,72 @@ void main() {
 
     expect(authRepo.signInWithGoogleCalled, isTrue);
     expect(completed, isTrue);
+  });
+
+  testWidgets('7. Google ile Devam (Yeni Hesap): Sunucuda takma adı olmayan hesapta kalıcı bilgi kutusu ve e-posta görünür', (tester) async {
+    bool completed = false;
+    final authRepo = FakeAuthRepository(
+      signInResultToReturn: const AuthLinkSuccess(email: 'yeni@google.com'),
+    );
+    final apiClient = FakeProfileApiClient()
+      ..mockProfile = const UserProfileModel(
+        uid: 'test_uid_new',
+        nickname: null,
+        coins: 100,
+      );
+
+    await tester.pumpWidget(buildTestScreen(
+      authRepo: authRepo,
+      apiClient: apiClient,
+      onComplete: () => completed = true,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+    await tester.pumpAndSettle();
+
+    expect(authRepo.signInWithGoogleCalled, isTrue);
+    expect(completed, isFalse);
+    expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
+    expect(find.text(AppStrings.googleLinkedNoProfileNotice), findsOneWidget);
+    expect(find.text('yeni@google.com'), findsOneWidget);
+  });
+
+  testWidgets('8. Yeni Google hesabı bağlandıktan sonra geçerli takma ad girilip devam edilince kaydedilir', (tester) async {
+    bool completed = false;
+    final authRepo = FakeAuthRepository(
+      signInResultToReturn: const AuthLinkSuccess(email: 'yeni@google.com'),
+    );
+    final apiClient = FakeProfileApiClient()
+      ..mockProfile = const UserProfileModel(
+        uid: 'test_uid_new',
+        nickname: null,
+        coins: 100,
+      );
+
+    await tester.pumpWidget(buildTestScreen(
+      authRepo: authRepo,
+      apiClient: apiClient,
+      onComplete: () => completed = true,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'GoogleOyuncu');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.continueAction));
+    await tester.pumpAndSettle();
+
+    expect(completed, isTrue);
+    const repo = LocalProfileRepository();
+    expect(await repo.getNickname(), 'GoogleOyuncu');
   });
 }

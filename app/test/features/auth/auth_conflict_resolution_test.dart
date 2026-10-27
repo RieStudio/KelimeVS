@@ -425,12 +425,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+      expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
 
       await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
       await tester.pumpAndSettle();
 
       expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
       expect(find.byType(HomeScreen), findsNothing);
+      expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
+      expect(find.text(AppStrings.googleLinkedNoProfileNotice), findsOneWidget);
+      expect(find.text('brandnew@google.com'), findsOneWidget);
       expect(authRepo.signInWithGoogleCalled, isTrue);
       expect(authRepo.isGoogleLinked, isTrue);
     });

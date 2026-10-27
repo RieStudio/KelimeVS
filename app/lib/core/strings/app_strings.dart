@@ -204,7 +204,11 @@ abstract final class AppStrings {
 
   // Google Hesap Bağlama ve Çıkış
   static const String linkGoogle = 'Google ile Bağla';
-  static const String signInWithGoogle = 'Google ile Giriş Yap';
+  static const String signInWithGoogle = 'Google ile Devam Et';
+  static const String signInWithGoogleHint =
+      'Önceki hesabın varsa Google ile devam et.';
+  static const String googleLinkedNoProfileNotice =
+      'Bu Google hesabında henüz KelimeVS hesabı yok. Bir takma ad seç, hesabın bu Google hesabına bağlı olarak oluşturulsun.';
   static const String linkedAccount = 'Bağlı Hesap';
   static const String signOut = 'Çıkış Yap';
   static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
