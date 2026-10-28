@@ -85,6 +85,7 @@ class MatchUiState {
   final bool isUsingPowerup;
   final String? powerupErrorNotice;
   final int powerupErrorCounter;
+  final bool isPaused;
 
   const MatchUiState({
     this.matchState,
@@ -119,6 +120,7 @@ class MatchUiState {
     this.isUsingPowerup = false,
     this.powerupErrorNotice,
     this.powerupErrorCounter = 0,
+    this.isPaused = false,
   });
 
   ConnectionStatus get kendiBaglanti => connectionStatus;
@@ -191,6 +193,7 @@ class MatchUiState {
     bool? isUsingPowerup,
     String? powerupErrorNotice,
     int? powerupErrorCounter,
+    bool? isPaused,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -232,6 +235,7 @@ class MatchUiState {
       isUsingPowerup: isUsingPowerup ?? this.isUsingPowerup,
       powerupErrorNotice: powerupErrorNotice ?? this.powerupErrorNotice,
       powerupErrorCounter: powerupErrorCounter ?? this.powerupErrorCounter,
+      isPaused: isPaused ?? this.isPaused,
     );
   }
 }

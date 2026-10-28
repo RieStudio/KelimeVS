@@ -163,6 +163,7 @@ void main() {
         // Uygulama arka plana gider (paused)
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.paused);
         expect(controller.isPausedForTesting, isTrue);
+        expect(controller.state.isPaused, isTrue);
 
         // Arka planda 20 saniye geçer (duvar saati 20 sn ilerler)
         async.elapse(const Duration(seconds: 20));
@@ -173,6 +174,7 @@ void main() {
         // Uygulama öne gelir (resumed)
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.resumed);
         expect(controller.isPausedForTesting, isFalse);
+        expect(controller.state.isPaused, isFalse);
 
         // Kalan süre hala ~12.000 ms'dir (20 saniyelik arka plan süresi tüketmemiştir!)
         expect(controller.state.remainingMs, 12000);

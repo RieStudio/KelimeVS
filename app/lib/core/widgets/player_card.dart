@@ -4,6 +4,7 @@ import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'smooth_progress_bar.dart';
 
 /// DESIGN.md Bölüm 6: Oyuncu Kartı (Maç Ekranı)
 ///
@@ -21,6 +22,7 @@ class PlayerCard extends StatelessWidget {
   final int? remainingSeconds;
   final double? timeProgress;
   final int maxSeconds;
+  final bool isPaused;
 
   const PlayerCard({
     super.key,
@@ -31,14 +33,18 @@ class PlayerCard extends StatelessWidget {
     this.remainingSeconds,
     this.timeProgress,
     this.maxSeconds = 15,
+    this.isPaused = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final progress = (timeProgress ?? 0.0).clamp(0.0, 1.0);
     final clampedSec = remainingSeconds?.clamp(0, maxSeconds);
     final isDanger = clampedSec != null && clampedSec <= 5;
     final fillColor = isDanger ? AppColors.dangerSoft : AppColors.bright;
+    final totalDurationMs = maxSeconds * 1000;
+    final remainingMs = timeProgress != null
+        ? (timeProgress! * totalDurationMs).round()
+        : (clampedSec != null ? clampedSec * 1000 : 0);
 
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
@@ -62,7 +68,7 @@ class PlayerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimens.radiusListCard - AppDimens.borderThick),
         child: Stack(
           children: [
-            // Kalan süre ilerleme dolgusu (sadece aktif oyuncuda)
+            // Kalan süre ilerleme dolgusu (sadece aktif oyuncuda, pürüzsüz akış)
             if (isActive)
               Positioned.fill(
                 child: Semantics(
@@ -71,9 +77,12 @@ class PlayerCard extends StatelessWidget {
                       ? '$clampedSec${AppStrings.secondsSuffix}'
                       : null,
                   container: true,
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
+                  child: SmoothProgressBar(
+                    totalDurationMs: totalDurationMs,
+                    remainingMs: remainingMs,
+                    isActive: isActive,
+                    isPaused: isPaused,
+                    fillColor: fillColor,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       color: fillColor,

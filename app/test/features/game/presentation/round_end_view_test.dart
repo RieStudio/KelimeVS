@@ -246,7 +246,7 @@ void main() {
 
     final controller = FakeMatchController(uiState);
     await tester.pumpWidget(_buildTestApp(controller));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     // FractionallySizedBox widthFactor 0.5 olmalı
     final fractionallySizedBox = tester.widget<FractionallySizedBox>(
@@ -284,5 +284,43 @@ void main() {
       findsNothing,
     );
     expect(find.text(AppStrings.roundWonTitle), findsOneWidget);
+  });
+
+  testWidgets('7. isPaused true iken tur geçiş çizgisi donar, false olunca kaldığı yerden devam eder', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+
+    final pausedState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      roundTransitionTotalMs: 3000,
+      roundTransitionRemainingMs: 1500, // %50
+      isPaused: true,
+    );
+
+    final controller = FakeMatchController(pausedState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    final fractionallySizedBoxBefore = tester.widget<FractionallySizedBox>(
+      find.byWidgetPredicate(
+        (w) => w is FractionallySizedBox && w.alignment == Alignment.centerLeft,
+      ),
+    );
+    expect(fractionallySizedBoxBefore.widthFactor, closeTo(0.5, 0.01));
+
+    // 500 ms süre geçse bile isPaused true olduğu için çubuk donmalıdır
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final fractionallySizedBoxPaused = tester.widget<FractionallySizedBox>(
+      find.byWidgetPredicate(
+        (w) => w is FractionallySizedBox && w.alignment == Alignment.centerLeft,
+      ),
+    );
+    expect(fractionallySizedBoxPaused.widthFactor, closeTo(0.5, 0.01));
   });
 }

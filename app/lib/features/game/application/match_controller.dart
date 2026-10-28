@@ -170,6 +170,8 @@ class MatchController extends Notifier<MatchUiState>
     // 4. Tick timer'ı durdur (arka planda hiçbir şey tetiklenmesin)
     _tickTimer?.cancel();
     _tickTimer = null;
+
+    state = state.copyWith(isPaused: true);
   }
 
   void _resumeMatch() {
@@ -177,6 +179,7 @@ class MatchController extends Notifier<MatchUiState>
     final match = state.matchState;
     if (match == null || match.phase == MatchPhase.matchFinished) {
       _isPaused = false;
+      state = state.copyWith(isPaused: false);
       return;
     }
 
@@ -236,6 +239,7 @@ class MatchController extends Notifier<MatchUiState>
     _isPaused = false;
 
     state = state.copyWith(
+      isPaused: false,
       matchState: updatedMatch,
       remainingMs: remaining,
       roundTransitionRemainingMs: transitionRemaining,
@@ -288,6 +292,7 @@ class MatchController extends Notifier<MatchUiState>
     _registerLifecycleObserver();
 
     state = state.copyWith(
+      isPaused: false,
       isLoading: true,
       errorMessage: null,
       acceptedAnswers: const [],

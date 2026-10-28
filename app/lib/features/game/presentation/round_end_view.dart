@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/result_circle.dart';
+import '../../../core/widgets/smooth_progress_bar.dart';
 import '../application/match_providers.dart';
 import '../domain/match/match_events.dart';
 
@@ -108,10 +109,9 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
           '${AppStrings.roundPrefix}$nextNum${AppStrings.nextRoundStartingSoonSuffix}';
     }
 
-    // Geri sayım çubuğu ilerleme oranı (kalan süreye bağlı)
+    // Geri sayım çubuğu süresi
     final totalMs = uiState.roundTransitionTotalMs;
     final remainingMs = uiState.roundTransitionRemainingMs;
-    final progress = totalMs > 0 ? (remainingMs / totalMs).clamp(0.0, 1.0) : 0.0;
 
     final myScore = matchState?.scores['me'] ?? 0;
     final opponentScore = matchState?.scores['bot'] ?? 0;
@@ -294,14 +294,15 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                   ),
                   child: ClipRRect(
                     borderRadius: AppDimens.borderRadiusFull,
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: progress,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: AppDimens.borderRadiusFull,
-                        ),
+                    child: SmoothProgressBar(
+                      totalDurationMs: totalMs,
+                      remainingMs: remainingMs,
+                      isActive: true,
+                      isPaused: uiState.isPaused,
+                      fillColor: AppColors.primary,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: AppDimens.borderRadiusFull,
                       ),
                     ),
                   ),

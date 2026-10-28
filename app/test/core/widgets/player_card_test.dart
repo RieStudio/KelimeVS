@@ -159,5 +159,49 @@ void main() {
         expect(find.text('15 sn'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'isPaused true iken PlayerCard süre çubuğu donar, false olunca akmaya devam eder',
+      (tester) async {
+        Widget buildCard(bool isPaused) {
+          return MaterialApp(
+            home: Scaffold(
+              body: PlayerCard(
+                name: 'Oyuncu',
+                score: 0,
+                avatar: const SizedBox(),
+                isActive: true,
+                remainingSeconds: 10,
+                timeProgress: 0.5,
+                maxSeconds: 20,
+                isPaused: isPaused,
+              ),
+            ),
+          );
+        }
+
+        await tester.pumpWidget(buildCard(true));
+        await tester.pump();
+
+        FractionallySizedBox getBox() => tester.widget<FractionallySizedBox>(
+              find.byWidgetPredicate(
+                (w) => w is FractionallySizedBox && w.alignment == Alignment.centerLeft,
+              ),
+            );
+
+        expect(getBox().widthFactor, 0.5);
+
+        // isPaused true iken 500 ms pump edilse de donuk kalmalı
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(getBox().widthFactor, 0.5);
+
+        // isPaused false olunca devam etmeli
+        await tester.pumpWidget(buildCard(false));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        expect(getBox().widthFactor, lessThan(0.5));
+      },
+    );
   });
 }

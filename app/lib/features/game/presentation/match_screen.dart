@@ -280,6 +280,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               remainingSeconds: isMyTurn ? remainingSec : null,
                               timeProgress: isMyTurn ? timeProgress : null,
                               maxSeconds: maxSec,
+                              isPaused: uiState.isPaused,
                             ),
                             if (isOnlineRanked) ...[
                               const SizedBox(height: AppDimens.space6),
@@ -332,6 +333,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               remainingSeconds: isBotTurn ? remainingSec : null,
                               timeProgress: isBotTurn ? timeProgress : null,
                               maxSeconds: maxSec,
+                              isPaused: uiState.isPaused,
                             ),
                           ],
                         ),
