@@ -35,6 +35,7 @@ abstract final class AppStrings {
   static const String reasonOpponentTimeout = 'Rakibin süresi doldu';
   static const String reasonMyTimeout = 'Süren doldu';
   static const String reasonExhausted = 'Tüm cevaplar söylendi';
+  static const String reasonRoundLimitReached = 'Tur sınırına ulaşıldı';
   static const String nextRoundStartingSoonSuffix = ' birazdan başlıyor';
   static const String newRoundStartingSoon = 'Yeni tur birazdan başlıyor';
   static const String matchResultStartingSoon = 'Maç sonucu birazdan';

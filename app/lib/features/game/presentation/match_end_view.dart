@@ -199,8 +199,34 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
         endNote = AppStrings.opponentConnectionLost;
         endNoteColor = AppColors.muted;
       case MatchEndReason.normal:
-        endNote = null;
-        endNoteColor = AppColors.muted;
+        final lastRound = matchState?.roundHistory.isNotEmpty == true
+            ? matchState!.roundHistory.last
+            : (uiState.lastSavedMatch?.roundRecords.isNotEmpty == true
+                ? uiState.lastSavedMatch!.roundRecords.last
+                : null);
+        final totalRounds = matchState?.totalRoundsPlayed ??
+            uiState.lastSavedMatch?.roundRecords.length ??
+            0;
+        final maxTotal = matchState?.config.maxTotalRounds ?? 5;
+
+        if (totalRounds >= maxTotal && lastRound?.winnerId == null) {
+          endNote = AppStrings.reasonRoundLimitReached;
+          endNoteColor = AppColors.muted;
+        } else if (lastRound != null) {
+          if (lastRound.winnerId == 'me') {
+            endNote = AppStrings.reasonOpponentTimeout;
+            endNoteColor = AppColors.muted;
+          } else if (lastRound.winnerId != null) {
+            endNote = AppStrings.reasonMyTimeout;
+            endNoteColor = AppColors.dangerText;
+          } else {
+            endNote = null;
+            endNoteColor = AppColors.muted;
+          }
+        } else {
+          endNote = null;
+          endNoteColor = AppColors.muted;
+        }
     }
 
     final myScore = matchState?.scores['me'] ?? 0;

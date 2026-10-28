@@ -325,7 +325,7 @@ void main() {
       });
     });
 
-    test('2-0 durumunda 2. tur sonunda maç biter (matchFinished), isFinalReveal tetiklenir ve 3. tur oynanmaz', () {
+    test('2-0 durumunda 2. tur sonunda maç biter (matchFinished), ara tur sonu atlanır ve 500 ms sonra maç sonu ekranı açılır', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
         final container = ProviderContainer(
@@ -377,18 +377,17 @@ void main() {
         // Best of 3 kuralı: 2 galibiyete ulaşıldığı için motor matchFinished yapar, 3. tur oynanmaz!
         async.elapse(const Duration(milliseconds: 15200));
         state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.matchFinished);
         expect(state.matchState!.scores['bot'], 2);
         expect(state.matchState!.scores['me'], 0);
-        // Son tur normal bittiğinde 3000 ms boyunca isFinalReveal ve isRoundEnded true olur:
-        expect(state.isFinalReveal, isTrue);
-        expect(state.isRoundEnded, isTrue);
+        // Maçı bitiren turda ara tur sonu ekranı (isRoundEnded) gösterilmez!
+        // 500 ms boyunca tahta aktif kalır, isRoundEnded false'tur:
+        expect(state.isRoundEnded, isFalse);
         expect(state.isMatchFinished, isFalse);
 
-        // 3000 ms sonra finalReveal biter ve maç sonucu ekranı açılır:
-        async.elapse(const Duration(milliseconds: 3000));
+        // 500 ms sonra maç sonucu ekranı açılır:
+        async.elapse(const Duration(milliseconds: 500));
         state = container.read(matchControllerProvider);
-        expect(state.isFinalReveal, isFalse);
+        expect(state.matchState!.phase, MatchPhase.matchFinished);
         expect(state.isRoundEnded, isFalse);
         expect(state.isMatchFinished, isTrue);
         expect(state.summary, isNotNull);
@@ -401,7 +400,7 @@ void main() {
       });
     });
 
-    test('1-1 durumunda 3. tur oynanır ve 2-1 ile maç biter, isFinalReveal 3. tur sonunda tetiklenir', () {
+    test('1-1 durumunda 3. tur oynanır ve 2-1 ile maç biter, son turda ara tur sonu atlanır', () {
       fakeAsync((async) {
         final fakeClock = FakeClock(async);
         final container = ProviderContainer(
@@ -462,17 +461,15 @@ void main() {
         // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 2-1 kazanır ve maç biter!
         async.elapse(const Duration(milliseconds: 15200));
         state = container.read(matchControllerProvider);
-        expect(state.matchState!.phase, MatchPhase.matchFinished);
         expect(state.matchState!.scores['bot'], 2);
         expect(state.matchState!.scores['me'], 1);
-        expect(state.isFinalReveal, isTrue);
-        expect(state.isRoundEnded, isTrue);
+        expect(state.isRoundEnded, isFalse);
         expect(state.isMatchFinished, isFalse);
 
-        // 3000 ms sonra finalReveal biter ve maç sonucu ekranı açılır:
-        async.elapse(const Duration(milliseconds: 3000));
+        // 500 ms sonra maç sonucu ekranı açılır:
+        async.elapse(const Duration(milliseconds: 500));
         state = container.read(matchControllerProvider);
-        expect(state.isFinalReveal, isFalse);
+        expect(state.matchState!.phase, MatchPhase.matchFinished);
         expect(state.isRoundEnded, isFalse);
         expect(state.isMatchFinished, isTrue);
         expect(state.summary, isNotNull);

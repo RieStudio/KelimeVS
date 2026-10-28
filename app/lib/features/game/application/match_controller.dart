@@ -74,6 +74,9 @@ class MatchController extends Notifier<MatchUiState>
   int? _botDeadlineMs;
   Timer? _transitionTimer;
   int? _transitionDeadlineMs;
+  static const int matchFinishDelayMs = 500;
+  MatchState? _pendingFinishedMatchState;
+  MatchSummary? _pendingSummary;
   List<BotAction> _pendingBotActions = const [];
   int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
@@ -221,19 +224,25 @@ class MatchController extends Notifier<MatchUiState>
       _transitionDeadlineMs = now + transRemaining;
       transitionRemaining = transRemaining;
 
-      if (updatedMatch.phase == MatchPhase.roundEnded) {
+      if (_pendingFinishedMatchState != null) {
+        _transitionTimer = Timer(Duration(milliseconds: transRemaining), () {
+          _commitFinishedMatch();
+        });
+      } else if (updatedMatch.phase == MatchPhase.roundEnded) {
         _transitionTimer = Timer(Duration(milliseconds: transRemaining), () {
           _startNextRound(clock, random);
         });
-      } else if (state.isFinalReveal) {
-        _transitionTimer = Timer(Duration(milliseconds: transRemaining), () {
-          _cancelAllTimers();
-          state = state.copyWith(
-            isFinalReveal: false,
-            roundTransitionRemainingMs: 0,
-          );
-        });
       }
+    }
+
+    if (_pendingFinishedMatchState != null) {
+      _isPaused = false;
+      state = state.copyWith(
+        isPaused: false,
+        remainingMs: 0,
+        roundTransitionRemainingMs: transitionRemaining,
+      );
+      return;
     }
 
     _isPaused = false;
@@ -394,7 +403,11 @@ class MatchController extends Notifier<MatchUiState>
   @override
   void leaveMatch() {
     final match = state.matchState;
-    if (match == null || match.phase == MatchPhase.matchFinished) return;
+    if (match == null ||
+        match.phase == MatchPhase.matchFinished ||
+        _pendingFinishedMatchState != null) {
+      return;
+    }
 
     _cancelAllTimers();
     _unregisterLifecycleObserver();
@@ -525,8 +538,8 @@ class MatchController extends Notifier<MatchUiState>
     int transitionRemaining = 0;
 
     if (nextState.phase == MatchPhase.matchFinished) {
-      _unregisterLifecycleObserver();
       if (nextState.endedBy == 'draw_limit_reached') {
+        _unregisterLifecycleObserver();
         _cancelAllTimers();
         state = state.copyWith(
           isVoided: true,
@@ -546,21 +559,48 @@ class MatchController extends Notifier<MatchUiState>
       );
 
       if (nextState.endedBy == 'normal') {
-        isFinal = true;
         _cancelBotTimer();
         _cancelTransitionTimer();
-        final transitionDelay = roundTransitionDelayMs;
-        _transitionDeadlineMs = now + transitionDelay;
-        transitionRemaining = transitionDelay;
-        _transitionTimer = Timer(Duration(milliseconds: transitionDelay), () {
-          _cancelAllTimers();
-          state = state.copyWith(
-            isFinalReveal: false,
-            roundTransitionRemainingMs: 0,
-          );
+        _tickTimer?.cancel();
+        _tickTimer = null;
+
+        _pendingFinishedMatchState = nextState;
+        _pendingSummary = summary;
+        _transitionDeadlineMs = now + matchFinishDelayMs;
+
+        final boardDisplayState = nextState.copyWith(
+          phase: MatchPhase.roundActive,
+          turnPlayerId: null,
+          deadlineMs: 0,
+        );
+
+        state = state.copyWith(
+          matchState: boardDisplayState,
+          remainingMs: 0,
+          recentEvents: updatedEvents,
+          eventCounter: updatedEventCounter,
+          opponentName: opponentName ?? state.opponentName,
+          opponentFrame: opponentName != null
+              ? BotFrameResolver.resolve(opponentName)
+              : state.opponentFrame,
+          summary: summary,
+          isLoading: false,
+          acceptedAnswers: updatedAcceptedAnswers,
+          roundAttempts: updatedRoundAttempts,
+          lastFeedback: updatedFeedback,
+          feedbackCounter: updatedFeedbackCounter,
+          isFinalReveal: false,
+          roundTransitionRemainingMs: matchFinishDelayMs,
+          roundTransitionTotalMs: matchFinishDelayMs,
+        );
+
+        _transitionTimer = Timer(const Duration(milliseconds: matchFinishDelayMs), () {
+          _commitFinishedMatch();
         });
+        return;
       } else {
         // forfeit -> tur sonunu atla, hemen maç sonucu
+        _unregisterLifecycleObserver();
         _cancelAllTimers();
       }
     } else if (nextState.phase == MatchPhase.roundEnded) {
@@ -728,12 +768,30 @@ class MatchController extends Notifier<MatchUiState>
     _unregisterLifecycleObserver();
   }
 
+  void _commitFinishedMatch() {
+    final finishedState = _pendingFinishedMatchState;
+    final finishedSummary = _pendingSummary;
+    _cancelAllTimers();
+    _unregisterLifecycleObserver();
+
+    if (finishedState != null) {
+      state = state.copyWith(
+        matchState: finishedState,
+        summary: finishedSummary,
+        isFinalReveal: false,
+        roundTransitionRemainingMs: 0,
+      );
+    }
+  }
+
   void _cancelAllTimers() {
     _tickTimer?.cancel();
     _tickTimer = null;
     _cancelBotTimer();
     _cancelTransitionTimer();
     _frozenRemainingTurnMs = null;
+    _pendingFinishedMatchState = null;
+    _pendingSummary = null;
   }
 
   void _cancelBotTimer() {

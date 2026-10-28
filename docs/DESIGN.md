@@ -161,12 +161,15 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 - **Kazandın:** daire `bright` zemin, 4 px `ink` kenarlık ve gölge, içinde onay. Başlık "Turu kazandın!" (`ink`). Neden: "Rakibin süresi doldu".
 - **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` çarpı. Başlık "Turu kaybettin" (`dangerText`). Neden: "Süren doldu".
 - **Beraberlik:** daire `mint` zemin, `ink` kenarlık, içinde eşit işareti. Başlık "Tur berabere" (`ink`). Neden: "Tüm cevaplar söylendi". Alt yazı "Yeni tur birazdan başlıyor" (berabere tur sayıya dahil olmadığı için tur numarası değişmez).
-- Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Maçı belirleyen turdan sonra (bir oyuncu 2. galibiyetini alınca; 2–0 ya da 2–1) da bu ekran kısa süre gösterilir, alt yazı "Maç sonucu birazdan" olur; ardından maç sonucu ekranı açılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa bu ekran atlanır.
+- Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Ara turlarda (maçı bitirmeyen turlarda) bu ekran 3 sn boyunca geri sayım çubuğuyla gösterilir. **Maçı bitiren turda ise bu ara tur-sonu ekranı gösterilmez;** tahta üzerinde ~500 ms'lik kısa ve doğal bir duraklamanın ardından doğrudan maç sonucu ekranına yumuşak geçiş (350 ms easeOut) yapılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa ara ekran zaten atlanır.
 
 **5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada tur sonuyla aynı boyutta (104 px) ikon dairesi, başlık, skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı. Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Varyantlar:
 - **Kazandın:** daire `bright` zemin, içinde kupa (gövdesi `coin`). Başlık "Kazandın!" (46, `ink`).
 - **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` "tekrar" oku. Başlık "Kaybettin" (46, `dangerText`).
-- **Rakip maçı terk etti:** "Kazandın!" ve başlığın altında küçük "Rakip maçtan ayrıldı" notu. **Sen terk ettin:** "Kaybettin" ve "Maçı terk ettin" notu.
+- **Bitiş Sebebi / Terk Notu:** Başlığın altında 14 pt kalın alt satır olarak gösterilir:
+  - Süre aşımıyla bitişte: "Rakibin süresi doldu" (`muted`) veya "Süren doldu" (`dangerText`).
+  - Tur sınırına (5 tur) ulaşılarak skor üstünlüğüyle bitişte: "Tur sınırına ulaşıldı" (`muted`).
+  - Terk ve kopma durumlarında: "Rakip maçtan ayrıldı" (`muted`), "Maçı terk ettin" (`dangerText`), "Bağlantın koptu" (`dangerText`), "Rakibin bağlantısı koptu" (`muted`).
 - Jeton ödülü kartı geçici içerik: ekonomi kararı verilene kadar sabit örnek değer gösterilir ve veri kaydedilmez **[VARSAYIM]**.
 
 **6) Maç detayı** – Ana ekrandaki maç kartına ya da maç sonucu ekranındaki "Maç Detayı" butonuna dokununca açılır. Üstte geri ikon butonu + "Maç Detayı". Özet kartı: solda kendi avatarın ("Sen"), ortada skor (Fredoka 42) ve altında sonuç etiketi, sağda rakibin avatarı ve adı. Terk ya da kopma durumunda etiketin altında küçük not (12, `muted`): "Rakip maçtan ayrıldı" / "Maçı terk ettin" / "Bağlantın koptu" / "Rakibin bağlantısı koptu". Bağlantı kopması yüzünden kesinleşmemiş kayıtlarda (sunucudan kesin sonuç alınamamışsa) bu notun altına ikinci bir satır eklenir: "Skor, bağlantı kopmadan önceki duruma göredir." (12, `muted`).

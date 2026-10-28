@@ -1266,6 +1266,138 @@ void main() {
       expect(state.roundAttempts[2].isCorrect, isFalse);
     },
   );
+
+  test(
+    '15. Maçı bitiren turda sunucudan state(phase: matchFinished) ve final geldiğinde isRoundEnded ASLA true olmaz, doğrudan isMatchFinished true olur (ranked ve friendly)',
+    () async {
+      final clock = FakeManualClock(10000);
+      final repo = FakeHistoryRepo();
+      final client = FakeOnlineMatchClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          gameClockProvider.overrideWithValue(clock),
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(matchId: 'm_finish_test', opponentName: 'Ayşe');
+
+      // 1. Tur bitti (ara tur) -> roundEnded fazı gelir, isRoundEnded true olur
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 20000,
+            receivedLocalMs: 20000,
+            phase: OnlineMatchPhase.roundEnded,
+            roundNumber: 1,
+            myScore: 1,
+            opponentScore: 0,
+            question: OnlineQuestion(id: 'q_1', text: 'Meyveler'),
+            turnIsMine: false,
+            deadlineMs: 0,
+            nextRoundAtMs: 23000,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Ayşe',
+            opponentConnected: true,
+          ),
+        ),
+      );
+      var uiState = container.read(onlineMatchSessionProvider);
+      expect(uiState.isRoundEnded, isTrue);
+      expect(uiState.isMatchFinished, isFalse);
+
+      // 2. Tur başladı -> roundActive fazı gelir, isRoundEnded false olur
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 23000,
+            receivedLocalMs: 23000,
+            phase: OnlineMatchPhase.roundActive,
+            roundNumber: 2,
+            myScore: 1,
+            opponentScore: 0,
+            question: OnlineQuestion(id: 'q_2', text: 'Renkler'),
+            turnIsMine: true,
+            deadlineMs: 38000,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Ayşe',
+            opponentConnected: true,
+          ),
+        ),
+      );
+      uiState = container.read(onlineMatchSessionProvider);
+      expect(uiState.isRoundEnded, isFalse);
+      expect(uiState.isMatchFinished, isFalse);
+
+      // 3. 2. Tur bitti ve maçı bitirdi (skor 2-0):
+      // Sunucu doğrudan phase: matchFinished gönderir (roundEnded göndermez!)
+      client.emit(
+        const OnlineMatchStateUpdate(
+          OnlineMatchState(
+            serverNowMs: 35000,
+            receivedLocalMs: 35000,
+            phase: OnlineMatchPhase.matchFinished,
+            roundNumber: 2,
+            myScore: 2,
+            opponentScore: 0,
+            question: OnlineQuestion(id: 'q_2', text: 'Renkler'),
+            turnIsMine: false,
+            deadlineMs: 0,
+            myHintsLeft: 1,
+            attempts: [],
+            opponentName: 'Ayşe',
+            opponentConnected: true,
+            winnerIsMe: true,
+            endedBy: 'normal',
+          ),
+        ),
+      );
+      uiState = container.read(onlineMatchSessionProvider);
+      // DOĞRULAMA: Ara tur-sonu ekranı (isRoundEnded) ASLA true olmaz!
+      expect(uiState.isRoundEnded, isFalse);
+      expect(uiState.isMatchFinished, isTrue);
+      expect(uiState.matchState?.scores['me'], 2);
+      expect(uiState.matchState?.scores['bot'], 0);
+
+      // 4. Hemen ardından final mesajı gelir
+      client.emit(
+        const OnlineMatchFinal(
+          FinalServerMessage(
+            rounds: [
+              OnlineRoundRecord(
+                questionId: 'q_1',
+                attempts: [],
+                winnerIsMe: true,
+                reason: 'timeout',
+              ),
+              OnlineRoundRecord(
+                questionId: 'q_2',
+                attempts: [],
+                winnerIsMe: true,
+                reason: 'timeout',
+              ),
+            ],
+            myScore: 2,
+            opponentScore: 0,
+            winnerIsMe: true,
+            endedBy: 'normal',
+            coinsAwarded: 50,
+            coins: null,
+          ),
+        ),
+      );
+      uiState = container.read(onlineMatchSessionProvider);
+      expect(uiState.isRoundEnded, isFalse);
+      expect(uiState.isMatchFinished, isTrue);
+      expect(uiState.coinsAwarded, 50);
+    },
+  );
 }
 
 

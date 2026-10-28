@@ -138,10 +138,10 @@ class MatchUiState {
       matchState?.turnPlayerId == myPlayerId;
 
   bool get isMatchFinished =>
-      matchState?.phase == MatchPhase.matchFinished && !isFinalReveal;
+      matchState?.phase == MatchPhase.matchFinished;
   bool get isRoundActive => matchState?.phase == MatchPhase.roundActive;
   bool get isRoundEnded =>
-      (matchState?.phase == MatchPhase.roundEnded) || isFinalReveal;
+      matchState?.phase == MatchPhase.roundEnded;
 
   List<RoundAttemptUiModel> get displayAttempts {
     final list = roundAttempts.isNotEmpty

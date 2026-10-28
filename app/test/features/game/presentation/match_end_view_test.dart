@@ -13,10 +13,19 @@ import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
+import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/game/application/match_session.dart';
+
+class _TestSessionModeNotifier extends ActiveMatchSessionModeNotifier {
+  final MatchSessionMode _mode;
+  _TestSessionModeNotifier(this._mode);
+  @override
+  MatchSessionMode build() => _mode;
+}
 
 class FakeMatchController extends MatchController {
   final MatchUiState _initialState;
@@ -392,5 +401,145 @@ void main() {
 
     expect(find.text(AppStrings.wonExclamation), findsOneWidget);
     expect(find.text(AppStrings.opponentConnectionLost), findsOneWidget);
+  });
+
+  testWidgets('11. Normal galibiyet (rakip süre aşımı): "Rakibin süresi doldu" alt satır olarak görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 0},
+      winnerId: 'me',
+    ).copyWith(
+      roundHistory: [
+        const RoundRecord(
+          questionId: 'q_test_1',
+          starterPlayerId: 'me',
+          attempts: [],
+          winnerId: 'me',
+          reason: RoundEndReason.timeout,
+        ),
+      ],
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.wonExclamation), findsOneWidget);
+    expect(find.text(AppStrings.reasonOpponentTimeout), findsOneWidget);
+  });
+
+  testWidgets('12. Normal mağlubiyet (kendi süre aşımım): "Süren doldu" alt satır olarak görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 0, 'bot': 2},
+      winnerId: 'bot',
+    ).copyWith(
+      roundHistory: [
+        const RoundRecord(
+          questionId: 'q_test_1',
+          starterPlayerId: 'me',
+          attempts: [],
+          winnerId: 'bot',
+          reason: RoundEndReason.timeout,
+        ),
+      ],
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.lost), findsOneWidget);
+    expect(find.text(AppStrings.reasonMyTimeout), findsOneWidget);
+  });
+
+  testWidgets('13. Tur sınırına ulaşıldığında (5. tur berabere, skor üstünlüğüyle bitiş): "Tur sınırına ulaşıldı" görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+    ).copyWith(
+      totalRoundsPlayed: 5,
+      roundHistory: [
+        const RoundRecord(
+          questionId: 'q_test_1',
+          starterPlayerId: 'me',
+          attempts: [],
+          winnerId: null,
+          reason: RoundEndReason.exhausted,
+        ),
+      ],
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.wonExclamation), findsOneWidget);
+    expect(find.text(AppStrings.reasonRoundLimitReached), findsOneWidget);
+  });
+
+  testWidgets('14. Online ranked maçta final henüz gelmemişken jeton kartı gizlidir, takılma olmaz', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 0},
+      winnerId: 'me',
+    );
+    final historyEntry = MatchHistoryEntry(
+      id: 'm_online_ranked_test',
+      matchId: 'm_online_ranked_test',
+      opponentName: 'Zeynep',
+      finishedAtMs: 1000,
+      myScore: 2,
+      opponentScore: 0,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      endReason: MatchEndReason.normal,
+      roundRecords: const [],
+      botlaOynandi: false,
+      isFriendly: false,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Zeynep',
+      lastSavedMatch: historyEntry,
+      coinsAwarded: null, // Henüz sunucudan final gelmedi
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          matchControllerProvider.overrideWith(() => controller),
+          activeMatchSessionModeProvider.overrideWith(
+            () => _TestSessionModeNotifier(MatchSessionMode.online),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: MatchEndView(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label?.startsWith('Jeton ödülü') == true,
+      ),
+      findsNothing,
+    );
+
+
+
   });
 }
