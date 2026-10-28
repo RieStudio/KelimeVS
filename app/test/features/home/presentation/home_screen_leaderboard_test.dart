@@ -10,7 +10,11 @@ import 'package:app/features/leaderboard/application/leaderboard_providers.dart'
 import 'package:app/features/leaderboard/data/leaderboard_api_client.dart';
 import 'package:app/features/leaderboard/domain/models/leaderboard_models.dart';
 import 'package:app/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:app/core/widgets/app_bottom_nav_bar.dart';
+import 'package:app/core/widgets/app_icon_button.dart';
+import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
+import 'package:app/features/profile/presentation/profile_screen.dart';
 import 'package:app/main.dart';
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
@@ -160,6 +164,23 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('leaderboard_button')), findsOneWidget);
       expect(find.byKey(const Key('profile_avatar_button')), findsOneWidget);
+    });
+
+    testWidgets('5. Sol üstteki avatar butonuna basıldığında Profil sekmesine (index 3) geçilir, alt bar görünür ve geri butonu çıkmaz',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient();
+
+      await tester.pumpWidget(_buildMainShellApp(leaderboardClient: fakeClient));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('profile_avatar_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+      expect(find.byType(AppBottomNavBar), findsOneWidget);
+      expect(find.byType(AppIconButton), findsNothing);
     });
   });
 }

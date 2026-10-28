@@ -229,7 +229,7 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
                       color: AppColors.primary,
                     ),
                   )
-                else
+                else ...[
                   Text(
                     '${AppStrings.nextEnergyPrefix}$countdownStr',
                     style: const TextStyle(
@@ -240,17 +240,18 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
                     ),
                   ),
 
-                const SizedBox(height: AppDimens.space4),
+                  const SizedBox(height: AppDimens.space4),
 
-                Text(
-                  AppStrings.energyRegenInfo,
-                  style: const TextStyle(
-                    fontFamily: AppTextStyles.fontNunito,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: AppColors.muted,
+                  Text(
+                    AppStrings.energyRegenInfo,
+                    style: const TextStyle(
+                      fontFamily: AppTextStyles.fontNunito,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

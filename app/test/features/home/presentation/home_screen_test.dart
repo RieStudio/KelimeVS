@@ -17,7 +17,7 @@ import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
-import 'package:app/features/profile/presentation/profile_screen.dart';
+import 'package:app/main.dart';
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
   final List<MatchHistoryEntry> initialEntries;
@@ -251,18 +251,33 @@ void main() {
     expect(renderedCards[3].entry.id, 'm_old');
   });
 
-  testWidgets('6. Avatar/takma ad butonuna tıklandığında ProfileScreen açılır', (tester) async {
+  testWidgets('6. Avatar/takma ad butonuna tıklandığında bottomNavIndexProvider 3 (Profil) olur', (tester) async {
     final repo = FakeMatchHistoryRepository([]);
+    int capturedIndex = 0;
 
-    await tester.pumpWidget(_buildTestApp(repo));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          matchHistoryRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: Consumer(
+          builder: (context, ref, _) {
+            capturedIndex = ref.watch(bottomNavIndexProvider);
+            return const MaterialApp(
+              home: HomeScreen(),
+            );
+          },
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byType(ProfileScreen), findsNothing);
+    expect(capturedIndex, 0);
 
     await tester.tap(find.byKey(const Key('profile_avatar_button')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(ProfileScreen), findsOneWidget);
+    expect(capturedIndex, 3);
   });
 
   testWidgets('7. Son Maçlarım boş durumu: played > 0 ve yerel geçmiş boşsa geçmiş sıfırlandı mesajı gösterilir', (tester) async {

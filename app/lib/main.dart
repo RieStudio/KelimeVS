@@ -311,6 +311,9 @@ class _MainShellState extends ConsumerState<MainShell>
       if (next == 1 && _hasVisitedLeaderboard) {
         ref.read(leaderboardNotifierProvider.notifier).refresh();
       }
+      if (next == 3 && prev != 3) {
+        ref.read(profileProvider.notifier).syncWithServer();
+      }
     });
 
     final currentIndex = ref.watch(bottomNavIndexProvider);

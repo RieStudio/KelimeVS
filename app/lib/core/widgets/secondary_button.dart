@@ -15,6 +15,7 @@ class SecondaryButton extends StatefulWidget {
   final Color? textColor;
   final Color? borderColor;
   final List<BoxShadow>? boxShadow;
+  final double? horizontalPadding;
 
   const SecondaryButton({
     super.key,
@@ -26,6 +27,7 @@ class SecondaryButton extends StatefulWidget {
     this.textColor,
     this.borderColor,
     this.boxShadow,
+    this.horizontalPadding,
   });
 
   const SecondaryButton.danger({
@@ -34,6 +36,7 @@ class SecondaryButton extends StatefulWidget {
     this.onPressed,
     this.width,
     this.height = AppDimens.secondaryButtonHeight,
+    this.horizontalPadding,
   })  : backgroundColor = AppColors.dangerSoft,
         textColor = AppColors.dangerText,
         borderColor = AppColors.danger,
@@ -115,15 +118,22 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                     ),
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space16,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: widget.horizontalPadding ??
+                              (widget.width != null && widget.width! < 100
+                                  ? AppDimens.space6
+                                  : AppDimens.space16),
                         ),
-                        child: Text(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
                           widget.text,
                           style: AppTextStyles.secondaryButton.copyWith(
                             color: widget.textColor ?? AppColors.ink,
                           ),
                           textAlign: TextAlign.center,
+                          maxLines: 1,
+                        ),
                         ),
                       ),
                     ),

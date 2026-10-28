@@ -131,12 +131,16 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                                   ),
                                 ],
                               )
-                            : Text(
-                                widget.text,
-                                style: widget.isLarge
-                                    ? AppTextStyles.primaryButtonLarge
-                                    : AppTextStyles.primaryButton,
-                                textAlign: TextAlign.center,
+                            : FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  widget.text,
+                                  style: widget.isLarge
+                                      ? AppTextStyles.primaryButtonLarge
+                                      : AppTextStyles.primaryButton,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                ),
                               ),
                       ),
                     ),

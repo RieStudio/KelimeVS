@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/core/strings/app_strings.dart';
 import 'package:app/features/profile/domain/energy_state.dart';
 import 'package:app/features/store/presentation/widgets/energy_tab_view.dart';
 
@@ -47,6 +48,7 @@ void main() {
       expect(find.text('Tam Doldur'), findsOneWidget);
       expect(find.text('20'), findsOneWidget);
       expect(find.text('80'), findsOneWidget);
+      expect(find.text(AppStrings.energyRegenInfo), findsOneWidget);
     });
 
     testWidgets('tam enerji (5/5) durumunda "Tüm enerjin doldu" ve "Enerjin dolu" yazar',
@@ -78,7 +80,7 @@ void main() {
       expect(find.text('5 / 5'), findsOneWidget);
       expect(find.text('Tüm enerjin doldu'), findsOneWidget);
       expect(find.text('Enerjin dolu'), findsNWidgets(2));
+      expect(find.text(AppStrings.energyRegenInfo), findsNothing);
     });
   });
 }
-

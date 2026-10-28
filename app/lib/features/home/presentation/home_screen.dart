@@ -25,7 +25,6 @@ import '../../game/application/match_history_provider.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
-import '../../profile/presentation/profile_screen.dart';
 import '../../store/application/store_notifier.dart';
 import '../../store/domain/models/store_item.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
@@ -64,17 +63,13 @@ class HomeScreen extends ConsumerWidget {
               // 1. Üst Çubuk
               Row(
                 children: [
-                  // Oyuncu Avatarı (44 px, selfHome) ve Adı - Dokunulduğunda Profil ekranını açar
+                  // Oyuncu Avatarı (44 px, selfHome) ve Adı - Dokunulduğunda Profil sekmesine geçer
                   Flexible(
                     child: GestureDetector(
                       key: const Key('profile_avatar_button'),
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileScreen(),
-                          ),
-                        );
+                        ref.read(bottomNavIndexProvider.notifier).setIndex(3);
                       },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
