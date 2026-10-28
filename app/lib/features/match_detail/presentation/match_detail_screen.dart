@@ -542,6 +542,9 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                           attempt: attempts[validAttemptIndices[i]],
                           isSelected: validAttemptIndices[i] == selectedAttemptIndex,
                           textFilter: textFilter,
+                          showTail: i == 0 ||
+                              attempts[validAttemptIndices[i - 1]].playerId !=
+                                  attempts[validAttemptIndices[i]].playerId,
                         ),
                       ],
 
@@ -572,6 +575,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
     required TurnAttempt attempt,
     required bool isSelected,
     required TextFilter textFilter,
+    bool showTail = true,
   }) {
     final isMe = attempt.playerId == 'me';
     final isRejected = attempt.resultType != AttemptResultType.correct;
@@ -589,6 +593,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
       isMe: isMe,
       isRejected: isRejected,
       isSelected: isSelected && canSelect,
+      showTail: showTail,
       onTap: canSelect
           ? () {
               setState(() {

@@ -360,11 +360,15 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           const SizedBox(height: AppDimens.bubbleSpacing),
                       itemBuilder: (context, index) {
                         final item = uiState.displayAttempts[index];
+                        final bool showTail = index == 0 ||
+                            uiState.displayAttempts[index - 1].playerId !=
+                                item.playerId;
                         return _AnimatedBubble(
                           key: ValueKey('${item.playerId}_${item.text}_$index'),
                           text: item.text,
                           isMe: item.playerId == uiState.myPlayerId,
                           isRejected: !item.isCorrect,
+                          showTail: showTail,
                         );
                       },
                     ),
@@ -470,12 +474,14 @@ class _AnimatedBubble extends StatefulWidget {
   final String text;
   final bool isMe;
   final bool isRejected;
+  final bool showTail;
 
   const _AnimatedBubble({
     super.key,
     required this.text,
     required this.isMe,
     this.isRejected = false,
+    this.showTail = true,
   });
 
   @override
@@ -518,6 +524,7 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
         text: widget.text,
         isMe: widget.isMe,
         isRejected: widget.isRejected,
+        showTail: widget.showTail,
       ),
     );
   }

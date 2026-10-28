@@ -731,6 +731,61 @@ void main() {
 
       expect(find.byType(MatchDetailScreen), findsOneWidget);
     });
+
+    testWidgets('14. Maç Detayı ekranında WhatsApp tarzı çentik gruplaması uygulanır', (tester) async {
+      final groupedMatch = createSampleMatch(
+        rounds: [
+          const RoundRecord(
+            questionId: 'q1',
+            starterPlayerId: 'me',
+            winnerId: 'me',
+            reason: RoundEndReason.timeout,
+            attempts: [
+              TurnAttempt(
+                playerId: 'me',
+                rawInput: 'cevap1',
+                resultType: AttemptResultType.correct,
+                nowMs: 1000,
+              ),
+              TurnAttempt(
+                playerId: 'me',
+                rawInput: 'cevap2',
+                resultType: AttemptResultType.wrong,
+                nowMs: 2000,
+              ),
+              TurnAttempt(
+                playerId: 'opponent',
+                rawInput: 'cevap3',
+                resultType: AttemptResultType.correct,
+                nowMs: 3000,
+              ),
+              TurnAttempt(
+                playerId: 'opponent',
+                rawInput: 'cevap4',
+                resultType: AttemptResultType.wrong,
+                nowMs: 4000,
+              ),
+            ],
+          ),
+        ],
+        questionTexts: ['Soru 1'],
+      );
+
+      await tester.pumpWidget(createDetailTestWidget(match: groupedMatch));
+      await tester.pumpAndSettle();
+
+      final bubbles = tester.widgetList<AnswerBubble>(find.byType(AnswerBubble)).toList();
+      expect(bubbles.length, 4);
+
+      // 0: 'me' (ilk) -> showTail: true
+      expect(bubbles[0].showTail, isTrue);
+      // 1: 'me' (devam) -> showTail: false
+      expect(bubbles[1].showTail, isFalse);
+      // 2: 'opponent' (yeni gönderici ilk) -> showTail: true
+      expect(bubbles[2].showTail, isTrue);
+      // 3: 'opponent' (devam) -> showTail: false
+      expect(bubbles[3].showTail, isFalse);
+    });
   });
 }
 

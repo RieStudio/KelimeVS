@@ -338,20 +338,52 @@ void main() {
     final bubbles = tester.widgetList<AnswerBubble>(find.byType(AnswerBubble)).toList();
     expect(bubbles.length, 3);
 
-    // 1. Rakibin reddedilen cevabı: isMe: false, isRejected: true
+    // 1. Rakibin reddedilen cevabı: isMe: false, isRejected: true, showTail: true (ilk)
     expect(bubbles[0].text, 'YanlışCevap1');
     expect(bubbles[0].isMe, isFalse);
     expect(bubbles[0].isRejected, isTrue);
+    expect(bubbles[0].showTail, isTrue);
 
-    // 2. Kendi reddedilen cevabım: isMe: true, isRejected: true
+    // 2. Kendi reddedilen cevabım: isMe: true, isRejected: true, showTail: true (yeni gönderici)
     expect(bubbles[1].text, 'YanlışCevap2');
     expect(bubbles[1].isMe, isTrue);
     expect(bubbles[1].isRejected, isTrue);
+    expect(bubbles[1].showTail, isTrue);
 
-    // 3. Kendi doğru cevabım: isMe: true, isRejected: false
+    // 3. Kendi doğru cevabım: isMe: true, isRejected: false, showTail: false (aynı göndericinin devamı)
     expect(bubbles[2].text, 'Boğa');
     expect(bubbles[2].isMe, isTrue);
     expect(bubbles[2].isRejected, isFalse);
+    expect(bubbles[2].showTail, isFalse);
+  });
+
+  testWidgets('7b. WhatsApp tarzı çentik gruplaması: art arda gelen aynı göndericinin yalnızca ilk balonunda çentik gösterilir',
+      (tester) async {
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: const [
+        RoundAttemptUiModel(playerId: 'me', text: 'Cevap1', isCorrect: true),
+        RoundAttemptUiModel(playerId: 'me', text: 'Cevap2', isCorrect: true),
+        RoundAttemptUiModel(playerId: 'bot', text: 'Cevap3', isCorrect: true),
+        RoundAttemptUiModel(playerId: 'bot', text: 'Cevap4', isCorrect: true),
+        RoundAttemptUiModel(playerId: 'me', text: 'Cevap5', isCorrect: true),
+      ],
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    final bubbles = tester.widgetList<AnswerBubble>(find.byType(AnswerBubble)).toList();
+    expect(bubbles.length, 5);
+
+    expect(bubbles[0].showTail, isTrue);
+    expect(bubbles[1].showTail, isFalse);
+    expect(bubbles[2].showTail, isTrue);
+    expect(bubbles[3].showTail, isFalse);
+    expect(bubbles[4].showTail, isTrue);
   });
 
   testWidgets('8. Giriş alanında en fazla 40 karakter girilebilir ve sayaç görünmez',
