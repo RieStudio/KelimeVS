@@ -15,5 +15,15 @@ abstract final class AppConfig {
     'ONLINE_MATCHMAKING',
     defaultValue: true,
   );
+
+  /// Gizlilik Politikası web sayfası adresi.
+  static const String privacyPolicyUrl =
+      'https://riestudio.com.tr/privacy/kelimevs';
+
+  /// Destek ve iletişim e-posta adresi.
+  static const String supportEmail = 'contact@riestudio.com.tr';
+
+  /// Destek e-postası varsayılan konu başlığı.
+  static const String supportSubject = 'KelimeVS Destek';
 }
 

@@ -12,6 +12,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_dimens.dart';
 import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/font_licenses.dart';
 import 'core/widgets/app_widgets.dart';
 import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
@@ -25,6 +26,7 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerFontLicenses();
   String? authError;
 
   try {

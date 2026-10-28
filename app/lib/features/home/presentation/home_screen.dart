@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,7 +18,7 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/section_label.dart';
-import '../../../gallery/component_gallery.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../../../main.dart';
 import '../../friend_match/presentation/friend_duel_bottom_sheet.dart';
 import '../../game/application/match_history_provider.dart';
@@ -135,18 +134,17 @@ class HomeScreen extends ConsumerWidget {
 
                   const SizedBox(width: AppDimens.space8),
 
-                  // Ayarlar İkon Butonu (kDebugMode'da ComponentGallery, release'te boş)
+                  // Ayarlar İkon Butonu: Ayarlar ekranına geçiş
                   AppIconButton(
+                    key: const Key('settings_button'),
                     icon: AppIcons.settings,
                     semanticLabel: AppStrings.settings,
                     onTap: () {
-                      if (kDebugMode) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const ComponentGallery(),
-                          ),
-                        );
-                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],

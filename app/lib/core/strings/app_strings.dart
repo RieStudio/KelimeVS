@@ -464,4 +464,18 @@ abstract final class AppStrings {
   static const String energyDepletedSubtitle =
       'Sıralı online maç oynamak için en az 1 enerjiye ihtiyacın var.';
   static const String playWithBotEnergyFree = 'Botla Oyna';
+
+  // Ayarlar Ekranı
+  static const String settingsTitle = 'Ayarlar';
+  static const String settingsSectionLegal = 'Yasal ve Bilgilendirme';
+  static const String settingsSectionSupport = 'Destek';
+  static const String settingsSectionDeveloper = 'Geliştirici';
+  static const String privacyPolicy = 'Gizlilik Politikası';
+  static const String openSourceLicenses = 'Açık Kaynak Lisansları';
+  static const String contactSupport = 'İletişim ve Destek';
+  static const String devComponentGallery = 'Bileşen Galerisi (Geliştirici)';
+  static const String linkOpenError =
+      'Bağlantı açılamadı. Lütfen tekrar deneyin.';
+  static String appVersionFooter(String version, String build) =>
+      'KelimeVS v$version ($build)';
 }

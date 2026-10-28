@@ -215,6 +215,16 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 - **Rakip terk ederse veya maç iptal edilirse:** Maçı terk eden (maçtan çıkan ya da bağlantısı kopup 30 saniyelik süre içinde dönmeyen, yani kopma yenilgisi alan) oyuncu enerjisini kaybeder; maçta kalan oyuncuya **1 enerji iade edilir**. Eşleşme sonrası rakip hiç bağlanmazsa (`opponent_absent`) ya da maç sırasında her iki oyuncunun da bağlantısı kopup süreleri dolarsa (`both_disconnected`) maç iptal (`voided`) edilir ve **harcama yapmış her iki oyuncuya da enerjileri iade edilir**. Normal süre aşımı (cevap vermeme) terk sayılmaz, o durumda iade yoktur. Oyuncu kendi bağlantısını kaybedip süre içinde dönerse enerjisi düşmüş kalır, maç normal devam eder.
 - **Özellik anahtarı:** Enerji sistemi sunucuda `ENERGY_ENABLED` anahtarıyla açılıp kapanır. Varsayılan **kapalı**. Kapalıyken enerji hapı, Enerji sekmesi ve "Enerjin bitti" akışı görünmez, tüm maçlar sınırsızdır.
 
+**10) Ayarlar Ekranı** – Ana ekrandaki ayarlar ikon butonuyla tam ekran rota (`SettingsScreen`) olarak açılır. Geri tuşuyla ana ekrana dönülür. Zemin `surface`, kartlar `card` zemin + 2 px `mint` kenarlık + `borderRadiusListCard` (16 px).
+- **Yasal ve Bilgilendirme:**
+  - *Gizlilik Politikası:* Tıklandığında tarayıcıda harici bağlantı olarak açılır (`AppConfig.privacyPolicyUrl`). Ağ yoksa `ensureNetworkConnected` SnackBar gösterir; bağlantı açılamazsa kullanıcıya hata uyarısı verilir.
+  - *Açık Kaynak Lisansları:* Flutter'ın `showLicensePage` fonksiyonunu açar. Fredoka ve Nunito fontlarının SIL OFL 1.1 lisansları `LicenseRegistry` üzerinden sayfaya dahil edilmiştir.
+- **Destek:**
+  - *İletişim ve Destek:* E-posta istemcisini (`AppConfig.supportEmail`) açar. Ağ kontrolü uygulanır.
+- **Geliştirici Grubu:** Yalnızca `kDebugMode` derlemelerinde görünür; "Bileşen Galerisi" (`ComponentGallery`) sayfasına yönlendirir. Release sürümlerde bu satır widget ağacına hiç dahil edilmez.
+- **Alt Bilgi:** En altta ortalı sürüm ve derleme numarası ("KelimeVS v{version} ({build})", Nunito 12/700 `muted`).
+- **Platform Notları:** Android 11+ paket görünürlüğü için `AndroidManifest.xml` içinde `https` ve `mailto` için `<queries>` tanımlıdır. (iOS tarafında `Info.plist` içinde `LSApplicationQueriesSchemes` listesine `https` ve `mailto` eklenmelidir).
+
 ## 8. Hareket (animasyon)
 
 - Süreler kısa: dokunma geri bildirimi 80–100 ms, geçişler 200–250 ms, sonuç ekranı girişi 300–400 ms.
