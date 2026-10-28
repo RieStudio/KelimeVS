@@ -146,6 +146,89 @@ class ComponentGallery extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space24),
 
+            // 3.1 TÜRKÇE TİPOGRAFİ TESTİ (Fredoka Glif Kontrolü)
+            const SectionLabel('Türkçe Tipografi Testi (Fredoka & Nunito Glifleri)'),
+            const SizedBox(height: AppDimens.space10),
+            Container(
+              padding: const EdgeInsets.all(AppDimens.space16),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: AppDimens.borderRadiusQuestionCard,
+                border: Border.all(
+                  color: AppColors.ink,
+                  width: AppDimens.borderThin,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Fredoka Bold (w700):',
+                    style: AppTextStyles.sectionLabel,
+                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  const Text(
+                    'ş Ş ç Ç ğ Ğ ı İ ö Ö ü Ü',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFredoka,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space12),
+                  const Text(
+                    'Fredoka SemiBold (w600):',
+                    style: AppTextStyles.sectionLabel,
+                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  const Text(
+                    'ş Ş ç Ç ğ Ğ ı İ ö Ö ü Ü',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontFredoka,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space12),
+                  const Text(
+                    'Nunito Bold (Referans Karşılaştırma):',
+                    style: AppTextStyles.sectionLabel,
+                  ),
+                  const SizedBox(height: AppDimens.space6),
+                  const Text(
+                    'ş Ş ç Ç ğ Ğ ı İ ö Ö ü Ü',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.fontNunito,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimens.space16),
+                  const Text(
+                    'Buton Glifleri Doğrulama:',
+                    style: AppTextStyles.sectionLabel,
+                  ),
+                  const SizedBox(height: AppDimens.space10),
+                  SecondaryButton(
+                    text: AppStrings.changeNickname,
+                    onPressed: () {},
+                  ),
+                  const SizedBox(height: AppDimens.space10),
+                  SecondaryButton.danger(
+                    text: AppStrings.signOut,
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimens.space24),
+
             // 4. BUTONLAR
             const SectionLabel('Butonlar (Sert Gölge & Basılma Efekti)'),
             const SizedBox(height: AppDimens.space10),

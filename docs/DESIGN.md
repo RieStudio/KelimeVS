@@ -48,6 +48,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 | Gövde, etiket, cevap balonu, giriş | **Nunito** | 700–800 |
 
 **[KARAR]** Türkçe karakterleri (ç ğ ı İ ö ş ü) destekleyen Latin-ext alt kümeli sürümler kullanılır. Fontlar uygulamayla birlikte `assets/fonts/` içinde paketlenir (çevrimdışı ve ilk açılışta gecikmesiz). Paketleme yerine `google_fonts` kullanılacaksa çalışma zamanı indirmesi test edilir.
+- **Fredoka Türkçe Glif Genişletmesi (SIL OFL 1.1):** Orijinal Fredoka fontunda (v2.001) bulunmayan Türkçe Latin Extended-A glifleri (`Ş`, `ş`, `Ğ`, `ğ`, `İ`), Android HarfBuzz/Impeller üzerinde çengel ayrışma ve kayma sorununu önlemek için fontun mevcut bileşenleriyle (`s` + `uni0327`, `g` + `uni0306`, `I` + `uni0307`) `app/tool/patch_fredoka_turkish.py` ile precomposed composite glif olarak font dosyalarına işlenmiştir. Orijinal dosyalar `app/assets/fonts/original/` altında saklanmaktadır. Lisans metni `app/assets/fonts/OFL.txt` içinde belgelenmiştir.
 
 | Stil | Font | Boyut | Ağırlık |
 |---|---|---|---|
