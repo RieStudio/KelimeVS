@@ -142,16 +142,20 @@ class SettingsScreen extends ConsumerWidget {
                           _SettingsTile(
                             key: const Key('settings_licenses'),
                             icon: Icons.description_outlined,
-                            title: AppStrings.openSourceLicenses,
+                            title: AppStrings.thirdPartyLicenses,
                             trailing: const Icon(
                               Icons.chevron_right,
                               size: 20,
                               color: AppColors.muted,
                             ),
                             onTap: () {
+                              final info = versionAsync.asData?.value;
                               showLicensePage(
                                 context: context,
                                 applicationName: 'KelimeVS',
+                                applicationVersion: info != null
+                                    ? 'v${info.version} (${info.buildNumber})'
+                                    : null,
                                 applicationLegalese: '© 2026 Rie Studio',
                               );
                             },

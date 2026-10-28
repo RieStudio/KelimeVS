@@ -218,7 +218,7 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 **10) Ayarlar Ekranı** – Ana ekrandaki ayarlar ikon butonuyla tam ekran rota (`SettingsScreen`) olarak açılır. Geri tuşuyla ana ekrana dönülür. Zemin `surface`, kartlar `card` zemin + 2 px `mint` kenarlık + `borderRadiusListCard` (16 px).
 - **Yasal ve Bilgilendirme:**
   - *Gizlilik Politikası:* Tıklandığında tarayıcıda harici bağlantı olarak açılır (`AppConfig.privacyPolicyUrl`). Ağ yoksa `ensureNetworkConnected` SnackBar gösterir; bağlantı açılamazsa kullanıcıya hata uyarısı verilir.
-  - *Açık Kaynak Lisansları:* Flutter'ın `showLicensePage` fonksiyonunu açar. Fredoka ve Nunito fontlarının SIL OFL 1.1 lisansları `LicenseRegistry` üzerinden sayfaya dahil edilmiştir.
+  - *Üçüncü Taraf Lisansları:* Flutter'ın `showLicensePage` fonksiyonunu açar. Fredoka ve Nunito fontlarının SIL OFL 1.1 lisansları `LicenseRegistry` üzerinden sayfaya dahil edilmiştir.
 - **Destek:**
   - *İletişim ve Destek:* E-posta istemcisini (`AppConfig.supportEmail`) açar. Ağ kontrolü uygulanır.
 - **Geliştirici Grubu:** Yalnızca `kDebugMode` derlemelerinde görünür; "Bileşen Galerisi" (`ComponentGallery`) sayfasına yönlendirir. Release sürümlerde bu satır widget ağacına hiç dahil edilmez.

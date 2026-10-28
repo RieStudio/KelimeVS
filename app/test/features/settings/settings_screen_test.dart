@@ -79,7 +79,7 @@ void main() {
 
       // Tiles
       expect(find.text(AppStrings.privacyPolicy), findsOneWidget);
-      expect(find.text(AppStrings.openSourceLicenses), findsOneWidget);
+      expect(find.text(AppStrings.thirdPartyLicenses), findsOneWidget);
       expect(find.text(AppStrings.contactSupport), findsOneWidget);
       expect(find.text(AppConfig.supportEmail), findsOneWidget);
 
@@ -183,7 +183,7 @@ void main() {
       expect(find.text(AppStrings.linkOpenError), findsOneWidget);
     });
 
-    testWidgets('tapping Open Source Licenses opens showLicensePage', (tester) async {
+    testWidgets('tapping Third Party Licenses opens showLicensePage', (tester) async {
       await tester.pumpWidget(createWidget());
       await tester.pumpAndSettle();
 

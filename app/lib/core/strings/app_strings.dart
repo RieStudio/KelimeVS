@@ -471,7 +471,7 @@ abstract final class AppStrings {
   static const String settingsSectionSupport = 'Destek';
   static const String settingsSectionDeveloper = 'Geliştirici';
   static const String privacyPolicy = 'Gizlilik Politikası';
-  static const String openSourceLicenses = 'Açık Kaynak Lisansları';
+  static const String thirdPartyLicenses = 'Üçüncü Taraf Lisansları';
   static const String contactSupport = 'İletişim ve Destek';
   static const String devComponentGallery = 'Bileşen Galerisi (Geliştirici)';
   static const String linkOpenError =
