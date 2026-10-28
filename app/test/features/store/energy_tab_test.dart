@@ -8,7 +8,7 @@ import 'package:app/features/store/presentation/widgets/energy_tab_view.dart';
 
 void main() {
   group('EnergyTabView Widget Tests', () {
-    testWidgets('3/5 enerji durumunu, hücreleri ve canlı mm:ss sayacını gösterir',
+    testWidgets('3/5 enerji durumunu, hücreleri ve canlı mm:ss sayacını gösterir, sabit yenilenme açıklamasını göstermez',
         (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       // 14 dakika 25 saniye sonrası
@@ -43,15 +43,17 @@ void main() {
       // mm:ss formatında (14:25) geri sayım metni aranır
       expect(find.textContaining('14:25'), findsOneWidget);
 
+      // Sabit yenilenme cümlesi eksik enerjide de gösterilmemelidir
+      expect(find.textContaining('Her 20 dakikada 1 enerji yenilenir'), findsNothing);
+
       // Paket kartları
       expect(find.text('+1 Enerji'), findsOneWidget);
       expect(find.text('Tam Doldur'), findsOneWidget);
       expect(find.text('20'), findsOneWidget);
       expect(find.text('80'), findsOneWidget);
-      expect(find.text(AppStrings.energyRegenInfo), findsOneWidget);
     });
 
-    testWidgets('tam enerji (5/5) durumunda "Tüm enerjin doldu" ve "Enerjin dolu" yazar',
+    testWidgets('tam enerji (5/5) durumunda "Tüm enerjin doldu" ve "Enerjin dolu" yazar, sabit yenilenme açıklamasını göstermez',
         (tester) async {
       final energy = const EnergyState(
         enabled: true,
@@ -78,9 +80,9 @@ void main() {
       );
 
       expect(find.text('5 / 5'), findsOneWidget);
-      expect(find.text('Tüm enerjin doldu'), findsOneWidget);
-      expect(find.text('Enerjin dolu'), findsNWidgets(2));
-      expect(find.text(AppStrings.energyRegenInfo), findsNothing);
+      expect(find.text(AppStrings.energyFull), findsOneWidget);
+      expect(find.text(AppStrings.energyFullButton), findsNWidgets(2));
+      expect(find.textContaining('Her 20 dakikada 1 enerji yenilenir'), findsNothing);
     });
   });
 }

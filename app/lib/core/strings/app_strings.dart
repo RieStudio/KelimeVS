@@ -451,7 +451,6 @@ abstract final class AppStrings {
   static const String energyFull = 'Tüm enerjin doldu';
   static const String energyFullButton = 'Enerjin dolu';
   static const String nextEnergyPrefix = 'Sonraki enerji: ';
-  static const String energyRegenInfo = 'Her 20 dakikada 1 enerji yenilenir.';
   static const String energyPackOneTitle = '+1 Enerji';
   static const String energyPackOneDesc = 'Hemen 1 enerji doldur';
   static const String energyPackFullTitle = 'Tam Doldur';
