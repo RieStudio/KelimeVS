@@ -48,10 +48,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  void _showChangeNicknameDialog(
-    BuildContext context,
-    String currentNickname,
-  ) {
+  void _showChangeNicknameDialog(BuildContext context, String currentNickname) {
     if (!ensureNetworkConnected(context, ref)) return;
     showDialog<void>(
       context: context,
@@ -60,9 +57,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return _ChangeNicknameDialog(
           currentNickname: currentNickname,
           onSave: (newNickname) async {
-            await ref
-                .read(profileProvider.notifier)
-                .setNickname(newNickname);
+            await ref.read(profileProvider.notifier).setNickname(newNickname);
           },
         );
       },
@@ -90,9 +85,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.isNetworkError
-                ? AppStrings.networkError
-                : result.message,
+            result.isNetworkError ? AppStrings.networkError : result.message,
             style: const TextStyle(
               fontFamily: AppTextStyles.fontNunito,
               fontWeight: FontWeight.w700,
@@ -171,6 +164,91 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  final GlobalKey _moreButtonKey = GlobalKey();
+
+  Future<void> _showMoreMenu(BuildContext context) async {
+    final renderBox =
+        _moreButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (renderBox == null || overlay == null) return;
+
+    final authState = ref.read(authNotifierProvider);
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        renderBox.localToGlobal(
+          Offset(0, renderBox.size.height + 4),
+          ancestor: overlay,
+        ),
+        renderBox.localToGlobal(
+          renderBox.size.bottomRight(const Offset(0, 4)),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final selected = await showMenu<String>(
+      context: context,
+      position: position,
+      color: AppColors.card,
+      elevation: 4,
+      shadowColor: AppColors.ink.withValues(alpha: 0.15),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppDimens.borderRadiusListCard,
+        side: const BorderSide(
+          color: AppColors.mint,
+          width: AppDimens.borderThin,
+        ),
+      ),
+      items: [
+        if (authState.isGoogleLinked)
+          PopupMenuItem<String>(
+            value: 'sign_out',
+            height: 44,
+            child: Semantics(
+              label: AppStrings.signOut,
+              child: Text(
+                AppStrings.signOut,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontNunito,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+          ),
+        if (authState.isGoogleLinked) const _ProfileMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'delete_account',
+          height: 44,
+          child: Semantics(
+            label: AppStrings.deleteAccount,
+            child: Text(
+              AppStrings.deleteAccount,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.dangerText,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (!context.mounted || selected == null) return;
+
+    if (selected == 'sign_out') {
+      _showSignOutDialog(context, ref);
+    } else if (selected == 'delete_account') {
+      _showDeleteAccountDialog(context, ref);
+    }
+  }
+
   void _showSignOutDialog(BuildContext context, WidgetRef ref) {
     showDialog<void>(
       context: context,
@@ -238,10 +316,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             AppStrings.deleteAccountDialogTitle,
             style: AppTextStyles.cardTitle,
           ),
-          content: Text(
-            dialogMessage,
-            style: AppTextStyles.bodyText,
-          ),
+          content: Text(dialogMessage, style: AppTextStyles.bodyText),
           actions: [
             PrimaryButton(
               text: AppStrings.deleteAccountConfirm,
@@ -265,8 +340,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _handleDeleteAccount(BuildContext context, WidgetRef ref) async {
-    final success =
-        await ref.read(authNotifierProvider.notifier).deleteAccount();
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .deleteAccount();
 
     if (!context.mounted) return;
 
@@ -308,7 +384,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final profile = ref.watch(profileProvider);
     final authState = ref.watch(authNotifierProvider);
 
-    final nickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
+    final nickname =
+        (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
         ? profile.nickname!.trim()
         : AppStrings.defaultPlayerName;
 
@@ -343,7 +420,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(width: 44, height: 44), // Dengelemek için
+                  AppIconButton(
+                    key: _moreButtonKey,
+                    icon: AppIcons.more,
+                    semanticLabel: AppStrings.more,
+                    onTap: authState.isLoading
+                        ? null
+                        : () => _showMoreMenu(context),
+                  ),
                 ],
               ),
               const SizedBox(height: AppDimens.space24),
@@ -455,15 +539,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: AppDimens.space12),
-
-                // Çıkış Yap Butonu
-                SecondaryButton(
-                  text: AppStrings.signOut,
-                  onPressed: authState.isLoading
-                      ? null
-                      : () => _showSignOutDialog(context, ref),
-                ),
               ],
 
               const SizedBox(height: AppDimens.space16),
@@ -480,15 +555,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 },
               ),
 
-              const SizedBox(height: AppDimens.space32),
-
-              // Hesabı Sil Butonu
-              SecondaryButton.danger(
-                text: AppStrings.deleteAccount,
-                onPressed: authState.isLoading
-                    ? null
-                    : () => _showDeleteAccountDialog(context, ref),
-              ),
+              const SizedBox(height: AppDimens.space24),
             ],
           ),
         ),
@@ -730,10 +797,7 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatCard({
-    required this.label,
-    required this.value,
-  });
+  const _StatCard({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -745,10 +809,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppDimens.borderRadiusListCard,
-        border: Border.all(
-          color: AppColors.mint,
-          width: AppDimens.borderThin,
-        ),
+        border: Border.all(color: AppColors.mint, width: AppDimens.borderThin),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -781,3 +842,23 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+/// DESIGN.md token'larına uygun ince açılır menü ayırıcısı (1 px mint)
+class _ProfileMenuDivider extends PopupMenuEntry<Never> {
+  const _ProfileMenuDivider();
+
+  @override
+  final double height = 1.0;
+
+  @override
+  bool represents(void value) => false;
+
+  @override
+  State<_ProfileMenuDivider> createState() => _ProfileMenuDividerState();
+}
+
+class _ProfileMenuDividerState extends State<_ProfileMenuDivider> {
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, thickness: 1, color: AppColors.mint);
+  }
+}

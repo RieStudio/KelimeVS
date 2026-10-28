@@ -8,10 +8,26 @@ class AppIconData {
   final String path;
   final bool isTrophy;
   final bool isBolt;
+  final bool isMore;
 
-  const AppIconData(this.path) : isTrophy = false, isBolt = false;
-  const AppIconData._trophy(this.path) : isTrophy = true, isBolt = false;
-  const AppIconData._bolt() : path = '', isTrophy = false, isBolt = true;
+  const AppIconData(this.path)
+    : isTrophy = false,
+      isBolt = false,
+      isMore = false;
+  const AppIconData._trophy(this.path)
+    : isTrophy = true,
+      isBolt = false,
+      isMore = false;
+  const AppIconData._bolt()
+    : path = '',
+      isTrophy = false,
+      isBolt = true,
+      isMore = false;
+  const AppIconData._more()
+    : path = '',
+      isTrophy = false,
+      isBolt = false,
+      isMore = true;
 
   String toSvgString({required Color strokeColor}) {
     final strokeHex = _toHex(strokeColor);
@@ -29,6 +45,15 @@ class AppIconData {
       return '''
 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M13 2L3 14h8l-1 8 11-12h-8l1-8z" fill="$strokeHex" stroke="$strokeHex" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>''';
+    }
+
+    if (isMore) {
+      return '''
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="12" cy="5" r="1.8" fill="$strokeHex"/>
+  <circle cx="12" cy="12" r="1.8" fill="$strokeHex"/>
+  <circle cx="12" cy="19" r="1.8" fill="$strokeHex"/>
 </svg>''';
     }
 
@@ -99,6 +124,9 @@ abstract final class AppIcons {
 
   // 14. Yıldırım (enerji)
   static const AppIconData bolt = AppIconData._bolt();
+
+  // 15. Daha fazla (üç nokta)
+  static const AppIconData more = AppIconData._more();
 }
 
 /// DESIGN.md Bölüm 5 standartlarına uygun İkon Widget'ı

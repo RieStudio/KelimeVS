@@ -478,4 +478,7 @@ abstract final class AppStrings {
       'Bağlantı açılamadı. Lütfen tekrar deneyin.';
   static String appVersionFooter(String version, String build) =>
       'KelimeVS v$version ($build)';
+
+  // Genel
+  static const String more = 'Daha fazla';
 }
