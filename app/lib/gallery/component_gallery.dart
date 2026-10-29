@@ -229,7 +229,7 @@ class ComponentGallery extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space24),
 
-            // 4. BUTONLAR
+            // 5. BUTONLAR
             const SectionLabel('Butonlar (Sert Gölge & Basılma Efekti)'),
             const SizedBox(height: AppDimens.space10),
             PrimaryButton(
@@ -441,6 +441,36 @@ class ComponentGallery extends StatelessWidget {
               NetworkDiagnosticsDebugWidget(
                 diagnosticsService: networkDiagnostics,
               ),
+            // 4. KELİMEVS LOGO
+            const SectionLabel('KelimeVS Logo (Konuşma Balonlu)'),
+            const SizedBox(height: AppDimens.space10),
+            Container(
+              padding: const EdgeInsets.all(AppDimens.space16),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: AppDimens.borderRadiusQuestionCard,
+                border: Border.all(
+                  color: AppColors.mint,
+                  width: AppDimens.borderThin,
+                ),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _LogoPreviewCard(
+                    label: 'Ana Sayfa Boyutu (64 dp):',
+                    logo: KelimeVSLogo(fontSize: 64),
+                  ),
+                  SizedBox(height: AppDimens.space16),
+                  _LogoPreviewCard(
+                    label: 'Orta Boyut (52 dp):',
+                    logo: KelimeVSLogo(fontSize: 52),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimens.space24),
+
               const SizedBox(height: AppDimens.space24),
             ],
           ],
@@ -748,6 +778,51 @@ class _NetworkDiagnosticsDebugWidgetState
           ),
         ],
       ],
+    );
+  }
+}
+
+class _LogoPreviewCard extends StatelessWidget {
+  final String label;
+  final Widget logo;
+
+  const _LogoPreviewCard({
+    required this.label,
+    required this.logo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space16,
+        vertical: AppDimens.space14,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppDimens.borderRadiusListCard,
+        border: Border.all(
+          color: AppColors.mint,
+          width: AppDimens.borderThin,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.secondaryText.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppDimens.space12),
+          Center(child: logo),
+        ],
+      ),
     );
   }
 }

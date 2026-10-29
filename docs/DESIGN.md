@@ -12,7 +12,7 @@
 - **Hava:** Eğlenceli, renkli, çizgi film hissi. Kalın koyu kenarlıklar, yuvarlak köşeler, altta sert gölge ("basılabilir" butonlar).
 - **Renk yönü:** Beyaz ve yeşil. Sıcak vurgu olarak tek bir sarı (jeton). Kırmızı sadece olumsuz durumlar için.
 - **Maskot yok.** Kimlik tamamen tipografi ve ikonlarla kurulur.
-- **Logo:** `Kelimeta` tek kelime. "Kelime" `ink` renginde, "ta" `primary` renginde ve arkasında açık nane yeşili (`mint`), yuvarlatılmış, sağa bakan bir oynat (play) üçgeni rozeti durur. Aynı boyut ve kalınlıkta (Fredoka 700). Üçgenin kenarlığı ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz. **[VARSAYIM]** Geçici çözüm; telefonda görüp netleştirilecek.
+- **Logo:** `KelimeVS`. "Kelime" `ink` renginde (#14532D, Fredoka 700); "VS" ise canlı yeşil (`primary`, #15803D) dolgulu, beyaz (`card`) metinli ve sol alt köşesinde "Kelime"ye doğru bakan konuşma çentiğine (WhatsApp tarzı kuyruk) sahip bir konuşma balonu içindedir (Fredoka 700). Balonun alt kenarı "Kelime" taban çizgisiyle (baseline) hizalanır. Kenarlık ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz.
 
 ## 2. Renk jetonları
 
@@ -23,7 +23,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 | `ink` | `#14532D` | Ana yazı, kenarlık, gölge, ikon |
 | `primary` | `#15803D` | Ana buton, vurgulu metin, "Kazandın" etiketi |
 | `bright` | `#4ADE80` | Avatar zemini, kendi cevap balonu, süre dolgusu |
-| `mint` | `#BBF7D0` | Açık kenarlık, süre çubuğu zemini, logo üçgeni |
+| `mint` | `#BBF7D0` | Açık kenarlık, süre çubuğu zemini, soru kartı rozeti |
 | `surface` | `#F0FDF4` | Ekran arka planı |
 | `card` | `#FFFFFF` | Kart, buton, giriş alanı zemini |
 | `muted` | `#166534` | İkincil yazı (tarih, etiket başlığı) |

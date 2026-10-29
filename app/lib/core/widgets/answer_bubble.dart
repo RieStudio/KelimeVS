@@ -144,6 +144,13 @@ class AnswerBubble extends StatelessWidget {
   }
 }
 
+enum BubbleNipPosition {
+  topLeft,
+  topRight,
+  bottomLeft,
+  none,
+}
+
 /// WhatsApp tarzı çentikli/yuvarlak köşeli balon çizici
 class BubblePainter extends CustomPainter {
   final Color color;
@@ -153,6 +160,10 @@ class BubblePainter extends CustomPainter {
   final bool showTail;
   final bool isSelected;
   final bool isRejected;
+  final BubbleNipPosition? nipPosition;
+  final double? customNipWidth;
+  final double? customNipHeight;
+  final double? customRadius;
 
   static const double nipWidth = 6.0;
   static const double nipHeight = 11.0;
@@ -160,15 +171,24 @@ class BubblePainter extends CustomPainter {
 
   const BubblePainter({
     required this.color,
-    required this.borderColor,
-    required this.borderWidth,
-    required this.isMe,
-    required this.showTail,
-    required this.isSelected,
-    required this.isRejected,
+    this.borderColor = Colors.transparent,
+    this.borderWidth = 0.0,
+    this.isMe = false,
+    this.showTail = true,
+    this.isSelected = false,
+    this.isRejected = false,
+    this.nipPosition,
+    this.customNipWidth,
+    this.customNipHeight,
+    this.customRadius,
   });
 
   Path _buildPath(Size size) {
+    final effectiveNipPosition = nipPosition ??
+        (!showTail
+            ? BubbleNipPosition.none
+            : (isMe ? BubbleNipPosition.topRight : BubbleNipPosition.topLeft));
+
     final halfStroke = borderWidth / 2.0;
     final left = halfStroke;
     final top = halfStroke;
@@ -178,13 +198,14 @@ class BubblePainter extends CustomPainter {
     final width = right - left;
     final height = bottom - top;
 
+    final baseRadius = customRadius ?? cornerRadius;
     final r = math.min(
-      cornerRadius - halfStroke,
+      baseRadius - halfStroke,
       math.min(width / 2.0, height / 2.0),
     );
     final path = Path();
 
-    if (!showTail) {
+    if (effectiveNipPosition == BubbleNipPosition.none) {
       path.addRRect(RRect.fromRectAndRadius(
         Rect.fromLTRB(left, top, right, bottom),
         Radius.circular(r),
@@ -192,97 +213,116 @@ class BubblePainter extends CustomPainter {
       return path;
     }
 
-    final effectiveNipW = math.min(nipWidth, width / 3.0);
-    final effectiveNipH = math.min(nipHeight, math.max(0.0, height - r));
+    final baseNipW = customNipWidth ?? nipWidth;
+    final baseNipH = customNipHeight ?? nipHeight;
+    final effectiveNipW = math.min(baseNipW, width / 3.0);
+    final effectiveNipH = math.min(baseNipH, math.max(0.0, height - r));
 
-    if (isMe) {
-      // Kendi balonumuz: Kuyruk sağ üst köşede dışa doğru
-      final bodyRight = right - effectiveNipW;
+    switch (effectiveNipPosition) {
+      case BubbleNipPosition.topRight:
+        final bodyRight = right - effectiveNipW;
+        path.moveTo(left + r, top);
+        path.lineTo(right - 1.5, top);
+        path.quadraticBezierTo(right, top, right, top + 1.5);
+        path.cubicTo(
+          right - 1.0,
+          top + (effectiveNipH * 0.4),
+          bodyRight,
+          top + (effectiveNipH * 0.7),
+          bodyRight,
+          top + effectiveNipH,
+        );
+        path.lineTo(bodyRight, bottom - r);
+        path.arcToPoint(
+          Offset(bodyRight - r, bottom),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(left + r, bottom);
+        path.arcToPoint(
+          Offset(left, bottom - r),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(left, top + r);
+        path.arcToPoint(
+          Offset(left + r, top),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.close();
+        break;
 
-      // Sol üst köşeden başla
-      path.moveTo(left + r, top);
-      // Üst kenar gövdeden kuyruk ucuna uzanır
-      path.lineTo(right - 1.5, top);
-      // Kuyruk ucu yumuşak kavis
-      path.quadraticBezierTo(right, top, right, top + 1.5);
-      // WhatsApp tarzı içe kıvrılan kavis (gövde dikey duvarına teğet varış)
-      path.cubicTo(
-        right - 1.0,
-        top + (effectiveNipH * 0.4),
-        bodyRight,
-        top + (effectiveNipH * 0.7),
-        bodyRight,
-        top + effectiveNipH,
-      );
-      // Sağ dikey duvar
-      path.lineTo(bodyRight, bottom - r);
-      // Sağ alt köşe
-      path.arcToPoint(
-        Offset(bodyRight - r, bottom),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      // Alt kenar
-      path.lineTo(left + r, bottom);
-      // Sol alt köşe
-      path.arcToPoint(
-        Offset(left, bottom - r),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      // Sol dikey duvar
-      path.lineTo(left, top + r);
-      // Sol üst köşe
-      path.arcToPoint(
-        Offset(left + r, top),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      path.close();
-    } else {
-      // Rakip balonu: Kuyruk sol üst köşede dışa doğru
-      final bodyLeft = left + effectiveNipW;
+      case BubbleNipPosition.topLeft:
+        final bodyLeft = left + effectiveNipW;
+        path.moveTo(bodyLeft, top + effectiveNipH);
+        path.cubicTo(
+          bodyLeft,
+          top + (effectiveNipH * 0.7),
+          left + 1.0,
+          top + (effectiveNipH * 0.4),
+          left,
+          top + 1.5,
+        );
+        path.quadraticBezierTo(left, top, left + 1.5, top);
+        path.lineTo(right - r, top);
+        path.arcToPoint(
+          Offset(right, top + r),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(right, bottom - r);
+        path.arcToPoint(
+          Offset(right - r, bottom),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(bodyLeft + r, bottom);
+        path.arcToPoint(
+          Offset(bodyLeft, bottom - r),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(bodyLeft, top + effectiveNipH);
+        path.close();
+        break;
 
-      // Sol üst duvardan kuyruk ucuna kavisle başla
-      path.moveTo(bodyLeft, top + effectiveNipH);
-      // WhatsApp tarzı dışa kıvrılan kavis
-      path.cubicTo(
-        bodyLeft,
-        top + (effectiveNipH * 0.7),
-        left + 1.0,
-        top + (effectiveNipH * 0.4),
-        left,
-        top + 1.5,
-      );
-      // Kuyruk ucu yumuşak kavis
-      path.quadraticBezierTo(left, top, left + 1.5, top);
-      // Üst kenar sağa uzanır
-      path.lineTo(right - r, top);
-      // Sağ üst köşe
-      path.arcToPoint(
-        Offset(right, top + r),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      // Sağ dikey duvar
-      path.lineTo(right, bottom - r);
-      // Sağ alt köşe
-      path.arcToPoint(
-        Offset(right - r, bottom),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      // Alt kenar
-      path.lineTo(bodyLeft + r, bottom);
-      // Sol alt köşe
-      path.arcToPoint(
-        Offset(bodyLeft, bottom - r),
-        radius: Radius.circular(r),
-        clockwise: true,
-      );
-      // Sol dikey duvar (kuyruk birleşimine kadar)
-      path.lineTo(bodyLeft, top + effectiveNipH);
-      path.close();
+      case BubbleNipPosition.bottomLeft:
+        final bodyLeft = left + effectiveNipW;
+        path.moveTo(bodyLeft + r, top);
+        path.lineTo(right - r, top);
+        path.arcToPoint(
+          Offset(right, top + r),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(right, bottom - r);
+        path.arcToPoint(
+          Offset(right - r, bottom),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.lineTo(left + 1.5, bottom);
+        path.quadraticBezierTo(left, bottom, left, bottom - 1.5);
+        path.cubicTo(
+          left + 1.0,
+          bottom - (effectiveNipH * 0.4),
+          bodyLeft,
+          bottom - (effectiveNipH * 0.7),
+          bodyLeft,
+          bottom - effectiveNipH,
+        );
+        path.lineTo(bodyLeft, top + r);
+        path.arcToPoint(
+          Offset(bodyLeft + r, top),
+          radius: Radius.circular(r),
+          clockwise: true,
+        );
+        path.close();
+        break;
+
+      case BubbleNipPosition.none:
+        break;
     }
 
     return path;
@@ -306,13 +346,15 @@ class BubblePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
-    final strokePaint = Paint()
-      ..color = borderColor
-      ..strokeWidth = borderWidth
-      ..style = PaintingStyle.stroke
-      ..strokeJoin = StrokeJoin.round
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, strokePaint);
+    if (borderWidth > 0 && borderColor != Colors.transparent) {
+      final strokePaint = Paint()
+        ..color = borderColor
+        ..strokeWidth = borderWidth
+        ..style = PaintingStyle.stroke
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = StrokeCap.round;
+      canvas.drawPath(path, strokePaint);
+    }
   }
 
   @override
@@ -323,6 +365,10 @@ class BubblePainter extends CustomPainter {
         oldDelegate.isMe != isMe ||
         oldDelegate.showTail != showTail ||
         oldDelegate.isSelected != isSelected ||
-        oldDelegate.isRejected != isRejected;
+        oldDelegate.isRejected != isRejected ||
+        oldDelegate.nipPosition != nipPosition ||
+        oldDelegate.customNipWidth != customNipWidth ||
+        oldDelegate.customNipHeight != customNipHeight ||
+        oldDelegate.customRadius != customRadius;
   }
 }
