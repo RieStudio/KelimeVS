@@ -86,7 +86,9 @@ class KelimeVSApp extends ConsumerWidget {
           ),
         );
       },
-      home: MainShell(initialAuthError: authError),
+      home: SplashGate(
+        child: MainShell(initialAuthError: authError),
+      ),
     );
   }
 }

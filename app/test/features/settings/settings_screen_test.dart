@@ -85,6 +85,70 @@ void main() {
 
       // Version footer
       expect(find.text('KelimeVS v1.2.3 (45)'), findsOneWidget);
+
+      // Copyright & RieStudio Logo footer
+      expect(find.text(AppStrings.copyrightPrefix), findsOneWidget);
+      final imageFinder = find.byWidgetPredicate(
+        (w) => w is Image && w.semanticLabel == AppStrings.companyName,
+      );
+      expect(imageFinder, findsOneWidget);
+      final logoImage = tester.widget<Image>(imageFinder);
+      final imageProvider = logoImage.image;
+      final assetImage = imageProvider is ResizeImage
+          ? imageProvider.imageProvider as AssetImage
+          : imageProvider as AssetImage;
+      expect(assetImage.assetName, 'assets/images/riestudio_logo_black_trimmed.png');
+      expect(logoImage.height, 15.0);
+    });
+
+    testWidgets('footer logo renders fallback text when image load fails', (tester) async {
+      await tester.pumpWidget(createWidget(isDebug: false));
+      await tester.pumpAndSettle();
+
+      // Find the Image widget
+      final imageFinder = find.byWidgetPredicate(
+        (w) => w is Image && w.semanticLabel == AppStrings.companyName,
+      );
+      expect(imageFinder, findsOneWidget);
+      final imageWidget = tester.widget<Image>(imageFinder);
+
+      // Test errorBuilder
+      final context = tester.element(imageFinder);
+      final fallbackWidget = imageWidget.errorBuilder!(
+        context,
+        Exception('Asset not found'),
+        StackTrace.empty,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: Center(child: fallbackWidget)),
+        ),
+      );
+      expect(find.text(AppStrings.companyName), findsOneWidget);
+    });
+
+    testWidgets('320 dp width and 1.5 textScaler renders without overflow in settings footer', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: createWidget(isDebug: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(AppStrings.copyrightPrefix), findsOneWidget);
     });
 
     testWidgets('Gallery row is HIDDEN in release mode (isDebug = false)', (tester) async {

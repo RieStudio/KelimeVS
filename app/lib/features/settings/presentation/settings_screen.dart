@@ -75,9 +75,15 @@ class SettingsScreen extends ConsumerWidget {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const SizedBox(width: AppDimens.space12),
-                  const Text(
-                    AppStrings.settingsTitle,
-                    style: AppTextStyles.screenTitle,
+                  const Expanded(
+                    child: FittedBox(
+                      alignment: Alignment.centerLeft,
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        AppStrings.settingsTitle,
+                        style: AppTextStyles.screenTitle,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -156,7 +162,7 @@ class SettingsScreen extends ConsumerWidget {
                                 applicationVersion: info != null
                                     ? 'v${info.version} (${info.buildNumber})'
                                     : null,
-                                applicationLegalese: '© 2026 Rie Studio',
+                                applicationLegalese: AppStrings.copyright,
                               );
                             },
                           ),
@@ -279,6 +285,10 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: AppDimens.space6),
+                    const Center(
+                      child: _RieStudioFooterLogo(),
+                    ),
                     const SizedBox(height: AppDimens.space24),
                   ],
                 ),
@@ -367,6 +377,45 @@ class _SettingsTile extends StatelessWidget {
               trailing,
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RieStudioFooterLogo extends StatelessWidget {
+  /// RieStudio alt bilgi (footer) logosunun ekrandaki dikey yüksekliği (dp).
+  static const double footerLogoHeight = 15.0;
+
+  const _RieStudioFooterLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: AppStrings.copyright,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              AppStrings.copyrightPrefix,
+              style: AppTextStyles.secondaryText,
+            ),
+            const SizedBox(width: AppDimens.space6),
+            Image.asset(
+              'assets/images/riestudio_logo_black_trimmed.png',
+              height: footerLogoHeight,
+              fit: BoxFit.contain,
+              semanticLabel: AppStrings.companyName,
+              cacheHeight: 160,
+              errorBuilder: (context, error, stackTrace) => Text(
+                AppStrings.companyName,
+                style: AppTextStyles.secondaryText,
+              ),
+            ),
+          ],
         ),
       ),
     );
