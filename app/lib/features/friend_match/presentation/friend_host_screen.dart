@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,11 +10,13 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
+import '../../matchmaking/domain/match_tip_selector.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
 
@@ -21,10 +24,12 @@ import '../data/friend_match_client.dart';
 /// ve rakip katıldığında maça yönlendirir.
 class FriendHostScreen extends ConsumerStatefulWidget {
   final FriendMatchClient? client;
+  final math.Random? random;
 
   const FriendHostScreen({
     super.key,
     this.client,
+    this.random,
   });
 
   @override
@@ -45,10 +50,12 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
   String? _errorMessage;
   bool _isMatched = false;
   late final BannerSuppressionNotifier _suppressionNotifier;
+  late final String _tipText;
 
   @override
   void initState() {
     super.initState();
+    _tipText = MatchTipSelector.selectTip(random: widget.random);
     WidgetsBinding.instance.addObserver(this);
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -412,6 +419,10 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
                           isLarge: true,
                           onPressed: _shareCode,
                         ),
+                        const SizedBox(height: AppDimens.space16),
+
+                        // 2b. İpucu Kartı
+                        MatchTipCard(tip: _tipText),
 
                         const Spacer(),
 

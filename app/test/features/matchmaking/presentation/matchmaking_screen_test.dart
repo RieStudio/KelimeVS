@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/match_tip_card.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
@@ -156,7 +157,7 @@ void main() {
 
       // İpucu kartı
       expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
-      expect(find.text(AppStrings.searchTipContent), findsOneWidget);
+      expect(find.byType(MatchTipCard), findsOneWidget);
 
       // Vazgeç butonu
       expect(
@@ -418,6 +419,38 @@ void main() {
       expect(profile.energy!.max, 5);
       expect(profile.energy!.nextEnergyAtMs, 1729556400000);
       expect(profile.serverNowMs, 1729555200000);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    'İpucu kartı: initState içinde bir kez seçilir ve ekran rebuild olduğunda değişmez',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          searchDuration: const Duration(seconds: 30),
+        ),
+      );
+      await tester.pump();
+
+      final tipCardFinder = find.byType(MatchTipCard);
+      expect(tipCardFinder, findsOneWidget);
+      final tipBefore = tester.widget<MatchTipCard>(tipCardFinder).tip;
+      expect(tipBefore, isNotEmpty);
+
+      // Nokta animasyonunun tetiklediği setState rebuild'leri
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      final tipAfter = tester.widget<MatchTipCard>(tipCardFinder).tip;
+      expect(tipAfter, equals(tipBefore));
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

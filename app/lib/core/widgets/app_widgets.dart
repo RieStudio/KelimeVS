@@ -16,4 +16,5 @@ export 'match_card.dart';
 export 'connection_banner.dart';
 export 'global_offline_banner.dart';
 export 'offline_splash_screen.dart';
+export 'match_tip_card.dart';
 

@@ -58,6 +58,70 @@ abstract final class AppStrings {
   static const String searchTipContent =
       'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
 
+  // Maç Öncesi İpucu Havuzu
+  static const String matchTipBestOfThree =
+      'Maçlar 3 turun en iyisidir; 2 tur kazanan maçı alır.';
+  static String matchTipAnswerSeconds(int seconds) =>
+      'Her cevap için $seconds saniyen var; süre bitmeden kelimeni yazmalısın.';
+  static const String matchTipWrongDoesNotLose =
+      'Yanlış cevap turu kaybettirmez; süren bitene kadar tekrar deneyebilirsin.';
+  static const String matchTipNoRepeats =
+      'Daha önce söylenmiş bir cevabı tekrar yazamazsın; rakibini iyi takip et!';
+  static const String matchTipTurkishCharsOptional =
+      'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
+  static const String matchTipCaseInsensitive =
+      'Büyük ya da küçük harf fark etmez; nasıl rahatsan öyle yaz.';
+  static const String matchTipAliasesAccepted =
+      'Bazı cevapların yaygın alternatif yazımları da kabul edilir.';
+  static const String matchTipForfeit =
+      'Maçı terk edersen rakibin maçı kazanır.';
+  static const String matchTipReconnection =
+      'Bağlantın koparsa kısa süre içinde geri dönüp maça devam edebilirsin.';
+  static const String matchTipRankedCoins =
+      'Sıralamalı online maçları kazanarak jeton toplayabilir, Mağaza\'da harcayabilirsin.';
+  static const String matchTipFriendlyNoCoins =
+      'Arkadaş düellosu ve alıştırma maçları jeton kazandırmaz; antrenman içindir.';
+  static const String matchTipStoreFrames =
+      'Kazandığın jetonlarla Mağaza\'dan avatar çerçeveleri alabilirsin.';
+  static const String matchTipExhaustedDraw =
+      'Sorudaki tüm cevaplar tükenirse tur berabere biter.';
+  static const String matchTipTurnSwitch =
+      'Cevaplar sırayla verilir; sen doğru bilince sıra rakibe geçer.';
+  static const String matchTipPunctuationCleaned =
+      'Noktalama işaretleri otomatik temizlenir, uğraşma.';
+  static const String matchTipNearMiss =
+      '"Çok yakın!" uyarısı alırsan harfleri kontrol et; doğru kelimeye çok az kalmış demektir.';
+  static const String matchTipOpponentMistakesVisible =
+      'Rakibinin hatalı denemelerini sen de görürsün.';
+  static const String matchTipRankedPowerup =
+      'Sıralamalı online maçlarda jetonla ek süre güçlendiricisi alabilirsin.';
+  static const String matchTipLeaderboardReset =
+      'Haftalık sıralama her pazartesi sıfırlanır.';
+
+  /// Maç öncesi ipucu havuzundaki tüm metinlerin listesi.
+  /// [answerSeconds] değeri MatchConfig'ten dinamik geçirilebilir.
+  static List<String> getMatchTips({int answerSeconds = 15}) => [
+        matchTipBestOfThree,
+        matchTipAnswerSeconds(answerSeconds),
+        matchTipWrongDoesNotLose,
+        matchTipNoRepeats,
+        matchTipTurkishCharsOptional,
+        matchTipCaseInsensitive,
+        matchTipAliasesAccepted,
+        matchTipForfeit,
+        matchTipReconnection,
+        matchTipRankedCoins,
+        matchTipFriendlyNoCoins,
+        matchTipStoreFrames,
+        matchTipExhaustedDraw,
+        matchTipTurnSwitch,
+        matchTipPunctuationCleaned,
+        matchTipNearMiss,
+        matchTipOpponentMistakesVisible,
+        matchTipRankedPowerup,
+        matchTipLeaderboardReset,
+      ];
+
   // Maç İçi
   static const String you = 'Sen';
   static const String opponent = 'Rakip';

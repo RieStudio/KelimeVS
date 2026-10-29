@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/match_tip_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/features/friend_match/data/friend_match_client.dart';
 import 'package:app/features/friend_match/presentation/friend_duel_bottom_sheet.dart';
@@ -118,6 +119,8 @@ void main() {
       expect(find.text('K7M9P2'), findsOneWidget);
       expect(find.text(AppStrings.shareCode), findsOneWidget);
       expect(find.text(AppStrings.waitingForOpponent), findsOneWidget);
+      expect(find.byType(MatchTipCard), findsOneWidget);
+      expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
 
       // Kopyalama düğmesine bas
       await tester.tap(find.byKey(const Key('copy_invite_code_button')));
@@ -157,6 +160,37 @@ void main() {
 
       // MatchScreen'e geçmiş olmalıdır
       expect(find.byType(MatchScreen), findsOneWidget);
+    });
+
+    testWidgets('3b. İpucu kartı initState içinde bir kez seçilir ve nokta animasyonlarında değişmez',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: FriendHostScreen(client: mockClient),
+          ),
+        ),
+      );
+
+      mockClient.emit(
+        FriendMatchRoomCreated(
+          code: 'K7M9P2',
+          expiresAt: DateTime.now().millisecondsSinceEpoch + 300000,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final tipCardFinder = find.byType(MatchTipCard);
+      expect(tipCardFinder, findsOneWidget);
+      final tipBefore = tester.widget<MatchTipCard>(tipCardFinder).tip;
+      expect(tipBefore, isNotEmpty);
+
+      // 3 nokta animasyonunun tetiklediği setState'ler
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      final tipAfter = tester.widget<MatchTipCard>(tipCardFinder).tip;
+      expect(tipAfter, equals(tipBefore));
     });
   });
 

@@ -12,15 +12,16 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/secondary_button.dart';
-import '../../../core/widgets/section_label.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/domain/energy_state.dart';
+import '../domain/match_tip_selector.dart';
 
 /// DESIGN.md Bölüm 7: 2) Eşleşme Bekleme Ekranı
 ///
@@ -78,10 +79,12 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   Timer? _dotsTimer;
   int _activeDotIndex = 0;
   late final BannerSuppressionNotifier _suppressionNotifier;
+  late final String _tipText;
 
   @override
   void initState() {
     super.initState();
+    _tipText = MatchTipSelector.selectTip(random: widget.random);
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -435,33 +438,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
               const Spacer(flex: 3),
 
               // 6. İpucu Kartı
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppDimens.space16),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: AppDimens.borderRadiusListCard,
-                  border: Border.all(
-                    color: AppColors.mint,
-                    width: AppDimens.borderThin,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionLabel(AppStrings.searchTipTitle),
-                    const SizedBox(height: AppDimens.space6),
-                    Text(
-                      AppStrings.searchTipContent,
-                      style: AppTextStyles.bodyText.copyWith(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              MatchTipCard(tip: _tipText),
 
               const SizedBox(height: AppDimens.space16),
 
