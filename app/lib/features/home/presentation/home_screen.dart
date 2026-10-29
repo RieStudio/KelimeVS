@@ -52,8 +52,10 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.screenPaddingHorizontal,
+          padding: const EdgeInsets.only(
+            left: AppDimens.screenPaddingHorizontal,
+            right: AppDimens.screenPaddingHorizontal,
+            bottom: AppDimens.space16,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,83 +66,83 @@ class HomeScreen extends ConsumerWidget {
               Row(
                 children: [
                   // Oyuncu Avatarı (44 px, selfHome) ve Adı - Dokunulduğunda Profil sekmesine geçer
-                  Flexible(
-                    child: GestureDetector(
-                      key: const Key('profile_avatar_button'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        ref.read(bottomNavIndexProvider.notifier).setIndex(3);
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          PlayerAvatar.selfHome(
-                            name: nickname,
-                            frame: profile.equippedFrame,
-                            size: AppDimens.avatarHome,
-                          ),
-                          const SizedBox(width: AppDimens.space8),
-                          Flexible(
-                            child: Text(
-                              nickname,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.playerName.copyWith(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w800,
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        key: const Key('profile_avatar_button'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          ref.read(bottomNavIndexProvider.notifier).setIndex(3);
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PlayerAvatar.selfHome(
+                              name: nickname,
+                              frame: profile.equippedFrame,
+                              size: AppDimens.avatarHome,
+                            ),
+                            const SizedBox(width: AppDimens.space8),
+                            Flexible(
+                              child: Text(
+                                nickname,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.playerName.copyWith(
+                                  color: AppColors.ink,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
                   const SizedBox(width: AppDimens.space8),
 
-                  // Jeton Hapı
-                  CoinPill(amount: profile.coins),
+                  // Sağ grup: Jeton Hapı + Enerji (varsa) + Ayarlar İkon Butonu
+                  Row(
+                    key: const Key('home_top_bar_right_group'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CoinPill(amount: profile.coins),
 
-                  if (profile.energy != null && profile.energy!.enabled) ...[
-                    const SizedBox(width: AppDimens.space8),
-                    EnergyPill(
-                      current: profile.energy!.current,
-                      max: profile.energy!.max,
-                      onTap: () {
-                        ref.read(bottomNavIndexProvider.notifier).setIndex(2);
-                        ref
-                            .read(storeNotifierProvider.notifier)
-                            .setTab(StoreTab.energy);
-                      },
-                    ),
-                  ],
-
-                  const SizedBox(width: AppDimens.space8),
-
-                  // Sıralama (Kupa) İkon Butonu: Sekme 1'e geçiş
-                  AppIconButton(
-                    key: const Key('leaderboard_button'),
-                    icon: AppIcons.trophy,
-                    semanticLabel: AppStrings.leaderboard,
-                    onTap: () {
-                      ref.read(bottomNavIndexProvider.notifier).setIndex(1);
-                    },
-                  ),
-
-                  const SizedBox(width: AppDimens.space8),
-
-                  // Ayarlar İkon Butonu: Ayarlar ekranına geçiş
-                  AppIconButton(
-                    key: const Key('settings_button'),
-                    icon: AppIcons.settings,
-                    semanticLabel: AppStrings.settings,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
+                      if (profile.energy != null &&
+                          profile.energy!.enabled) ...[
+                        const SizedBox(width: AppDimens.space8),
+                        EnergyPill(
+                          current: profile.energy!.current,
+                          max: profile.energy!.max,
+                          onTap: () {
+                            ref
+                                .read(bottomNavIndexProvider.notifier)
+                                .setIndex(2);
+                            ref
+                                .read(storeNotifierProvider.notifier)
+                                .setTab(StoreTab.energy);
+                          },
                         ),
-                      );
-                    },
+                      ],
+
+                      const SizedBox(width: AppDimens.space8),
+
+                      // Ayarlar İkon Butonu: Ayarlar ekranına geçiş
+                      AppIconButton(
+                        key: const Key('settings_button'),
+                        icon: AppIcons.settings,
+                        semanticLabel: AppStrings.settings,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const SettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -306,24 +308,31 @@ class HomeScreen extends ConsumerWidget {
         ? AppStrings.noMatchesHistoryReset
         : AppStrings.noMatchesYet;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space20,
-        vertical: AppDimens.space16,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: AppDimens.borderRadiusListCard,
-        border: Border.all(color: AppColors.mint, width: AppDimens.borderThin),
-      ),
-      child: Text(
-        message,
-        style: AppTextStyles.bodyText.copyWith(
-          color: AppColors.muted,
-          fontWeight: FontWeight.w700,
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        key: const Key('empty_matches_card'),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space20,
+          vertical: AppDimens.space16,
         ),
-        textAlign: TextAlign.center,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppDimens.borderRadiusListCard,
+          border: Border.all(
+            color: AppColors.mint,
+            width: AppDimens.borderThin,
+          ),
+        ),
+        child: Text(
+          message,
+          style: AppTextStyles.bodyText.copyWith(
+            color: AppColors.muted,
+            fontWeight: FontWeight.w700,
+          ),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }

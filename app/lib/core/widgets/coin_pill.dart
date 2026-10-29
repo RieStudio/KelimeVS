@@ -21,6 +21,9 @@ class CoinPill extends StatelessWidget {
     return Semantics(
       label: '$amount${AppStrings.coinSuffix}',
       child: Container(
+        constraints: const BoxConstraints(
+          maxWidth: 110.0,
+        ),
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimens.space12,
           vertical: AppDimens.space6,
@@ -63,14 +66,19 @@ class CoinPill extends StatelessWidget {
             ),
             const SizedBox(width: AppDimens.space8),
             // Sayı
-            Text(
-              '$amount',
-              style: const TextStyle(
-                fontFamily: AppTextStyles.fontFredoka,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-                color: AppColors.ink,
-                height: 1.0,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '$amount',
+                  style: const TextStyle(
+                    fontFamily: AppTextStyles.fontFredoka,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: AppColors.ink,
+                    height: 1.0,
+                  ),
+                ),
               ),
             ),
           ],

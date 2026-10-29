@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:app/core/widgets/coin_pill.dart';
 import 'package:app/core/widgets/kelime_vs_logo.dart';
 import 'package:app/core/widgets/match_card.dart';
@@ -52,6 +54,22 @@ Widget _buildTestApp(MatchHistoryRepository repo, {ProfileState? profileState}) 
     ],
     child: const MaterialApp(
       home: HomeScreen(),
+    ),
+  );
+}
+
+Widget _buildMainShellTestApp(
+  MatchHistoryRepository repo, {
+  ProfileState? profileState,
+}) {
+  return ProviderScope(
+    overrides: [
+      matchHistoryRepositoryProvider.overrideWithValue(repo),
+      if (profileState != null)
+        profileProvider.overrideWith(() => _MockProfileNotifier(profileState)),
+    ],
+    child: const MaterialApp(
+      home: MainShell(),
     ),
   );
 }
@@ -350,4 +368,197 @@ void main() {
     expect(find.text(AppStrings.noMatchesYet), findsOneWidget);
     expect(find.text(AppStrings.noMatchesHistoryReset), findsNothing);
   });
+
+  testWidgets(
+    '11. Üst satır hizalaması: kısa ve uzun kullanıcı adında sağ grup her zaman sağ kenara yaslı kalır ve x koordinatı sabittir',
+    (tester) async {
+      final repo = FakeMatchHistoryRepository([]);
+
+      // 1. Kısa kullanıcı adı ('Ali')
+      const shortProfile = ProfileState(
+        isLoaded: true,
+        nickname: 'Ali',
+        coins: 100,
+      );
+      await tester.pumpWidget(_buildTestApp(repo, profileState: shortProfile));
+      await tester.pumpAndSettle();
+
+      final rightGroupFinder = find.byKey(
+        const Key('home_top_bar_right_group'),
+      );
+      expect(rightGroupFinder, findsOneWidget);
+      final shortRightRect = tester.getRect(rightGroupFinder);
+      final settingsFinder = find.byKey(const Key('settings_button'));
+      expect(settingsFinder, findsOneWidget);
+      final shortSettingsRect = tester.getRect(settingsFinder);
+
+      // 2. Uzun kullanıcı adı ('MuhammedMustafa_')
+      const longProfile = ProfileState(
+        isLoaded: true,
+        nickname: 'MuhammedMustafa_',
+        coins: 100,
+      );
+      await tester.pumpWidget(_buildTestApp(repo, profileState: longProfile));
+      await tester.pumpAndSettle();
+
+      final longRightRect = tester.getRect(rightGroupFinder);
+      final longSettingsRect = tester.getRect(settingsFinder);
+
+      // Sağ grubun ve ayarlar butonunun sol/sağ x koordinatı hem kısa hem uzun isimde TAMAMEN aynı olmalıdır
+      expect(shortRightRect.left, equals(longRightRect.left));
+      expect(shortRightRect.right, equals(longRightRect.right));
+      expect(shortSettingsRect.left, equals(longSettingsRect.left));
+      expect(shortSettingsRect.right, equals(longSettingsRect.right));
+    },
+  );
+
+  testWidgets(
+    '12. Son Maçlarım boş durum kartı ile alt bar arasında en az 16 dp mesafe bulunur',
+    (tester) async {
+      final repo = FakeMatchHistoryRepository([]);
+      const profile = ProfileState(
+        isLoaded: true,
+        nickname: 'Oyuncu',
+        coins: 100,
+      );
+
+      await tester.pumpWidget(
+        _buildMainShellTestApp(repo, profileState: profile),
+      );
+      await tester.pumpAndSettle();
+
+      final emptyCardFinder = find.byKey(const Key('empty_matches_card'));
+      expect(emptyCardFinder, findsOneWidget);
+
+      final bottomNavFinder = find.byType(AppBottomNavBar);
+      expect(bottomNavFinder, findsOneWidget);
+
+      final emptyCardBottom = tester.getBottomLeft(emptyCardFinder).dy;
+      final bottomNavTop = tester.getTopLeft(bottomNavFinder).dy;
+
+      expect(
+        bottomNavTop - emptyCardBottom,
+        greaterThanOrEqualTo(AppDimens.space16),
+      );
+    },
+  );
+
+  testWidgets(
+    '13. Son Maçlarım dolu listede en son eleman ile alt bar arasında en az 16 dp mesafe bulunur',
+    (tester) async {
+      final entries = List.generate(
+        8,
+        (i) => MatchHistoryEntry(
+          id: 'm_$i',
+          opponentName: 'Rakip $i',
+          finishedAtMs: 1000 + i * 1000,
+          myScore: 2,
+          opponentScore: 0,
+          result: MatchResult.win,
+          endType: MatchEndType.normal,
+          roundRecords: const [],
+        ),
+      );
+      final repo = FakeMatchHistoryRepository(entries);
+      const profile = ProfileState(
+        isLoaded: true,
+        nickname: 'Oyuncu',
+        coins: 100,
+      );
+
+      await tester.pumpWidget(
+        _buildMainShellTestApp(repo, profileState: profile),
+      );
+      await tester.pumpAndSettle();
+
+      final listViewFinder = find.byType(ListView);
+      expect(listViewFinder, findsOneWidget);
+
+      // Listenin en sonuna kaydır
+      await tester.drag(listViewFinder, const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      final bottomNavFinder = find.byType(AppBottomNavBar);
+      expect(bottomNavFinder, findsOneWidget);
+
+      final bottomNavTop = tester.getTopLeft(bottomNavFinder).dy;
+      final listViewBottom = tester.getBottomLeft(listViewFinder).dy;
+
+      // ListView'in bittiği yer alt çubuğun en az 16 dp üzerinde olmalı
+      expect(
+        bottomNavTop - listViewBottom,
+        greaterThanOrEqualTo(AppDimens.space16),
+      );
+
+      // Son görünen kartın alt kenarı da alt çubuğun en az 16 dp üzerinde olmalı
+      final matchCards = find.byType(MatchCard);
+      expect(matchCards, findsWidgets);
+      final lastCardBottom = tester.getBottomLeft(matchCards.last).dy;
+      expect(
+        bottomNavTop - lastCardBottom,
+        greaterThanOrEqualTo(AppDimens.space16),
+      );
+    },
+  );
+
+  testWidgets(
+    '14. 320x640 ekranda ve 1.5 yazı ölçeğinde hem boş hem dolu listede sıfır taşma ile çizilir',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      const profile = ProfileState(
+        isLoaded: true,
+        nickname: 'MuhammedMustafa_',
+        coins: 9999,
+      );
+
+      // A) Boş liste
+      final emptyRepo = FakeMatchHistoryRepository([]);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: _buildMainShellTestApp(emptyRepo, profileState: profile),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      final emptyCardFinder = find.byKey(const Key('empty_matches_card'));
+      expect(emptyCardFinder, findsOneWidget);
+      final bottomNavFinder = find.byType(AppBottomNavBar);
+      expect(bottomNavFinder, findsOneWidget);
+
+      final emptyCardBottom = tester.getBottomLeft(emptyCardFinder).dy;
+      final bottomNavTop = tester.getTopLeft(bottomNavFinder).dy;
+      expect(
+        bottomNavTop - emptyCardBottom,
+        greaterThanOrEqualTo(AppDimens.space16),
+      );
+
+      // B) Dolu liste
+      final filledRepo = FakeMatchHistoryRepository([wonEntry, lostEntry]);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: _buildMainShellTestApp(filledRepo, profileState: profile),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(MatchCard), findsWidgets);
+    },
+  );
 }

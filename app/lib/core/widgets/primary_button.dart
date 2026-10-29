@@ -113,23 +113,27 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                           horizontal: AppDimens.space16,
                         ),
                         child: widget.subtitle != null
-                            ? Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    widget.text,
-                                    style: widget.isLarge
-                                        ? AppTextStyles.primaryButtonLarge
-                                        : AppTextStyles.primaryButton,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: AppDimens.space4),
-                                  Text(
-                                    widget.subtitle!,
-                                    style: AppTextStyles.primaryButtonSubtitle,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                            ? FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      widget.text,
+                                      style: widget.isLarge
+                                          ? AppTextStyles.primaryButtonLarge
+                                          : AppTextStyles.primaryButton,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: AppDimens.space4),
+                                    Text(
+                                      widget.subtitle!,
+                                      style:
+                                          AppTextStyles.primaryButtonSubtitle,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
                               )
                             : FittedBox(
                                 fit: BoxFit.scaleDown,

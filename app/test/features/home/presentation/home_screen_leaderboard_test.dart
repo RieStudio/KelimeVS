@@ -107,7 +107,7 @@ void main() {
     );
 
     testWidgets(
-      '2. Kupa butonuna tıklandığında Sıralama sekmesine (index 1) geçer ve LeaderboardScreen kurulur',
+      '2. Ana ekran üst çubuğunda kupa (sıralama kısayolu) butonu bulunmaz',
       (tester) async {
         final fakeClient = FakeLeaderboardApiClient();
 
@@ -116,21 +116,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final trophyButton = find.byKey(const Key('leaderboard_button'));
-        expect(trophyButton, findsOneWidget);
-
-        // Kupa butonuna tıkla
-        await tester.tap(trophyButton);
-        await tester.pumpAndSettle();
-
-        // Sekme 1'e geçmiş olmalı ve LeaderboardScreen kurulmalı
-        expect(find.byType(LeaderboardScreen), findsOneWidget);
-        expect(find.text(AppStrings.leaderboardTitle), findsOneWidget);
-        expect(find.text('Lider1'), findsOneWidget);
-        expect(fakeClient.fetchCallCount, 1);
-
-        // Sekmede açıldığı için (canPop false) geri butonu OLMAMALI
-        expect(find.byKey(const Key('leaderboard_back_button')), findsNothing);
+        expect(find.byKey(const Key('leaderboard_button')), findsNothing);
       },
     );
 
@@ -179,7 +165,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.byKey(const Key('leaderboard_button')), findsOneWidget);
+        expect(find.byKey(const Key('leaderboard_button')), findsNothing);
+        expect(find.byKey(const Key('settings_button')), findsOneWidget);
         expect(find.byKey(const Key('profile_avatar_button')), findsOneWidget);
       },
     );
