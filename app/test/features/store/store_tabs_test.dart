@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/features/profile/domain/energy_state.dart';
 import 'package:app/features/store/data/store_api_client.dart';
 import 'package:app/features/store/domain/models/store_item.dart';
 import 'package:app/features/store/presentation/store_screen.dart';
+import 'package:app/features/store/presentation/widgets/store_segmented_control.dart';
 
 class MockStoreApiClient implements StoreApiClient {
   final EnergyState? energyState;
@@ -133,6 +135,109 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Jeton paketleri çok yakında'), findsOneWidget);
+    });
+
+    testWidgets('segmentli kontrolün sol-sağ kenarları altındaki içerikle tam hizalıdır (20 dp yan boşluk)',
+        (tester) async {
+      final mockClient = MockStoreApiClient(
+        energyState: const EnergyState(
+          enabled: true,
+          current: 3,
+          max: 5,
+          packs: [],
+        ),
+        items: const [],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            storeApiClientProvider.overrideWithValue(mockClient),
+          ],
+          child: const MaterialApp(
+            home: StoreScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final segmentedFinder = find.byType(StoreSegmentedControl);
+      expect(segmentedFinder, findsOneWidget);
+      final segmentedRect = tester.getRect(segmentedFinder);
+
+      // Ekran genişliği 800 dp (varsayılan test viewport), yan boşluk AppDimens.screenPaddingHorizontal (20 dp)
+      expect(segmentedRect.left, equals(AppDimens.screenPaddingHorizontal));
+      expect(segmentedRect.right, equals(800.0 - AppDimens.screenPaddingHorizontal));
+      expect(segmentedRect.width, equals(800.0 - (AppDimens.screenPaddingHorizontal * 2)));
+    });
+
+    testWidgets('320x640 dar ekran ve textScale 1.5 altında hem 2 sekme hem 3 sekme sıfır taşma ile çizilir',
+        (tester) async {
+      // A) 3 sekmeli durum
+      final client3Tabs = MockStoreApiClient(
+        energyState: const EnergyState(
+          enabled: true,
+          current: 4,
+          max: 5,
+          packs: [],
+        ),
+        items: const [],
+      );
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: ProviderScope(
+            overrides: [
+              storeApiClientProvider.overrideWithValue(client3Tabs),
+            ],
+            child: const MaterialApp(
+              home: StoreScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(StoreSegmentedControl), findsOneWidget);
+      expect(find.text('Jeton'), findsOneWidget);
+      expect(find.text('Enerji'), findsOneWidget);
+      expect(find.text('Çerçeve'), findsOneWidget);
+
+      // B) 2 sekmeli durum
+      final client2Tabs = MockStoreApiClient(
+        energyState: null,
+        items: const [],
+      );
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(1.5),
+          ),
+          child: ProviderScope(
+            key: const ValueKey('2tabs_scope'),
+            overrides: [
+              storeApiClientProvider.overrideWithValue(client2Tabs),
+            ],
+            child: const MaterialApp(
+              home: StoreScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(StoreSegmentedControl), findsOneWidget);
+      expect(find.text('Jeton'), findsOneWidget);
+      expect(find.text('Enerji'), findsNothing);
+      expect(find.text('Çerçeve'), findsOneWidget);
     });
   });
 }

@@ -17,11 +17,12 @@ import 'widgets/coins_tab_view.dart';
 import 'widgets/energy_tab_view.dart';
 import 'widgets/purchase_bottom_sheet.dart';
 import 'widgets/store_frame_card.dart';
+import 'widgets/store_segmented_control.dart';
 
 /// DESIGN.md Bölüm 7: 9) Mağaza Ekranı & 9a) Mağaza Sekmeleri
 ///
 /// Üst çubukta başlık ("Mağaza") ve sağda CoinPill.
-/// Altında sekme şeridi: **Jeton · Enerji · Çerçeve**.
+/// Altında segmentli kontrol: **Jeton · Enerji · Çerçeve**.
 /// (Enerji kapalıyken Enerji sekmesi gösterilmez; varsayılan açılış Çerçeve sekmesidir).
 class StoreScreen extends ConsumerStatefulWidget {
   const StoreScreen({super.key});
@@ -31,39 +32,11 @@ class StoreScreen extends ConsumerStatefulWidget {
 }
 
 class _StoreScreenState extends ConsumerState<StoreScreen> {
-  final ScrollController _tabsScrollController = ScrollController();
   final Map<StoreTab, GlobalKey> _tabKeys = {
     StoreTab.coins: GlobalKey(),
     StoreTab.energy: GlobalKey(),
     StoreTab.frames: GlobalKey(),
   };
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToSelectedTab();
-    });
-  }
-
-  void _scrollToSelectedTab() {
-    final currentTab = ref.read(storeNotifierProvider).selectedTab;
-    final key = _tabKeys[currentTab];
-    if (key?.currentContext != null) {
-      Scrollable.ensureVisible(
-        key!.currentContext!,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        alignment: 0.5,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _tabsScrollController.dispose();
-    super.dispose();
-  }
 
   void _showSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
@@ -207,71 +180,25 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                 ),
               ),
 
-              // 2. Yatay Sekme Şeridi: Jeton · Enerji · Çerçeve
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    controller: _tabsScrollController,
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.screenPaddingHorizontal,
-                    ),
-                    itemCount: availableTabs.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: AppDimens.space8),
-                    itemBuilder: (context, index) {
-                      final tab = availableTabs[index];
-                      final isSelected = tab == effectiveTab;
-                      final label = switch (tab) {
-                        StoreTab.coins => AppStrings.tabCoins,
-                        StoreTab.energy => AppStrings.tabEnergy,
-                        StoreTab.frames => AppStrings.tabFrames,
-                      };
-
-                      return GestureDetector(
-                        key: _tabKeys[tab],
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          ref.read(storeNotifierProvider.notifier).setTab(tab);
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _scrollToSelectedTab();
-                          });
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppDimens.space16,
-                          ),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.card,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppColors.ink,
-                              width: AppDimens.borderThin,
-                            ),
-                          ),
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              fontFamily: AppTextStyles.fontNunito,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: isSelected ? Colors.white : AppColors.ink,
-                            ),
-                          ),
-                        ),
-                      );
+              // 2. Segmentli Sekme Kontrolü: Jeton · Enerji · Çerçeve
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.screenPaddingHorizontal,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: StoreSegmentedControl(
+                    availableTabs: availableTabs,
+                    selectedTab: effectiveTab,
+                    onTabSelected: (tab) {
+                      ref.read(storeNotifierProvider.notifier).setTab(tab);
                     },
+                    tabKeys: _tabKeys,
                   ),
                 ),
               ),
 
               const SliverToBoxAdapter(
-                child: SizedBox(height: AppDimens.space12),
+                child: SizedBox(height: AppDimens.space16),
               ),
 
               // 3. Sekme İçeriği
