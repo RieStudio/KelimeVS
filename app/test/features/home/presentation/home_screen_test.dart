@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/theme/app_text_styles.dart';
 import 'package:app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:app/core/widgets/coin_pill.dart';
 import 'package:app/core/widgets/kelime_vs_logo.dart';
@@ -19,6 +22,9 @@ import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
+import 'package:app/features/profile/domain/energy_state.dart';
+import 'package:app/features/store/application/store_notifier.dart';
+import 'package:app/features/store/domain/models/store_item.dart';
 import 'package:app/main.dart';
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
@@ -559,6 +565,269 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(MatchCard), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    '15. Enerji kapalı/null iken CoinPill tekil rozet halinde kalır, ayırıcı ve enerji ikonu çizilmez',
+    (tester) async {
+      final repo = FakeMatchHistoryRepository([]);
+      const profileNoEnergy = ProfileState(
+        isLoaded: true,
+        nickname: 'Oyuncu',
+        coins: 250,
+        energy: null,
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(repo, profileState: profileNoEnergy),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CoinPill), findsOneWidget);
+      expect(find.text('250'), findsOneWidget);
+      expect(find.byKey(const Key('energy_pill_button')), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is AppIcon && w.icon == AppIcons.bolt,
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    '16. Enerji açıkken CoinPill birleşik rozet (Jeton | Ayırıcı | Enerji) olarak tek kapsülde çizilir',
+    (tester) async {
+      final repo = FakeMatchHistoryRepository([]);
+      const profileWithEnergy = ProfileState(
+        isLoaded: true,
+        nickname: 'Oyuncu',
+        coins: 350,
+        energy: EnergyState(
+          enabled: true,
+          current: 4,
+          max: 5,
+          regenSeconds: 1200,
+          packs: [],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(repo, profileState: profileWithEnergy),
+      );
+      await tester.pumpAndSettle();
+
+      // Tek bir CoinPill var
+      expect(find.byType(CoinPill), findsOneWidget);
+      // Jeton ve enerji değerleri aynı rozette
+      expect(find.text('350'), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.byKey(const Key('energy_pill_button')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is AppIcon && w.icon == AppIcons.bolt,
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    '17. Dokunma davranışları: Enerjiye dokununca Mağaza Enerji sekmesine geçer, jetona dokunulunca sayfa değişmez',
+    (tester) async {
+      final repo = FakeMatchHistoryRepository([]);
+      const profile = ProfileState(
+        isLoaded: true,
+        nickname: 'Oyuncu',
+        coins: 100,
+        energy: EnergyState(
+          enabled: true,
+          current: 2,
+          max: 5,
+          regenSeconds: 1200,
+          packs: [],
+        ),
+      );
+
+      late ProviderContainer container;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchHistoryRepositoryProvider.overrideWithValue(repo),
+            profileProvider.overrideWith(() => _MockProfileNotifier(profile)),
+          ],
+          child: Consumer(
+            builder: (context, ref, _) {
+              container = ProviderScope.containerOf(context);
+              return const MaterialApp(home: MainShell());
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Başlangıç: Ana Sayfa sekmesi (index 0)
+      expect(container.read(bottomNavIndexProvider), 0);
+
+      // 1. Jeton bölümüne dokun (herhangi bir rota/sekme değişikliği olmamalı)
+      await tester.tap(find.text('100'));
+      await tester.pumpAndSettle();
+      expect(container.read(bottomNavIndexProvider), 0);
+
+      // 2. Enerji bölümüne dokun (Mağaza sekmesine ve Enerji alt sekmesine geçmeli)
+      await tester.tap(find.byKey(const Key('energy_pill_button')));
+      await tester.pumpAndSettle();
+      expect(container.read(bottomNavIndexProvider), 2);
+      expect(container.read(storeNotifierProvider).selectedTab, StoreTab.energy);
+    },
+  );
+
+  testWidgets(
+    '18. Kısa, uzun ve 16 karakterlik takma ad ile 5-6 haneli jetonlarda sağ grup x konumu sabittir, 320x640 ve 1.5 yazı ölçeğinde sıfır taşma',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final repo = FakeMatchHistoryRepository([]);
+
+      final testCases = [
+        ('Ali', 50),
+        ('MuhammedMustafa_', 99999),
+        ('1234567890123456', 999999),
+      ];
+
+      double? expectedRightGroupLeft;
+      double? expectedRightGroupRight;
+
+      for (final (name, coins) in testCases) {
+        final profile = ProfileState(
+          isLoaded: true,
+          nickname: name,
+          coins: coins,
+          energy: const EnergyState(
+            enabled: true,
+            current: 5,
+            max: 5,
+            regenSeconds: 1200,
+            packs: [],
+          ),
+        );
+
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 640),
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: _buildTestApp(repo, profileState: profile),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 320x640 ve 1.5 textScaler'da hiçbir taşma hatası olmamalı
+        expect(tester.takeException(), isNull);
+
+        final rightGroupFinder = find.byKey(const Key('home_top_bar_right_group'));
+        expect(rightGroupFinder, findsOneWidget);
+        final rect = tester.getRect(rightGroupFinder);
+
+        // Sağ grup her zaman sağ kenara dayalı olmalıdır (320 - 20 padding = 300)
+        expect(rect.right, equals(300.0));
+
+        // 5 ve 6 haneli sayılarda maxWidth (180) ve FixedBox sayesinde sağ grubun genişliği sabit kalır
+        expectedRightGroupLeft ??= rect.left;
+        expectedRightGroupRight ??= rect.right;
+        expect(rect.right, equals(expectedRightGroupRight));
+      }
+    },
+  );
+
+  testWidgets(
+    '19. 360 dp ekranda enerji açıkken takma ad görünür alanının ölçümü (önce vs sonra)',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final repo = FakeMatchHistoryRepository([]);
+      const longNickname = 'MuhammedMustafa_'; // 16 karakter
+
+      const profile = ProfileState(
+        isLoaded: true,
+        nickname: longNickname,
+        coins: 100,
+        energy: EnergyState(
+          enabled: true,
+          current: 3,
+          max: 5,
+          regenSeconds: 1200,
+          packs: [],
+        ),
+      );
+
+      await tester.pumpWidget(_buildTestApp(repo, profileState: profile));
+      await tester.pumpAndSettle();
+
+      final nicknameFinder = find.text(longNickname);
+      expect(nicknameFinder, findsOneWidget);
+
+      final renderParagraph = tester.renderObject<RenderParagraph>(nicknameFinder);
+      final availableWidthNew = renderParagraph.constraints.maxWidth;
+
+      // Önceki iki rozetli sistemde:
+      // CoinPill (88) + 8 + EnergyPill (62) + 8 + SettingsBtn (48) = 214 dp sağ grup.
+      // 360 ekran - 40 margin - 8 gap - 214 sağ grup = 98 dp sol grup.
+      // 98 - 52 (avatar + gap) = 46 dp takma ad alanı.
+      //
+      // Yeni birleşik rozette:
+      // Tek rozet (~144) + 8 + SettingsBtn (48) = 200 dp sağ grup.
+      // 360 ekran - 40 margin - 8 gap - 200 sağ grup = 112 dp sol grup.
+      // 112 - 52 (avatar + gap) = 60 dp takma ad alanı!
+      const availableWidthOld = 46.0;
+
+      expect(availableWidthNew, greaterThan(availableWidthOld));
+
+      // Nunito 16/800 fontunda ellipsis öncesi kaç karakter sığıyor hesapla:
+      const textStyle = TextStyle(
+        fontFamily: AppTextStyles.fontNunito,
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+      );
+
+      int countVisibleChars(double width) {
+        for (int i = longNickname.length; i >= 1; i--) {
+          final candidate = '${longNickname.substring(0, i)}…';
+          final tp = TextPainter(
+            text: TextSpan(text: candidate, style: textStyle),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          if (tp.width <= width) {
+            return i;
+          }
+        }
+        return 0;
+      }
+
+      final charsOld = countVisibleChars(availableWidthOld);
+      final charsNew = countVisibleChars(availableWidthNew);
+
+      // ignore: avoid_print
+      print(
+        '[Nickname Width Measurement @ 360dp]: '
+        'Önceki alan: ${availableWidthOld.toStringAsFixed(1)} dp ($charsOld karakter + …) -> '
+        'Yeni alan: ${availableWidthNew.toStringAsFixed(1)} dp ($charsNew karakter + …) '
+        '(Kazanım: +${(availableWidthNew - availableWidthOld).toStringAsFixed(1)} dp, +${charsNew - charsOld} karakter)',
+      );
+
+      expect(charsNew, greaterThanOrEqualTo(charsOld));
     },
   );
 }

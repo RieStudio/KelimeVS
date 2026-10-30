@@ -11,7 +11,6 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_pill.dart';
-import '../../../core/widgets/energy_pill.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
 import '../../../core/widgets/match_card.dart';
 import '../../../core/widgets/player_avatar.dart';
@@ -103,29 +102,27 @@ class HomeScreen extends ConsumerWidget {
 
                   const SizedBox(width: AppDimens.space8),
 
-                  // Sağ grup: Jeton Hapı + Enerji (varsa) + Ayarlar İkon Butonu
+                  // Sağ grup: Birleşik Jeton/Enerji Rozeti + Ayarlar İkon Butonu
                   Row(
                     key: const Key('home_top_bar_right_group'),
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CoinPill(amount: profile.coins),
-
-                      if (profile.energy != null &&
-                          profile.energy!.enabled) ...[
-                        const SizedBox(width: AppDimens.space8),
-                        EnergyPill(
-                          current: profile.energy!.current,
-                          max: profile.energy!.max,
-                          onTap: () {
-                            ref
-                                .read(bottomNavIndexProvider.notifier)
-                                .setIndex(2);
-                            ref
-                                .read(storeNotifierProvider.notifier)
-                                .setTab(StoreTab.energy);
-                          },
-                        ),
-                      ],
+                      CoinPill(
+                        amount: profile.coins,
+                        energyCurrent: (profile.energy != null &&
+                                profile.energy!.enabled)
+                            ? profile.energy!.current
+                            : null,
+                        energyMax: profile.energy?.max ?? 5,
+                        onEnergyTap: () {
+                          ref
+                              .read(bottomNavIndexProvider.notifier)
+                              .setIndex(2);
+                          ref
+                              .read(storeNotifierProvider.notifier)
+                              .setTab(StoreTab.energy);
+                        },
+                      ),
 
                       const SizedBox(width: AppDimens.space8),
 
