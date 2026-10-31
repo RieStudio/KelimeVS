@@ -1,6 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validateNickname } from './engine/nicknameValidator';
-import { FRAME_CATALOG, getFrameCatalogItem, isValidFrameId } from './frames';
+import {
+  FRAME_CATALOG,
+  getFrameCatalogItem,
+  getMinClientBuildForFrame,
+  isValidFrameId,
+  type FrameKind,
+  type FrameTier,
+} from './frames';
 import {
   calculateRegeneratedEnergy,
   getEnergyMax,
@@ -67,6 +74,8 @@ export interface StoreCatalogItem {
   readonly isOwned: boolean;
   readonly owned?: boolean;
   readonly isEquipped: boolean;
+  readonly kind?: FrameKind;
+  readonly tier?: FrameTier;
 }
 
 export interface StoreStateResult {
@@ -79,7 +88,11 @@ export type PurchaseItemResult =
   | { readonly success: true; readonly itemId: string; readonly coins: number }
   | {
       readonly success: false;
-      readonly error: 'not_enough_coins' | 'already_owned' | 'invalid_item';
+      readonly error:
+        | 'not_enough_coins'
+        | 'already_owned'
+        | 'invalid_item'
+        | 'unsupported_client_version';
       readonly coins?: number;
     };
 
@@ -821,7 +834,7 @@ export class UserProfile extends DurableObject<Env> {
    * Mağaza durumunu döndürür: güncel bakiye, kuşanılan çerçeve ve tüm katalog ürünlerinin
    * sahiplik/kuşanılma durumu.
    */
-  async getStoreState(uid?: string): Promise<StoreStateResult> {
+  async getStoreState(uid?: string, clientBuild = 0): Promise<StoreStateResult> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
@@ -836,7 +849,12 @@ export class UserProfile extends DurableObject<Env> {
     const ownedSet = new Set(ownedRows.map((r) => r.item_id));
     ownedSet.add('classic'); // 'classic' her zaman ücretsiz ve sahiplenilmiştir
 
-    const items: StoreCatalogItem[] = FRAME_CATALOG.map((item) => ({
+    const visibleCatalog = FRAME_CATALOG.filter((item) => {
+      const minBuild = getMinClientBuildForFrame(item, this.env as any);
+      return minBuild <= clientBuild;
+    });
+
+    const items: StoreCatalogItem[] = visibleCatalog.map((item) => ({
       id: item.id,
       name: item.name,
       cost: item.cost,
@@ -846,6 +864,8 @@ export class UserProfile extends DurableObject<Env> {
       isOwned: ownedSet.has(item.id),
       owned: ownedSet.has(item.id),
       isEquipped: profile.equippedFrame === item.id,
+      kind: item.kind,
+      ...(item.tier ? { tier: item.tier } : {}),
     }));
 
     return {
@@ -863,7 +883,11 @@ export class UserProfile extends DurableObject<Env> {
    * 2. Bakiye kontrolü
    * 3. Bakiye düşme + owned_items tablosuna ekleme
    */
-  async purchaseItem(itemId: string, uid?: string): Promise<PurchaseItemResult> {
+  async purchaseItem(
+    itemId: string,
+    uid?: string,
+    clientBuild = 0
+  ): Promise<PurchaseItemResult> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
@@ -873,6 +897,11 @@ export class UserProfile extends DurableObject<Env> {
     const catalogItem = getFrameCatalogItem(itemId);
     if (!catalogItem) {
       return { success: false, error: 'invalid_item' };
+    }
+
+    const minBuild = getMinClientBuildForFrame(catalogItem, this.env as any);
+    if (minBuild > clientBuild) {
+      return { success: false, error: 'unsupported_client_version' };
     }
 
     if (catalogItem.id === 'classic') {

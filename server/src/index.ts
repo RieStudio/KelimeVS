@@ -32,6 +32,15 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly DAILY_MATCH_COIN_CAP?: string;
   readonly EXTRA_TIME_COST?: string;
   readonly EXTRA_TIME_SECONDS?: string;
+  readonly VISUAL_FRAMES_MIN_BUILD?: string;
+}
+
+export function parseClientBuild(request: Request): number {
+  const header = request.headers.get('x-app-build');
+  if (!header) return 0;
+  const parsed = parseInt(header.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
 }
 
 const jsonHeaders = {
@@ -285,9 +294,11 @@ export default {
         });
       }
 
+      const clientBuild = parseClientBuild(request);
+
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const storeData = await profileStub.getStoreState(uid);
+        const storeData = await profileStub.getStoreState(uid, clientBuild);
         const serverNowMs = Date.now();
         const energyState = await profileStub.getEnergyState(uid, serverNowMs);
         return new Response(
@@ -346,9 +357,11 @@ export default {
         );
       }
 
+      const clientBuild = parseClientBuild(request);
+
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const res = await profileStub.purchaseItem(body.itemId.trim(), uid);
+        const res = await profileStub.purchaseItem(body.itemId.trim(), uid, clientBuild);
         if (!res.success) {
           if (res.error === 'not_enough_coins') {
             return new Response(
@@ -359,6 +372,15 @@ export default {
           if (res.error === 'already_owned') {
             return new Response(
               JSON.stringify({ error: 'already_owned', message: 'Bu çerçeveye zaten sahipsiniz' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'unsupported_client_version') {
+            return new Response(
+              JSON.stringify({
+                error: 'unsupported_client_version',
+                message: 'Bu çerçeveyi satın almak için uygulamanızı güncelleyin',
+              }),
               { status: 400, headers: jsonHeaders }
             );
           }

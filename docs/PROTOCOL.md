@@ -479,7 +479,9 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 - `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
 - `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller.
 
-### Mağaza (Store)
+### Mağaza (Store) ve İstemci Sürüm Filtreleme (`X-App-Build`)
+- **`X-App-Build` Başlığı:** HTTP isteklerinde gönderilen tamsayı istemci derleme numarasıdır (örn. `X-App-Build: 11`). Başlık eksikse veya sayısal değilse sunucu bunu `0` kabul eder.
+- **Katalog ve Sürüm Filtresi:** Çerçevelerin `minClientBuild` değeri vardır (prosedürel çerçevelerde `0`, yeni görsel PNG çerçevelerde varsayılan `11`). `minClientBuild > clientBuild` olan çerçeveler eski istemcilere filtrelenerek gönderilmez.
 - `GET /store`: Mağaza durumu ve katalog ürünlerini döndürür:
   ```json
   {
@@ -493,9 +495,21 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
         "description": "Sade ve şık orijinal kenarlık",
         "order": 1,
         "isOwned": true,
-        "isEquipped": true
+        "isEquipped": true,
+        "kind": "procedural"
       },
       ...
+      {
+        "id": "gold_leaf",
+        "name": "Altın Yaprak",
+        "cost": 600,
+        "description": "Görkemli altın yaprak süslemeli çerçeve",
+        "order": 11,
+        "isOwned": false,
+        "isEquipped": false,
+        "kind": "visual",
+        "tier": "medium"
+      }
     ]
   }
   ```
@@ -503,7 +517,10 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
   - Başarılı: `200 OK` (`{ "success": true, "itemId": "mint", "coins": 0 }`).
   - Yetersiz bakiye: `402 Payment Required` (`{ "error": "not_enough_coins", "coins": ... }`).
   - Zaten sahip olunan ürün: `400 Bad Request` (`{ "error": "already_owned" }`).
+  - Yetersiz istemci sürümü (`minClientBuild > clientBuild`): `400 Bad Request` (`{ "error": "unsupported_client_version", "message": "Bu çerçeveyi satın almak için uygulamanızı güncelleyin" }`).
   - Geçersiz ürün: `400 Bad Request` (`{ "error": "invalid_item" }`).
+- `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller. Sahiplik varsa sürüm kontrolü uygulanmaz.
+- **Eski İstemci Uyumluluğu:** Liderlik tablosu (`GET /leaderboard`) ve maç mesajlarında (`opponentFrame` vb.) hiçbir filtreleme yapılmaz; yeni çerçeve kimlikleri doğrudan iletilir. Eski istemciler bilinmeyen kimliklerle karşılaştığında çökmeden `'classic'` (Klasik) çerçeveye güvenli bir şekilde geri düşer.
 
 ### Liderlik Tablosu
 - `GET /leaderboard`: Haftalık ilk 50 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.

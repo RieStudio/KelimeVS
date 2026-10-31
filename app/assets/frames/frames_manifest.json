@@ -1,0 +1,22 @@
+[
+  {
+    "id": "vine",
+    "file": "frame_vine.png",
+    "innerRatio": 0.658
+  },
+  {
+    "id": "silver",
+    "file": "frame_silver.png",
+    "innerRatio": 0.821
+  },
+  {
+    "id": "gold",
+    "file": "frame_gold.png",
+    "innerRatio": 0.809
+  },
+  {
+    "id": "bronze",
+    "file": "frame_bronze.png",
+    "innerRatio": 0.821
+  }
+]

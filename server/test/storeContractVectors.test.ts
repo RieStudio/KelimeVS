@@ -175,6 +175,39 @@ describe('Store HTTP API Contract Tests against shared/test-vectors/store_contra
     expect(goldItem.cost).toBe(300);
   });
 
+  it('1b. GET /store: X-App-Build: 11 başlığı ile 12 öğeli tam sözleşme kataloğu döner', async () => {
+    const ctx = createMockCtx();
+    const lbCtx = createMockCtx();
+    const profile = new UserProfile(ctx, {} as any);
+    const leaderboard = new Leaderboard(lbCtx, {} as any);
+    const env = createEnv(profile, leaderboard);
+
+    const uid = 'contract_user_v2';
+    const req = new Request('http://127.0.0.1/store', {
+      method: contract.get_store.method,
+      headers: {
+        Authorization: `Bearer dev:${uid}`,
+        'X-App-Build': '11',
+      },
+    });
+
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.items.length).toBe(contract.get_store.response_200.body.items.length);
+
+    for (const contractItem of contract.get_store.response_200.body.items) {
+      const found = body.items.find((i: any) => i.id === contractItem.id);
+      expect(found, `${contractItem.id} öğesi katalogda bulunmalı`).toBeDefined();
+      expect(found.name).toBe(contractItem.name);
+      expect(found.cost).toBe(contractItem.cost);
+      expect(found.kind).toBe(contractItem.kind);
+      if (contractItem.tier) {
+        expect(found.tier).toBe(contractItem.tier);
+      }
+    }
+  });
+
   it('2. POST /store/purchase sözleşme vektörü istek ve yanıtlarını tam karşılamalıdır (200, 402, 400)', async () => {
     const ctx = createMockCtx();
     const lbCtx = createMockCtx();
@@ -245,6 +278,22 @@ describe('Store HTTP API Contract Tests against shared/test-vectors/store_contra
     expect(resInvalid.status).toBe(contract.purchase_item.response_400_invalid_item.status);
     const bodyInvalid = (await resInvalid.json()) as any;
     expect(bodyInvalid.error).toBe(contract.purchase_item.response_400_invalid_item.body.error);
+
+    // E. 400 Yetersiz Build ile Satın Alma (unsupported_client_version)
+    const reqUnsupported = new Request('http://127.0.0.1/store/purchase', {
+      method: contract.purchase_item.method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer dev:${uid}`,
+        'X-App-Build': '10',
+      },
+      body: JSON.stringify({ itemId: 'gold_leaf' }),
+    });
+    const resUnsupported = await worker.fetch(reqUnsupported, env);
+    expect(resUnsupported.status).toBe(contract.purchase_item.response_400_unsupported_client_version.status);
+    const bodyUnsupported = (await resUnsupported.json()) as any;
+    expect(bodyUnsupported.error).toBe(contract.purchase_item.response_400_unsupported_client_version.body.error);
+    expect(bodyUnsupported.message).toBe(contract.purchase_item.response_400_unsupported_client_version.body.message);
   });
 
   it('3. PUT /me/frame sözleşme vektörü istek ve yanıtlarını tam karşılamalıdır (200, 400)', async () => {
