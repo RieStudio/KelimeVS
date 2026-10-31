@@ -461,6 +461,8 @@ abstract final class AppStrings {
       'Bağlantı hatası. Lütfen internetini kontrol et.';
   static const String storeGenericError =
       'İşlem gerçekleştirilemedi, lütfen tekrar dene.';
+  static const String storeUnsupportedClientVersion =
+      'Bu çerçeveyi almak için uygulamayı güncelleyin';
 
   // Çerçeve adları
   static const String frameClassic = 'Klasik';
@@ -471,6 +473,10 @@ abstract final class AppStrings {
   static const String frameNeon = 'Neon';
   static const String frameRainbow = 'Gökkuşağı';
   static const String frameDiamond = 'Elmas';
+  static const String frameVine = 'Sarmaşık';
+  static const String frameSilverEngraved = 'Gümüş Oyma';
+  static const String frameBronzeEngraved = 'Bronz Oyma';
+  static const String frameGoldLeaf = 'Altın Yaprak';
 
   static String frameDisplayName(String frameId) {
     switch (frameId.toLowerCase()) {
@@ -488,6 +494,14 @@ abstract final class AppStrings {
         return frameRainbow;
       case 'diamond':
         return frameDiamond;
+      case 'vine':
+        return frameVine;
+      case 'silver_engraved':
+        return frameSilverEngraved;
+      case 'bronze_engraved':
+        return frameBronzeEngraved;
+      case 'gold_leaf':
+        return frameGoldLeaf;
       case 'classic':
       default:
         return frameClassic;

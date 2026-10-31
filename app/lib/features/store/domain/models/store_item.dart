@@ -13,6 +13,8 @@ class StoreItem {
   final int price;
   final bool owned;
   final bool isEquipped;
+  final String? kind;
+  final String? tier;
 
   const StoreItem({
     required this.id,
@@ -20,6 +22,8 @@ class StoreItem {
     required this.price,
     required this.owned,
     required this.isEquipped,
+    this.kind,
+    this.tier,
   });
 
   factory StoreItem.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,8 @@ class StoreItem {
       price: ((json['cost'] ?? json['price']) as num?)?.toInt() ?? 0,
       owned: ((json['isOwned'] ?? json['owned']) as bool?) ?? false,
       isEquipped: json['isEquipped'] as bool? ?? false,
+      kind: json['kind'] as String?,
+      tier: json['tier'] as String?,
     );
   }
 
@@ -38,6 +44,8 @@ class StoreItem {
     int? price,
     bool? owned,
     bool? isEquipped,
+    String? kind,
+    String? tier,
   }) {
     return StoreItem(
       id: id ?? this.id,
@@ -45,6 +53,8 @@ class StoreItem {
       price: price ?? this.price,
       owned: owned ?? this.owned,
       isEquipped: isEquipped ?? this.isEquipped,
+      kind: kind ?? this.kind,
+      tier: tier ?? this.tier,
     );
   }
 
@@ -57,10 +67,12 @@ class StoreItem {
           name == other.name &&
           price == other.price &&
           owned == other.owned &&
-          isEquipped == other.isEquipped;
+          isEquipped == other.isEquipped &&
+          kind == other.kind &&
+          tier == other.tier;
 
   @override
-  int get hashCode => Object.hash(id, name, price, owned, isEquipped);
+  int get hashCode => Object.hash(id, name, price, owned, isEquipped, kind, tier);
 }
 
 /// Mağaza ekranı durum modeli.

@@ -4,6 +4,7 @@ import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/avatar_frame_registry.dart';
 import '../../../../core/widgets/player_avatar.dart';
 import '../../domain/models/store_item.dart';
 
@@ -61,23 +62,47 @@ class StoreFrameCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. Avatar Önizleme (72 px)
-              PlayerAvatar.selfMatch(
-                name: playerName,
-                frame: item.id,
-                size: 72,
+              // 1. Avatar Önizleme (72 px veya kart genişliğinin %90'ı)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const baseSize = 72.0;
+                  final visualDef = VisualFrameRegistry.getDefinition(item.id);
+                  if (visualDef == null) {
+                    return PlayerAvatar.selfMatch(
+                      name: playerName,
+                      frame: item.id,
+                      size: baseSize,
+                    );
+                  }
+
+                  // Büyük görsel çerçevelerin kart sınırına taşmaması için önizleme avatar boyutunu
+                  // kartın kullanılabilir genişliğine göre sınırla (frameSize kart iç genişliğinin ~%90'ını geçmesin)
+                  final maxAllowedFrame = constraints.maxWidth * 0.90;
+                  final idealFrameSize = baseSize / visualDef.innerRatio;
+                  final effectiveAvatarSize = idealFrameSize > maxAllowedFrame
+                      ? maxAllowedFrame * visualDef.innerRatio
+                      : baseSize;
+
+                  return PlayerAvatar.selfMatch(
+                    name: playerName,
+                    frame: item.id,
+                    size: effectiveAvatarSize,
+                  );
+                },
               ),
-              const SizedBox(height: AppDimens.space10),
+              const SizedBox(height: AppDimens.space6),
 
               // 2. Çerçeve Adı
-              Text(
-                displayName,
-                style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  displayName,
+                  style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                ),
               ),
-              const SizedBox(height: AppDimens.space10),
+              const SizedBox(height: AppDimens.space8),
 
               // 3. Durum / Aksiyon Butonu
               AnimatedSwitcher(
@@ -123,26 +148,29 @@ class StoreFrameCard extends StatelessWidget {
           ),
         ),
         alignment: Alignment.center,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(
-              Icons.check_rounded,
-              size: 16,
-              color: AppColors.ink,
-            ),
-            SizedBox(width: 4),
-            Text(
-              AppStrings.equippedStatus,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontFredoka,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(
+                Icons.check_rounded,
+                size: 16,
                 color: AppColors.ink,
               ),
-            ),
-          ],
+              SizedBox(width: 4),
+              Text(
+                AppStrings.equippedStatus,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFredoka,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -168,13 +196,16 @@ class StoreFrameCard extends StatelessWidget {
                 ),
               ),
               alignment: Alignment.center,
-              child: const Text(
-                AppStrings.equipAction,
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontFredoka,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AppColors.ink,
+              child: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  AppStrings.equipAction,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontFredoka,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppColors.ink,
+                  ),
                 ),
               ),
             ),
@@ -206,10 +237,12 @@ class StoreFrameCard extends StatelessWidget {
               ),
             ),
             alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 Container(
                   width: 18,
                   height: 18,
@@ -248,7 +281,8 @@ class StoreFrameCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

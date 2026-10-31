@@ -105,6 +105,10 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
             if (context.mounted) {
               _showSnackBar(context, res.message);
             }
+          } else if (res is StorePurchaseUnsupportedVersion) {
+            if (context.mounted) {
+              _showSnackBar(context, res.message);
+            }
           } else if (res != null) {
             if (context.mounted) {
               _showSnackBar(context, AppStrings.storeGenericError);
@@ -246,7 +250,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                             crossAxisCount: 2,
                             mainAxisSpacing: AppDimens.space12,
                             crossAxisSpacing: AppDimens.space12,
-                            childAspectRatio: 0.82,
+                            childAspectRatio: 0.72,
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = storeState.items[index];

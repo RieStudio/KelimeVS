@@ -148,7 +148,7 @@ void main() {
       final body = resp200['body'] as Map<String, dynamic>;
 
       final rawItems = body['items'] as List<dynamic>;
-      expect(rawItems.length, equals(8));
+      expect(rawItems.length, equals(12));
 
       // Her öğeyi StoreItem.fromJson ile ayrıştır ve alan adı doğruluğunu sına
       for (final raw in rawItems) {
@@ -183,7 +183,7 @@ void main() {
       expect(state, isNotNull);
       expect(state!.coins, equals(body['coins']));
       expect(state.equippedFrame, equals(body['equippedFrame']));
-      expect(state.items.length, equals(8));
+      expect(state.items.length, equals(12));
     });
 
     test('2. POST /store/purchase istek ve yanıt sözleşmesi istemciyle birebir uyumludur',

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/network/app_build_info.dart';
+
 /// Tek bir hedef adresin tanılama sonucu.
 ///
 /// Güvenlik kuralı: Gövde içeriği ve HTTP başlıkları kesinlikle saklanmaz ve döndürülmez.
@@ -148,6 +150,7 @@ class NetworkDiagnostics {
     final client = HttpClient()..connectionTimeout = timeout;
     try {
       final request = await client.getUrl(uri).timeout(timeout);
+      AppBuildInfo.applyHeaders(request.headers);
       final response = await request.close().timeout(timeout);
 
       // Gövde içeriğini güvenli bir şekilde tüket, ancak hiçbir yere kaydetme

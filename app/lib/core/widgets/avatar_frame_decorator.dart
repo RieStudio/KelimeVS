@@ -9,7 +9,19 @@ enum AvatarFrameType {
   gold,
   neon,
   rainbow,
-  diamond;
+  diamond,
+  vine,
+  silverEngraved,
+  bronzeEngraved,
+  goldLeaf;
+
+  bool get isVisual =>
+      this == AvatarFrameType.vine ||
+      this == AvatarFrameType.silverEngraved ||
+      this == AvatarFrameType.bronzeEngraved ||
+      this == AvatarFrameType.goldLeaf;
+
+  bool get isProcedural => !isVisual;
 
   static AvatarFrameType fromId(String? id) {
     if (id == null) return AvatarFrameType.classic;
@@ -28,6 +40,14 @@ enum AvatarFrameType {
         return AvatarFrameType.rainbow;
       case 'diamond':
         return AvatarFrameType.diamond;
+      case 'vine':
+        return AvatarFrameType.vine;
+      case 'silver_engraved':
+        return AvatarFrameType.silverEngraved;
+      case 'bronze_engraved':
+        return AvatarFrameType.bronzeEngraved;
+      case 'gold_leaf':
+        return AvatarFrameType.goldLeaf;
       case 'classic':
       default:
         return AvatarFrameType.classic;
@@ -55,7 +75,11 @@ class AvatarFramePainter extends CustomPainter {
 
     switch (frameType) {
       case AvatarFrameType.classic:
-        // Klasik: Tek katmanlı sağlam Ink kenarlık
+      case AvatarFrameType.vine:
+      case AvatarFrameType.silverEngraved:
+      case AvatarFrameType.bronzeEngraved:
+      case AvatarFrameType.goldLeaf:
+        // Klasik (veya görsel çerçeve fallback'i): Tek katmanlı sağlam Ink kenarlık
         final paint = Paint()
           ..color = AppColors.ink
           ..style = PaintingStyle.stroke

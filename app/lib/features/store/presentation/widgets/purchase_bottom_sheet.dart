@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_icon_button.dart';
+import '../../../../core/widgets/avatar_frame_registry.dart';
 import '../../../../core/widgets/player_avatar.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/secondary_button.dart';
@@ -62,9 +63,13 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    displayName,
-                    style: AppTextStyles.cardTitle.copyWith(fontSize: 20),
+                  child: FittedBox(
+                    alignment: Alignment.centerLeft,
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      displayName,
+                      style: AppTextStyles.cardTitle.copyWith(fontSize: 20),
+                    ),
                   ),
                 ),
                 AppIconButton(
@@ -76,11 +81,27 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
             ),
             const SizedBox(height: AppDimens.space20),
 
-            // Büyük Avatar Önizleme (104 px)
-            PlayerAvatar.selfMatch(
-              name: widget.playerName,
-              frame: item.id,
-              size: 104,
+            // Büyük Avatar Önizleme (104 px, kullanılabilir genişliğin %90'ını aşmayacak şekilde sınırlı)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                double targetAvatarSize = 104.0;
+                if (constraints.maxWidth.isFinite && constraints.maxWidth > 0) {
+                  final maxAllowedFrame = constraints.maxWidth * 0.90;
+                  final def = VisualFrameRegistry.getDefinition(item.id);
+                  if (def != null) {
+                    final idealFrame = targetAvatarSize / def.innerRatio;
+                    if (idealFrame > maxAllowedFrame) {
+                      final clampedFrame = maxAllowedFrame;
+                      targetAvatarSize = clampedFrame * def.innerRatio;
+                    }
+                  }
+                }
+                return PlayerAvatar.selfMatch(
+                  name: widget.playerName,
+                  frame: item.id,
+                  size: targetAvatarSize,
+                );
+              },
             ),
             const SizedBox(height: AppDimens.space16),
 
@@ -99,38 +120,41 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
                     width: AppDimens.borderThin,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: AppColors.coin,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.ink,
-                          width: 1,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: AppColors.coin,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.ink,
+                            width: 1,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'G',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontFredoka,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: AppColors.ink,
+                            height: 1.0,
+                          ),
                         ),
                       ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'G',
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontFredoka,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                          color: AppColors.ink,
-                          height: 1.0,
-                        ),
+                      const SizedBox(width: AppDimens.space8),
+                      Text(
+                        '${item.price} Jeton',
+                        style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
                       ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-                    Text(
-                      '${item.price} Jeton',
-                      style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ] else ...[

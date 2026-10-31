@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/config/server_config.dart';
+import '../../../core/network/app_build_info.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../domain/models/leaderboard_models.dart';
 
@@ -41,6 +42,7 @@ class HttpLeaderboardApiClient implements LeaderboardApiClient {
           await client.getUrl(uri).timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
 
       final response =
           await request.close().timeout(const Duration(seconds: 8));

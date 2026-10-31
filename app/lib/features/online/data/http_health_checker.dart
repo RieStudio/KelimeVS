@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/network/app_build_info.dart';
+
 /// Sunucu sağlık kontrolünü (GET /health) yürüten soyut arayüz.
 abstract interface class HttpHealthChecker {
   /// [url] adresine GET isteği atarak gövdeyi metin olarak döndürür.
@@ -52,6 +54,7 @@ class IoHttpHealthChecker implements HttpHealthChecker {
 
     try {
       final request = await client.getUrl(uri).timeout(timeout);
+      AppBuildInfo.applyHeaders(request.headers);
       final response = await request.close().timeout(timeout);
       final responseBody =
           await response.transform(utf8.decoder).join().timeout(timeout);

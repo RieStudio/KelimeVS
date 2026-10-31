@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/config/server_config.dart';
+import '../../../core/network/app_build_info.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../domain/energy_state.dart';
 
@@ -165,6 +166,7 @@ class HttpProfileApiClient implements ProfileApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),
@@ -209,6 +211,7 @@ class HttpProfileApiClient implements ProfileApiClient {
         HttpHeaders.contentTypeHeader,
         'application/json; charset=utf-8',
       );
+      AppBuildInfo.applyHeaders(request.headers);
 
       final bodyBytes = utf8.encode(jsonEncode({'nickname': nickname}));
       request.contentLength = bodyBytes.length;
@@ -264,6 +267,7 @@ class HttpProfileApiClient implements ProfileApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),

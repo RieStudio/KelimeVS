@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/server_config.dart';
+import '../../../core/network/app_build_info.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../online/data/auth_token_provider.dart';
@@ -38,6 +39,13 @@ class StorePurchaseAlreadyOwned extends StorePurchaseResult {
 class StorePurchaseInvalidItem extends StorePurchaseResult {
   final String message;
   const StorePurchaseInvalidItem([this.message = AppStrings.storeGenericError]);
+}
+
+class StorePurchaseUnsupportedVersion extends StorePurchaseResult {
+  final String message;
+  const StorePurchaseUnsupportedVersion([
+    this.message = AppStrings.storeUnsupportedClientVersion,
+  ]);
 }
 
 class StorePurchaseNetworkError extends StorePurchaseResult {
@@ -174,6 +182,7 @@ class HttpStoreApiClient implements StoreApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),
@@ -231,6 +240,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
       request.add(utf8.encode(jsonEncode({'itemId': itemId})));
 
       final response = await request.close().timeout(
@@ -250,8 +260,15 @@ class HttpStoreApiClient implements StoreApiClient {
       } else if (response.statusCode == 400) {
         try {
           final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
-          if (decoded['error'] == 'already_owned') {
+          final errCode = decoded['error'];
+          if (errCode == 'already_owned') {
             return const StorePurchaseAlreadyOwned();
+          }
+          if (errCode == 'unsupported_client_version') {
+            final msg = decoded['message'] as String?;
+            return StorePurchaseUnsupportedVersion(
+              msg ?? AppStrings.storeUnsupportedClientVersion,
+            );
           }
         } catch (_) {}
         return const StorePurchaseInvalidItem();
@@ -284,6 +301,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
       request.add(
         utf8.encode(jsonEncode({'frameId': frameId, 'frame': frameId})),
       );
@@ -347,6 +365,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      AppBuildInfo.applyHeaders(request.headers);
       request.add(utf8.encode(jsonEncode({'pack': pack})));
 
       final response = await request.close().timeout(

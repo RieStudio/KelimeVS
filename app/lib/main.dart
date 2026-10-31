@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/icons/app_icons.dart';
+import 'core/network/app_build_info.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
 import 'core/theme/app_colors.dart';
@@ -14,6 +15,7 @@ import 'core/theme/app_text_styles.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/font_licenses.dart';
 import 'core/widgets/app_widgets.dart';
+import 'core/widgets/avatar_frame_registry.dart';
 import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/leaderboard/application/leaderboard_providers.dart';
@@ -27,6 +29,7 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerFontLicenses();
+  await AppBuildInfo.initialize();
   String? authError;
 
   try {
@@ -130,6 +133,9 @@ class _MainShellState extends ConsumerState<MainShell>
     _initAuth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reconcilePendingMatches();
+      if (mounted) {
+        VisualFrameRegistry.precacheFrames(context);
+      }
     });
   }
 

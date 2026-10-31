@@ -329,6 +329,78 @@ class ComponentGallery extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space24),
 
+            // 6b. GÖRSEL VE PROSEDÜREL ÇERÇEVELER
+            const SectionLabel('Çerçeve Galerisi (36, 44, 72, 88, 104 dp)'),
+            const SizedBox(height: AppDimens.space10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final frame in [
+                    ('classic', 'Klasik'),
+                    ('diamond', 'Elmas'),
+                    ('vine', 'Sarmaşık'),
+                    ('silver_engraved', 'Gümüş'),
+                    ('bronze_engraved', 'Bronz'),
+                    ('gold_leaf', 'Altın'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            frame.$2,
+                            style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('104 dp', style: AppTextStyles.secondaryText),
+                          const SizedBox(height: 4),
+                          PlayerAvatar.selfMatch(
+                            name: 'A',
+                            frame: frame.$1,
+                            size: 104,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('88 dp', style: AppTextStyles.secondaryText),
+                          const SizedBox(height: 4),
+                          PlayerAvatar.selfMatch(
+                            name: 'A',
+                            frame: frame.$1,
+                            size: 88,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('72 dp', style: AppTextStyles.secondaryText),
+                          const SizedBox(height: 4),
+                          PlayerAvatar.selfMatch(
+                            name: 'A',
+                            frame: frame.$1,
+                            size: 72,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('44 dp', style: AppTextStyles.secondaryText),
+                          const SizedBox(height: 4),
+                          PlayerAvatar.selfMatch(
+                            name: 'A',
+                            frame: frame.$1,
+                            size: 44,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('36 dp', style: AppTextStyles.secondaryText),
+                          const SizedBox(height: 4),
+                          PlayerAvatar.selfMatch(
+                            name: 'A',
+                            frame: frame.$1,
+                            size: 36,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimens.space24),
+
             // 7. SONUÇ ETİKETLERİ
             const SectionLabel('Sonuç Etiketleri (Sabit 88dp Genişlik)'),
             const SizedBox(height: AppDimens.space10),

@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
 import 'avatar_frame_decorator.dart';
+import 'avatar_frame_registry.dart';
 
 enum PlayerAvatarVariant {
   selfHome, // bright zemin + ink harf
@@ -104,12 +105,12 @@ class PlayerAvatar extends StatelessWidget {
     }
 
     final isUnknown = variant == PlayerAvatarVariant.unknown;
+    final visualDef = isUnknown ? null : VisualFrameRegistry.getDefinition(frame);
 
-    return Semantics(
-      label: isUnknown
-          ? AppStrings.opponent
-          : AppStrings.avatarSemantics(name: name, frameId: frame),
-      child: Container(
+    final Widget avatarContent;
+
+    if (isUnknown) {
+      avatarContent = Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
@@ -119,25 +120,15 @@ class PlayerAvatar extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (isUnknown)
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _DashedCirclePainter(
-                    color: AppColors.ink,
-                    strokeWidth: effectiveBorderWidth,
-                    dashCount: (size / 3.2).clamp(12, 36).round(),
-                  ),
-                ),
-              )
-            else
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: AvatarFramePainter(
-                    frameType: AvatarFrameType.fromId(frame),
-                    borderWidth: effectiveBorderWidth,
-                  ),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DashedCirclePainter(
+                  color: AppColors.ink,
+                  strokeWidth: effectiveBorderWidth,
+                  dashCount: (size / 3.2).clamp(12, 36).round(),
                 ),
               ),
+            ),
             Center(
               child: Text(
                 displayChar,
@@ -150,7 +141,111 @@ class PlayerAvatar extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      );
+    } else if (visualDef != null) {
+      final dims = VisualFrameRegistry.calculateDimensions(
+        baseAvatarSize: size,
+        innerRatio: visualDef.innerRatio,
+      );
+
+      final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+      final cacheW = (dims.frameSize * dpr).round().clamp(1, 1024);
+
+      avatarContent = SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // 1. Merkezdeki Avatar Dairesi
+            Container(
+              width: dims.avatarSize,
+              height: dims.avatarSize,
+              decoration: BoxDecoration(
+                color: bgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  displayChar,
+                  style: AppTextStyles.avatarInitial.copyWith(
+                    fontSize: dims.avatarSize * 0.46,
+                    color: textColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
+            // 2. Dışa Büyüyen Görsel Çerçeve Katmanı (Dokunmaları engellemez)
+            IgnorePointer(
+              child: Image.asset(
+                visualDef.assetPath,
+                width: dims.frameSize,
+                height: dims.frameSize,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: cacheW,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) {
+                  // Varlık yüklenemezse güvenli geri dönüş: Klasik çerçeve painter
+                  return SizedBox(
+                    width: dims.avatarSize,
+                    height: dims.avatarSize,
+                    child: CustomPaint(
+                      painter: AvatarFramePainter(
+                        frameType: AvatarFrameType.classic,
+                        borderWidth: effectiveBorderWidth,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Prosedürel çerçeveler (classic, mint, sunset, ocean, gold, neon, rainbow, diamond veya bilinmeyen)
+      avatarContent = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: bgColor,
+          shape: BoxShape.circle,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: AvatarFramePainter(
+                  frameType: AvatarFrameType.fromId(frame),
+                  borderWidth: effectiveBorderWidth,
+                ),
+              ),
+            ),
+            Center(
+              child: Text(
+                displayChar,
+                style: AppTextStyles.avatarInitial.copyWith(
+                  fontSize: size * 0.46,
+                  color: textColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Semantics(
+      label: isUnknown
+          ? AppStrings.opponent
+          : AppStrings.avatarSemantics(name: name, frameId: frame),
+      child: avatarContent,
     );
   }
 }

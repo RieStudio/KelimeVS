@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../config/server_config.dart';
+import 'app_build_info.dart';
 
 /// Cihazın ağ donanım durumunu ve sunucu erişilebilirliğini sağlayan servis arayüzü.
 abstract interface class NetworkService {
@@ -70,6 +71,7 @@ class DefaultNetworkService implements NetworkService {
       final request = await client
           .getUrl(uri)
           .timeout(const Duration(milliseconds: 2500));
+      AppBuildInfo.applyHeaders(request.headers);
       final response =
           await request.close().timeout(const Duration(milliseconds: 2500));
 
