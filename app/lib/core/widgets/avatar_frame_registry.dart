@@ -28,7 +28,7 @@ abstract final class VisualFrameRegistry {
     'vine': VisualFrameDefinition(
       id: 'vine',
       assetPath: 'assets/frames/frame_vine.png',
-      innerRatio: 0.658,
+      innerRatio: 0.678,
       fileName: 'frame_vine.png',
     ),
     'silver_engraved': VisualFrameDefinition(

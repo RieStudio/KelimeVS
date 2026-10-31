@@ -179,28 +179,34 @@ class PlayerAvatar extends StatelessWidget {
             ),
 
             // 2. Dışa Büyüyen Görsel Çerçeve Katmanı (Dokunmaları engellemez)
-            IgnorePointer(
-              child: Image.asset(
-                visualDef.assetPath,
-                width: dims.frameSize,
-                height: dims.frameSize,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-                cacheWidth: cacheW,
-                gaplessPlayback: true,
-                errorBuilder: (context, error, stackTrace) {
-                  // Varlık yüklenemezse güvenli geri dönüş: Klasik çerçeve painter
-                  return SizedBox(
-                    width: dims.avatarSize,
-                    height: dims.avatarSize,
-                    child: CustomPaint(
-                      painter: AvatarFramePainter(
-                        frameType: AvatarFrameType.classic,
-                        borderWidth: effectiveBorderWidth,
+            Positioned(
+              left: (size - dims.frameSize) / 2,
+              top: (size - dims.frameSize) / 2,
+              width: dims.frameSize,
+              height: dims.frameSize,
+              child: IgnorePointer(
+                child: Image.asset(
+                  visualDef.assetPath,
+                  width: dims.frameSize,
+                  height: dims.frameSize,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: cacheW,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Varlık yüklenemezse güvenli geri dönüş: Klasik çerçeve painter
+                    return SizedBox(
+                      width: dims.avatarSize,
+                      height: dims.avatarSize,
+                      child: CustomPaint(
+                        painter: AvatarFramePainter(
+                          frameType: AvatarFrameType.classic,
+                          borderWidth: effectiveBorderWidth,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ],

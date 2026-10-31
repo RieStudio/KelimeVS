@@ -330,75 +330,7 @@ class ComponentGallery extends StatelessWidget {
             const SizedBox(height: AppDimens.space24),
 
             // 6b. GÖRSEL VE PROSEDÜREL ÇERÇEVELER
-            const SectionLabel('Çerçeve Galerisi (36, 44, 72, 88, 104 dp)'),
-            const SizedBox(height: AppDimens.space10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final frame in [
-                    ('classic', 'Klasik'),
-                    ('diamond', 'Elmas'),
-                    ('vine', 'Sarmaşık'),
-                    ('silver_engraved', 'Gümüş'),
-                    ('bronze_engraved', 'Bronz'),
-                    ('gold_leaf', 'Altın'),
-                  ])
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            frame.$2,
-                            style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('104 dp', style: AppTextStyles.secondaryText),
-                          const SizedBox(height: 4),
-                          PlayerAvatar.selfMatch(
-                            name: 'A',
-                            frame: frame.$1,
-                            size: 104,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('88 dp', style: AppTextStyles.secondaryText),
-                          const SizedBox(height: 4),
-                          PlayerAvatar.selfMatch(
-                            name: 'A',
-                            frame: frame.$1,
-                            size: 88,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('72 dp', style: AppTextStyles.secondaryText),
-                          const SizedBox(height: 4),
-                          PlayerAvatar.selfMatch(
-                            name: 'A',
-                            frame: frame.$1,
-                            size: 72,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('44 dp', style: AppTextStyles.secondaryText),
-                          const SizedBox(height: 4),
-                          PlayerAvatar.selfMatch(
-                            name: 'A',
-                            frame: frame.$1,
-                            size: 44,
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('36 dp', style: AppTextStyles.secondaryText),
-                          const SizedBox(height: 4),
-                          PlayerAvatar.selfMatch(
-                            name: 'A',
-                            frame: frame.$1,
-                            size: 36,
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            const FrameGallerySection(),
             const SizedBox(height: AppDimens.space24),
 
             // 7. SONUÇ ETİKETLERİ
@@ -895,6 +827,134 @@ class _LogoPreviewCard extends StatelessWidget {
           Center(child: logo),
         ],
       ),
+    );
+  }
+}
+
+class FrameGallerySection extends StatefulWidget {
+  const FrameGallerySection({super.key});
+
+  @override
+  State<FrameGallerySection> createState() => FrameGallerySectionState();
+}
+
+class FrameGallerySectionState extends State<FrameGallerySection> {
+  bool _showDebugRedRing = false;
+
+  Widget _buildAvatarWithGuide({
+    required String frameId,
+    required double size,
+  }) {
+    final avatar = PlayerAvatar.selfMatch(
+      name: 'A',
+      frame: frameId,
+      size: size,
+    );
+
+    if (!_showDebugRedRing) return avatar;
+
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        avatar,
+        IgnorePointer(
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.redAccent,
+                width: 1.0,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: SectionLabel('Çerçeve Galerisi (36, 44, 72, 88, 104 dp)'),
+            ),
+            const Text(
+              'Kılavuz',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.ink,
+              ),
+            ),
+            Switch(
+              key: const ValueKey('debug_frame_red_ring_switch'),
+              value: _showDebugRedRing,
+              activeTrackColor: Colors.redAccent.withValues(alpha: 0.5),
+              activeThumbColor: Colors.redAccent,
+              onChanged: (val) {
+                setState(() {
+                  _showDebugRedRing = val;
+                });
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final frame in [
+                ('classic', 'Klasik'),
+                ('diamond', 'Elmas'),
+                ('vine', 'Sarmaşık'),
+                ('silver_engraved', 'Gümüş'),
+                ('bronze_engraved', 'Bronz'),
+                ('gold_leaf', 'Altın'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        frame.$2,
+                        style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('104 dp', style: AppTextStyles.secondaryText),
+                      const SizedBox(height: 4),
+                      _buildAvatarWithGuide(frameId: frame.$1, size: 104),
+                      const SizedBox(height: 8),
+                      const Text('88 dp', style: AppTextStyles.secondaryText),
+                      const SizedBox(height: 4),
+                      _buildAvatarWithGuide(frameId: frame.$1, size: 88),
+                      const SizedBox(height: 8),
+                      const Text('72 dp', style: AppTextStyles.secondaryText),
+                      const SizedBox(height: 4),
+                      _buildAvatarWithGuide(frameId: frame.$1, size: 72),
+                      const SizedBox(height: 8),
+                      const Text('44 dp', style: AppTextStyles.secondaryText),
+                      const SizedBox(height: 4),
+                      _buildAvatarWithGuide(frameId: frame.$1, size: 44),
+                      const SizedBox(height: 8),
+                      const Text('36 dp', style: AppTextStyles.secondaryText),
+                      const SizedBox(height: 4),
+                      _buildAvatarWithGuide(frameId: frame.$1, size: 36),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
