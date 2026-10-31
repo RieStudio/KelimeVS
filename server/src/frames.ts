@@ -2,6 +2,7 @@ export type FrameKind = 'procedural' | 'visual';
 export type FrameTier = 'basic' | 'medium' | 'premium';
 
 export const DEFAULT_VISUAL_FRAMES_MIN_BUILD = 11;
+export const DEFAULT_RETIRED_FRAMES_BUILD = 11;
 
 export interface FrameCatalogItem {
   readonly id: string;
@@ -12,18 +13,29 @@ export interface FrameCatalogItem {
   readonly kind: FrameKind;
   readonly tier?: FrameTier;
   readonly minClientBuild?: number;
+  readonly retiredFromBuild?: number;
 }
+
+export const RETIRED_FRAME_IDS: readonly string[] = [
+  'mint',
+  'sunset',
+  'ocean',
+  'gold',
+  'neon',
+  'rainbow',
+  'diamond',
+];
 
 export const FRAME_CATALOG: readonly FrameCatalogItem[] = [
   { id: 'classic', name: 'Klasik', cost: 0, description: 'Sade ve şık orijinal kenarlık', order: 1, kind: 'procedural' },
-  { id: 'mint', name: 'Nane', cost: 100, description: 'Taze nane yeşili canlı çerçeve', order: 2, kind: 'procedural' },
-  { id: 'sunset', name: 'Gün Batımı', cost: 150, description: 'Sıcak gün batımı renkleri', order: 3, kind: 'procedural' },
-  { id: 'ocean', name: 'Okyanus', cost: 150, description: 'Derin mavi okyanus esintisi', order: 4, kind: 'procedural' },
-  { id: 'gold', name: 'Altın', cost: 300, description: 'Parıltılı şampiyon altını', order: 5, kind: 'procedural' },
-  { id: 'neon', name: 'Neon', cost: 300, description: 'Göz alıcı elektrik neonu', order: 6, kind: 'procedural' },
-  { id: 'rainbow', name: 'Gökkuşağı', cost: 500, description: 'Büyüleyici renk tayfı', order: 7, kind: 'procedural' },
-  { id: 'diamond', name: 'Elmas', cost: 800, description: 'Eşsiz kristal elmas ışıltısı', order: 8, kind: 'procedural' },
-  // Yeni Görsel (PNG) Çerçeveler (minClientBuild: 11)
+  { id: 'mint', name: 'Nane', cost: 100, description: 'Taze nane yeşili canlı çerçeve', order: 2, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'sunset', name: 'Gün Batımı', cost: 150, description: 'Sıcak gün batımı renkleri', order: 3, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'ocean', name: 'Okyanus', cost: 150, description: 'Derin mavi okyanus esintisi', order: 4, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'gold', name: 'Altın', cost: 300, description: 'Parıltılı şampiyon altını', order: 5, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'neon', name: 'Neon', cost: 300, description: 'Göz alıcı elektrik neonu', order: 6, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'rainbow', name: 'Gökkuşağı', cost: 500, description: 'Büyüleyici renk tayfı', order: 7, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  { id: 'diamond', name: 'Elmas', cost: 800, description: 'Eşsiz kristal elmas ışıltısı', order: 8, kind: 'procedural', retiredFromBuild: DEFAULT_RETIRED_FRAMES_BUILD },
+  // Görsel (PNG) Çerçeveler (minClientBuild: 11)
   {
     id: 'bronze_engraved',
     name: 'Bronz Oyma',
@@ -64,6 +76,26 @@ export const FRAME_CATALOG: readonly FrameCatalogItem[] = [
     tier: 'premium',
     minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
   },
+  {
+    id: 'emerald',
+    name: 'Zümrüt',
+    cost: 150,
+    description: 'Zarif zümrüt ışıltılı görsel çerçeve',
+    order: 13,
+    kind: 'visual',
+    tier: 'medium',
+    minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
+  },
+  {
+    id: 'sakura',
+    name: 'Kiraz Çiçeği',
+    cost: 700,
+    description: 'Bahar esintili zarif sakura çerçevesi',
+    order: 14,
+    kind: 'visual',
+    tier: 'premium',
+    minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
+  },
 ];
 
 export function isValidFrameId(id: string): boolean {
@@ -85,3 +117,23 @@ export function getMinClientBuildForFrame(
   return item.minClientBuild ?? 0;
 }
 
+export function getRetiredFromBuildForFrame(
+  item: FrameCatalogItem,
+  env?: { RETIRED_FRAMES_BUILD?: string }
+): number | undefined {
+  if (item.retiredFromBuild !== undefined && env?.RETIRED_FRAMES_BUILD) {
+    const parsed = parseInt(env.RETIRED_FRAMES_BUILD, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return item.retiredFromBuild;
+}
+
+export function isFrameRetiredForBuild(
+  item: FrameCatalogItem,
+  clientBuild: number,
+  env?: { RETIRED_FRAMES_BUILD?: string }
+): boolean {
+  const retiredBuild = getRetiredFromBuildForFrame(item, env);
+  if (retiredBuild === undefined) return false;
+  return clientBuild >= retiredBuild;
+}

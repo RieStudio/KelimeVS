@@ -33,6 +33,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly EXTRA_TIME_COST?: string;
   readonly EXTRA_TIME_SECONDS?: string;
   readonly VISUAL_FRAMES_MIN_BUILD?: string;
+  readonly RETIRED_FRAMES_BUILD?: string;
 }
 
 export function parseClientBuild(request: Request): number {
@@ -95,9 +96,11 @@ export default {
         });
       }
 
+      const clientBuild = parseClientBuild(request);
+
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const profile = await profileStub.getProfile(uid);
+        const profile = await profileStub.getProfile(uid, clientBuild);
         const serverNowMs = Date.now();
         const energyState = await profileStub.getEnergyState(uid, serverNowMs);
         return new Response(
@@ -238,10 +241,18 @@ export default {
 
       const frameId = rawFrame.trim().toLowerCase();
 
+      const clientBuild = parseClientBuild(request);
+
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const res = await profileStub.equipFrame(frameId, uid);
+        const res = await profileStub.equipFrame(frameId, uid, clientBuild);
         if (!res.success) {
+          if (res.error === 'item_retired') {
+            return new Response(
+              JSON.stringify({ error: 'item_retired', message: 'Bu çerçeve emekliye ayrılmıştır ve kuşanılamaz' }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
           if (res.error === 'item_not_owned') {
             return new Response(
               JSON.stringify({ error: 'item_not_owned', message: 'Bu çerçeveye sahip değilsiniz' }),
@@ -363,6 +374,15 @@ export default {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
         const res = await profileStub.purchaseItem(body.itemId.trim(), uid, clientBuild);
         if (!res.success) {
+          if (res.error === 'item_retired') {
+            return new Response(
+              JSON.stringify({
+                error: 'item_retired',
+                message: 'Bu çerçeve emekliye ayrılmıştır ve artık satın alınamaz',
+              }),
+              { status: 400, headers: jsonHeaders }
+            );
+          }
           if (res.error === 'not_enough_coins') {
             return new Response(
               JSON.stringify({ error: 'not_enough_coins', message: 'Yetersiz jeton', coins: res.coins }),

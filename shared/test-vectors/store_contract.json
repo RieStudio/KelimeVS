@@ -21,76 +21,6 @@
             "kind": "procedural"
           },
           {
-            "id": "mint",
-            "name": "Nane",
-            "cost": 100,
-            "description": "Taze nane yeşili canlı çerçeve",
-            "order": 2,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "sunset",
-            "name": "Gün Batımı",
-            "cost": 150,
-            "description": "Sıcak gün batımı renkleri",
-            "order": 3,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "ocean",
-            "name": "Okyanus",
-            "cost": 150,
-            "description": "Derin mavi okyanus esintisi",
-            "order": 4,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "gold",
-            "name": "Altın",
-            "cost": 300,
-            "description": "Parıltılı şampiyon altını",
-            "order": 5,
-            "isOwned": true,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "neon",
-            "name": "Neon",
-            "cost": 300,
-            "description": "Göz alıcı elektrik neonu",
-            "order": 6,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "rainbow",
-            "name": "Gökkuşağı",
-            "cost": 500,
-            "description": "Büyüleyici renk tayfı",
-            "order": 7,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
-            "id": "diamond",
-            "name": "Elmas",
-            "cost": 800,
-            "description": "Eşsiz kristal elmas ışıltısı",
-            "order": 8,
-            "isOwned": false,
-            "isEquipped": false,
-            "kind": "procedural"
-          },
-          {
             "id": "bronze_engraved",
             "name": "Bronz Oyma",
             "cost": 250,
@@ -129,6 +59,28 @@
             "cost": 900,
             "description": "Doğal sarmaşık işlemeli prestijli çerçeve",
             "order": 12,
+            "isOwned": false,
+            "isEquipped": false,
+            "kind": "visual",
+            "tier": "premium"
+          },
+          {
+            "id": "emerald",
+            "name": "Zümrüt",
+            "cost": 150,
+            "description": "Zarif zümrüt ışıltılı görsel çerçeve",
+            "order": 13,
+            "isOwned": false,
+            "isEquipped": false,
+            "kind": "visual",
+            "tier": "medium"
+          },
+          {
+            "id": "sakura",
+            "name": "Kiraz Çiçeği",
+            "cost": 700,
+            "description": "Bahar esintili zarif sakura çerçevesi",
+            "order": 14,
             "isOwned": false,
             "isEquipped": false,
             "kind": "visual",
@@ -180,6 +132,13 @@
         "error": "unsupported_client_version",
         "message": "Bu çerçeveyi satın almak için uygulamanızı güncelleyin"
       }
+    },
+    "response_400_item_retired": {
+      "status": 400,
+      "body": {
+        "error": "item_retired",
+        "message": "Bu çerçeve emekliye ayrılmıştır ve artık satın alınamaz"
+      }
     }
   },
   "equip_frame": {
@@ -212,6 +171,13 @@
         "error": "invalid_frame",
         "message": "Geçersiz çerçeve kimliği"
       }
+    },
+    "response_400_item_retired": {
+      "status": 400,
+      "body": {
+        "error": "item_retired",
+        "message": "Bu çerçeve emekliye ayrılmıştır ve kuşanılamaz"
+      }
     }
   },
   "common_errors": {
@@ -237,4 +203,3 @@
     }
   }
 }
-

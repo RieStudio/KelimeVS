@@ -195,6 +195,24 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
   - Pay-to-win'den kaçınılır; ücretli içerik kozmetik ağırlıklı olur.
 - Tüm sayısal değerler kodda sabitlenmez. İstemciyi ilgilendirenler (fiyat gösterimi vb.) Remote Config'te, sunucuyu ilgilendirenler (ödül miktarı, günlük sınır) Worker ortam değişkenlerinde tutulur.
 
+### 8.1 Kozmetik Kataloğu ve Avatar Çerçeveleri
+
+- **Katalog ve Fiyatlandırma:** Çerçeve fiyatları ve katalog tanımları sunucuda (`server/src/frames.ts`) tutulur.
+  - **Kalıcı Temel Çerçeve:** `classic` (Klasik, 0 jeton, ücretsiz ve varsayılan).
+  - **Görsel (PNG) Çerçeveler (`minClientBuild: 11`):**
+    - `emerald` (Zümrüt, 150 jeton, tier: medium)
+    - `bronze_engraved` (Bronz Oyma, 250 jeton, tier: basic)
+    - `silver_engraved` (Gümüş Oyma, 400 jeton, tier: basic)
+    - `gold_leaf` (Altın Yaprak, 600 jeton, tier: medium)
+    - `sakura` (Kiraz Çiçeği, 700 jeton, tier: premium)
+    - `vine` (Sarmaşık, 900 jeton, tier: premium)
+  - **Emekliye Ayrılan Prosedürel Çerçeveler (`retiredFromBuild: 11`):**
+    - `mint` (Nane, 100), `sunset` (Gün Batımı, 150), `ocean` (Okyanus, 150), `gold` (Altın, 300), `neon` (Neon, 300), `rainbow` (Gökkuşağı, 500), `diamond` (Elmas, 800).
+- **Emeklilik ve İadeli Geçiş Kuralı:**
+  - Build < 11 istemciler için eski prosedürel çerçeveler geçerliliğini korur (mağazada listelenir, satın alınabilir ve kuşanılabilir).
+  - Build >= 11 istemciler sunucuya bağlandığında (`GET /me` veya `GET /store` çağrıldığında) sahip oldukları emekli çerçeveler envanterden kaldırılır ve ödedikleri tüm jetonlar bakiyelerine iade edilir. Kuşanılmış emekli çerçeve `'classic'`e çekilir.
+  - İadeli geçiş işlemi tek seferlik ve idempotenttir; `daily_coins` (günlük maç kazanç üst sınırı) sayacını etkilemez.
+
 ## 9. Güvenlik ilkeleri
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.

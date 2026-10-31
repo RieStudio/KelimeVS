@@ -475,14 +475,31 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 
 ### Profil ve Hesap
 - `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `createdAt`, `equippedFrame`, `energy`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+  - **İadeli Çerçeve Geçişi (`frameMigration`):** `clientBuild >= 11` istemciden gelen istekte kullanıcının sahip olduğu emekli çerçeveler varsa otomatik olarak envanterden silinir, bedelleri bakiye (`coins`) alanına eklenir ve kuşanılmışsa çerçeve `'classic'`e çekilir. Bu geçiş ilk kez yapıldığında yanıtta opsiyonel `frameMigration` nesnesi döner:
+    ```json
+    {
+      "frameMigration": {
+        "refundedCoins": 400,
+        "removedFrames": ["mint", "neon"]
+      }
+    }
+    ```
+    Geçiş daha önce yapılmışsa veya emekli çerçeve yoksa bu alan yanıtta yer almaz. İade jetonları `daily_coins` sayacını etkilemez (günlük maç kazanç tavanına dahil edilmez).
 - `PUT /me/nickname`: Takma ad günceller (`{ "nickname": "..." }`).
 - `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
-- `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller.
+- `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`).
+  - Sahip olunmayan çerçeve için `400 item_not_owned` döner.
+  - `clientBuild >= 11` istemcilerde emekli bir çerçeve kuşanılmaya çalışılırsa `400 item_retired` döner (`{ "error": "item_retired", "message": "Bu çerçeve emekliye ayrılmıştır ve artık kuşanılamaz" }`).
+  - Başarılı kuşanmada liderlik tablosundaki çerçeveyi de günceller.
 
 ### Mağaza (Store) ve İstemci Sürüm Filtreleme (`X-App-Build`)
 - **`X-App-Build` Başlığı:** HTTP isteklerinde gönderilen tamsayı istemci derleme numarasıdır (örn. `X-App-Build: 11`). Başlık eksikse veya sayısal değilse sunucu bunu `0` kabul eder.
-- **Katalog ve Sürüm Filtresi:** Çerçevelerin `minClientBuild` değeri vardır (prosedürel çerçevelerde `0`, yeni görsel PNG çerçevelerde varsayılan `11`). `minClientBuild > clientBuild` olan çerçeveler eski istemcilere filtrelenerek gönderilmez.
-- `GET /store`: Mağaza durumu ve katalog ürünlerini döndürür:
+- **Katalog ve Sürüm Filtresi:** Çerçevelerin `minClientBuild` ve `retiredFromBuild` değerleri vardır:
+  - Prosedürel çerçeveler: `classic` hariç 7 tanesi (`mint`, `sunset`, `ocean`, `gold`, `neon`, `rainbow`, `diamond`) `retiredFromBuild: 11` olarak işaretlenmiştir. `classic` (ücretsiz) kalıcıdır.
+  - Yeni görsel PNG çerçeveler: `bronze_engraved` (250), `silver_engraved` (400), `gold_leaf` (600), `vine` (900), `emerald` (150), `sakura` (700) için `minClientBuild: 11`.
+  - `clientBuild < 11`: Eski 8 prosedürel çerçeve listelenir, satın alınabilir ve kuşanılabilir.
+  - `clientBuild >= 11`: Emekli çerçeveler `GET /store` listesinden gizlenir; sadece `classic` ve 6 görsel çerçeve (toplam 7) listelenir.
+- `GET /store`: Mağaza durumu ve katalog ürünlerini döndürür. İstemci `clientBuild >= 11` ise arka planda iadeli geçişi de tetikler:
   ```json
   {
     "coins": 100,
@@ -500,24 +517,36 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
       },
       ...
       {
-        "id": "gold_leaf",
-        "name": "Altın Yaprak",
-        "cost": 600,
-        "description": "Görkemli altın yaprak süslemeli çerçeve",
-        "order": 11,
+        "id": "emerald",
+        "name": "Zümrüt",
+        "cost": 150,
+        "description": "Zarif zümrüt taşlarıyla işlenmiş çerçeve",
+        "order": 12,
         "isOwned": false,
         "isEquipped": false,
         "kind": "visual",
         "tier": "medium"
+      },
+      {
+        "id": "sakura",
+        "name": "Kiraz Çiçeği",
+        "cost": 700,
+        "description": "Bahar esintili zarif kiraz çiçeği çerçevesi",
+        "order": 13,
+        "isOwned": false,
+        "isEquipped": false,
+        "kind": "visual",
+        "tier": "premium"
       }
     ]
   }
   ```
-- `POST /store/purchase`: Jetonla avatar çerçevesi satın alır (`{ "itemId": "mint" }`).
-  - Başarılı: `200 OK` (`{ "success": true, "itemId": "mint", "coins": 0 }`).
+- `POST /store/purchase`: Jetonla avatar çerçevesi satın alır (`{ "itemId": "sakura" }`).
+  - Başarılı: `200 OK` (`{ "success": true, "itemId": "sakura", "coins": ... }`).
   - Yetersiz bakiye: `402 Payment Required` (`{ "error": "not_enough_coins", "coins": ... }`).
   - Zaten sahip olunan ürün: `400 Bad Request` (`{ "error": "already_owned" }`).
   - Yetersiz istemci sürümü (`minClientBuild > clientBuild`): `400 Bad Request` (`{ "error": "unsupported_client_version", "message": "Bu çerçeveyi satın almak için uygulamanızı güncelleyin" }`).
+  - Emekli ürün (`clientBuild >= retiredFromBuild`): `400 Bad Request` (`{ "error": "item_retired", "message": "Bu çerçeve emekliye ayrılmıştır ve artık satın alınamaz" }`). Bakiye düşmez.
   - Geçersiz ürün: `400 Bad Request` (`{ "error": "invalid_item" }`).
 - `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`). Sahip olunmayan çerçeve için `400 item_not_owned` döner. Liderlik tablosundaki çerçeveyi de günceller. Sahiplik varsa sürüm kontrolü uygulanmaz.
 - **Eski İstemci Uyumluluğu:** Liderlik tablosu (`GET /leaderboard`) ve maç mesajlarında (`opponentFrame` vb.) hiçbir filtreleme yapılmaz; yeni çerçeve kimlikleri doğrudan iletilir. Eski istemciler bilinmeyen kimliklerle karşılaştığında çökmeden `'classic'` (Klasik) çerçeveye güvenli bir şekilde geri düşer.

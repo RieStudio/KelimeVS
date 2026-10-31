@@ -5,6 +5,9 @@ import {
   getFrameCatalogItem,
   getMinClientBuildForFrame,
   isValidFrameId,
+  RETIRED_FRAME_IDS,
+  isFrameRetiredForBuild,
+  DEFAULT_RETIRED_FRAMES_BUILD,
   type FrameKind,
   type FrameTier,
 } from './frames';
@@ -35,6 +38,11 @@ export interface UserStats {
   readonly correctAnswers: number;
 }
 
+export interface FrameMigrationResult {
+  readonly refundedCoins: number;
+  readonly removedFrames: readonly string[];
+}
+
 export interface UserProfileData {
   readonly uid: string;
   readonly nickname: string | null;
@@ -42,6 +50,7 @@ export interface UserProfileData {
   readonly stats: UserStats;
   readonly createdAt: number;
   readonly equippedFrame: string;
+  readonly frameMigration?: FrameMigrationResult;
 }
 
 export interface MatchRewardResult {
@@ -92,13 +101,14 @@ export type PurchaseItemResult =
         | 'not_enough_coins'
         | 'already_owned'
         | 'invalid_item'
-        | 'unsupported_client_version';
+        | 'unsupported_client_version'
+        | 'item_retired';
       readonly coins?: number;
     };
 
 export type EquipFrameResult =
   | { readonly success: true; readonly equippedFrame: string }
-  | { readonly success: false; readonly error: 'item_not_owned' | 'invalid_frame' };
+  | { readonly success: false; readonly error: 'item_not_owned' | 'invalid_frame' | 'item_retired' };
 
 export interface SpendEnergyResult {
   readonly success: boolean;
@@ -365,13 +375,157 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   /**
+   * Emekli çerçevelerin iadeli geçişi (build >= 11 için).
+   * Kullanıcı bu emekli çerçevelerden birine sahipse veya kuşanmışsa:
+   * 1. owned_items tablosundan silinir.
+   * 2. Orijinal maliyetleri jeton olarak bakiye eklenir (günlük kazanç tavanını etkilemez).
+   * 3. Kuşanılan çerçeve emeklilerden biriyse 'classic' yapılır ve Leaderboard güncellenir.
+   * 4. Idempotent: İkinci çağrıda silinecek kayıt olmayacağı için iade yapılmaz.
+   */
+  async migrateRetiredFrames(
+    uid?: string,
+    clientBuild = 0
+  ): Promise<FrameMigrationResult | null> {
+    const minRetiredBuild = parseInt(
+      this.env.RETIRED_FRAMES_BUILD ?? String(DEFAULT_RETIRED_FRAMES_BUILD),
+      10
+    );
+    const effectiveThreshold =
+      Number.isFinite(minRetiredBuild) && minRetiredBuild >= 0
+        ? minRetiredBuild
+        : DEFAULT_RETIRED_FRAMES_BUILD;
+
+    if (clientBuild < effectiveThreshold) {
+      return null;
+    }
+
+    const retiredIds = RETIRED_FRAME_IDS;
+    const placeholders = retiredIds.map(() => '?').join(',');
+
+    // Ucuz kontrol: kullanıcının owned_items tablosunda emekli çerçeve var mı?
+    const ownedRetired = this.ctx.storage.sql
+      .exec<{ item_id: string }>(
+        `SELECT item_id FROM owned_items WHERE item_id IN (${placeholders})`,
+        ...retiredIds
+      )
+      .toArray();
+
+    // Kuşanılan çerçeve emekli mi?
+    const profileRows = this.ctx.storage.sql
+      .exec<{ equipped_frame: string | null }>(
+        'SELECT equipped_frame FROM profiles LIMIT 1'
+      )
+      .toArray();
+    const currentEquipped = profileRows.length > 0 ? profileRows[0].equipped_frame : null;
+    const isEquippedRetired = currentEquipped ? retiredIds.includes(currentEquipped) : false;
+
+    // Emekli çerçeveye sahip değilse ve kuşanmamışsa hiçbir işlem yapma
+    if (ownedRetired.length === 0 && !isEquippedRetired) {
+      return null;
+    }
+
+    // Atomik geçiş işlemi
+    const migrationResult = this.ctx.storage.transactionSync(() => {
+      // 1. Transaction içinde güncel listeyi al
+      const itemsToRefund = this.ctx.storage.sql
+        .exec<{ item_id: string }>(
+          `SELECT item_id FROM owned_items WHERE item_id IN (${placeholders})`,
+          ...retiredIds
+        )
+        .toArray();
+
+      let totalRefund = 0;
+      const removedFrames: string[] = [];
+
+      for (const row of itemsToRefund) {
+        const itemDef = getFrameCatalogItem(row.item_id);
+        const cost = itemDef?.cost ?? 0;
+        totalRefund += cost;
+        removedFrames.push(row.item_id);
+      }
+
+      // 2. owned_items tablosundan emeklileri sil
+      if (itemsToRefund.length > 0) {
+        this.ctx.storage.sql.exec(
+          `DELETE FROM owned_items WHERE item_id IN (${placeholders})`,
+          ...retiredIds
+        );
+      }
+
+      // 3. Jetonları ekle (günlük kazanç tavanını etkilemez, direkt profiles.coins artar)
+      if (totalRefund > 0) {
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET coins = coins + ?',
+          totalRefund
+        );
+      }
+
+      // 4. Kuşanılan çerçeve kontrolü
+      const pRows = this.ctx.storage.sql
+        .exec<{ equipped_frame: string | null }>(
+          'SELECT equipped_frame FROM profiles LIMIT 1'
+        )
+        .toArray();
+      const equipped = pRows.length > 0 ? pRows[0].equipped_frame : null;
+      let resetEquipped = false;
+      if (equipped && retiredIds.includes(equipped)) {
+        this.ctx.storage.sql.exec(
+          "UPDATE profiles SET equipped_frame = 'classic'"
+        );
+        resetEquipped = true;
+      }
+
+      return {
+        totalRefund,
+        removedFrames,
+        resetEquipped,
+      };
+    });
+
+    // 5. Kuşanılan çerçeve 'classic' olduysa haftalık sıralamayı (Leaderboard) güncelle
+    if (migrationResult.resetEquipped && this.env.LEADERBOARD) {
+      const effectiveUid =
+        uid && uid.trim().length > 0
+          ? uid.trim()
+          : (this.ctx.storage.sql
+              .exec<{ uid: string }>('SELECT uid FROM profiles LIMIT 1')
+              .toArray()[0]?.uid ?? 'unknown');
+      try {
+        const leaderboardStub = this.env.LEADERBOARD.get(
+          this.env.LEADERBOARD.idFromName('global')
+        );
+        await leaderboardStub.updateFrame(effectiveUid, 'classic');
+      } catch (lbErr) {
+        console.error('Leaderboard updateFrame during frame migration failed:', lbErr);
+      }
+    }
+
+    if (migrationResult.removedFrames.length > 0 || migrationResult.resetEquipped) {
+      return {
+        refundedCoins: migrationResult.totalRefund,
+        removedFrames: migrationResult.removedFrames,
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Kullanıcının profilini döndürür; mevcut değilse varsayılan başlangıç bakiyesiyle oluşturur.
    */
-  async getProfile(uid?: string): Promise<UserProfileData> {
+  async getProfile(uid?: string, clientBuild = 0): Promise<UserProfileData> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
       throw new Error('account_deleted');
+    }
+
+    let frameMigration: FrameMigrationResult | undefined;
+    if (clientBuild > 0) {
+      const res = await this.migrateRetiredFrames(uid, clientBuild);
+      if (res) {
+        frameMigration = res;
+      }
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
@@ -393,6 +547,7 @@ export class UserProfile extends DurableObject<Env> {
         },
         createdAt: row.created_at,
         equippedFrame: (row.equipped_frame as string) || 'classic',
+        ...(frameMigration ? { frameMigration } : {}),
       };
     }
 
@@ -841,7 +996,7 @@ export class UserProfile extends DurableObject<Env> {
       throw new Error('account_deleted');
     }
 
-    const profile = await this.getProfile(uid);
+    const profile = await this.getProfile(uid, clientBuild);
 
     const ownedRows = this.ctx.storage.sql
       .exec<{ item_id: string }>('SELECT item_id FROM owned_items')
@@ -851,7 +1006,9 @@ export class UserProfile extends DurableObject<Env> {
 
     const visibleCatalog = FRAME_CATALOG.filter((item) => {
       const minBuild = getMinClientBuildForFrame(item, this.env as any);
-      return minBuild <= clientBuild;
+      if (minBuild > clientBuild) return false;
+      if (isFrameRetiredForBuild(item, clientBuild, this.env as any)) return false;
+      return true;
     });
 
     const items: StoreCatalogItem[] = visibleCatalog.map((item) => ({
@@ -897,6 +1054,10 @@ export class UserProfile extends DurableObject<Env> {
     const catalogItem = getFrameCatalogItem(itemId);
     if (!catalogItem) {
       return { success: false, error: 'invalid_item' };
+    }
+
+    if (isFrameRetiredForBuild(catalogItem, clientBuild, this.env as any)) {
+      return { success: false, error: 'item_retired' };
     }
 
     const minBuild = getMinClientBuildForFrame(catalogItem, this.env as any);
@@ -966,7 +1127,11 @@ export class UserProfile extends DurableObject<Env> {
    * Oyuncunun avatar çerçevesini kuşandırır.
    * Klasik çerçeve her zaman kuşanılabilir; diğerleri için owned_items sahiplik doğrulaması yapılır.
    */
-  async equipFrame(frameId: string, uid?: string): Promise<EquipFrameResult> {
+  async equipFrame(
+    frameId: string,
+    uid?: string,
+    clientBuild = 0
+  ): Promise<EquipFrameResult> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
@@ -977,6 +1142,11 @@ export class UserProfile extends DurableObject<Env> {
 
     if (!isValidFrameId(normalizedFrameId)) {
       return { success: false, error: 'invalid_frame' };
+    }
+
+    const catalogItem = getFrameCatalogItem(normalizedFrameId);
+    if (catalogItem && isFrameRetiredForBuild(catalogItem, clientBuild, this.env as any)) {
+      return { success: false, error: 'item_retired' };
     }
 
     if (normalizedFrameId !== 'classic') {
@@ -991,7 +1161,7 @@ export class UserProfile extends DurableObject<Env> {
       }
     }
 
-    await this.getProfile(uid);
+    await this.getProfile(uid, clientBuild);
 
     this.ctx.storage.sql.exec(
       'UPDATE profiles SET equipped_frame = ?',

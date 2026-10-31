@@ -1,0 +1,12 @@
+[
+  {
+    "id": "emerald",
+    "file": "frame_emerald.png",
+    "innerRatio": 0.809
+  },
+  {
+    "id": "sakura",
+    "file": "frame_sakura.png",
+    "innerRatio": 0.693
+  }
+]

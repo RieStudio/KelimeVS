@@ -48,6 +48,19 @@ function createMockCtx() {
   return {
     storage: {
       sql,
+      transactionSync<T>(closure: () => T): T {
+        db.exec('BEGIN TRANSACTION');
+        try {
+          const res = closure();
+          db.exec('COMMIT');
+          return res;
+        } catch (err) {
+          try {
+            db.exec('ROLLBACK');
+          } catch {}
+          throw err;
+        }
+      },
       async setAlarm(t: number) {
         alarmTime = t;
       },

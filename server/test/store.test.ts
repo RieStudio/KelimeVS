@@ -106,9 +106,9 @@ describe('Store & Avatar Frames - Server Tests', () => {
     // Varsayılan çağrıda (clientBuild = 0) sadece 8 prosedürel çerçeve döner
     expect(storeState.items.length).toBe(8);
 
-    // clientBuild >= 11 verildiğinde 12 çerçevenin tamamı döner
+    // clientBuild >= 11 verildiğinde 7 aktif çerçeve döner (classic + 6 görsel, 7 emekli hariç)
     const fullStoreState = await profile.getStoreState('user_1', 11);
-    expect(fullStoreState.items.length).toBe(FRAME_CATALOG.length);
+    expect(fullStoreState.items.length).toBe(7);
 
     const classic = storeState.items.find((i) => i.id === 'classic');
     expect(classic).toBeDefined();
@@ -568,7 +568,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
       }
     });
 
-    it('B. GET /store: X-App-Build >= 11 olduğunda 12 çerçevenin tamamı ek alanlarıyla döner', async () => {
+    it('B. GET /store: X-App-Build >= 11 olduğunda classic + 6 görsel çerçeve döner (emekliler gizlenir)', async () => {
       const { env } = setupServer();
 
       for (const build of ['11', '12', '100']) {
@@ -583,7 +583,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
         const res = await worker.fetch(req, env);
         expect(res.status).toBe(200);
         const data = (await res.json()) as any;
-        expect(data.items.length).toBe(12);
+        expect(data.items.length).toBe(7);
 
         // Yeni görsel çerçeveleri doğrula
         const vine = data.items.find((i: any) => i.id === 'vine');
@@ -617,6 +617,22 @@ describe('Store & Avatar Frames - Server Tests', () => {
         expect(bronze.kind).toBe('visual');
         expect(bronze.tier).toBe('basic');
         expect(bronze.order).toBe(9);
+
+        const emerald = data.items.find((i: any) => i.id === 'emerald');
+        expect(emerald).toBeDefined();
+        expect(emerald.name).toBe('Zümrüt');
+        expect(emerald.cost).toBe(150);
+        expect(emerald.kind).toBe('visual');
+        expect(emerald.tier).toBe('medium');
+        expect(emerald.order).toBe(13);
+
+        const sakura = data.items.find((i: any) => i.id === 'sakura');
+        expect(sakura).toBeDefined();
+        expect(sakura.name).toBe('Kiraz Çiçeği');
+        expect(sakura.cost).toBe(700);
+        expect(sakura.kind).toBe('visual');
+        expect(sakura.tier).toBe('premium');
+        expect(sakura.order).toBe(14);
       }
     });
 
@@ -750,10 +766,10 @@ describe('Store & Avatar Frames - Server Tests', () => {
       expect((await profile.getProfile(uid)).equippedFrame).toBe('mint');
     });
 
-    it('F. VISUAL_FRAMES_MIN_BUILD ortam değişkeni ile eşik değiştirilebilir', async () => {
-      const { env } = setupServer({ VISUAL_FRAMES_MIN_BUILD: '15' });
+    it('F. VISUAL_FRAMES_MIN_BUILD ve RETIRED_FRAMES_BUILD ortam değişkeni ile eşikler değiştirilebilir', async () => {
+      const { env } = setupServer({ VISUAL_FRAMES_MIN_BUILD: '15', RETIRED_FRAMES_BUILD: '15' });
 
-      // Build 11 ile sorguladığımızda (eşik 15 olduğu için) 8 çerçeve döner
+      // Build 11 ile sorguladığımızda (eşik 15 olduğu için) 8 prosedürel çerçeve döner
       const req11 = new Request('http://127.0.0.1/store', {
         method: 'GET',
         headers: {
@@ -765,7 +781,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
       const data11 = (await res11.json()) as any;
       expect(data11.items.length).toBe(8);
 
-      // Build 15 ile sorguladığımızda 12 çerçeve döner
+      // Build 15 ile sorguladığımızda 7 modern çerçeve döner (classic + 6 görsel, emekliler hariç)
       const req15 = new Request('http://127.0.0.1/store', {
         method: 'GET',
         headers: {
@@ -775,7 +791,329 @@ describe('Store & Avatar Frames - Server Tests', () => {
       });
       const res15 = await worker.fetch(req15, env);
       const data15 = (await res15.json()) as any;
-      expect(data15.items.length).toBe(12);
+      expect(data15.items.length).toBe(7);
+    });
+  });
+
+  describe('Emekli Çerçeveler ve İadeli Geçiş (Build >= 11) Testleri', () => {
+    function setupServerWithLeaderboard(overrides?: Partial<Env>) {
+      const ctx = createMockCtx();
+      const lbCtx = createMockCtx();
+      let profile: UserProfile;
+      const leaderboard = new Leaderboard(lbCtx, {} as any);
+      const env: Env = {
+        MATCHMAKER: {} as any,
+        MATCH_ROOM: {} as any,
+        USER_PROFILE: {
+          get: () => profile,
+          idFromName: () => ({}) as any,
+        } as any,
+        LEADERBOARD: {
+          get: () => leaderboard,
+          idFromName: () => ({}) as any,
+        } as any,
+        START_COINS: '500',
+        DAILY_MATCH_COIN_CAP: '300',
+        ALLOW_DEV_AUTH: 'true',
+        ...overrides,
+      };
+      profile = new UserProfile(ctx, env);
+      return { ctx, lbCtx, env, profile, leaderboard };
+    }
+
+    it('1. Mağaza listeleri: Build 0, 10 ve 11 için doğru katalog filtrelemesi yapılır', async () => {
+      const { env } = setupServerWithLeaderboard();
+
+      // Build 0: Eski 8 prosedürel çerçeve döner
+      const req0 = new Request('http://127.0.0.1/store', {
+        headers: { Authorization: 'Bearer dev:u_build_0' },
+      });
+      const res0 = await worker.fetch(req0, env);
+      const data0 = (await res0.json()) as any;
+      expect(data0.items.length).toBe(8);
+      expect(data0.items.map((i: any) => i.id)).toEqual([
+        'classic', 'mint', 'sunset', 'ocean', 'gold', 'neon', 'rainbow', 'diamond'
+      ]);
+
+      // Build 10: minClientBuild 11 olanlar gizli, emekliler henüz emekli değil -> 8 çerçeve döner
+      const req10 = new Request('http://127.0.0.1/store', {
+        headers: { Authorization: 'Bearer dev:u_build_10', 'X-App-Build': '10' },
+      });
+      const res10 = await worker.fetch(req10, env);
+      const data10 = (await res10.json()) as any;
+      expect(data10.items.length).toBe(8);
+
+      // Build 11: Emekliler filtrelenir; classic + 6 görsel çerçeve döner (toplam 7)
+      const req11 = new Request('http://127.0.0.1/store', {
+        headers: { Authorization: 'Bearer dev:u_build_11', 'X-App-Build': '11' },
+      });
+      const res11 = await worker.fetch(req11, env);
+      const data11 = (await res11.json()) as any;
+      expect(data11.items.length).toBe(7);
+      expect(data11.items.map((i: any) => i.id)).toEqual([
+        'classic',
+        'bronze_engraved',
+        'silver_engraved',
+        'gold_leaf',
+        'vine',
+        'emerald',
+        'sakura',
+      ]);
+    });
+
+    it('2. Emekli çerçeveler build >= 11 istemcide satın alınamaz ve kuşanılamaz (400 item_retired)', async () => {
+      const { env, profile } = setupServerWithLeaderboard();
+      const uid = 'u_ret_reject';
+      await profile.adminGrant({ uid, coins: 1000 });
+
+      // Build 11 ile emekli 'mint' satın alma denemesi
+      const reqBuy = new Request('http://127.0.0.1/store/purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+        body: JSON.stringify({ itemId: 'mint' }),
+      });
+      const resBuy = await worker.fetch(reqBuy, env);
+      expect(resBuy.status).toBe(400);
+      const dataBuy = (await resBuy.json()) as any;
+      expect(dataBuy.error).toBe('item_retired');
+      expect(dataBuy.message).toBe('Bu çerçeve emekliye ayrılmıştır ve artık satın alınamaz');
+
+      // Bakiye düşmemeli
+      const prof = await profile.getProfile(uid, 11);
+      expect(prof.coins).toBe(1500); // 500 başlangıç + 1000 adminGrant
+
+      // Build 11 ile kuşanma denemesi
+      const reqEquip = new Request('http://127.0.0.1/me/frame', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+        body: JSON.stringify({ frameId: 'mint' }),
+      });
+      const resEquip = await worker.fetch(reqEquip, env);
+      expect(resEquip.status).toBe(400);
+      const dataEquip = (await resEquip.json()) as any;
+      expect(dataEquip.error).toBe('item_retired');
+      expect(dataEquip.message).toBe('Bu çerçeve emekliye ayrılmıştır ve kuşanılamaz');
+    });
+
+    it('3. Emekli çerçeveler build < 11 istemcide satın alınabilir ve kuşanılabilir', async () => {
+      const { env, profile } = setupServerWithLeaderboard();
+      const uid = 'u_ret_legacy';
+      await profile.adminGrant({ uid, coins: 500 }); // 500 + 500 = 1000
+
+      // Build 10 ile mint (100) satın al
+      const reqBuy = new Request('http://127.0.0.1/store/purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '10',
+        },
+        body: JSON.stringify({ itemId: 'mint' }),
+      });
+      const resBuy = await worker.fetch(reqBuy, env);
+      expect(resBuy.status).toBe(200);
+      const dataBuy = (await resBuy.json()) as any;
+      expect(dataBuy.success).toBe(true);
+      expect(dataBuy.itemId).toBe('mint');
+      expect(dataBuy.coins).toBe(900); // 1000 - 100 = 900
+
+      // Build 10 ile kuşan
+      const reqEquip = new Request('http://127.0.0.1/me/frame', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '10',
+        },
+        body: JSON.stringify({ frameId: 'mint' }),
+      });
+      const resEquip = await worker.fetch(reqEquip, env);
+      expect(resEquip.status).toBe(200);
+      const dataEquip = (await resEquip.json()) as any;
+      expect(dataEquip.success).toBe(true);
+      expect(dataEquip.equippedFrame).toBe('mint');
+    });
+
+    it('4. İadeli Geçiş: [mint, neon sahip, neon kuşanılmış, bakiye X] -> bakiye X+400, owned_items temiz, equipped classic, haftalık sıralama classic, frameMigration döner', async () => {
+      const { env, profile, leaderboard, ctx } = setupServerWithLeaderboard();
+      const uid = 'u_migration_test';
+      const updateFrameSpy = vi.spyOn(leaderboard, 'updateFrame');
+
+      // Başlangıç: 500 jeton, mint ve neon çerçeveleri verelim
+      await profile.adminGrant({ uid, coins: 0, frameIds: ['mint', 'neon'] });
+      // neon'u kuşandıralım (build < 11 ile)
+      await profile.equipFrame('neon', uid, 10);
+
+      // Doğrulama: geçiş öncesi durum
+      const beforeProf = await profile.getProfile(uid, 0);
+      expect(beforeProf.coins).toBe(500);
+      expect(beforeProf.equippedFrame).toBe('neon');
+
+      // ADIM 1: Build 11 ile GET /me isteği gönderilir
+      const reqMe = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resMe = await worker.fetch(reqMe, env);
+      expect(resMe.status).toBe(200);
+      const dataMe = (await resMe.json()) as any;
+
+      // İade: mint (100) + neon (300) = 400 jeton iade edilir -> 500 + 400 = 900
+      expect(dataMe.coins).toBe(900);
+      expect(dataMe.equippedFrame).toBe('classic');
+
+      // frameMigration alanı eklenmiş olmalı
+      expect(dataMe.frameMigration).toBeDefined();
+      expect(dataMe.frameMigration.refundedCoins).toBe(400);
+      expect(dataMe.frameMigration.removedFrames).toEqual(['mint', 'neon']);
+
+      // owned_items'ta mint ve neon kalmamalı
+      const ownedRows = ctx.storage.sql
+        .exec<{ item_id: string }>('SELECT item_id FROM owned_items')
+        .toArray();
+      expect(ownedRows.map((r) => r.item_id)).toEqual([]);
+
+      // Leaderboard güncellenmiş olmalı
+      expect(updateFrameSpy).toHaveBeenCalledWith(uid, 'classic');
+
+      // ADIM 2: İkinci istek (idempotent kontrolü): Tekrar iade yapılmaz, frameMigration dönmez
+      const reqMe2 = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resMe2 = await worker.fetch(reqMe2, env);
+      expect(resMe2.status).toBe(200);
+      const dataMe2 = (await resMe2.json()) as any;
+      expect(dataMe2.coins).toBe(900); // 900 sabit, tekrar eklenmedi
+      expect(dataMe2.frameMigration).toBeUndefined(); // Sadece ilk geçiş anında döner
+    });
+
+    it('5. Build < 11 isteklerinde geçiş çalışmaz', async () => {
+      const { env, profile, ctx } = setupServerWithLeaderboard();
+      const uid = 'u_no_migration_old';
+      await profile.adminGrant({ uid, coins: 0, frameIds: ['mint', 'gold'] });
+      await profile.equipFrame('mint', uid, 10);
+
+      // Build 10 ile GET /me
+      const reqMe = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '10',
+        },
+      });
+      const resMe = await worker.fetch(reqMe, env);
+      const dataMe = (await resMe.json()) as any;
+
+      expect(dataMe.coins).toBe(500); // İade yok
+      expect(dataMe.equippedFrame).toBe('mint');
+      expect(dataMe.frameMigration).toBeUndefined();
+
+      // owned_items korunmalı
+      const ownedRows = ctx.storage.sql
+        .exec<{ item_id: string }>('SELECT item_id FROM owned_items')
+        .toArray();
+      expect(ownedRows.map((r) => r.item_id).sort()).toEqual(['gold', 'mint']);
+    });
+
+    it('6. İadeli geçiş günlük kazanç tavanını (DAILY_MATCH_COIN_CAP) etkilemez', async () => {
+      const { env, profile, ctx } = setupServerWithLeaderboard();
+      const uid = 'u_cap_test';
+      await profile.adminGrant({ uid, coins: 0, frameIds: ['diamond'] }); // 800 jetonluk elmas
+
+      // Build 11 ile geçiş tetiklensin: 800 jeton iade edilir
+      const reqMe = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resMe = await worker.fetch(reqMe, env);
+      const dataMe = (await resMe.json()) as any;
+      expect(dataMe.coins).toBe(1300); // 500 + 800
+
+      // daily_coins tablosunu kontrol et: geçiş yüzünden hiçbir günlük kazanç yazılmamış olmalı
+      const dailyRows = ctx.storage.sql
+        .exec<{ day_key: string; earned: number }>('SELECT day_key, earned FROM daily_coins')
+        .toArray();
+      expect(dailyRows.length).toBe(0);
+
+      // Kullanıcı ranked maç kazansın (+30 jeton)
+      const matchReward = await profile.applyMatchReward({
+        matchId: 'm_after_migration',
+        outcome: 'win',
+        opponentUid: 'opp_1',
+        uid,
+      });
+      expect(matchReward.coinsAwarded).toBe(30);
+
+      // daily_coins tablosunda sadece maç kazancı (30) görünmeli
+      const dailyRowsAfter = ctx.storage.sql
+        .exec<{ day_key: string; earned: number }>('SELECT day_key, earned FROM daily_coins')
+        .toArray();
+      expect(dailyRowsAfter.length).toBe(1);
+      expect(dailyRowsAfter[0].earned).toBe(30);
+    });
+
+    it('7. Emekli çerçeveye sahip olmayan kullanıcıda geçiş çalışmaz, frameMigration dönmez', async () => {
+      const { env } = setupServerWithLeaderboard();
+      const uid = 'u_clean_user';
+
+      const reqMe = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resMe = await worker.fetch(reqMe, env);
+      const dataMe = (await resMe.json()) as any;
+
+      expect(dataMe.coins).toBe(500);
+      expect(dataMe.equippedFrame).toBe('classic');
+      expect(dataMe.frameMigration).toBeUndefined();
+    });
+
+    it('8. Hesap silme akışı (DELETE /me) emekli çerçevelerle de bozulmadan çalışır', async () => {
+      const { env, profile } = setupServerWithLeaderboard();
+      const uid = 'u_delete_test';
+      await profile.adminGrant({ uid, frameIds: ['mint'] });
+
+      const reqDelete = new Request('http://127.0.0.1/me', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resDelete = await worker.fetch(reqDelete, env);
+      expect(resDelete.status).toBe(200);
+
+      // Sonraki istekler 410 account_deleted dönmeli
+      const reqMe = new Request('http://127.0.0.1/me', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer dev:${uid}`,
+          'X-App-Build': '11',
+        },
+      });
+      const resMe = await worker.fetch(reqMe, env);
+      expect(resMe.status).toBe(410);
     });
   });
 });

@@ -294,6 +294,22 @@ describe('Store HTTP API Contract Tests against shared/test-vectors/store_contra
     const bodyUnsupported = (await resUnsupported.json()) as any;
     expect(bodyUnsupported.error).toBe(contract.purchase_item.response_400_unsupported_client_version.body.error);
     expect(bodyUnsupported.message).toBe(contract.purchase_item.response_400_unsupported_client_version.body.message);
+
+    // F. 400 Emekli Çerçeve Satın Alma (item_retired - build >= 11)
+    const reqRetired = new Request('http://127.0.0.1/store/purchase', {
+      method: contract.purchase_item.method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer dev:${uid}`,
+        'X-App-Build': '11',
+      },
+      body: JSON.stringify({ itemId: 'mint' }),
+    });
+    const resRetired = await worker.fetch(reqRetired, env);
+    expect(resRetired.status).toBe(contract.purchase_item.response_400_item_retired.status);
+    const bodyRetired = (await resRetired.json()) as any;
+    expect(bodyRetired.error).toBe(contract.purchase_item.response_400_item_retired.body.error);
+    expect(bodyRetired.message).toBe(contract.purchase_item.response_400_item_retired.body.message);
   });
 
   it('3. PUT /me/frame sözleşme vektörü istek ve yanıtlarını tam karşılamalıdır (200, 400)', async () => {
@@ -364,6 +380,22 @@ describe('Store HTTP API Contract Tests against shared/test-vectors/store_contra
     const bodyClientPayload = (await resClientPayload.json()) as any;
     expect(bodyClientPayload.success).toBe(true);
     expect(bodyClientPayload.equippedFrame).toBe('mint');
+
+    // E. 400 Emekli Çerçeve Kuşanma (item_retired - build >= 11)
+    const reqEquipRetired = new Request('http://127.0.0.1/me/frame', {
+      method: contract.equip_frame.method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer dev:${uid}`,
+        'X-App-Build': '11',
+      },
+      body: JSON.stringify({ frameId: 'mint' }),
+    });
+    const resEquipRetired = await worker.fetch(reqEquipRetired, env);
+    expect(resEquipRetired.status).toBe(contract.equip_frame.response_400_item_retired.status);
+    const bodyEquipRetired = (await resEquipRetired.json()) as any;
+    expect(bodyEquipRetired.error).toBe(contract.equip_frame.response_400_item_retired.body.error);
+    expect(bodyEquipRetired.message).toBe(contract.equip_frame.response_400_item_retired.body.message);
   });
 
   it('4. Genel hata yanıtları sözleşme formatına uymalıdır (401, 410)', async () => {
