@@ -333,6 +333,23 @@ class _CountdownPillState extends State<_CountdownPill> {
   }
 }
 
+/// Sıralama ekranı kartları (satırlar, yapışkan çubuk ve durum kartları) için ortak kart dekorasyonu.
+BoxDecoration _buildCardDecoration({
+  Color color = AppColors.card,
+  Color borderColor = AppColors.ink,
+  bool isThickBorder = false,
+}) {
+  return BoxDecoration(
+    color: color,
+    borderRadius: AppDimens.borderRadiusListCard,
+    border: Border.all(
+      color: borderColor,
+      width: isThickBorder ? AppDimens.borderThick : AppDimens.borderThin,
+    ),
+    boxShadow: AppDimens.shadowQuestionCard,
+  );
+}
+
 /// Liderlik tablosundaki her bir oyuncu kartı
 class _LeaderboardItemCard extends StatelessWidget {
   final LeaderboardEntry entry;
@@ -351,14 +368,9 @@ class _LeaderboardItemCard extends StatelessWidget {
         horizontal: AppDimens.space12,
         vertical: AppDimens.space12,
       ),
-      decoration: BoxDecoration(
+      decoration: _buildCardDecoration(
         color: isMe ? AppColors.selfHighlight : AppColors.card,
-        borderRadius: AppDimens.borderRadiusListCard,
-        border: Border.all(
-          color: AppColors.ink,
-          width: isMe ? AppDimens.borderThick : AppDimens.borderThin,
-        ),
-        boxShadow: AppDimens.shadowQuestionCard,
+        isThickBorder: isMe,
       ),
       child: Row(
         children: [
@@ -654,14 +666,9 @@ class _StickyMeBar extends ConsumerWidget {
         horizontal: AppDimens.space12,
         vertical: AppDimens.space12,
       ),
-      decoration: BoxDecoration(
+      decoration: _buildCardDecoration(
         color: AppColors.selfHighlight,
-        borderRadius: AppDimens.borderRadiusListCard,
-        border: Border.all(
-          color: AppColors.ink,
-          width: AppDimens.borderThick,
-        ),
-        boxShadow: AppDimens.shadowQuestionCard,
+        isThickBorder: true,
       ),
       child: Row(
         children: [
@@ -760,15 +767,7 @@ class _EmptyView extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimens.screenPaddingHorizontal),
         child: Container(
           padding: const EdgeInsets.all(AppDimens.space24),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: AppDimens.borderRadiusListCard,
-            border: Border.all(
-              color: AppColors.mint,
-              width: AppDimens.borderThin,
-            ),
-            boxShadow: AppDimens.shadowQuestionCard,
-          ),
+          decoration: _buildCardDecoration(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -816,14 +815,8 @@ class _ErrorView extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimens.screenPaddingHorizontal),
         child: Container(
           padding: const EdgeInsets.all(AppDimens.space24),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: AppDimens.borderRadiusListCard,
-            border: Border.all(
-              color: AppColors.dangerSoft,
-              width: AppDimens.borderThin,
-            ),
-            boxShadow: AppDimens.shadowQuestionCard,
+          decoration: _buildCardDecoration(
+            borderColor: AppColors.dangerSoft,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

@@ -83,6 +83,19 @@ void main() {
       expect(find.text(AppStrings.emptyLeaderboard), findsOneWidget);
       expect(find.text(AppStrings.emptyLeaderboardSubtitle), findsOneWidget);
       expect(find.text(AppStrings.quickMatch), findsOneWidget);
+
+      // Boş durum kartının kenarlık stilini doğrula: AppColors.ink, borderThin, gölge ve köşe yarıçapı
+      final emptyContainer = tester.firstWidget<Container>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_empty')),
+          matching: find.byType(Container),
+        ),
+      );
+      final emptyDecoration = emptyContainer.decoration as BoxDecoration;
+      expect(emptyDecoration.border?.top.color, AppColors.ink);
+      expect(emptyDecoration.border?.top.width, AppDimens.borderThin);
+      expect(emptyDecoration.borderRadius, AppDimens.borderRadiusListCard);
+      expect(emptyDecoration.boxShadow, AppDimens.shadowQuestionCard);
     });
 
     testWidgets('2. Hata durumunda hata kartı ve Tekrar Dene butonu gösterilir',
