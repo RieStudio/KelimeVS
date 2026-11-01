@@ -122,7 +122,8 @@ abstract final class AppIcons {
   // 13. Eşit (beraberlik)
   static const AppIconData equal = AppIconData('M5 9h14M5 15h14');
 
-  // 14. Yıldırım (enerji)
+  // 14. Yıldırım (enerji) - Eski ikon; artık EnergyIcon widget'ı kullanılmaktadır.
+  @Deprecated('Use EnergyIcon instead')
   static const AppIconData bolt = AppIconData._bolt();
 
   // 15. Daha fazla (üç nokta)

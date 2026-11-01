@@ -477,6 +477,66 @@ class ComponentGallery extends StatelessWidget {
 
               const SizedBox(height: AppDimens.space24),
             ],
+
+            // 10. ENERJİ ROZETİ (EnergyIcon - Farklı Boyutlar)
+            const SectionLabel('Enerji Rozeti (EnergyIcon - Farklı Boyutlar)'),
+            const SizedBox(height: AppDimens.space10),
+            Wrap(
+              spacing: AppDimens.space16,
+              runSpacing: AppDimens.space16,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: const [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 26),
+                    SizedBox(height: 4),
+                    Text('26dp (Kapsül)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 36),
+                    SizedBox(height: 4),
+                    Text('36dp (Orta)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 44),
+                    SizedBox(height: 4),
+                    Text('44dp (Sayaç)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 48),
+                    SizedBox(height: 4),
+                    Text('48dp (Kart)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 64),
+                    SizedBox(height: 4),
+                    Text('64dp (Modal)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    EnergyIcon(size: 44, opacity: 0.25),
+                    SizedBox(height: 4),
+                    Text('44dp (Boş)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space24),
           ],
         ),
       ),

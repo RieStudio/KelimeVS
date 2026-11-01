@@ -5,6 +5,7 @@ import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/widgets/coin_pill.dart';
+import 'package:app/core/widgets/energy_icon.dart';
 
 void main() {
   group('CoinPill Widget Tests', () {
@@ -22,6 +23,7 @@ void main() {
       expect(find.text('500'), findsOneWidget);
       expect(find.text('G'), findsOneWidget);
       expect(find.byKey(const Key('energy_pill_button')), findsNothing);
+      expect(find.byType(EnergyIcon), findsNothing);
       expect(
         find.byWidgetPredicate((w) => w is AppIcon && w.icon == AppIcons.bolt),
         findsNothing,
@@ -48,9 +50,10 @@ void main() {
       expect(find.text('1250'), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
       expect(find.text('G'), findsOneWidget);
+      expect(find.byType(EnergyIcon), findsOneWidget);
       expect(
         find.byWidgetPredicate((w) => w is AppIcon && w.icon == AppIcons.bolt),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byWidgetPredicate((w) => w is Container && w.color == AppColors.mint),

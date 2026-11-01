@@ -4,12 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/icons/app_icons.dart';
 import '../../../../core/network/network_guard.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/energy_icon.dart';
 import '../../../profile/domain/energy_state.dart';
 import '../../application/store_notifier.dart';
 import '../../data/store_api_client.dart';
@@ -173,31 +173,32 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
             ),
             child: Column(
               children: [
-                // 5 Hücreli Yıldırım Göstergesi
+                // 5 Hücreli Enerji Rozeti Göstergesi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(max, (index) {
                     final isFilled = index < current;
-                    return Container(
-                      width: 44,
-                      height: 44,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        color: isFilled ? AppColors.coin : AppColors.card,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isFilled ? AppColors.ink : AppColors.mint,
-                          width: isFilled
-                              ? AppDimens.borderThin
-                              : AppDimens.borderThick,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: AppIcon(
-                        AppIcons.bolt,
-                        size: 20,
-                        color: isFilled ? AppColors.ink : AppColors.mint,
-                      ),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: isFilled
+                          ? const EnergyIcon(size: 44)
+                          : Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.mint,
+                                  width: AppDimens.borderThick,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: const EnergyIcon(
+                                size: 32,
+                                opacity: 0.25,
+                              ),
+                            ),
                     );
                   }),
                 ),
@@ -302,20 +303,10 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
       ),
       child: Row(
         children: [
-          // Yıldırım İkonu Dairesi
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: isFull ? AppColors.mint : AppColors.coin,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.ink,
-                width: AppDimens.borderThin,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: const AppIcon(AppIcons.bolt, size: 24, color: AppColors.ink),
+          // Enerji Rozeti
+          EnergyIcon(
+            size: 48,
+            opacity: isFull ? 0.45 : 1.0,
           ),
 
           const SizedBox(width: AppDimens.space12),

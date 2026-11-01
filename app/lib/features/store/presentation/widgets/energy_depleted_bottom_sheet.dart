@@ -11,6 +11,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_icon_button.dart';
+import '../../../../core/widgets/energy_icon.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/secondary_button.dart';
 import '../../../profile/domain/energy_state.dart';
@@ -195,6 +196,13 @@ class _EnergyDepletedBottomSheetState
 
             const SizedBox(height: AppDimens.space12),
 
+            // Büyük Enerji Rozeti
+            const Center(
+              child: EnergyIcon(size: 64),
+            ),
+
+            const SizedBox(height: AppDimens.space12),
+
             // Açıklama Metni
             const Text(
               AppStrings.energyDepletedSubtitle,
@@ -226,12 +234,9 @@ class _EnergyDepletedBottomSheetState
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const AppIcon(
-                      AppIcons.bolt,
-                      size: 20,
-                      color: AppColors.ink,
-                    ),
+                    const EnergyIcon(size: 26),
                     const SizedBox(width: AppDimens.space8),
                     Text(
                       '${AppStrings.nextEnergyPrefix}$countdownStr',

@@ -10,6 +10,7 @@ import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/core/theme/app_text_styles.dart';
 import 'package:app/core/widgets/app_bottom_nav_bar.dart';
 import 'package:app/core/widgets/coin_pill.dart';
+import 'package:app/core/widgets/energy_icon.dart';
 import 'package:app/core/widgets/kelime_vs_logo.dart';
 import 'package:app/core/widgets/match_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
@@ -587,6 +588,7 @@ void main() {
       expect(find.byType(CoinPill), findsOneWidget);
       expect(find.text('250'), findsOneWidget);
       expect(find.byKey(const Key('energy_pill_button')), findsNothing);
+      expect(find.byType(EnergyIcon), findsNothing);
       expect(
         find.byWidgetPredicate(
           (w) => w is AppIcon && w.icon == AppIcons.bolt,
@@ -624,11 +626,12 @@ void main() {
       expect(find.text('350'), findsOneWidget);
       expect(find.text('4'), findsOneWidget);
       expect(find.byKey(const Key('energy_pill_button')), findsOneWidget);
+      expect(find.byType(EnergyIcon), findsOneWidget);
       expect(
         find.byWidgetPredicate(
           (w) => w is AppIcon && w.icon == AppIcons.bolt,
         ),
-        findsOneWidget,
+        findsNothing,
       );
     },
   );

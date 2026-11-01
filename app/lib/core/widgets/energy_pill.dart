@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../icons/app_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'energy_icon.dart';
 
 /// DESIGN.md Bölüm 7: 9b) Enerji Hapı (EnergyPill)
 /// Beyaz hap (`card`), 2 px `ink` kenarlık, tam yuvarlak köşeler.
@@ -39,25 +39,8 @@ class EnergyPill extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Yıldırım Simgesi
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: AppColors.coin,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.ink,
-                  width: AppDimens.borderThin,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: const AppIcon(
-                AppIcons.bolt,
-                size: 13,
-                color: AppColors.ink,
-              ),
-            ),
+            // Enerji Rozeti
+            const EnergyIcon(size: 24),
             const SizedBox(width: AppDimens.space6),
             // Sayı
             Text(

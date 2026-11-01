@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../icons/app_icons.dart';
 import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'energy_icon.dart';
 
 /// DESIGN.md Bölüm 7: Jeton ve Enerji Rozeti (CoinPill)
 /// Beyaz hap (`card`), 2 px `ink` kenarlık, tam yuvarlak köşeler.
@@ -56,24 +56,7 @@ class CoinPill extends StatelessWidget {
   }
 
   Widget _buildEnergyIcon() {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: AppColors.coin,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: AppColors.ink,
-          width: AppDimens.borderThin,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: const AppIcon(
-        AppIcons.bolt,
-        size: 13,
-        color: AppColors.ink,
-      ),
-    );
+    return const EnergyIcon(size: 24);
   }
 
   @override
