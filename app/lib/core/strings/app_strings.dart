@@ -278,7 +278,11 @@ abstract final class AppStrings {
   static const String signOut = 'Çıkış Yap';
   static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
   static const String linkConflictDialogMessage =
-      'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu hesaba geçersen şu anki anonim ilerlemen (takma ad, jeton, maç geçmişi) silinir. Devam edilsin mi?';
+      'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu Google hesabına geçersen şu anki misafir ilerlemen (jetonlar, çerçeveler, istatistikler ve maç geçmişi) yeni hesaba taşınmaz ve kaybolur. Devam edilsin mi?';
+  static const String nicknameReservedError =
+      'Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.';
+  static const String nicknameCooldownError =
+      'Takma adınızı 24 saatte bir değiştirebilirsiniz.';
   static const String profileLoadErrorTitle = 'Profil yüklenemedi';
   static const String profileLoadErrorMessage =
       'Profil bilgilerin alınamadı. Lütfen internet bağlantını kontrol edip tekrar dene.';

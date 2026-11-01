@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/server_config.dart';
-import '../../../core/network/app_build_info.dart';
+import '../../../core/network/auth_http_executor.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../online/data/auth_token_provider.dart';
@@ -73,27 +72,22 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
     this.onAccountDeleted,
   }) : authTokenProvider = authTokenProvider ?? const FirebaseAuthTokenProvider();
 
-  HttpClient _createClient() => clientFactory != null ? clientFactory!() : HttpClient();
-
   @override
   Future<List<BlockedUser>> getBlockedUsers() async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null || token.isEmpty) return const [];
-
-    final client = _createClient();
     final uri = Uri.parse(ServerConfig.joinUrl(ServerConfig.serverUrl, '/me/blocks'));
 
     try {
-      final request = await client.getUrl(uri).timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'GET',
+        clientFactory: clientFactory,
+      );
 
-      final response = await request.close().timeout(const Duration(seconds: 8));
-      final responseBody = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
+      if (response == null) return const [];
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as List<dynamic>;
+        final decoded = response.decodeJsonList();
         return decoded
             .map((e) => BlockedUser.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -104,26 +98,23 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       return const [];
     } catch (_) {
       return const [];
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<bool> unblockUser(String id) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null || token.isEmpty) return false;
-
-    final client = _createClient();
     final uri = Uri.parse(ServerConfig.joinUrl(ServerConfig.serverUrl, '/me/blocks/$id'));
 
     try {
-      final request = await client.deleteUrl(uri).timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'DELETE',
+        clientFactory: clientFactory,
+      );
 
-      final response = await request.close().timeout(const Duration(seconds: 8));
+      if (response == null) return false;
+
       if (response.statusCode == 200) {
         return true;
       } else if (response.statusCode == 410) {
@@ -133,39 +124,33 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       return false;
     } catch (_) {
       return false;
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<BlockUserResult> blockUser(String matchId) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null || token.isEmpty) {
-      return const BlockUserError(AppStrings.blockGenericError);
-    }
-
-    final client = _createClient();
     final uri = Uri.parse(ServerConfig.joinUrl(ServerConfig.serverUrl, '/matches/$matchId/block'));
 
     try {
-      final request = await client.postUrl(uri).timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'POST',
+        clientFactory: clientFactory,
+      );
 
-      final response = await request.close().timeout(const Duration(seconds: 8));
-      final responseBody = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
+      if (response == null) {
+        return const BlockUserError(AppStrings.blockGenericError);
+      }
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         return BlockUserSuccess(decoded['id'] as String? ?? '');
       } else if (response.statusCode == 400) {
         return const BlockUserError(AppStrings.blockLimitReached, isLimitReached: true);
       } else if (response.statusCode == 410) {
         try {
-          final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+          final decoded = response.decodeJsonMap();
           if (decoded['error'] == 'account_deleted') {
             onAccountDeleted?.call();
             return const BlockUserError(AppStrings.blockGenericError);
@@ -176,8 +161,6 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       return const BlockUserError(AppStrings.blockGenericError);
     } catch (_) {
       return const BlockUserError(AppStrings.blockGenericError);
-    } finally {
-      client.close();
     }
   }
 
@@ -186,24 +169,20 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
     required String matchId,
     required String reason,
   }) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null || token.isEmpty) {
-      return const ReportUserError(AppStrings.reportGenericError);
-    }
-
-    final client = _createClient();
     final uri = Uri.parse(ServerConfig.joinUrl(ServerConfig.serverUrl, '/matches/$matchId/report'));
 
     try {
-      final request = await client.postUrl(uri).timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-      request.add(utf8.encode(jsonEncode({'reason': reason})));
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'POST',
+        clientFactory: clientFactory,
+        jsonBody: {'reason': reason},
+      );
 
-      final response = await request.close().timeout(const Duration(seconds: 8));
-      final responseBody = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
+      if (response == null) {
+        return const ReportUserError(AppStrings.reportGenericError);
+      }
 
       if (response.statusCode == 200) {
         return const ReportUserSuccess();
@@ -213,7 +192,7 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
         return const ReportUserError(AppStrings.reportDailyLimit, isDailyLimit: true);
       } else if (response.statusCode == 410) {
         try {
-          final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+          final decoded = response.decodeJsonMap();
           if (decoded['error'] == 'account_deleted') {
             onAccountDeleted?.call();
             return const ReportUserError(AppStrings.reportGenericError);
@@ -224,8 +203,6 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       return const ReportUserError(AppStrings.reportGenericError);
     } catch (_) {
       return const ReportUserError(AppStrings.reportGenericError);
-    } finally {
-      client.close();
     }
   }
 }

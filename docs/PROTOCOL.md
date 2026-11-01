@@ -485,7 +485,12 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
     }
     ```
     Geçiş daha önce yapılmışsa veya emekli çerçeve yoksa bu alan yanıtta yer almaz. İade jetonları `daily_coins` sayacını etkilemez (günlük maç kazanç tavanına dahil edilmez).
-- `PUT /me/nickname`: Takma ad günceller (`{ "nickname": "..." }`).
+- `PUT /me/nickname`: Takma ad belirler veya günceller (`{ "nickname": "..." }`).
+  - İlk takma ad belirleme serbesttir.
+  - Sonraki takma ad değişiklikleri arasında **24 saatlik bekleme süresi (cooldown)** uygulanır.
+  - Sınır dolmadan gelen isteklerde `429 Too Many Requests` döner (`{ "error": "nickname_cooldown", "message": "Takma adınızı 24 saatte bir değiştirebilirsiniz", "remainingSeconds": 86340 }`). Yanıtta ayrıca `Retry-After: <saniye>` başlığı bulunur.
+  - Sistem tarafından ayrılmış takma adlar (RESERVED: admin, moderator, sistem, destek, support, kelimevs, riestudio, yetkili, official vb. varyasyonları) seçilemez; seçilirse `400 Bad Request` döner (`{ "error": "reserved_nickname", "message": "Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin." }`).
+  - Takma ad 3-16 karakter uzunluğunda olmalı, yalnızca harf, rakam ve alt çizgi içermelidir (`400 invalid_nickname`).
 - `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
 - `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`).
   - Sahip olunmayan çerçeve için `400 item_not_owned` döner.

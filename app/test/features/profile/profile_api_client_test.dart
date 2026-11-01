@@ -183,5 +183,26 @@ void main() {
       final res = await client.updateNickname('YeniAd');
       expect(res, isA<ProfileUpdateNetworkError>());
     });
+
+    test('6. updateNickname() 429 döndüğünde ProfileUpdateCooldown üretir', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_123');
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 429,
+          responseBody: jsonEncode({
+            'error': 'nickname_cooldown',
+            'message': 'Takma adınızı 24 saatte bir değiştirebilirsiniz.',
+            'remainingSeconds': 7200,
+          }),
+        ),
+      );
+
+      final res = await client.updateNickname('YeniAd');
+      expect(res, isA<ProfileUpdateCooldown>());
+      final cooldown = res as ProfileUpdateCooldown;
+      expect(cooldown.remainingSeconds, 7200);
+      expect(cooldown.message, 'Takma adınızı 24 saatte bir değiştirebilirsiniz.');
+    });
   });
 }

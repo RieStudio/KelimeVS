@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/server_config.dart';
-import '../../../core/network/app_build_info.dart';
+import '../../../core/network/auth_http_executor.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../online/data/auth_token_provider.dart';
@@ -163,37 +162,22 @@ class HttpStoreApiClient implements StoreApiClient {
     this.onAccountDeleted,
   });
 
-  HttpClient _createClient(Duration timeout) {
-    if (clientFactory != null) return clientFactory!();
-    return HttpClient()..connectionTimeout = timeout;
-  }
-
   @override
   Future<StoreState?> getStore() async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) return null;
-
     final uri = Uri.parse(ServerConfig.storeUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .getUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'GET',
+        clientFactory: clientFactory,
       );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+
+      if (response == null) return null;
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         final coins = (decoded['coins'] as num?)?.toInt() ?? 0;
         final equippedFrame = decoded['equippedFrame'] as String? ?? 'classic';
         final itemsList = (decoded['items'] as List<dynamic>? ?? [])
@@ -218,48 +202,35 @@ class HttpStoreApiClient implements StoreApiClient {
       return null;
     } catch (_) {
       return null;
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<StorePurchaseResult> purchaseItem(String itemId) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) {
-      return const StorePurchaseNetworkError();
-    }
-
     final uri = Uri.parse(ServerConfig.purchaseUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .postUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-      request.add(utf8.encode(jsonEncode({'itemId': itemId})));
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'POST',
+        clientFactory: clientFactory,
+        jsonBody: {'itemId': itemId},
       );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+
+      if (response == null) {
+        return const StorePurchaseNetworkError();
+      }
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         final coins = (decoded['coins'] as num?)?.toInt() ?? 0;
         return StorePurchaseSuccess(coins: coins, itemId: itemId);
       } else if (response.statusCode == 402) {
         return const StorePurchaseNotEnoughCoins();
       } else if (response.statusCode == 400) {
         try {
-          final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+          final decoded = response.decodeJsonMap();
           final errCode = decoded['error'];
           if (errCode == 'already_owned') {
             return const StorePurchaseAlreadyOwned();
@@ -279,46 +250,31 @@ class HttpStoreApiClient implements StoreApiClient {
       return const StorePurchaseNetworkError();
     } catch (e) {
       return StorePurchaseNetworkError(AppStrings.storeNetworkError, e);
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<StoreEquipResult> equipFrame(String frameId) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) {
-      return const StoreEquipNetworkError();
-    }
-
     final uri = Uri.parse(ServerConfig.frameUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .putUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-      request.add(
-        utf8.encode(jsonEncode({'frameId': frameId, 'frame': frameId})),
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'PUT',
+        clientFactory: clientFactory,
+        jsonBody: {'frameId': frameId, 'frame': frameId},
       );
 
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-      );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+      if (response == null) {
+        return const StoreEquipNetworkError();
+      }
 
       if (response.statusCode == 200) {
         return StoreEquipSuccess(frameId);
       } else if (response.statusCode == 400) {
         try {
-          final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+          final decoded = response.decodeJsonMap();
           final errCode = decoded['error'];
           if (errCode == 'item_not_owned') {
             return const StoreEquipNotOwned();
@@ -343,41 +299,28 @@ class HttpStoreApiClient implements StoreApiClient {
       return const StoreEquipNetworkError();
     } catch (e) {
       return StoreEquipNetworkError(AppStrings.storeNetworkError, e);
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<StorePurchaseEnergyResult> purchaseEnergy(String pack) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) {
-      return const StorePurchaseEnergyNetworkError();
-    }
-
     final uri = Uri.parse(ServerConfig.energyUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .postUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-      request.add(utf8.encode(jsonEncode({'pack': pack})));
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'POST',
+        clientFactory: clientFactory,
+        jsonBody: {'pack': pack},
       );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+
+      if (response == null) {
+        return const StorePurchaseEnergyNetworkError();
+      }
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         return StorePurchaseEnergySuccess(
           coins: (decoded['coins'] as num?)?.toInt() ?? 0,
           energy: (decoded['energy'] as num?)?.toInt() ?? 0,
@@ -389,15 +332,15 @@ class HttpStoreApiClient implements StoreApiClient {
           pack: decoded['pack'] as String? ?? pack,
         );
       } else if (response.statusCode == 402) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>?;
+        final decoded = response.decodeJsonMap();
         final msg =
-            decoded?['message'] as String? ?? AppStrings.insufficientCoins;
-        final coins = (decoded?['coins'] as num?)?.toInt();
+            decoded['message'] as String? ?? AppStrings.insufficientCoins;
+        final coins = (decoded['coins'] as num?)?.toInt();
         return StorePurchaseEnergyNotEnoughCoins(msg, coins);
       } else if (response.statusCode == 400) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>?;
-        final error = decoded?['error'] as String?;
-        final msg = decoded?['message'] as String?;
+        final decoded = response.decodeJsonMap();
+        final error = decoded['error'] as String?;
+        final msg = decoded['message'] as String?;
         if (error == 'energy_full') {
           return StorePurchaseEnergyFull(msg ?? AppStrings.energyAlreadyFull);
         }
@@ -414,8 +357,6 @@ class HttpStoreApiClient implements StoreApiClient {
       return const StorePurchaseEnergyNetworkError();
     } catch (e) {
       return StorePurchaseEnergyNetworkError(AppStrings.storeNetworkError, e);
-    } finally {
-      client.close();
     }
   }
 }

@@ -92,6 +92,22 @@ void main() {
         NicknameValidator.validate('kufurlu_biri').errorMessage,
         equals('Bu takma ad uygunsuz ifadeler içeriyor.'),
       );
+      expect(
+        NicknameValidator.validate('admin').errorMessage,
+        equals('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.'),
+      );
+      expect(
+        NicknameValidator.validate('Admin_99').errorMessage,
+        equals('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.'),
+      );
+      expect(
+        NicknameValidator.validate('Destek_Hatti').errorMessage,
+        equals('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.'),
+      );
+      expect(
+        NicknameValidator.validate('kelimevs_bot').errorMessage,
+        equals('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.'),
+      );
     });
   });
 }

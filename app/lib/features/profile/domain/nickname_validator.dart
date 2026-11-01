@@ -1,5 +1,6 @@
 // Saf Dart - Flutter veya Firebase bağımlılığı yoktur.
 
+import '../../../core/strings/app_strings.dart';
 import '../../game/domain/text_normalizer.dart';
 import 'profanity_words.dart';
 
@@ -27,6 +28,33 @@ abstract final class NicknameValidator {
   static final RegExp _allowedCharsRegex =
       RegExp(r'^[a-zA-Z0-9_ çÇğĞıIİiöÖşŞüÜ]+$');
   static final RegExp _multiSpaceRegex = RegExp(r'\s+');
+
+  static const List<String> reservedNicknames = [
+    'admin',
+    'administrator',
+    'moderator',
+    'sistem',
+    'system',
+    'destek',
+    'support',
+    'kelimevs',
+    'kelimego',
+    'riestudio',
+    'yetkili',
+    'official',
+    'resmi',
+  ];
+
+  static bool isReserved(String raw) {
+    final normalized = TextNormalizer.normalize(raw);
+    final stripped = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    for (final reserved in reservedNicknames) {
+      if (stripped.contains(reserved)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   static NicknameValidationResult validate(String? raw) {
     if (raw == null) {
@@ -63,7 +91,14 @@ abstract final class NicknameValidator {
       );
     }
 
-    // 4. Küfür/uygunsuz kelime filtresi (Türkçe normalizasyon uygulanarak)
+    // 4. Yasaklı / Sistem rezervli unvan kontrolü
+    if (isReserved(trimmed)) {
+      return const NicknameValidationResult.invalid(
+        AppStrings.nicknameReservedError,
+      );
+    }
+
+    // 5. Küfür/uygunsuz kelime filtresi (Türkçe normalizasyon uygulanarak)
     final normalized = TextNormalizer.normalize(trimmed);
     for (final badWord in profanityWords) {
       if (normalized.contains(badWord)) {

@@ -179,6 +179,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
             if (ref.mounted) {
               state = state.copyWith(syncError: uploadRes.message);
             }
+          } else if (uploadRes is ProfileUpdateCooldown) {
+            await repo.setNicknameSyncPending(false);
+            if (ref.mounted) {
+              state = state.copyWith(syncError: uploadRes.message);
+            }
           }
         }
       } else {
@@ -292,6 +297,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
   /// Ağ hatasında yerel adı kaydeder, 'buluta gönderilmedi' işareti tutar.
   /// 400 geçersiz ad dönerse hata fırlatır ve işareti temizler.
   Future<void> setNickname(String newNickname) async {
+    final previousNickname = state.nickname;
     final trimmed = newNickname.trim();
     final repo = ref.read(profileRepositoryProvider);
     final apiClient = ref.read(profileApiClientProvider);
@@ -308,10 +314,25 @@ class ProfileNotifier extends Notifier<ProfileState> {
     } else if (res is ProfileUpdateNetworkError) {
       // Ağ hatası: yerelde geçerli kaldı, bekleyen işareti koy
       await repo.setNicknameSyncPending(true);
+    } else if (res is ProfileUpdateCooldown) {
+      // 24 saatlik bekleme süresi: yerel adı eski haline döndür
+      if (previousNickname != null) {
+        await repo.setNickname(previousNickname);
+        state = state.copyWith(nickname: previousNickname, syncError: res.message);
+      } else {
+        state = state.copyWith(syncError: res.message);
+      }
+      await repo.setNicknameSyncPending(false);
+      throw Exception(res.message);
     } else if (res is ProfileUpdateInvalidNickname) {
       // Sunucu "geçersiz ad" (400) derse işareti temizle ve kullanıcıya bildir
+      if (previousNickname != null) {
+        await repo.setNickname(previousNickname);
+        state = state.copyWith(nickname: previousNickname, syncError: res.message);
+      } else {
+        state = state.copyWith(syncError: res.message);
+      }
       await repo.setNicknameSyncPending(false);
-      state = state.copyWith(syncError: res.message);
       throw Exception(res.message);
     }
   }
@@ -330,6 +351,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
       await repo.setNicknameSyncPending(false);
       state = state.copyWith(nickname: res.nickname);
     } else if (res is ProfileUpdateInvalidNickname) {
+      await repo.setNicknameSyncPending(false);
+      state = state.copyWith(syncError: res.message);
+    } else if (res is ProfileUpdateCooldown) {
       await repo.setNicknameSyncPending(false);
       state = state.copyWith(syncError: res.message);
     }

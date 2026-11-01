@@ -631,10 +631,11 @@ class _ChangeNicknameDialogState extends State<_ChangeNicknameDialog> {
       if (mounted) {
         Navigator.of(context).pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isSaving = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     }

@@ -195,6 +195,36 @@ export default {
             }
           );
         }
+        if (msg === 'nickname_cooldown') {
+          const remainingSeconds =
+            (err as { remainingSeconds?: number }).remainingSeconds ?? 86400;
+          return new Response(
+            JSON.stringify({
+              error: 'nickname_cooldown',
+              message: 'Takma adınızı 24 saatte bir değiştirebilirsiniz.',
+              remainingSeconds,
+            }),
+            {
+              status: 429,
+              headers: {
+                ...jsonHeaders,
+                'Retry-After': String(remainingSeconds),
+              },
+            }
+          );
+        }
+        if (msg === 'reserved_nickname') {
+          return new Response(
+            JSON.stringify({
+              error: 'reserved_nickname',
+              message: 'Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.',
+            }),
+            {
+              status: 400,
+              headers: jsonHeaders,
+            }
+          );
+        }
         return new Response(
           JSON.stringify({ error: 'invalid_nickname', message: msg }),
           {
@@ -844,80 +874,6 @@ export default {
           );
         }
         const res = await profileStub.unblockUser(blockId);
-        return new Response(JSON.stringify(res), {
-          status: 200,
-          headers: jsonHeaders,
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg === 'account_deleted') {
-          return new Response(
-            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
-            { status: 410, headers: jsonHeaders }
-          );
-        }
-        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
-          status: 500,
-          headers: jsonHeaders,
-        });
-      }
-    }
-
-    // Enerji paketi satın alma: POST /store/energy
-    if (request.method === 'POST' && pathname === '/store/energy') {
-      const uid = await authenticateRequest(request, env);
-      if (!uid) {
-        return new Response(JSON.stringify({ error: 'unauthorized' }), {
-          status: 401,
-          headers: jsonHeaders,
-        });
-      }
-
-      let body: { pack?: unknown };
-      try {
-        body = (await request.json()) as { pack?: unknown };
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
-          { status: 400, headers: jsonHeaders }
-        );
-      }
-
-      if (body?.pack !== 'one' && body?.pack !== 'full') {
-        return new Response(
-          JSON.stringify({ error: 'invalid_pack', message: "pack alanı 'one' veya 'full' olmalıdır" }),
-          { status: 400, headers: jsonHeaders }
-        );
-      }
-
-      try {
-        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const res = await profileStub.purchaseEnergy({ pack: body.pack, uid });
-        if (!res.success) {
-          if (res.error === 'energy_disabled') {
-            return new Response(
-              JSON.stringify({ error: 'energy_disabled', message: 'Enerji sistemi şu anda aktif değil' }),
-              { status: 400, headers: jsonHeaders }
-            );
-          }
-          if (res.error === 'energy_full') {
-            return new Response(
-              JSON.stringify({ error: 'energy_full', message: 'Enerjiniz zaten dolu' }),
-              { status: 400, headers: jsonHeaders }
-            );
-          }
-          if (res.error === 'not_enough_coins') {
-            return new Response(
-              JSON.stringify({ error: 'not_enough_coins', message: 'Yetersiz jeton', coins: res.coins }),
-              { status: 402, headers: jsonHeaders }
-            );
-          }
-          return new Response(
-            JSON.stringify({ error: 'invalid_pack', message: 'Geçersiz paket' }),
-            { status: 400, headers: jsonHeaders }
-          );
-        }
-
         return new Response(JSON.stringify(res), {
           status: 200,
           headers: jsonHeaders,

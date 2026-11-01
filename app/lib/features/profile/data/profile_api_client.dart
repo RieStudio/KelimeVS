@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/config/server_config.dart';
-import '../../../core/network/app_build_info.dart';
+import '../../../core/network/auth_http_executor.dart';
+import '../../../core/strings/app_strings.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../domain/energy_state.dart';
 
@@ -151,6 +151,15 @@ class ProfileUpdateInvalidNickname extends ProfileUpdateResult {
   const ProfileUpdateInvalidNickname(this.message);
 }
 
+class ProfileUpdateCooldown extends ProfileUpdateResult {
+  final int remainingSeconds;
+  final String message;
+  const ProfileUpdateCooldown({
+    required this.remainingSeconds,
+    required this.message,
+  });
+}
+
 class ProfileUpdateNetworkError extends ProfileUpdateResult {
   final Object error;
   const ProfileUpdateNetworkError(this.error);
@@ -173,37 +182,22 @@ class HttpProfileApiClient implements ProfileApiClient {
     this.onAccountDeleted,
   });
 
-  HttpClient _createClient(Duration timeout) {
-    if (clientFactory != null) return clientFactory!();
-    return HttpClient()..connectionTimeout = timeout;
-  }
-
   @override
   Future<UserProfileModel?> getProfile() async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) return null;
-
     final uri = Uri.parse(ServerConfig.meUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .getUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'GET',
+        clientFactory: clientFactory,
       );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+
+      if (response == null) return null;
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         return UserProfileModel.fromJson(decoded);
       } else if (response.statusCode == 410) {
         onAccountDeleted?.call();
@@ -213,105 +207,85 @@ class HttpProfileApiClient implements ProfileApiClient {
     } catch (_) {
       // Ağ hatasında sessizce null döner (çevrimdışı dayanıklılık)
       return null;
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<ProfileUpdateResult> updateNickname(String nickname) async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) {
-      return const ProfileUpdateNetworkError('Auth token unavailable');
-    }
-
     final uri = Uri.parse(ServerConfig.nicknameUrl);
-    final client = _createClient(const Duration(seconds: 8));
 
     try {
-      final request = await client
-          .putUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'application/json; charset=utf-8',
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'PUT',
+        clientFactory: clientFactory,
+        jsonBody: {'nickname': nickname},
       );
-      await AppBuildInfo.applyHeaders(request.headers);
 
-      final bodyBytes = utf8.encode(jsonEncode({'nickname': nickname}));
-      request.contentLength = bodyBytes.length;
-      request.add(bodyBytes);
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-      );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
+      if (response == null) {
+        return const ProfileUpdateNetworkError('Auth token unavailable');
+      }
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+        final decoded = response.decodeJsonMap();
         final normalized = decoded['nickname'] as String? ?? nickname.trim();
         return ProfileUpdateSuccess(normalized);
       } else if (response.statusCode == 410) {
         onAccountDeleted?.call();
         return const ProfileUpdateNetworkError('account_deleted');
+      } else if (response.statusCode == 429) {
+        int remainingSeconds = 86400;
+        String msg = AppStrings.nicknameCooldownError;
+        try {
+          final decoded = response.decodeJsonMap();
+          msg = decoded['message'] as String? ?? msg;
+          if (decoded['remainingSeconds'] is num) {
+            remainingSeconds = (decoded['remainingSeconds'] as num).toInt();
+          }
+        } catch (_) {}
+        return ProfileUpdateCooldown(
+          remainingSeconds: remainingSeconds,
+          message: msg,
+        );
       } else if (response.statusCode == 400) {
         String msg = 'Geçersiz takma ad';
         try {
-          final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+          final decoded = response.decodeJsonMap();
           msg = decoded['message'] as String? ?? msg;
         } catch (_) {}
         return ProfileUpdateInvalidNickname(msg);
       } else {
         return ProfileUpdateNetworkError(
-          'HTTP ${response.statusCode}: $responseBody',
+          'HTTP ${response.statusCode}: ${response.body}',
         );
       }
     } catch (e) {
       return ProfileUpdateNetworkError(e);
-    } finally {
-      client.close();
     }
   }
 
   @override
   Future<bool> deleteProfile() async {
-    final token = await authTokenProvider.getIdToken();
-    if (token == null) {
+    final uri = Uri.parse(ServerConfig.meUrl);
+
+    final response = await AuthHttpExecutor.execute(
+      authTokenProvider: authTokenProvider,
+      uri: uri,
+      method: 'DELETE',
+      clientFactory: clientFactory,
+    );
+
+    if (response == null) {
       throw const SocketException('Yetkilendirme jetonu alınamadı');
     }
 
-    final uri = Uri.parse(ServerConfig.meUrl);
-    final client = _createClient(const Duration(seconds: 8));
-
-    try {
-      final request = await client
-          .deleteUrl(uri)
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      await AppBuildInfo.applyHeaders(request.headers);
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-      );
-      final responseBody = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200 || response.statusCode == 410) {
-        return true;
-      }
-      throw HttpException(
-        'Hesap silinemedi (HTTP ${response.statusCode}: $responseBody)',
-        uri: uri,
-      );
-    } finally {
-      client.close();
+    if (response.statusCode == 200 || response.statusCode == 410) {
+      return true;
     }
+    throw HttpException(
+      'Hesap silinemedi (HTTP ${response.statusCode}: ${response.body})',
+      uri: uri,
+    );
   }
 }

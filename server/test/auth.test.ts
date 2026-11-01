@@ -587,4 +587,57 @@ describe('Firebase ID Token & Dev Auth (Adım 4.3b)', () => {
     );
     expect(uid).toBeNull();
   });
+
+  it('JWK: Google JWK çekimi hata verirse (ağ hatası veya 5xx) 15 sn geri çekilme uygular ve AbortSignal iletir', async () => {
+    let fetchCount = 0;
+    let receivedInit: RequestInit | undefined;
+    const failingFetch: FetchFunction = async (url: string, init?: RequestInit) => {
+      fetchCount++;
+      receivedInit = init;
+      return new Response('Internal Server Error', { status: 500 });
+    };
+
+    const cache = createKeyCache();
+    const t1 = 100_000_000;
+    const t1Sec = Math.floor(t1 / 1000);
+    const token = await signJwt(
+      { alg: 'RS256', kid: 'key-err' },
+      createValidPayload({
+        iat: t1Sec - 10,
+        auth_time: t1Sec - 10,
+        exp: t1Sec + 3600,
+      }),
+      (await generateTestKeyPair('key-err')).keyPair.privateKey
+    );
+
+    // 1. İlk çağrı (t = t1): Hata döner (500)
+    const uid1 = await verifyToken(token, { FIREBASE_PROJECT_ID: TEST_PROJECT_ID }, {
+      nowMs: t1,
+      keyCache: cache,
+      fetchFn: failingFetch,
+    });
+    expect(uid1).toBeNull();
+    expect(fetchCount).toBe(1);
+    expect(cache.lastFetchedAtMs).toBe(t1);
+    expect(receivedInit?.signal).toBeDefined();
+
+    // 2. İkinci çağrı 5 sn sonra (t = t1 + 5000): Geri çekilme devrede, fetch çağrılmaz!
+    const uid2 = await verifyToken(token, { FIREBASE_PROJECT_ID: TEST_PROJECT_ID }, {
+      nowMs: t1 + 5000,
+      keyCache: cache,
+      fetchFn: failingFetch,
+    });
+    expect(uid2).toBeNull();
+    expect(fetchCount).toBe(1); // Artmadı!
+
+    // 3. Üçüncü çağrı 16 sn sonra (t = t1 + 16000): Geri çekilme bitti, yeniden fetch denenir!
+    const uid3 = await verifyToken(token, { FIREBASE_PROJECT_ID: TEST_PROJECT_ID }, {
+      nowMs: t1 + 16000,
+      keyCache: cache,
+      fetchFn: failingFetch,
+    });
+    expect(uid3).toBeNull();
+    expect(fetchCount).toBe(2); // Yeniden denendi
+    expect(cache.lastFetchedAtMs).toBe(t1 + 16000);
+  });
 });

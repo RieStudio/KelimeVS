@@ -310,6 +310,13 @@ export class UserProfile extends DurableObject<Env> {
       );
     }
 
+    const hasNicknameUpdatedAt = profileCols.some((c) => c.name === 'nickname_updated_at');
+    if (!hasNicknameUpdatedAt) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN nickname_updated_at INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
     this.initialized = true;
   }
 
@@ -578,8 +585,13 @@ export class UserProfile extends DurableObject<Env> {
 
   /**
    * Takma adı sanitize/validate edip kaydeder.
+   * İlk belirleme serbesttir; sonraki değişiklikler için 24 saat bekleme süresi şartı aranır.
    */
-  async setNickname(nickname: string, uid?: string): Promise<{ ok: true; nickname: string }> {
+  async setNickname(
+    nickname: string,
+    uid?: string,
+    nowMs = Date.now()
+  ): Promise<{ ok: true; nickname: string }> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
@@ -588,6 +600,9 @@ export class UserProfile extends DurableObject<Env> {
 
     const validation = validateNickname(nickname);
     if (!validation.isValid || validation.normalized === null) {
+      if (validation.error === 'reserved') {
+        throw new Error('reserved_nickname');
+      }
       throw new Error('invalid_nickname');
     }
 
@@ -596,9 +611,38 @@ export class UserProfile extends DurableObject<Env> {
     // Profil yoksa önce oluştur
     await this.getProfile(uid);
 
+    // 24 saat bekleme süresi (cooldown) kontrolü:
+    // İlk takma ad belirleme serbest (mevcut ad null/boş ise veya nickname_updated_at <= 0 ise).
+    // Sonraki değişikliklerde 24 saat (86.400.000 ms) bekleme süresi şartı aranır.
+    const rows = this.ctx.storage.sql
+      .exec<{ nickname: string | null; nickname_updated_at: number | null }>(
+        'SELECT nickname, nickname_updated_at FROM profiles LIMIT 1'
+      )
+      .toArray();
+
+    if (rows.length > 0) {
+      const currentNickname = rows[0].nickname;
+      const lastUpdatedAt = rows[0].nickname_updated_at ?? 0;
+
+      const hasExistingNickname =
+        typeof currentNickname === 'string' && currentNickname.trim().length > 0;
+
+      if (hasExistingNickname && lastUpdatedAt > 0) {
+        const NICKNAME_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+        const elapsed = nowMs - lastUpdatedAt;
+        if (elapsed < NICKNAME_COOLDOWN_MS) {
+          const remainingSeconds = Math.ceil((NICKNAME_COOLDOWN_MS - elapsed) / 1000);
+          const error = new Error('nickname_cooldown');
+          (error as any).remainingSeconds = remainingSeconds;
+          throw error;
+        }
+      }
+    }
+
     this.ctx.storage.sql.exec(
-      'UPDATE profiles SET nickname = ?',
-      normalized
+      'UPDATE profiles SET nickname = ?, nickname_updated_at = ?',
+      normalized,
+      nowMs
     );
 
     return { ok: true, nickname: normalized };

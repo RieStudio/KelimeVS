@@ -131,6 +131,38 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
 
     // Geçersiz ad (yasak karakter)
     await expect(profileDO.setNickname('User@123', 'user_1')).rejects.toThrow('invalid_nickname');
+
+    // Yasaklı / rezerve ad
+    await expect(profileDO.setNickname('Admin_Ahmet', 'user_1')).rejects.toThrow('reserved_nickname');
+  });
+
+  it('3b. Takma ad 24 saat bekleme süresi (cooldown) kuralı doğru uygulanır', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv();
+    const profileDO = new UserProfile(ctx, env);
+
+    const t0 = 1_000_000_000;
+
+    // 1. İlk belirleme serbesttir
+    const r1 = await profileDO.setNickname('IlkAdim', 'user_cd', t0);
+    expect(r1.ok).toBe(true);
+    expect(r1.nickname).toBe('IlkAdim');
+
+    // 2. 1 saat sonra değiştirme denenirse (3600 sn < 86400 sn) 429 nickname_cooldown fırlatılır
+    const tPlus1Hour = t0 + 3600 * 1000;
+    try {
+      await profileDO.setNickname('IkinciAdim', 'user_cd', tPlus1Hour);
+      expect.unreachable('nickname_cooldown hatası fırlatılmalıydı');
+    } catch (err) {
+      expect((err as Error).message).toBe('nickname_cooldown');
+      expect((err as any).remainingSeconds).toBe(23 * 3600);
+    }
+
+    // 3. 24 saat 1 saniye sonra (t0 + 86401 sn) değiştirme başarılı olur
+    const tPlus24Hours = t0 + 86401 * 1000;
+    const r2 = await profileDO.setNickname('IkinciAdim', 'user_cd', tPlus24Hours);
+    expect(r2.ok).toBe(true);
+    expect(r2.nickname).toBe('IkinciAdim');
   });
 
   it('4. applyMatchReward galibiyet, mağlubiyet ve kopma ödüllerini doğru uygular', async () => {

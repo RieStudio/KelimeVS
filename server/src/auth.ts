@@ -23,7 +23,7 @@ export interface KeyCache {
   lastFetchedAtMs: number;
 }
 
-export type FetchFunction = (url: string) => Promise<Response>;
+export type FetchFunction = (url: string, init?: RequestInit) => Promise<Response>;
 
 export interface VerifyTokenOptions {
   readonly nowMs?: number;
@@ -36,6 +36,7 @@ export const GOOGLE_JWK_URL =
 
 const CLOCK_SKEW_TOLERANCE_SECONDS = 60;
 const REFETCH_RATE_LIMIT_MS = 60_000; // Bilinmeyen kid için dakikada en fazla 1 kez yeniden çek
+const ERROR_BACKOFF_MS = 15_000; // Google JWK çekim hatası durumunda 15 saniye geri çekilme
 
 export function createKeyCache(): KeyCache {
   return {
@@ -114,16 +115,21 @@ async function getOrFetchKey(
   // 1. Önbellek süresi dolmuşsa
   // 2. Önbellek boşsa
   // 3. kid önbellekte yoksa VE son çekmeden bu yana en az 60 sn geçmişse
+  // 4. Son çekimden bu yana en az 15 sn hata geri çekilmesi geçmişse
   const isExpired = nowMs >= cache.expiresAtMs;
   const isEmpty = cache.keys.size === 0;
   const isUnknownKid = !cache.keys.has(kid);
   const canRefetchRateLimit = nowMs - cache.lastFetchedAtMs >= REFETCH_RATE_LIMIT_MS;
+  const hasErrorBackoff = nowMs - cache.lastFetchedAtMs < ERROR_BACKOFF_MS;
 
-  const shouldFetch = isExpired || isEmpty || (isUnknownKid && canRefetchRateLimit);
+  const shouldFetch =
+    !hasErrorBackoff && (isExpired || isEmpty || (isUnknownKid && canRefetchRateLimit));
 
   if (shouldFetch) {
     try {
-      const res = await fetchFn(GOOGLE_JWK_URL);
+      const res = await fetchFn(GOOGLE_JWK_URL, {
+        signal: AbortSignal.timeout(5000),
+      });
       if (res.ok) {
         const data = (await res.json()) as JwkResponse;
         if (data && Array.isArray(data.keys)) {
@@ -139,10 +145,16 @@ async function getOrFetchKey(
               cache.keys.set(k.kid, k);
             }
           }
+        } else {
+          cache.lastFetchedAtMs = nowMs;
         }
+      } else {
+        // Ağ HTTP hatası (5xx, 4xx) durumunda ~15 sn geri çekil
+        cache.lastFetchedAtMs = nowMs;
       }
     } catch {
-      // Ağ hatası durumunda sessizce devam et
+      // Ağ hatası veya zaman aşımı durumunda ~15 sn geri çekil
+      cache.lastFetchedAtMs = nowMs;
     }
   }
 
@@ -262,8 +274,8 @@ export async function verifyToken(
   const keyCache = options?.keyCache ?? defaultKeyCache;
   const injectedFetch = options?.fetchFn;
   const fetchFn: FetchFunction = injectedFetch
-    ? ((url: string) => injectedFetch(url))
-    : ((url: string) => fetch(url));
+    ? ((url: string, init?: RequestInit) => injectedFetch(url, init))
+    : ((url: string, init?: RequestInit) => fetch(url, init));
 
   const cryptoKey = await getOrFetchKey(header.kid, keyCache, fetchFn, nowMs);
   if (!cryptoKey) {

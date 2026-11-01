@@ -66,5 +66,55 @@ describe('NicknameValidator and sanitizePlayerName (shared test vectors)', () =>
       }
     });
   }
+
+  describe('Reserved Nicknames (Yasaklı / Sistem Takma Adları)', () => {
+    const reservedSamples = [
+      'admin',
+      'Admin',
+      'ADMİN',
+      'a d m i n',
+      'admin_99',
+      'SuperAdmin',
+      'moderator',
+      'Moderatör',
+      'moderatör_1',
+      'sistem',
+      'SİSTEM',
+      'system',
+      'destek',
+      'Destek_Hattı',
+      'support',
+      'kelimevs',
+      'Kelime VS',
+      'kelime_vs',
+      'kelimego',
+      'Kelime Go',
+      'riestudio',
+      'Rie Studio',
+      'yetkili',
+      'OyunYetkilisi',
+      'official',
+      'resmi',
+      'Resmi Destek',
+    ];
+
+    for (const sample of reservedSamples) {
+      it(`"${sample}" rezerve takma ad olarak reddedilmeli`, () => {
+        const res = validateNickname(sample);
+        expect(res.isValid).toBe(false);
+        expect(res.error).toBe('reserved');
+        expect(res.errorMessage).toBe('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.');
+      });
+    }
+
+    it('Normal geçerli adlar rezerve filtresine takılmamalı', () => {
+      const validSamples = ['Ahmet', 'Zeynep', 'Mehmet_99', 'KelimeAvcisi', 'KelimeUstasi', 'Demir'];
+      for (const sample of validSamples) {
+        const res = validateNickname(sample);
+        expect(res.isValid).toBe(true);
+        expect(res.error).toBeUndefined();
+      }
+    });
+  });
 });
 
