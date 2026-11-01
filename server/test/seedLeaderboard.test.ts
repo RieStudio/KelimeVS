@@ -17,6 +17,7 @@ import { Leaderboard } from '../src/leaderboard';
 import {
   generateSeedPlayers,
   validateLocalServerUrl,
+  parseCliArgs,
   SEED_FRAMES,
 } from '../tools/seed-leaderboard';
 
@@ -328,6 +329,149 @@ describe('Worker API Routes: /admin/leaderboard/seed ve /admin/leaderboard/clear
     };
     expect(bodyGet.top).toHaveLength(2);
     expect(bodyGet.top.some((e) => e.nickname === 'Gecersiz Gercek')).toBe(false);
+  });
+
+  it('4. parseCliArgs: --count, --me-uid, --me-rank, --clear ve --clear-me parametrelerini doğru ayrıştırır', () => {
+    const args1 = parseCliArgs([
+      '--count=200',
+      '--me-uid=usr_custom_167',
+      '--me-rank=167',
+      '--server=http://localhost:8787',
+    ]);
+    expect(args1.count).toBe(200);
+    expect(args1.meUid).toBe('usr_custom_167');
+    expect(args1.meRank).toBe(167);
+    expect(args1.serverUrl).toBe('http://localhost:8787');
+    expect(args1.isClear).toBe(false);
+    expect(args1.clearMeUid).toBeUndefined();
+
+    const args2 = parseCliArgs(['--clear', '--clear-me=usr_custom_167']);
+    expect(args2.isClear).toBe(true);
+    expect(args2.clearMeUid).toBe('usr_custom_167');
+  });
+
+  it('5. generateSeedPlayers: 200 oyuncu üretimi ve me-uid tam 167. sıraya yerleşimi (deterministik sıra garantisi)', () => {
+    const players = generateSeedPlayers({
+      count: 200,
+      meUid: 'me_rank_167',
+      meRank: 167,
+    });
+
+    expect(players).toHaveLength(200);
+
+    // 167. eleman (indeks 166) me_rank_167 olmalıdır
+    const meSlot = players[166];
+    expect(meSlot.uid).toBe('me_rank_167');
+    expect(meSlot.nickname).toBe('Sen (Test)');
+
+    // 166. eleman (indeks 165) bir önceki sıradır
+    const prevSlot = players[165];
+    // 168. eleman (indeks 167) bir sonraki sıradır
+    const nextSlot = players[167];
+
+    // Önceki slot meSlot'un kesinlikle önünde olmalıdır:
+    // (wins daha yüksek, veya eşitse losses daha az, veya eşitse reachedAt daha erken)
+    const prevBeatsMe =
+      prevSlot.wins > meSlot.wins ||
+      (prevSlot.wins === meSlot.wins && prevSlot.losses < meSlot.losses) ||
+      (prevSlot.wins === meSlot.wins &&
+        prevSlot.losses === meSlot.losses &&
+        prevSlot.reachedAt < meSlot.reachedAt);
+    expect(prevBeatsMe).toBe(true);
+
+    // meSlot nextSlot'un kesinlikle önünde olmalıdır:
+    const meBeatsNext =
+      meSlot.wins > nextSlot.wins ||
+      (meSlot.wins === nextSlot.wins && meSlot.losses < nextSlot.losses) ||
+      (meSlot.wins === nextSlot.wins &&
+        meSlot.losses === nextSlot.losses &&
+        meSlot.reachedAt < nextSlot.reachedAt);
+    expect(meBeatsNext).toBe(true);
+  });
+
+  it('6. "Ben 167.yim" senaryosu: 200 oyuncu tohumlanır, me 167. sırada döner, --clear meUidyi korur, clearMeUid ile silinir', async () => {
+    const { env } = createEnv({ ALLOW_DEV_AUTH: 'true' });
+    const meUid = 'my_local_dev_user';
+
+    const players = generateSeedPlayers({
+      count: 200,
+      meUid,
+      meRank: 167,
+    });
+
+    // 1) 200 oyuncuyu tohumla
+    const seedReq = new Request('http://127.0.0.1:8787/admin/leaderboard/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: players, meUid }),
+    });
+
+    const resSeed = await worker.fetch(seedReq, env);
+    expect(resSeed.status).toBe(200);
+    const bodySeed = (await resSeed.json()) as { success: boolean; inserted: number };
+    expect(bodySeed.success).toBe(true);
+    expect(bodySeed.inserted).toBe(200);
+
+    // 2) GET /leaderboard isteği yap (Authorization: Bearer dev:my_local_dev_user)
+    const getReq = new Request('http://127.0.0.1:8787/leaderboard', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer dev:${meUid}`,
+      },
+    });
+
+    const resGet = await worker.fetch(getReq, env);
+    expect(resGet.status).toBe(200);
+    const bodyGet = (await resGet.json()) as {
+      top: Array<{ rank: number; nickname: string; wins: number; frame: string }>;
+      me: { rank: number; wins: number };
+    };
+
+    // İlk 100 sınırı: top listesi tam 100 eleman içermelidir
+    expect(bodyGet.top).toHaveLength(100);
+    // 167. sıradaki kullanıcı ilk 100 listesinde YER ALMAZ
+    expect(bodyGet.top.some((e) => (e as any).uid === meUid)).toBe(false);
+
+    // Fakat me objesi kullanıcının tam 167. sırada olduğunu doğrulamalıdır!
+    expect(bodyGet.me).toBeDefined();
+    expect(bodyGet.me.rank).toBe(167);
+    const expectedMeSlot = players.find((p) => p.uid === meUid);
+    expect(bodyGet.me.wins).toBe(expectedMeSlot!.wins);
+
+    // 3) Standart --clear çalıştırıldığında seed_ ön ekli kayıtlar silinmeli, meUid KORUNMALIDIR!
+    const clearSeedReq = new Request('http://127.0.0.1:8787/admin/leaderboard/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const resClearSeed = await worker.fetch(clearSeedReq, env);
+    const bodyClearSeed = (await resClearSeed.json()) as { deleted: number };
+    expect(bodyClearSeed.deleted).toBe(199); // 199 seed oyuncusu silindi
+
+    // Liderlik tablosunu tekrar sorgula: top listesinde yalnızca meUid kalmış olmalı (1. sıraya yükselir)
+    const resGetAfterSeedClear = await worker.fetch(getReq, env);
+    const bodyAfterSeedClear = (await resGetAfterSeedClear.json()) as {
+      top: Array<{ rank: number; nickname: string }>;
+      me: { rank: number };
+    };
+    expect(bodyAfterSeedClear.top).toHaveLength(1);
+    expect(bodyAfterSeedClear.me.rank).toBe(1);
+
+    // 4) clearMeUid ile meUid de temizlenebilir
+    const clearMeReq = new Request('http://127.0.0.1:8787/admin/leaderboard/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clearMeUid: meUid }),
+    });
+    const resClearMe = await worker.fetch(clearMeReq, env);
+    const bodyClearMe = (await resClearMe.json()) as { deleted: number };
+    expect(bodyClearMe.deleted).toBe(1);
+
+    // Artık tablo tamamen boştur
+    const resGetFinal = await worker.fetch(getReq, env);
+    const bodyFinal = (await resGetFinal.json()) as { top: any[]; me: unknown };
+    expect(bodyFinal.top).toHaveLength(0);
+    expect(bodyFinal.me).toBeNull();
   });
 });
 

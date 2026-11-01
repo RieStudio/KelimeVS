@@ -148,7 +148,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('Senin sıran: #74 (3 galibiyet)'), findsOneWidget);
+      expect(find.text('74. sıradasın'), findsOneWidget);
+      expect(find.text('#74'), findsOneWidget);
+      expect(find.text('3 galibiyet'), findsOneWidget);
     });
 
     testWidgets('5. Sekme modunda (canPop == false) geri butonu gizlidir',
@@ -360,7 +362,9 @@ void main() {
 
       // İlk 100 dışındaki kullanıcı için yapışkan çubuk görünür
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('Senin sıran: #105 (4 galibiyet)'), findsOneWidget);
+      expect(find.text('105. sıradasın'), findsOneWidget);
+      expect(find.text('#105'), findsOneWidget);
+      expect(find.text('4 galibiyet'), findsOneWidget);
 
       // 100 satırlık listeyi aşağı kaydır
       await tester.drag(
@@ -374,7 +378,9 @@ void main() {
 
       // Yapışkan çubuk kaydırmadan sonra da altta sabit kalmalıdır
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('Senin sıran: #105 (4 galibiyet)'), findsOneWidget);
+      expect(find.text('105. sıradasın'), findsOneWidget);
+      expect(find.text('#105'), findsOneWidget);
+      expect(find.text('4 galibiyet'), findsOneWidget);
 
       // Listenin en sonuna kadar kaydır
       await tester.scrollUntilVisible(
@@ -386,6 +392,81 @@ void main() {
 
       expect(find.text('Oyuncu_100'), findsOneWidget);
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        '10. İlk 3 rozet (taç, gümüş 2, bronz 3), koyu kenarlıklar ve dar ekranda (320dp, textScale 1.3) #100/#1000 taşma yapmaz',
+        (tester) async {
+      // 320x640 dar ekran boyutu
+      tester.view.physicalSize = const Size(320 * 2.0, 640 * 2.0);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'LiderKral', wins: 40, isMe: false),
+            LeaderboardEntry(rank: 2, nickname: 'IkinciOyuncu', wins: 38, isMe: false),
+            LeaderboardEntry(rank: 3, nickname: 'UcuncuOyuncu', wins: 35, isMe: false),
+            LeaderboardEntry(rank: 100, nickname: 'YuzuncuOyuncu', wins: 5, isMe: false),
+            LeaderboardEntry(rank: 1000, nickname: 'BinOyuncu', wins: 1, isMe: true),
+          ],
+          me: LeaderboardMe(rank: 1000, wins: 1),
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            leaderboardApiClientProvider.overrideWithValue(fakeClient),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(320, 640),
+                textScaler: TextScaler.linear(1.3),
+              ),
+              child: const LeaderboardScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. sıra rozeti: Semantics etiketi "1. sıra" var ve CustomPaint taç ikonu çizilmiş
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == '1. sıra',
+        ),
+        findsOneWidget,
+      );
+      // 2. ve 3. sıra: Semantics etiketleri ve metinleri
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == '2. sıra',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('2'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == '3. sıra',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('3'), findsOneWidget);
+
+      // #100 ve #1000 sıra numaraları görünür ve FittedBox içinde tek satırdadır
+      expect(find.text('#100'), findsOneWidget);
+      expect(find.text('#1000'), findsOneWidget);
+
+      // Hiçbir RenderFlex taşma (A RenderFlex overflowed...) hatası oluşmamalıdır
       expect(tester.takeException(), isNull);
     });
   });

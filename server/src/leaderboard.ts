@@ -278,7 +278,8 @@ export class Leaderboard extends DurableObject<Env> {
    */
   async seedUsers(
     entries: readonly LeaderboardSeedEntry[],
-    atMs: number = Date.now()
+    atMs: number = Date.now(),
+    allowedMeUid?: string
   ): Promise<{ inserted: number }> {
     this.ensureSchema();
 
@@ -287,7 +288,9 @@ export class Leaderboard extends DurableObject<Env> {
 
     let inserted = 0;
     for (const entry of entries) {
-      if (!entry.uid.startsWith('seed_')) {
+      const isSeed = entry.uid.startsWith('seed_');
+      const isAllowedMe = Boolean(allowedMeUid && entry.uid === allowedMeUid);
+      if (!isSeed && !isAllowedMe) {
         continue;
       }
       const nickname = entry.nickname.trim();
@@ -337,6 +340,32 @@ export class Leaderboard extends DurableObject<Env> {
     this.ctx.storage.sql.exec("DELETE FROM week_wins WHERE uid LIKE 'seed_%'");
     this.ctx.storage.sql.exec(
       "DELETE FROM pair_wins WHERE winner_uid LIKE 'seed_%' OR loser_uid LIKE 'seed_%'"
+    );
+
+    return { deleted: count };
+  }
+
+  /**
+   * Yerel test için eklenmiş belirli bir test kullanıcısını liderlik tablosundan temizler.
+   * Güvenlik: Yalnızca parametre olarak verilen uid'yi siler, diğer kullanıcılara dokunmaz.
+   */
+  async clearMeUser(uid: string): Promise<{ deleted: number }> {
+    this.ensureSchema();
+    const cleanUid = uid.trim();
+    if (!cleanUid) {
+      return { deleted: 0 };
+    }
+
+    const countRow = this.ctx.storage.sql
+      .exec<{ count: number }>('SELECT COUNT(*) as count FROM week_wins WHERE uid = ?', cleanUid)
+      .toArray();
+    const count = countRow[0]?.count ?? 0;
+
+    this.ctx.storage.sql.exec('DELETE FROM week_wins WHERE uid = ?', cleanUid);
+    this.ctx.storage.sql.exec(
+      'DELETE FROM pair_wins WHERE winner_uid = ? OR loser_uid = ?',
+      cleanUid,
+      cleanUid
     );
 
     return { deleted: count };

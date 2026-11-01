@@ -9,6 +9,9 @@ abstract final class AppColors {
   static const Color card = Color(0xFFFFFFFF);
   static const Color muted = Color(0xFF166534);
   static const Color coin = Color(0xFFFACC15);
+  static const Color rankGold = Color(0xFFFACC15);
+  static const Color rankSilver = Color(0xFFE2E8F0);
+  static const Color rankBronze = Color(0xFFE0A96D);
   static const Color danger = Color(0xFFDC2626);
   static const Color dangerDark = Color(0xFF7F1D1D);
   static const Color dangerText = Color(0xFFB91C1C);

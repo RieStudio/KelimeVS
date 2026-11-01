@@ -347,14 +347,14 @@ class _LeaderboardItemCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space16,
+        horizontal: AppDimens.space12,
         vertical: AppDimens.space12,
       ),
       decoration: BoxDecoration(
-        color: isMe ? const Color(0xFFE8F5E9) : AppColors.card,
+        color: isMe ? AppColors.surface : AppColors.card,
         borderRadius: AppDimens.borderRadiusListCard,
         border: Border.all(
-          color: isMe ? AppColors.primary : AppColors.mint,
+          color: AppColors.ink,
           width: isMe ? AppDimens.borderThick : AppDimens.borderThin,
         ),
         boxShadow: AppDimens.shadowQuestionCard,
@@ -364,7 +364,7 @@ class _LeaderboardItemCard extends StatelessWidget {
           // Sıra Rozeti (İlk 3 özel rozetli)
           _RankBadge(rank: entry.rank),
 
-          const SizedBox(width: AppDimens.space12),
+          const SizedBox(width: AppDimens.space10),
 
           // Oyuncu Avatarı
           isMe
@@ -381,7 +381,7 @@ class _LeaderboardItemCard extends StatelessWidget {
                   borderWidth: AppDimens.borderThin,
                 ),
 
-          const SizedBox(width: AppDimens.space12),
+          const SizedBox(width: AppDimens.space10),
 
           // Takma Ad
           Expanded(
@@ -408,6 +408,10 @@ class _LeaderboardItemCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: AppDimens.borderRadiusBadge,
+                      border: Border.all(
+                        color: AppColors.ink,
+                        width: 1.0,
+                      ),
                     ),
                     child: Text(
                       AppStrings.you,
@@ -424,18 +428,72 @@ class _LeaderboardItemCard extends StatelessWidget {
 
           const SizedBox(width: AppDimens.space8),
 
-          // Galibiyet Sayısı
-          Text(
-            '${entry.wins}${AppStrings.winsSuffix}',
-            style: AppTextStyles.bodyText.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
+          // Galibiyet Sayısı (Dar ekranda ve büyük yazı tipi ölçeğinde taşmaz)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${entry.wins}${AppStrings.winsSuffix}',
+                style: AppTextStyles.bodyText.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// 3 sivri uçlu vektör taç çizen CustomPainter
+class _CrownPainter extends CustomPainter {
+  final Color color;
+
+  const _CrownPainter({this.color = AppColors.ink});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    final w = size.width;
+    final h = size.height;
+
+    // 3 sivri uçlu taç poligonu
+    final path = Path()
+      ..moveTo(w * 0.12, h * 0.80)
+      ..lineTo(w * 0.04, h * 0.28)
+      ..lineTo(w * 0.35, h * 0.52)
+      ..lineTo(w * 0.50, h * 0.12)
+      ..lineTo(w * 0.65, h * 0.52)
+      ..lineTo(w * 0.96, h * 0.28)
+      ..lineTo(w * 0.88, h * 0.80)
+      ..close();
+
+    canvas.drawPath(path, paint);
+
+    // Taç taban şeridi
+    final basePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(w * 0.10, h * 0.88),
+      Offset(w * 0.90, h * 0.88),
+      basePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrownPainter oldDelegate) =>
+      color != oldDelegate.color;
 }
 
 /// 1., 2., 3. ve diğer sıralar için rozet
@@ -446,56 +504,82 @@ class _RankBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bgColor;
-    Color textColor = AppColors.ink;
-
-    switch (rank) {
-      case 1:
-        bgColor = AppColors.coin;
-        break;
-      case 2:
-        bgColor = AppColors.bright;
-        break;
-      case 3:
-        bgColor = AppColors.mint;
-        break;
-      default:
-        bgColor = Colors.transparent;
-    }
-
     if (rank <= 3) {
-      return Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: bgColor,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: AppColors.ink,
-            width: AppDimens.borderThin,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          '$rank',
-          style: AppTextStyles.playerName.copyWith(
-            color: textColor,
-            fontWeight: FontWeight.w800,
-            fontSize: 15,
+      Color bgColor;
+      Widget content;
+
+      switch (rank) {
+        case 1:
+          bgColor = AppColors.rankGold;
+          content = const CustomPaint(
+            size: Size(18, 14),
+            painter: _CrownPainter(color: AppColors.ink),
+          );
+          break;
+        case 2:
+          bgColor = AppColors.rankSilver;
+          content = Text(
+            '2',
+            style: AppTextStyles.playerName.copyWith(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          );
+          break;
+        case 3:
+        default:
+          bgColor = AppColors.rankBronze;
+          content = Text(
+            '3',
+            style: AppTextStyles.playerName.copyWith(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          );
+          break;
+      }
+
+      return SizedBox(
+        width: 40,
+        child: Center(
+          child: Semantics(
+            label: '$rank. sıra',
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: bgColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.ink,
+                  width: AppDimens.borderThin,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: content,
+            ),
           ),
         ),
       );
     }
 
     return SizedBox(
-      width: 32,
-      child: Text(
-        '#$rank',
-        textAlign: TextAlign.center,
-        style: AppTextStyles.secondaryText.copyWith(
-          color: AppColors.muted,
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
+      width: 40,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          '#$rank',
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          softWrap: false,
+          style: AppTextStyles.secondaryText.copyWith(
+            color: AppColors.muted,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
         ),
       ),
     );
@@ -514,7 +598,7 @@ class _StickyMeBar extends StatelessWidget {
       key: const Key('leaderboard_sticky_me'),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimens.space16,
-        vertical: AppDimens.space14,
+        vertical: AppDimens.space12,
       ),
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -527,19 +611,85 @@ class _StickyMeBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const AppIcon(
-            AppIcons.trophy,
-            size: 24,
-            color: AppColors.coin,
+          // Rozet diliyle tutarlı sıra rozeti
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.space10,
+              vertical: AppDimens.space6,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppDimens.borderRadiusBadge,
+              border: Border.all(
+                color: AppColors.ink,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            child: Text(
+              '#${me.rank}',
+              style: AppTextStyles.playerName.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
           ),
           const SizedBox(width: AppDimens.space12),
+
+          // Metin: "167. sıradasın" ve galibiyet sayısı
           Expanded(
-            child: Text(
-              AppStrings.yourRank(me.rank, me.wins),
-              style: AppTextStyles.cardTitle.copyWith(
-                fontSize: 16,
-                color: AppColors.ink,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${me.rank}. sıradasın',
+                        style: AppTextStyles.cardTitle.copyWith(
+                          fontSize: 15,
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: AppDimens.space6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space6,
+                        vertical: 2.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: AppDimens.borderRadiusBadge,
+                        border: Border.all(
+                          color: AppColors.ink,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Text(
+                        AppStrings.you,
+                        style: AppTextStyles.resultBadge.copyWith(
+                          color: AppColors.card,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${me.wins}${AppStrings.winsSuffix}',
+                  style: AppTextStyles.secondaryText.copyWith(
+                    fontSize: 13,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

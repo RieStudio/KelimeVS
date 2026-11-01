@@ -1070,6 +1070,7 @@ export default {
 
       const body = (await request.json().catch(() => ({}))) as {
         entries?: LeaderboardSeedEntry[];
+        meUid?: unknown;
       };
 
       if (!Array.isArray(body.entries) || body.entries.length === 0) {
@@ -1079,8 +1080,13 @@ export default {
         );
       }
 
+      const meUid =
+        typeof body.meUid === 'string' && body.meUid.trim().length > 0
+          ? body.meUid.trim()
+          : undefined;
+
       const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
-      const result = await leaderboardStub.seedUsers(body.entries);
+      const result = await leaderboardStub.seedUsers(body.entries, undefined, meUid);
       return new Response(JSON.stringify({ success: true, ...result }), {
         status: 200,
         headers: jsonHeaders,
@@ -1102,8 +1108,19 @@ export default {
         });
       }
 
+      const body = (await request.json().catch(() => ({}))) as {
+        clearMeUid?: unknown;
+      };
+
+      const clearMeUid =
+        typeof body?.clearMeUid === 'string' && body.clearMeUid.trim().length > 0
+          ? body.clearMeUid.trim()
+          : undefined;
+
       const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
-      const result = await leaderboardStub.clearSeedUsers();
+      const result = clearMeUid
+        ? await leaderboardStub.clearMeUser(clearMeUid)
+        : await leaderboardStub.clearSeedUsers();
       return new Response(JSON.stringify({ success: true, ...result }), {
         status: 200,
         headers: jsonHeaders,
