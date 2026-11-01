@@ -15,6 +15,7 @@ import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/secondary_button.dart';
+import '../../../main.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
@@ -258,7 +259,13 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     _cancelAllTimers();
     _cancelMatchmakingClient();
     if (mounted) {
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainShell()),
+        );
+      }
     }
   }
 
@@ -304,8 +311,14 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.of(context).disableAnimations;
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _cancelAndExit();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
@@ -453,8 +466,9 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDot(int index, Color color, bool disableAnimations) {
     final isActive = index == _activeDotIndex;

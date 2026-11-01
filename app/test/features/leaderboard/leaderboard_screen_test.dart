@@ -6,11 +6,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/widgets/secondary_button.dart';
+import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/leaderboard/application/leaderboard_providers.dart';
 import 'package:app/features/leaderboard/data/leaderboard_api_client.dart';
 import 'package:app/features/leaderboard/domain/models/leaderboard_models.dart';
 import 'package:app/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/online/data/matchmaking_client.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
+
+class _FakeMatchmakingClient extends MatchmakingClient {
+  final StreamController<MatchmakingEvent> _controller =
+      StreamController<MatchmakingEvent>.broadcast(sync: true);
+
+  @override
+  Stream<MatchmakingEvent> get events => _controller.stream;
+
+  @override
+  Future<void> start(String name) async {}
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+}
 
 class _TestProfileNotifier extends ProfileNotifier {
   final ProfileState _state;
@@ -51,6 +74,7 @@ Widget createLeaderboardScreen({
   return ProviderScope(
     overrides: [
       leaderboardApiClientProvider.overrideWithValue(client),
+      matchmakingClientFactoryProvider.overrideWithValue(() => _FakeMatchmakingClient()),
       if (profileState != null)
         profileProvider.overrideWith(
           () => _TestProfileNotifier(profileState),
@@ -675,5 +699,80 @@ void main() {
       final winsText11 = find.descendant(of: card11, matching: find.text('22 galibiyet'));
       expect(tester.widget<Text>(winsText11).style?.color, AppColors.primary);
     });
+
+    testWidgets(
+      '13. Boş sıralama ekranı -> Hızlı Maç -> Vazgeç -> Sıralama ekranına güvenli dönüş (siyah ekran oluşmaz)',
+      (tester) async {
+        final fakeClient = FakeLeaderboardApiClient(
+          dataToReturn: const LeaderboardData(
+            weekKey: '2026-W42',
+            endsAt: 1792357200000,
+            top: [],
+            me: null,
+          ),
+        );
+
+        await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('leaderboard_empty')), findsOneWidget);
+        expect(find.text(AppStrings.quickMatch), findsOneWidget);
+
+        // Hızlı Maç butonuna dokun
+        await tester.tap(find.text(AppStrings.quickMatch));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // Eşleşme ekranı açılmış olmalı
+        expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+        // Vazgeç butonuna dokun
+        final cancelButton = find.widgetWithText(SecondaryButton, AppStrings.cancel);
+        expect(cancelButton, findsOneWidget);
+        await tester.tap(cancelButton);
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        // MatchmakingScreen kapanmış ve LeaderboardScreen (boş durum) geri gelmiş olmalı (siyah ekran yok)
+        expect(find.byType(MatchmakingScreen), findsNothing);
+        expect(find.byKey(const Key('leaderboard_screen')), findsOneWidget);
+        expect(find.byKey(const Key('leaderboard_empty')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      '14. Boş sıralama ekranı -> Hızlı Maç -> Sistem geri hareketi -> Sıralama ekranına güvenli dönüş',
+      (tester) async {
+        final fakeClient = FakeLeaderboardApiClient(
+          dataToReturn: const LeaderboardData(
+            weekKey: '2026-W42',
+            endsAt: 1792357200000,
+            top: [],
+            me: null,
+          ),
+        );
+
+        await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+        await tester.pumpAndSettle();
+
+        // Hızlı Maç butonuna dokun
+        await tester.tap(find.text(AppStrings.quickMatch));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+        // Sistem geri hareketini simüle et
+        final didPop = await tester.binding.handlePopRoute();
+        expect(didPop, isTrue);
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        // MatchmakingScreen kapanmış ve LeaderboardScreen geri gelmiş olmalı
+        expect(find.byType(MatchmakingScreen), findsNothing);
+        expect(find.byKey(const Key('leaderboard_screen')), findsOneWidget);
+        expect(find.byKey(const Key('leaderboard_empty')), findsOneWidget);
+      },
+    );
   });
 }

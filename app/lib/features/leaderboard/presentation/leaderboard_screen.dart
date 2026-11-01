@@ -116,7 +116,7 @@ class LeaderboardScreen extends ConsumerWidget {
       return _EmptyView(
         onPlay: () {
           if (!ensureNetworkConnected(context, ref)) return;
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const MatchmakingScreen(),
             ),

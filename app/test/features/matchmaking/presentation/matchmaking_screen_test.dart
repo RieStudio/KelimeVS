@@ -15,6 +15,7 @@ import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 import 'package:app/features/online/application/online_match_session.dart';
+import 'package:app/main.dart';
 import 'package:app/features/online/data/matchmaking_client.dart';
 import 'package:app/features/online/data/online_match_client.dart';
 import 'package:app/features/online/domain/models/online_messages.dart';
@@ -451,6 +452,92 @@ void main() {
 
       final tipAfter = tester.widget<MatchTipCard>(tipCardFinder).tip;
       expect(tipAfter, equals(tipBefore));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '7. Yığın boşken (canPop == false) Vazgeç butonuna basılınca siyah ekran yerine MainShell\'e döner',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            onlineMatchmakingEnabledProvider.overrideWithValue(true),
+          ],
+          child: const MaterialApp(
+            home: MatchmakingScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+      // canPop == false iken Vazgeç'e bas
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Siyah ekran oluşmaz, MainShell açılır
+      expect(find.byType(MatchmakingScreen), findsNothing);
+      expect(find.byType(MainShell), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '8. Sistem geri hareketi (PopScope) tetiklendiğinde _cancelAndExit çalışır, client iptal edilir ve ekran kapanır',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      // Üstte bir sayfa var gibi push edilmiş MaterialApp
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            onlineMatchmakingEnabledProvider.overrideWithValue(true),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const MatchmakingScreen()),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+      // Sistem geri hareketini simüle et
+      final didPop = await tester.binding.handlePopRoute();
+      expect(didPop, isTrue);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(mmClient.cancelCalled, isTrue);
+      expect(find.byType(MatchmakingScreen), findsNothing);
+      expect(find.text('Open'), findsOneWidget);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
