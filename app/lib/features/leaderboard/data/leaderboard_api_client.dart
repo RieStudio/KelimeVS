@@ -42,7 +42,7 @@ class HttpLeaderboardApiClient implements LeaderboardApiClient {
           await client.getUrl(uri).timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response =
           await request.close().timeout(const Duration(seconds: 8));

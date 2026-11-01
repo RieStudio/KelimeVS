@@ -85,6 +85,39 @@
             "isEquipped": false,
             "kind": "visual",
             "tier": "premium"
+          },
+          {
+            "id": "gear",
+            "name": "Dişli",
+            "cost": 100,
+            "description": "Mekanik hassasiyetli dişli çerçeve",
+            "order": 15,
+            "isOwned": false,
+            "isEquipped": false,
+            "kind": "visual",
+            "tier": "basic"
+          },
+          {
+            "id": "ice",
+            "name": "Buz",
+            "cost": 250,
+            "description": "Soğuk ve keskin kristal buz çerçevesi",
+            "order": 16,
+            "isOwned": false,
+            "isEquipped": false,
+            "kind": "visual",
+            "tier": "medium"
+          },
+          {
+            "id": "nazar",
+            "name": "Nazar Boncuğu",
+            "cost": 300,
+            "description": "Geleneksel koruyucu nazar boncuğu çerçevesi",
+            "order": 17,
+            "isOwned": false,
+            "isEquipped": false,
+            "kind": "visual",
+            "tier": "medium"
           }
         ]
       }

@@ -213,7 +213,7 @@ class PlayerAvatar extends StatelessWidget {
         ),
       );
     } else {
-      // Prosedürel çerçeveler (classic, mint, sunset, ocean, gold, neon, rainbow, diamond veya bilinmeyen)
+      // Klasik çerçeve veya bilinmeyen/fallback çerçeveler
       avatarContent = Container(
         width: size,
         height: size,

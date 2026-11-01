@@ -32,7 +32,9 @@ class StoreFrameCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canAfford = userCoins >= item.price;
-    final displayName = AppStrings.frameDisplayName(item.id);
+    final displayName = item.name.trim().isNotEmpty
+        ? item.name.trim()
+        : AppStrings.frameDisplayName(item.id);
 
     return Semantics(
       container: true,

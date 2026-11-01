@@ -477,6 +477,14 @@ abstract final class AppStrings {
   static const String frameSilverEngraved = 'Gümüş Oyma';
   static const String frameBronzeEngraved = 'Bronz Oyma';
   static const String frameGoldLeaf = 'Altın Yaprak';
+  static const String frameEmerald = 'Zümrüt';
+  static const String frameSakura = 'Kiraz Çiçeği';
+  static const String frameIce = 'Buz';
+  static const String frameGear = 'Dişli';
+  static const String frameNazar = 'Nazar Boncuğu';
+
+  static String frameMigrationNotice(int refundedCoins) =>
+      'Eski çerçeveler kaldırıldı, $refundedCoins jeton hesabına iade edildi.';
 
   static String frameDisplayName(String frameId) {
     switch (frameId.toLowerCase()) {
@@ -502,6 +510,16 @@ abstract final class AppStrings {
         return frameBronzeEngraved;
       case 'gold_leaf':
         return frameGoldLeaf;
+      case 'emerald':
+        return frameEmerald;
+      case 'sakura':
+        return frameSakura;
+      case 'ice':
+        return frameIce;
+      case 'gear':
+        return frameGear;
+      case 'nazar':
+        return frameNazar;
       case 'classic':
       default:
         return frameClassic;

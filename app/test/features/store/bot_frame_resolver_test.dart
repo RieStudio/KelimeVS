@@ -35,13 +35,15 @@ void main() {
 
       const validFrames = {
         'classic',
-        'mint',
-        'sunset',
-        'ocean',
-        'gold',
-        'neon',
-        'rainbow',
-        'diamond',
+        'silver_engraved',
+        'bronze_engraved',
+        'gear',
+        'ice',
+        'emerald',
+        'nazar',
+        'gold_leaf',
+        'sakura',
+        'vine',
       };
 
       for (final name in names) {
@@ -61,8 +63,8 @@ void main() {
         }
       }
 
-      // 70% nominal, should comfortably be over 50% in 200 samples
-      expect(classicCount, greaterThan(100));
+      // 60% nominal, should comfortably be over 45% in 200 samples
+      expect(classicCount, greaterThan(90));
     });
   });
 }

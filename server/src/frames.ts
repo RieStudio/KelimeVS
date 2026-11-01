@@ -96,6 +96,36 @@ export const FRAME_CATALOG: readonly FrameCatalogItem[] = [
     tier: 'premium',
     minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
   },
+  {
+    id: 'gear',
+    name: 'Dişli',
+    cost: 100,
+    description: 'Mekanik hassasiyetli dişli çerçeve',
+    order: 15,
+    kind: 'visual',
+    tier: 'basic',
+    minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
+  },
+  {
+    id: 'ice',
+    name: 'Buz',
+    cost: 250,
+    description: 'Soğuk ve keskin kristal buz çerçevesi',
+    order: 16,
+    kind: 'visual',
+    tier: 'medium',
+    minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
+  },
+  {
+    id: 'nazar',
+    name: 'Nazar Boncuğu',
+    cost: 300,
+    description: 'Geleneksel koruyucu nazar boncuğu çerçevesi',
+    order: 17,
+    kind: 'visual',
+    tier: 'medium',
+    minClientBuild: DEFAULT_VISUAL_FRAMES_MIN_BUILD,
+  },
 ];
 
 export function isValidFrameId(id: string): boolean {

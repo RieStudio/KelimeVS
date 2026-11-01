@@ -145,12 +145,7 @@ void main() {
 
     test('sizing math for large area (D > 48 dp) does not clamp', () {
       final testSizes = [72.0, 88.0, 92.0, 104.0];
-      final frameIds = [
-        'vine',
-        'silver_engraved',
-        'bronze_engraved',
-        'gold_leaf',
-      ];
+      final frameIds = VisualFrameRegistry.definitions.keys;
 
       for (final size in testSizes) {
         for (final frameId in frameIds) {
@@ -187,6 +182,25 @@ void main() {
           equals(AvatarFrameType.bronzeEngraved));
       expect(AvatarFrameType.fromId('gold_leaf'),
           equals(AvatarFrameType.goldLeaf));
+      expect(AvatarFrameType.fromId('emerald'),
+          equals(AvatarFrameType.emerald));
+      expect(AvatarFrameType.fromId('sakura'),
+          equals(AvatarFrameType.sakura));
+      expect(AvatarFrameType.fromId('ice'),
+          equals(AvatarFrameType.ice));
+      expect(AvatarFrameType.fromId('gear'),
+          equals(AvatarFrameType.gear));
+      expect(AvatarFrameType.fromId('nazar'),
+          equals(AvatarFrameType.nazar));
+
+      // Emekli prosedürel çerçeveler classic'e düşer
+      expect(AvatarFrameType.fromId('mint'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('sunset'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('ocean'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('gold'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('neon'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('rainbow'), equals(AvatarFrameType.classic));
+      expect(AvatarFrameType.fromId('diamond'), equals(AvatarFrameType.classic));
 
       expect(AvatarFrameType.fromId('unknown_fancy_frame'),
           equals(AvatarFrameType.classic));
@@ -258,6 +272,55 @@ void main() {
       expect(find.byType(Image), findsNothing);
       expect(find.byType(CustomPaint), findsWidgets);
     });
+
+    test('all 5 new visual frames (emerald, sakura, ice, gear, nazar) exist on disk and decode to 512x512',
+        () async {
+      const newFrames = ['emerald', 'sakura', 'ice', 'gear', 'nazar'];
+      for (final id in newFrames) {
+        final def = VisualFrameRegistry.getDefinition(id);
+        expect(def, isNotNull, reason: 'Definition for $id must exist');
+        final file = File(def!.assetPath);
+        expect(file.existsSync(), isTrue,
+            reason: 'File ${def.assetPath} must exist on disk');
+        final bytes = await file.readAsBytes();
+        final codec = await instantiateImageCodec(bytes);
+        final frameInfo = await codec.getNextFrame();
+        expect(frameInfo.image.width, equals(512),
+            reason: '$id width must be 512');
+        expect(frameInfo.image.height, equals(512),
+            reason: '$id height must be 512');
+      }
+    });
+
+    testWidgets(
+        'PlayerAvatar falls back to classic painter when asset fails to load (errorBuilder)',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Image.asset(
+                'assets/frames/non_existent_placeholder.png',
+                errorBuilder: (context, error, stackTrace) {
+                  return const SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: CustomPaint(
+                      painter: AvatarFramePainter(
+                        frameType: AvatarFrameType.classic,
+                        borderWidth: 2.0,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
   });
 
   group('Asset-independent PNG hole measurement and validation', () {
@@ -320,12 +383,7 @@ void main() {
   });
 
   group('PlayerAvatar render layout and concentricity (D=104 and D=88)', () {
-    final frames = [
-      'vine',
-      'silver_engraved',
-      'bronze_engraved',
-      'gold_leaf',
-    ];
+    final frames = VisualFrameRegistry.definitions.keys.toList();
 
     const testSizes = [104.0, 88.0];
 

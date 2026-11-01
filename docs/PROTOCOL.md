@@ -496,9 +496,9 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 - **`X-App-Build` Başlığı:** HTTP isteklerinde gönderilen tamsayı istemci derleme numarasıdır (örn. `X-App-Build: 11`). Başlık eksikse veya sayısal değilse sunucu bunu `0` kabul eder.
 - **Katalog ve Sürüm Filtresi:** Çerçevelerin `minClientBuild` ve `retiredFromBuild` değerleri vardır:
   - Prosedürel çerçeveler: `classic` hariç 7 tanesi (`mint`, `sunset`, `ocean`, `gold`, `neon`, `rainbow`, `diamond`) `retiredFromBuild: 11` olarak işaretlenmiştir. `classic` (ücretsiz) kalıcıdır.
-  - Yeni görsel PNG çerçeveler: `bronze_engraved` (250), `silver_engraved` (400), `gold_leaf` (600), `vine` (900), `emerald` (150), `sakura` (700) için `minClientBuild: 11`.
+  - Yeni görsel PNG çerçeveler: `gear` (100), `emerald` (150), `bronze_engraved` (250), `ice` (250), `nazar` (300), `silver_engraved` (400), `gold_leaf` (600), `sakura` (700), `vine` (900) için `minClientBuild: 11`.
   - `clientBuild < 11`: Eski 8 prosedürel çerçeve listelenir, satın alınabilir ve kuşanılabilir.
-  - `clientBuild >= 11`: Emekli çerçeveler `GET /store` listesinden gizlenir; sadece `classic` ve 6 görsel çerçeve (toplam 7) listelenir.
+  - `clientBuild >= 11`: Emekli çerçeveler `GET /store` listesinden gizlenir; sadece `classic` ve 9 görsel çerçeve (toplam 10) listelenir.
 - `GET /store`: Mağaza durumu ve katalog ürünlerini döndürür. İstemci `clientBuild >= 11` ise arka planda iadeli geçişi de tetikler:
   ```json
   {

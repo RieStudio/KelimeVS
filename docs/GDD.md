@@ -200,8 +200,11 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 - **Katalog ve Fiyatlandırma:** Çerçeve fiyatları ve katalog tanımları sunucuda (`server/src/frames.ts`) tutulur.
   - **Kalıcı Temel Çerçeve:** `classic` (Klasik, 0 jeton, ücretsiz ve varsayılan).
   - **Görsel (PNG) Çerçeveler (`minClientBuild: 11`):**
+    - `gear` (Dişli, 100 jeton, tier: basic)
     - `emerald` (Zümrüt, 150 jeton, tier: medium)
     - `bronze_engraved` (Bronz Oyma, 250 jeton, tier: basic)
+    - `ice` (Buz, 250 jeton, tier: medium)
+    - `nazar` (Nazar Boncuğu, 300 jeton, tier: medium)
     - `silver_engraved` (Gümüş Oyma, 400 jeton, tier: basic)
     - `gold_leaf` (Altın Yaprak, 600 jeton, tier: medium)
     - `sakura` (Kiraz Çiçeği, 700 jeton, tier: premium)

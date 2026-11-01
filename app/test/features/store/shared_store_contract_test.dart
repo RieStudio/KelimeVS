@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/core/network/app_build_info.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/features/online/data/auth_token_provider.dart';
 import 'package:app/features/store/data/store_api_client.dart';
@@ -136,6 +137,7 @@ void main() {
     late Map<String, dynamic> contract;
 
     setUpAll(() {
+      AppBuildInfo.setMockBuildNumber(11);
       final file = _resolveSharedFile('test-vectors/store_contract.json');
       expect(file.existsSync(), isTrue);
       contract = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
@@ -148,7 +150,7 @@ void main() {
       final body = resp200['body'] as Map<String, dynamic>;
 
       final rawItems = body['items'] as List<dynamic>;
-      expect(rawItems.length, equals(7));
+      expect(rawItems.length, equals(10));
 
       // Her öğeyi StoreItem.fromJson ile ayrıştır ve alan adı doğruluğunu sına
       for (final raw in rawItems) {
@@ -183,7 +185,7 @@ void main() {
       expect(state, isNotNull);
       expect(state!.coins, equals(body['coins']));
       expect(state.equippedFrame, equals(body['equippedFrame']));
-      expect(state.items.length, equals(7));
+      expect(state.items.length, equals(10));
     });
 
     test('2. POST /store/purchase istek ve yanıt sözleşmesi istemciyle birebir uyumludur',

@@ -49,6 +49,36 @@ abstract final class VisualFrameRegistry {
       innerRatio: 0.809,
       fileName: 'frame_gold.png',
     ),
+    'emerald': VisualFrameDefinition(
+      id: 'emerald',
+      assetPath: 'assets/frames/frame_emerald.png',
+      innerRatio: 0.809,
+      fileName: 'frame_emerald.png',
+    ),
+    'sakura': VisualFrameDefinition(
+      id: 'sakura',
+      assetPath: 'assets/frames/frame_sakura.png',
+      innerRatio: 0.693,
+      fileName: 'frame_sakura.png',
+    ),
+    'ice': VisualFrameDefinition(
+      id: 'ice',
+      assetPath: 'assets/frames/frame_ice.png',
+      innerRatio: 0.725,
+      fileName: 'frame_ice.png',
+    ),
+    'gear': VisualFrameDefinition(
+      id: 'gear',
+      assetPath: 'assets/frames/frame_gear.png',
+      innerRatio: 0.797,
+      fileName: 'frame_gear.png',
+    ),
+    'nazar': VisualFrameDefinition(
+      id: 'nazar',
+      assetPath: 'assets/frames/frame_nazar.png',
+      innerRatio: 0.8,
+      fileName: 'frame_nazar.png',
+    ),
   };
 
   static VisualFrameDefinition? getDefinition(String? frameId) {
@@ -119,7 +149,7 @@ abstract final class VisualFrameRegistry {
     );
   }
 
-  /// İlk kareden sonra arka planda 4 görseli önbelleğe alır.
+  /// İlk kareden sonra arka planda görsel çerçeveleri önbelleğe alır.
   static void precacheFrames(BuildContext context) {
     for (final def in definitions.values) {
       precacheImage(AssetImage(def.assetPath), context);

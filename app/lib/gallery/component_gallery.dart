@@ -914,11 +914,15 @@ class FrameGallerySectionState extends State<FrameGallerySection> {
             children: [
               for (final frame in [
                 ('classic', 'Klasik'),
-                ('diamond', 'Elmas'),
                 ('vine', 'Sarmaşık'),
                 ('silver_engraved', 'Gümüş'),
                 ('bronze_engraved', 'Bronz'),
                 ('gold_leaf', 'Altın'),
+                ('emerald', 'Zümrüt'),
+                ('sakura', 'Kiraz Çiçeği'),
+                ('ice', 'Buz'),
+                ('gear', 'Dişli'),
+                ('nazar', 'Nazar Boncuğu'),
               ])
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),

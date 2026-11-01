@@ -20,6 +20,7 @@ class ProfileState {
   final EnergyState? energy;
   final int? serverNowMs;
   final UserStats stats;
+  final FrameMigrationInfo? pendingMigrationNotice;
 
   const ProfileState({
     this.nickname,
@@ -31,6 +32,7 @@ class ProfileState {
     this.energy,
     this.serverNowMs,
     this.stats = const UserStats(),
+    this.pendingMigrationNotice,
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -47,6 +49,8 @@ class ProfileState {
     EnergyState? energy,
     int? serverNowMs,
     UserStats? stats,
+    FrameMigrationInfo? pendingMigrationNotice,
+    bool clearMigrationNotice = false,
   }) {
     return ProfileState(
       nickname: clearNickname ? null : (nickname ?? this.nickname),
@@ -58,6 +62,9 @@ class ProfileState {
       energy: energy ?? this.energy,
       serverNowMs: serverNowMs ?? this.serverNowMs,
       stats: stats ?? this.stats,
+      pendingMigrationNotice: clearMigrationNotice
+          ? null
+          : (pendingMigrationNotice ?? this.pendingMigrationNotice),
     );
   }
 }
@@ -138,6 +145,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           serverNowMs: remote.serverNowMs,
           stats: remote.stats,
           clearSyncError: true,
+          pendingMigrationNotice: remote.frameMigration,
         );
 
         // 2. Takma ad senkronizasyonu (Kural 2)
@@ -358,6 +366,13 @@ class ProfileNotifier extends Notifier<ProfileState> {
       isLoaded: true,
       stats: UserStats(),
     );
+  }
+
+  /// Göç bildirimini temizler.
+  void clearMigrationNotice() {
+    if (state.pendingMigrationNotice != null) {
+      state = state.copyWith(clearMigrationNotice: true);
+    }
   }
 }
 

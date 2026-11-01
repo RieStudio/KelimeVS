@@ -130,6 +130,20 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<ProfileState>(profileProvider, (previous, next) {
+      final notice = next.pendingMigrationNotice;
+      if (notice != null && notice.refundedCoins > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showSnackBar(
+            context,
+            AppStrings.frameMigrationNotice(notice.refundedCoins),
+          );
+          ref.read(profileProvider.notifier).clearMigrationNotice();
+        });
+      }
+    });
+
     final storeState = ref.watch(storeNotifierProvider);
     final profile = ref.watch(profileProvider);
     final playerName =

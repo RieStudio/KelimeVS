@@ -106,9 +106,9 @@ describe('Store & Avatar Frames - Server Tests', () => {
     // Varsayılan çağrıda (clientBuild = 0) sadece 8 prosedürel çerçeve döner
     expect(storeState.items.length).toBe(8);
 
-    // clientBuild >= 11 verildiğinde 7 aktif çerçeve döner (classic + 6 görsel, 7 emekli hariç)
+    // clientBuild >= 11 verildiğinde 10 aktif çerçeve döner (classic + 9 görsel, 7 emekli hariç)
     const fullStoreState = await profile.getStoreState('user_1', 11);
-    expect(fullStoreState.items.length).toBe(7);
+    expect(fullStoreState.items.length).toBe(10);
 
     const classic = storeState.items.find((i) => i.id === 'classic');
     expect(classic).toBeDefined();
@@ -568,7 +568,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
       }
     });
 
-    it('B. GET /store: X-App-Build >= 11 olduğunda classic + 6 görsel çerçeve döner (emekliler gizlenir)', async () => {
+    it('B. GET /store: X-App-Build >= 11 olduğunda classic + 9 görsel çerçeve döner (emekliler gizlenir)', async () => {
       const { env } = setupServer();
 
       for (const build of ['11', '12', '100']) {
@@ -583,7 +583,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
         const res = await worker.fetch(req, env);
         expect(res.status).toBe(200);
         const data = (await res.json()) as any;
-        expect(data.items.length).toBe(7);
+        expect(data.items.length).toBe(10);
 
         // Yeni görsel çerçeveleri doğrula
         const vine = data.items.find((i: any) => i.id === 'vine');
@@ -781,7 +781,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
       const data11 = (await res11.json()) as any;
       expect(data11.items.length).toBe(8);
 
-      // Build 15 ile sorguladığımızda 7 modern çerçeve döner (classic + 6 görsel, emekliler hariç)
+      // Build 15 ile sorguladığımızda 10 modern çerçeve döner (classic + 9 görsel, emekliler hariç)
       const req15 = new Request('http://127.0.0.1/store', {
         method: 'GET',
         headers: {
@@ -791,7 +791,7 @@ describe('Store & Avatar Frames - Server Tests', () => {
       });
       const res15 = await worker.fetch(req15, env);
       const data15 = (await res15.json()) as any;
-      expect(data15.items.length).toBe(7);
+      expect(data15.items.length).toBe(10);
     });
   });
 
@@ -843,13 +843,13 @@ describe('Store & Avatar Frames - Server Tests', () => {
       const data10 = (await res10.json()) as any;
       expect(data10.items.length).toBe(8);
 
-      // Build 11: Emekliler filtrelenir; classic + 6 görsel çerçeve döner (toplam 7)
+      // Build 11: Emekliler filtrelenir; classic + 9 görsel çerçeve döner (toplam 10)
       const req11 = new Request('http://127.0.0.1/store', {
         headers: { Authorization: 'Bearer dev:u_build_11', 'X-App-Build': '11' },
       });
       const res11 = await worker.fetch(req11, env);
       const data11 = (await res11.json()) as any;
-      expect(data11.items.length).toBe(7);
+      expect(data11.items.length).toBe(10);
       expect(data11.items.map((i: any) => i.id)).toEqual([
         'classic',
         'bronze_engraved',
@@ -858,6 +858,9 @@ describe('Store & Avatar Frames - Server Tests', () => {
         'vine',
         'emerald',
         'sakura',
+        'gear',
+        'ice',
+        'nazar',
       ]);
     });
 

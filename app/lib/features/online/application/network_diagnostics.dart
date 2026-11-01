@@ -150,7 +150,7 @@ class NetworkDiagnostics {
     final client = HttpClient()..connectionTimeout = timeout;
     try {
       final request = await client.getUrl(uri).timeout(timeout);
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       final response = await request.close().timeout(timeout);
 
       // Gövde içeriğini güvenli bir şekilde tüket, ancak hiçbir yere kaydetme

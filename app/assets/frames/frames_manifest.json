@@ -18,5 +18,30 @@
     "id": "bronze",
     "file": "frame_bronze.png",
     "innerRatio": 0.821
+  },
+  {
+    "id": "emerald",
+    "file": "frame_emerald.png",
+    "innerRatio": 0.809
+  },
+  {
+    "id": "sakura",
+    "file": "frame_sakura.png",
+    "innerRatio": 0.693
+  },
+  {
+    "id": "ice",
+    "file": "frame_ice.png",
+    "innerRatio": 0.725
+  },
+  {
+    "id": "gear",
+    "file": "frame_gear.png",
+    "innerRatio": 0.797
+  },
+  {
+    "id": "nazar",
+    "file": "frame_nazar.png",
+    "innerRatio": 0.8
   }
 ]

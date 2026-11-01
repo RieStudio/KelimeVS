@@ -87,7 +87,7 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       final request = await client.getUrl(uri).timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(const Duration(seconds: 8));
       final responseBody = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
@@ -121,7 +121,7 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       final request = await client.deleteUrl(uri).timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
@@ -153,7 +153,7 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(const Duration(seconds: 8));
       final responseBody = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 8));
@@ -199,7 +199,7 @@ class HttpBlockedUsersApiClient implements BlockedUsersApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       request.add(utf8.encode(jsonEncode({'reason': reason})));
 
       final response = await request.close().timeout(const Duration(seconds: 8));

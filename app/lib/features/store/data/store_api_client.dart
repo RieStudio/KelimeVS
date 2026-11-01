@@ -182,7 +182,7 @@ class HttpStoreApiClient implements StoreApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),
@@ -240,7 +240,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       request.add(utf8.encode(jsonEncode({'itemId': itemId})));
 
       final response = await request.close().timeout(
@@ -301,7 +301,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       request.add(
         utf8.encode(jsonEncode({'frameId': frameId, 'frame': frameId})),
       );
@@ -365,7 +365,7 @@ class HttpStoreApiClient implements StoreApiClient {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       request.add(utf8.encode(jsonEncode({'pack': pack})));
 
       final response = await request.close().timeout(

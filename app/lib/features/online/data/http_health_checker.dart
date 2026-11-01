@@ -54,7 +54,7 @@ class IoHttpHealthChecker implements HttpHealthChecker {
 
     try {
       final request = await client.getUrl(uri).timeout(timeout);
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       final response = await request.close().timeout(timeout);
       final responseBody =
           await response.transform(utf8.decoder).join().timeout(timeout);

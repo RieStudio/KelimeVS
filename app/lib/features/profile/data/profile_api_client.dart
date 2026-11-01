@@ -67,6 +67,26 @@ class UserStats {
       played.hashCode ^ won.hashCode ^ lost.hashCode ^ correctAnswers.hashCode;
 }
 
+class FrameMigrationInfo {
+  final int refundedCoins;
+  final List<String> removedFrames;
+
+  const FrameMigrationInfo({
+    required this.refundedCoins,
+    required this.removedFrames,
+  });
+
+  factory FrameMigrationInfo.fromJson(Map<String, dynamic> json) {
+    return FrameMigrationInfo(
+      refundedCoins: (json['refundedCoins'] as num?)?.toInt() ?? 0,
+      removedFrames: (json['removedFrames'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+    );
+  }
+}
+
 class UserProfileModel {
   final String uid;
   final String? nickname;
@@ -76,6 +96,7 @@ class UserProfileModel {
   final String equippedFrame;
   final EnergyState? energy;
   final int? serverNowMs;
+  final FrameMigrationInfo? frameMigration;
 
   const UserProfileModel({
     required this.uid,
@@ -86,6 +107,7 @@ class UserProfileModel {
     this.equippedFrame = 'classic',
     this.energy,
     this.serverNowMs,
+    this.frameMigration,
   });
 
   int get played => stats.played;
@@ -98,6 +120,7 @@ class UserProfileModel {
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     final statsJson = json['stats'] as Map<String, dynamic>?;
     final energyJson = json['energy'] as Map<String, dynamic>?;
+    final migrationJson = json['frameMigration'] as Map<String, dynamic>?;
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
       nickname: json['nickname'] as String?,
@@ -107,6 +130,9 @@ class UserProfileModel {
       equippedFrame: json['equippedFrame'] as String? ?? 'classic',
       energy: energyJson != null ? EnergyState.fromJson(energyJson) : null,
       serverNowMs: (json['serverNowMs'] as num?)?.toInt(),
+      frameMigration: migrationJson != null
+          ? FrameMigrationInfo.fromJson(migrationJson)
+          : null,
     );
   }
 }
@@ -166,7 +192,7 @@ class HttpProfileApiClient implements ProfileApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),
@@ -211,7 +237,7 @@ class HttpProfileApiClient implements ProfileApiClient {
         HttpHeaders.contentTypeHeader,
         'application/json; charset=utf-8',
       );
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final bodyBytes = utf8.encode(jsonEncode({'nickname': nickname}));
       request.contentLength = bodyBytes.length;
@@ -267,7 +293,7 @@ class HttpProfileApiClient implements ProfileApiClient {
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
 
       final response = await request.close().timeout(
         const Duration(seconds: 8),

@@ -71,7 +71,7 @@ class DefaultNetworkService implements NetworkService {
       final request = await client
           .getUrl(uri)
           .timeout(const Duration(milliseconds: 2500));
-      AppBuildInfo.applyHeaders(request.headers);
+      await AppBuildInfo.applyHeaders(request.headers);
       final response =
           await request.close().timeout(const Duration(milliseconds: 2500));
 

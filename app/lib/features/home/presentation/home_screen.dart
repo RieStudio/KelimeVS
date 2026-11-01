@@ -39,6 +39,29 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<ProfileState>(profileProvider, (previous, next) {
+      final notice = next.pendingMigrationNotice;
+      if (notice != null && notice.refundedCoins > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppStrings.frameMigrationNotice(notice.refundedCoins),
+                style: const TextStyle(
+                  fontFamily: AppTextStyles.fontNunito,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              backgroundColor: AppColors.ink,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          ref.read(profileProvider.notifier).clearMigrationNotice();
+        });
+      }
+    });
+
     ref.watch(networkStatusProvider);
     final historyAsync = ref.watch(matchHistoryProvider);
     final profile = ref.watch(profileProvider);
