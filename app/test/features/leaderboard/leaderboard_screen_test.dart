@@ -4,10 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/features/leaderboard/application/leaderboard_providers.dart';
 import 'package:app/features/leaderboard/data/leaderboard_api_client.dart';
 import 'package:app/features/leaderboard/domain/models/leaderboard_models.dart';
 import 'package:app/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
+
+class _TestProfileNotifier extends ProfileNotifier {
+  final ProfileState _state;
+  _TestProfileNotifier(this._state);
+
+  @override
+  ProfileState build() => _state;
+}
 
 class FakeLeaderboardApiClient implements LeaderboardApiClient {
   LeaderboardData? dataToReturn;
@@ -35,10 +46,15 @@ class FakeLeaderboardApiClient implements LeaderboardApiClient {
 
 Widget createLeaderboardScreen({
   required LeaderboardApiClient client,
+  ProfileState? profileState,
 }) {
   return ProviderScope(
     overrides: [
       leaderboardApiClientProvider.overrideWithValue(client),
+      if (profileState != null)
+        profileProvider.overrideWith(
+          () => _TestProfileNotifier(profileState),
+        ),
     ],
     child: const MaterialApp(
       home: LeaderboardScreen(),
@@ -99,7 +115,7 @@ void main() {
       expect(find.text('Lider'), findsOneWidget);
     });
 
-    testWidgets('3. Dolu listede 1., 2. ve 3. sıra rozetleri ve kullanıcı vurgusu doğrulanır',
+    testWidgets('3. Dolu listede 1., 2. ve 3. sıra rozetleri ve kullanıcı vurgusu (turuncu zemin, ink metin, SEN etiketsiz) doğrulanır',
         (tester) async {
       final fakeClient = FakeLeaderboardApiClient(
         dataToReturn: const LeaderboardData(
@@ -124,14 +140,55 @@ void main() {
       expect(find.text('Ucuncu'), findsOneWidget);
       expect(find.text('Dorduncu'), findsOneWidget);
 
-      // Kullanıcı vurgusu (Sen rozeti)
-      expect(find.text(AppStrings.you), findsOneWidget);
+      // Kullanıcı vurgusu: "SEN" metin rozeti kaldırıldı, kart zemini AppColors.selfHighlight oldu
+      expect(find.text(AppStrings.you), findsNothing);
+
+      final myDecoratedBox = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_2')),
+          matching: find.byType(DecoratedBox),
+        ).first,
+      );
+      final boxDecoration = myDecoratedBox.decoration as BoxDecoration;
+      expect(boxDecoration.color, AppColors.selfHighlight);
+
+      // Kullanıcının galibiyet metni yeşil yerine AppColors.ink olmalı
+      final myWinsText = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_2')),
+          matching: find.text('12 galibiyet'),
+        ),
+      );
+      expect(myWinsText.style?.color, AppColors.ink);
+
+      // 1. kartın zemini ise AppColors.card (beyaz), galibiyet metni AppColors.primary
+      final firstDecoratedBox = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_1')),
+          matching: find.byType(DecoratedBox),
+        ).first,
+      );
+      final firstDecoration = firstDecoratedBox.decoration as BoxDecoration;
+      expect(firstDecoration.color, AppColors.card);
+
+      final firstWinsText = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_1')),
+          matching: find.text('15 galibiyet'),
+        ),
+      );
+      expect(firstWinsText.style?.color, AppColors.primary);
 
       // Kullanıcı zaten ilk 100'de olduğu için yapışkan alt çubuk gösterilmez
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsNothing);
+
+      // Çubuk görünmediğinde ListView alt padding'i screenPaddingHorizontal (20.0) olmalı
+      final listView = tester.widget<ListView>(find.byKey(const Key('leaderboard_list')));
+      final insets = listView.padding as EdgeInsets;
+      expect(insets.bottom, AppDimens.screenPaddingHorizontal);
     });
 
-    testWidgets('4. Kullanıcı ilk 100 dışındaysa yapışkan alt çubukta sırası gösterilir',
+    testWidgets('4. Kullanıcı ilk 100 dışındaysa yapışkan alt çubuk satır kartı düzeninde, turuncu zemin ve ink metinle görünür',
         (tester) async {
       final fakeClient = FakeLeaderboardApiClient(
         dataToReturn: const LeaderboardData(
@@ -144,13 +201,46 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+      await tester.pumpWidget(
+        createLeaderboardScreen(
+          client: fakeClient,
+          profileState: const ProfileState(nickname: 'BenimNick'),
+        ),
+      );
       await tester.pumpAndSettle();
 
+      // Yapışkan çubuk görünür
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('74. sıradasın'), findsOneWidget);
+
+      // "sıradasın" ve "Sen" rozeti KALDIRILDI
+      expect(find.textContaining('sıradasın'), findsNothing);
+      expect(find.text(AppStrings.you), findsNothing);
+
+      // Sıra, avatar/takma ad ve galibiyet
       expect(find.text('#74'), findsOneWidget);
+      expect(find.text('BenimNick'), findsOneWidget);
       expect(find.text('3 galibiyet'), findsOneWidget);
+
+      // Çubuk arka plan rengi AppColors.selfHighlight
+      final stickyContainer = tester.widget<Container>(
+        find.byKey(const Key('leaderboard_sticky_me')),
+      );
+      final stickyDecoration = stickyContainer.decoration as BoxDecoration;
+      expect(stickyDecoration.color, AppColors.selfHighlight);
+
+      // Galibiyet metni yeşil yerine AppColors.ink olmalı
+      final stickyWinsText = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_sticky_me')),
+          matching: find.text('3 galibiyet'),
+        ),
+      );
+      expect(stickyWinsText.style?.color, AppColors.ink);
+
+      // Çubuk varken ListView alt padding'i 96.0 olmalı (çubuk yüksekliği kadar boşluk)
+      final listView = tester.widget<ListView>(find.byKey(const Key('leaderboard_list')));
+      final insets = listView.padding as EdgeInsets;
+      expect(insets.bottom, 96.0);
     });
 
     testWidgets('5. Sekme modunda (canPop == false) geri butonu gizlidir',
@@ -353,17 +443,23 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+      await tester.pumpWidget(
+        createLeaderboardScreen(
+          client: fakeClient,
+          profileState: const ProfileState(nickname: 'BenimProfilim'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Liste ve ilk eleman görünür
       expect(find.byKey(const Key('leaderboard_list')), findsOneWidget);
       expect(find.text('Oyuncu_1'), findsOneWidget);
 
-      // İlk 100 dışındaki kullanıcı için yapışkan çubuk görünür
+      // İlk 100 dışındaki kullanıcı için yapışkan çubuk görünür (sıradasın metni yok, nick ve galibiyet var)
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('105. sıradasın'), findsOneWidget);
+      expect(find.textContaining('sıradasın'), findsNothing);
       expect(find.text('#105'), findsOneWidget);
+      expect(find.text('BenimProfilim'), findsOneWidget);
       expect(find.text('4 galibiyet'), findsOneWidget);
 
       // 100 satırlık listeyi aşağı kaydır
@@ -378,8 +474,9 @@ void main() {
 
       // Yapışkan çubuk kaydırmadan sonra da altta sabit kalmalıdır
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
-      expect(find.text('105. sıradasın'), findsOneWidget);
+      expect(find.textContaining('sıradasın'), findsNothing);
       expect(find.text('#105'), findsOneWidget);
+      expect(find.text('BenimProfilim'), findsOneWidget);
       expect(find.text('4 galibiyet'), findsOneWidget);
 
       // Listenin en sonuna kadar kaydır
@@ -396,56 +493,51 @@ void main() {
     });
 
     testWidgets(
-        '10. İlk 3 rozet (taç, gümüş 2, bronz 3), koyu kenarlıklar ve dar ekranda (320dp, textScale 1.3) #100/#1000 taşma yapmaz',
+        '10. İlk 3 rozet (taç, gümüş 2, bronz 3), kullanıcı 1. olsa bile taç korunur ve turuncu zeminle boyanır',
         (tester) async {
-      // 320x640 dar ekran boyutu
-      tester.view.physicalSize = const Size(320 * 2.0, 640 * 2.0);
-      tester.view.devicePixelRatio = 2.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
       final fakeClient = FakeLeaderboardApiClient(
         dataToReturn: const LeaderboardData(
           weekKey: '2026-W42',
           endsAt: 1792357200000,
           top: [
-            LeaderboardEntry(rank: 1, nickname: 'LiderKral', wins: 40, isMe: false),
+            LeaderboardEntry(rank: 1, nickname: 'LiderKralBen', wins: 40, isMe: true),
             LeaderboardEntry(rank: 2, nickname: 'IkinciOyuncu', wins: 38, isMe: false),
             LeaderboardEntry(rank: 3, nickname: 'UcuncuOyuncu', wins: 35, isMe: false),
             LeaderboardEntry(rank: 100, nickname: 'YuzuncuOyuncu', wins: 5, isMe: false),
-            LeaderboardEntry(rank: 1000, nickname: 'BinOyuncu', wins: 1, isMe: true),
           ],
-          me: LeaderboardMe(rank: 1000, wins: 1),
+          me: LeaderboardMe(rank: 1, wins: 40),
         ),
       );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            leaderboardApiClientProvider.overrideWithValue(fakeClient),
-          ],
-          child: MaterialApp(
-            home: MediaQuery(
-              data: const MediaQueryData(
-                size: Size(320, 640),
-                textScaler: TextScaler.linear(1.3),
-              ),
-              child: const LeaderboardScreen(),
-            ),
-          ),
-        ),
-      );
+      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
       await tester.pumpAndSettle();
 
-      // 1. sıra rozeti: Semantics etiketi "1. sıra" var ve CustomPaint taç ikonu çizilmiş
+      // 1. sıra rozeti: Kullanıcı 1. olsa bile taç rozeti korunur (Semantics "1. sıra")
       expect(
         find.byWidgetPredicate(
           (widget) => widget is Semantics && widget.properties.label == '1. sıra',
         ),
         findsOneWidget,
       );
+      // 1. sıradaki kullanıcının kart zemini turuncu (AppColors.selfHighlight) rengindedir
+      final firstDecoratedBox = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_1')),
+          matching: find.byType(DecoratedBox),
+        ).first,
+      );
+      final firstDecoration = firstDecoratedBox.decoration as BoxDecoration;
+      expect(firstDecoration.color, AppColors.selfHighlight);
+
+      // Galibiyet metni yeşil yerine AppColors.ink olmalı
+      final firstWinsText = tester.widget<Text>(
+        find.descendant(
+          of: find.byKey(const Key('leaderboard_item_1')),
+          matching: find.text('40 galibiyet'),
+        ),
+      );
+      expect(firstWinsText.style?.color, AppColors.ink);
+
       // 2. ve 3. sıra: Semantics etiketleri ve metinleri
       expect(
         find.byWidgetPredicate(
@@ -461,13 +553,114 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('3'), findsOneWidget);
-
-      // #100 ve #1000 sıra numaraları görünür ve FittedBox içinde tek satırdadır
       expect(find.text('#100'), findsOneWidget);
+    });
+
+    testWidgets(
+        '11. Dar ekranda (320dp, textScale 1.3) yapışkan çubuk (#1000, uzun isim) ve liste kartlarında taşma (overflow) olmaz',
+        (tester) async {
+      // 320x640 dar ekran boyutu ve %130 yazı tipi ölçeği
+      tester.view.physicalSize = const Size(320 * 2.0, 640 * 2.0);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 1, nickname: 'CokUzunBirOyuncuAdiBirinci', wins: 40, isMe: false),
+            LeaderboardEntry(rank: 99, nickname: 'DoksanDokuzuncu', wins: 5, isMe: false),
+          ],
+          me: LeaderboardMe(rank: 1000, wins: 12),
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            leaderboardApiClientProvider.overrideWithValue(fakeClient),
+            profileProvider.overrideWith(
+              () => _TestProfileNotifier(
+                const ProfileState(nickname: 'CokUzunProfilIsmiKullanicisi'),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(320, 640),
+                textScaler: TextScaler.linear(1.3),
+              ),
+              child: const LeaderboardScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Yapışkan çubuk görünür ve bilgileri tamdır
+      expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
       expect(find.text('#1000'), findsOneWidget);
+      expect(find.text('CokUzunProfilIsmiKullanicisi'), findsOneWidget);
+      expect(find.text('12 galibiyet'), findsOneWidget);
 
       // Hiçbir RenderFlex taşma (A RenderFlex overflowed...) hatası oluşmamalıdır
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        '12. İlk 100 içinde 3. sıradan sonraki kullanıcı (#12) satırında turuncu zemin ve beyaz #12 rozet gösterilir',
+        (tester) async {
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: const LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: [
+            LeaderboardEntry(rank: 11, nickname: 'OnBirinci', wins: 22, isMe: false),
+            LeaderboardEntry(rank: 12, nickname: 'BenOnIkinci', wins: 21, isMe: true),
+          ],
+          me: LeaderboardMe(rank: 12, wins: 21),
+        ),
+      );
+
+      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+      await tester.pumpAndSettle();
+
+      final card12 = find.byKey(const Key('leaderboard_item_12'));
+      expect(card12, findsOneWidget);
+
+      // Kart zemini canlı turuncu (AppColors.selfHighlight)
+      final decoratedBox12 = tester.widget<DecoratedBox>(
+        find.descendant(of: card12, matching: find.byType(DecoratedBox)).first,
+      );
+      expect((decoratedBox12.decoration as BoxDecoration).color, AppColors.selfHighlight);
+
+      // #12 rozeti beyaz zeminli hap içinde ve metni AppColors.ink
+      final rank12TextFinder = find.descendant(of: card12, matching: find.text('#12'));
+      expect(rank12TextFinder, findsOneWidget);
+      expect(tester.widget<Text>(rank12TextFinder).style?.color, AppColors.ink);
+
+      // 12. sıradaki kullanıcının galibiyet metni yeşil yerine AppColors.ink
+      final winsText12 = find.descendant(of: card12, matching: find.text('21 galibiyet'));
+      expect(winsText12, findsOneWidget);
+      expect(tester.widget<Text>(winsText12).style?.color, AppColors.ink);
+
+      // Diğer oyuncunun (11. sıra) kartı ise beyaz zemin, muted sıra metni ve primary galibiyet metnidir
+      final card11 = find.byKey(const Key('leaderboard_item_11'));
+      final decoratedBox11 = tester.widget<DecoratedBox>(
+        find.descendant(of: card11, matching: find.byType(DecoratedBox)).first,
+      );
+      expect((decoratedBox11.decoration as BoxDecoration).color, AppColors.card);
+
+      final rank11TextFinder = find.descendant(of: card11, matching: find.text('#11'));
+      expect(tester.widget<Text>(rank11TextFinder).style?.color, AppColors.muted);
+
+      final winsText11 = find.descendant(of: card11, matching: find.text('22 galibiyet'));
+      expect(tester.widget<Text>(winsText11).style?.color, AppColors.primary);
     });
   });
 }

@@ -13,6 +13,7 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
+import '../../profile/application/profile_notifier.dart';
 import '../application/leaderboard_providers.dart';
 import '../domain/models/leaderboard_models.dart';
 
@@ -143,7 +144,7 @@ class LeaderboardScreen extends ConsumerWidget {
               right: AppDimens.screenPaddingHorizontal,
               top: AppDimens.space8,
               bottom: showStickyMe
-                  ? 88.0
+                  ? 96.0
                   : AppDimens.screenPaddingHorizontal,
             ),
             itemCount: data.top.length + (hasSyncError ? 1 : 0),
@@ -351,7 +352,7 @@ class _LeaderboardItemCard extends StatelessWidget {
         vertical: AppDimens.space12,
       ),
       decoration: BoxDecoration(
-        color: isMe ? AppColors.surface : AppColors.card,
+        color: isMe ? AppColors.selfHighlight : AppColors.card,
         borderRadius: AppDimens.borderRadiusListCard,
         border: Border.all(
           color: AppColors.ink,
@@ -362,7 +363,10 @@ class _LeaderboardItemCard extends StatelessWidget {
       child: Row(
         children: [
           // Sıra Rozeti (İlk 3 özel rozetli)
-          _RankBadge(rank: entry.rank),
+          _RankBadge(
+            rank: entry.rank,
+            isMe: isMe,
+          ),
 
           const SizedBox(width: AppDimens.space10),
 
@@ -383,46 +387,16 @@ class _LeaderboardItemCard extends StatelessWidget {
 
           const SizedBox(width: AppDimens.space10),
 
-          // Takma Ad
+          // Takma Ad (SEN rozeti kaldırıldı, kart zemini vurgu rengindedir)
           Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    entry.nickname,
-                    style: AppTextStyles.playerName.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: isMe ? AppColors.primary : AppColors.ink,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isMe) ...[
-                  const SizedBox(width: AppDimens.space6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space6,
-                      vertical: 2.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: AppDimens.borderRadiusBadge,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Text(
-                      AppStrings.you,
-                      style: AppTextStyles.resultBadge.copyWith(
-                        color: AppColors.card,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            child: Text(
+              entry.nickname,
+              style: AppTextStyles.playerName.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
 
@@ -437,7 +411,7 @@ class _LeaderboardItemCard extends StatelessWidget {
               child: Text(
                 '${entry.wins}${AppStrings.winsSuffix}',
                 style: AppTextStyles.bodyText.copyWith(
-                  color: AppColors.primary,
+                  color: isMe ? AppColors.ink : AppColors.primary,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -449,7 +423,7 @@ class _LeaderboardItemCard extends StatelessWidget {
   }
 }
 
-/// 3 sivri uçlu vektör taç çizen CustomPainter
+/// 3 sivri uçlu, bilyeli, taban şeritli ve mücevher detaylı vektör taç çizen CustomPainter
 class _CrownPainter extends CustomPainter {
   final Color color;
 
@@ -457,38 +431,70 @@ class _CrownPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final w = size.width;
+    final h = size.height;
+
+    final fillPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    final w = size.width;
-    final h = size.height;
+    final strokePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+
+    // Taban şeridi
+    final baseRect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(w * 0.12, h * 0.78, w * 0.88, h * 0.94),
+      const Radius.circular(1.5),
+    );
+    canvas.drawRRect(baseRect, fillPaint);
+    canvas.drawRRect(baseRect, strokePaint);
 
     // 3 sivri uçlu taç poligonu
     final path = Path()
-      ..moveTo(w * 0.12, h * 0.80)
-      ..lineTo(w * 0.04, h * 0.28)
-      ..lineTo(w * 0.35, h * 0.52)
-      ..lineTo(w * 0.50, h * 0.12)
-      ..lineTo(w * 0.65, h * 0.52)
-      ..lineTo(w * 0.96, h * 0.28)
-      ..lineTo(w * 0.88, h * 0.80)
+      ..moveTo(w * 0.16, h * 0.78)
+      ..lineTo(w * 0.14, h * 0.32)
+      ..lineTo(w * 0.34, h * 0.54)
+      ..lineTo(w * 0.50, h * 0.18)
+      ..lineTo(w * 0.66, h * 0.54)
+      ..lineTo(w * 0.86, h * 0.32)
+      ..lineTo(w * 0.84, h * 0.78)
       ..close();
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, strokePaint);
 
-    // Taç taban şeridi
-    final basePaint = Paint()
-      ..color = color
+    // 3 sivri ucun tepesindeki küçük toplar (bilye uçları)
+    canvas.drawCircle(Offset(w * 0.14, h * 0.28), w * 0.075, fillPaint);
+    canvas.drawCircle(Offset(w * 0.50, h * 0.13), w * 0.090, fillPaint);
+    canvas.drawCircle(Offset(w * 0.86, h * 0.28), w * 0.075, fillPaint);
+
+    // Taban şeridi üzerindeki 3 küçük mücevher noktası (ortadaki biraz daha büyük)
+    final gemPaint = Paint()
+      ..color = AppColors.card
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    canvas.drawCircle(Offset(w * 0.50, h * 0.86), 1.3, gemPaint);
+    canvas.drawCircle(Offset(w * 0.28, h * 0.86), 0.95, gemPaint);
+    canvas.drawCircle(Offset(w * 0.72, h * 0.86), 0.95, gemPaint);
+
+    // Üst yüzeyde hafif açık bir parlama çizgisi (gleam)
+    final gleamPaint = Paint()
+      ..color = AppColors.card.withValues(alpha: 0.65)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(w * 0.10, h * 0.88),
-      Offset(w * 0.90, h * 0.88),
-      basePaint,
-    );
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+    final gleamPath = Path()
+      ..moveTo(w * 0.22, h * 0.44)
+      ..lineTo(w * 0.34, h * 0.53)
+      ..lineTo(w * 0.48, h * 0.22);
+    canvas.drawPath(gleamPath, gleamPaint);
   }
 
   @override
@@ -499,8 +505,12 @@ class _CrownPainter extends CustomPainter {
 /// 1., 2., 3. ve diğer sıralar için rozet
 class _RankBadge extends StatelessWidget {
   final int rank;
+  final bool isMe;
 
-  const _RankBadge({required this.rank});
+  const _RankBadge({
+    required this.rank,
+    this.isMe = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -512,7 +522,7 @@ class _RankBadge extends StatelessWidget {
         case 1:
           bgColor = AppColors.rankGold;
           content = const CustomPaint(
-            size: Size(18, 14),
+            size: Size(20, 16),
             painter: _CrownPainter(color: AppColors.ink),
           );
           break;
@@ -565,6 +575,42 @@ class _RankBadge extends StatelessWidget {
       );
     }
 
+    // Kullanıcının kendi kartı ilk 100 içinde ve 3. sıradan sonraysa (#12 gibi)
+    // turuncu zeminde öne çıkan beyaz hap rozet kullanılır
+    if (isMe) {
+      return SizedBox(
+        width: 40,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.space4,
+            vertical: AppDimens.space4,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppDimens.borderRadiusBadge,
+            border: Border.all(
+              color: AppColors.ink,
+              width: AppDimens.borderThin,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '#$rank',
+              maxLines: 1,
+              softWrap: false,
+              style: AppTextStyles.playerName.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       width: 40,
       child: FittedBox(
@@ -586,110 +632,112 @@ class _RankBadge extends StatelessWidget {
   }
 }
 
-/// İlk 100 dışındaki oyuncunun sırasını gösteren yapışkan çubuk
-class _StickyMeBar extends StatelessWidget {
+/// İlk 100 dışındaki oyuncunun sırasını gösteren yapışkan çubuk (satır kartlarıyla aynı düzende)
+class _StickyMeBar extends ConsumerWidget {
   final LeaderboardMe me;
 
-  const _StickyMeBar({required this.me});
+  const _StickyMeBar({
+    required this.me,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(profileProvider);
+    final myNickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
+        ? profile.nickname!.trim()
+        : AppStrings.defaultPlayerName;
+    final myFrame = profile.equippedFrame;
+
     return Container(
       key: const Key('leaderboard_sticky_me'),
       padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space16,
+        horizontal: AppDimens.space12,
         vertical: AppDimens.space12,
       ),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: AppColors.selfHighlight,
         borderRadius: AppDimens.borderRadiusListCard,
         border: Border.all(
           color: AppColors.ink,
           width: AppDimens.borderThick,
         ),
-        boxShadow: AppDimens.shadowSecondaryButton,
+        boxShadow: AppDimens.shadowQuestionCard,
       ),
       child: Row(
         children: [
-          // Rozet diliyle tutarlı sıra rozeti
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimens.space10,
-              vertical: AppDimens.space6,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppDimens.borderRadiusBadge,
-              border: Border.all(
-                color: AppColors.ink,
-                width: AppDimens.borderThin,
+          // Solda Sıra Rozeti (3 haneyi taşırmadan rozet/hap içinde)
+          SizedBox(
+            width: 40,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space4,
+                vertical: AppDimens.space4,
               ),
-            ),
-            child: Text(
-              '#${me.rank}',
-              style: AppTextStyles.playerName.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: AppDimens.borderRadiusBadge,
+                border: Border.all(
+                  color: AppColors.ink,
+                  width: AppDimens.borderThin,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '#${me.rank}',
+                  maxLines: 1,
+                  softWrap: false,
+                  style: AppTextStyles.playerName.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(width: AppDimens.space12),
 
-          // Metin: "167. sıradasın" ve galibiyet sayısı
+          const SizedBox(width: AppDimens.space10),
+
+          // Ortada Kullanıcının Kendi Avatarı
+          PlayerAvatar.selfHome(
+            name: myNickname,
+            frame: myFrame,
+            size: AppDimens.avatarMatch,
+            borderWidth: AppDimens.borderThin,
+          ),
+
+          const SizedBox(width: AppDimens.space10),
+
+          // Ortada Takma Ad
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        '${me.rank}. sıradasın',
-                        style: AppTextStyles.cardTitle.copyWith(
-                          fontSize: 15,
-                          color: AppColors.ink,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.space6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppDimens.space6,
-                        vertical: 2.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: AppDimens.borderRadiusBadge,
-                        border: Border.all(
-                          color: AppColors.ink,
-                          width: 1.0,
-                        ),
-                      ),
-                      child: Text(
-                        AppStrings.you,
-                        style: AppTextStyles.resultBadge.copyWith(
-                          color: AppColors.card,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
+            child: Text(
+              myNickname,
+              style: AppTextStyles.playerName.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          const SizedBox(width: AppDimens.space8),
+
+          // Sağda Galibiyet Sayısı
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${me.wins}${AppStrings.winsSuffix}',
+                style: AppTextStyles.bodyText.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${me.wins}${AppStrings.winsSuffix}',
-                  style: AppTextStyles.secondaryText.copyWith(
-                    fontSize: 13,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],

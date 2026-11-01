@@ -17,5 +17,6 @@ abstract final class AppColors {
   static const Color dangerText = Color(0xFFB91C1C);
   static const Color dangerSoft = Color(0xFFFECACA);
   static const Color dangerSurface = Color(0xFFFEF2F2);
+  static const Color selfHighlight = Color(0xFFFB923C);
 }
 
