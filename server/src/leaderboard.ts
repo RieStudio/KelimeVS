@@ -74,6 +74,8 @@ export function getIstanbulWeekInfo(date: Date = new Date()): IstanbulWeekInfo {
   };
 }
 
+export const LEADERBOARD_TOP_LIMIT = 100;
+
 export interface LeaderboardEntry {
   readonly rank: number;
   readonly nickname: string;
@@ -372,7 +374,7 @@ export class Leaderboard extends DurableObject<Env> {
         FROM week_wins
         WHERE week_key = ? AND wins > 0 AND nickname IS NOT NULL AND TRIM(nickname) != ''
       )
-      SELECT rank, uid, nickname, wins, frame FROM ranked ORDER BY rank ASC LIMIT 50`,
+      SELECT rank, uid, nickname, wins, frame FROM ranked ORDER BY rank ASC LIMIT ${LEADERBOARD_TOP_LIMIT}`,
       weekKey
     );
 

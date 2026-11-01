@@ -552,6 +552,6 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 - **Eski İstemci Uyumluluğu:** Liderlik tablosu (`GET /leaderboard`) ve maç mesajlarında (`opponentFrame` vb.) hiçbir filtreleme yapılmaz; yeni çerçeve kimlikleri doğrudan iletilir. Eski istemciler bilinmeyen kimliklerle karşılaştığında çökmeden `'classic'` (Klasik) çerçeveye güvenli bir şekilde geri düşer.
 
 ### Liderlik Tablosu
-- `GET /leaderboard`: Haftalık ilk 50 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.
+- `GET /leaderboard`: Haftalık ilk 100 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.
 
 

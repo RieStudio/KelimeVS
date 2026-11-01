@@ -130,9 +130,11 @@ describe('MatchRoom Leaderboard Integration & Hibernation Resilience', () => {
     expect(recordedParams.winnerNickname).toBe('AliceProfileNick'); // QueueNameAlice DEĞİL!
     expect(recordedParams.loserUid).toBe('bob');
     expect(recordedParams.loserNickname).toBe('BobProfileNick');
+    expect(recordedParams.finishedAtMs).toBeTypeOf('number');
 
     const roomData = (room as any).data;
     expect(roomData.leaderboardPending).toBe(false);
+    expect(roomData.finishedAtMs).toBe(recordedParams.finishedAtMs);
   });
 
   it('2. Leaderboard hatasında leaderboardPending kalıcı duruma kaydedilir, alarm ve hibernation sonrası tekrar denenir', async () => {
@@ -200,6 +202,7 @@ describe('MatchRoom Leaderboard Integration & Hibernation Resilience', () => {
     // Kalıcı durumda leaderboardPending: true olmalı ve alarm kurulmalı
     const persistedInitial = store.get('roomData');
     expect(persistedInitial.leaderboardPending).toBe(true);
+    expect(persistedInitial.finishedAtMs).toBeTypeOf('number');
     expect(persistedInitial.leaderboardRetryCount).toBe(1);
     expect(persistedInitial.schedule.leaderboardRetryAtMs).toBeDefined();
 
@@ -228,6 +231,7 @@ describe('MatchRoom Leaderboard Integration & Hibernation Resilience', () => {
     expect(recordedParams).toBeDefined();
     expect(recordedParams.matchId).toBe('match_lb_retry_test');
     expect(recordedParams.winnerUid).toBe('alice');
+    expect(recordedParams.finishedAtMs).toBe(persistedInitial.finishedAtMs);
 
     const persistedAfter = store.get('roomData');
     expect(persistedAfter.leaderboardPending).toBe(false);

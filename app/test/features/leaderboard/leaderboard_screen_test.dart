@@ -127,11 +127,11 @@ void main() {
       // Kullanıcı vurgusu (Sen rozeti)
       expect(find.text(AppStrings.you), findsOneWidget);
 
-      // Kullanıcı zaten ilk 50'de olduğu için yapışkan alt çubuk gösterilmez
+      // Kullanıcı zaten ilk 100'de olduğu için yapışkan alt çubuk gösterilmez
       expect(find.byKey(const Key('leaderboard_sticky_me')), findsNothing);
     });
 
-    testWidgets('4. Kullanıcı ilk 50 dışındaysa yapışkan alt çubukta sırası gösterilir',
+    testWidgets('4. Kullanıcı ilk 100 dışındaysa yapışkan alt çubukta sırası gösterilir',
         (tester) async {
       final fakeClient = FakeLeaderboardApiClient(
         dataToReturn: const LeaderboardData(
@@ -327,6 +327,66 @@ void main() {
 
       // Küçük senkronizasyon uyarı şeridi çıkmalı
       expect(find.byKey(const Key('leaderboard_sync_error_banner')), findsOneWidget);
+    });
+
+    testWidgets(
+        '9. 100 satırlık listede kaydırma sorunsuz çalışır ve ilk 100 dışındaki kullanıcı için yapışkan SEN çubuğu görünür kalır',
+        (tester) async {
+      final entries = List.generate(
+        100,
+        (i) => LeaderboardEntry(
+          rank: i + 1,
+          nickname: 'Oyuncu_${i + 1}',
+          wins: 100 - i,
+          isMe: false,
+        ),
+      );
+
+      final fakeClient = FakeLeaderboardApiClient(
+        dataToReturn: LeaderboardData(
+          weekKey: '2026-W42',
+          endsAt: 1792357200000,
+          top: entries,
+          me: const LeaderboardMe(rank: 105, wins: 4),
+        ),
+      );
+
+      await tester.pumpWidget(createLeaderboardScreen(client: fakeClient));
+      await tester.pumpAndSettle();
+
+      // Liste ve ilk eleman görünür
+      expect(find.byKey(const Key('leaderboard_list')), findsOneWidget);
+      expect(find.text('Oyuncu_1'), findsOneWidget);
+
+      // İlk 100 dışındaki kullanıcı için yapışkan çubuk görünür
+      expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
+      expect(find.text('Senin sıran: #105 (4 galibiyet)'), findsOneWidget);
+
+      // 100 satırlık listeyi aşağı kaydır
+      await tester.drag(
+        find.byKey(const Key('leaderboard_list')),
+        const Offset(0, -3000),
+      );
+      await tester.pumpAndSettle();
+
+      // Hata oluşmadığını doğrula
+      expect(tester.takeException(), isNull);
+
+      // Yapışkan çubuk kaydırmadan sonra da altta sabit kalmalıdır
+      expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
+      expect(find.text('Senin sıran: #105 (4 galibiyet)'), findsOneWidget);
+
+      // Listenin en sonuna kadar kaydır
+      await tester.scrollUntilVisible(
+        find.text('Oyuncu_100'),
+        500.0,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Oyuncu_100'), findsOneWidget);
+      expect(find.byKey(const Key('leaderboard_sticky_me')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

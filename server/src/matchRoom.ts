@@ -85,6 +85,7 @@ interface StoredRoomData {
   readonly leaderboardWinnerNickname?: string | null;
   readonly leaderboardLoserUid?: string;
   readonly leaderboardLoserNickname?: string | null;
+  readonly finishedAtMs?: number;
   readonly powerupsUsed?: Record<string, { extraTime?: boolean }>;
   readonly pendingRefunds?: readonly PendingRefund[];
   readonly refundRetryCount?: number;
@@ -912,6 +913,7 @@ export class MatchRoom extends DurableObject<Env> {
     this.data = {
       ...this.data,
       status: 'finished',
+      finishedAtMs: nowMs,
       schedule: {
         cleanupAtMs: nowMs + this.durations.cleanupMs,
       },
@@ -1134,6 +1136,7 @@ export class MatchRoom extends DurableObject<Env> {
         winnerFrame,
         loserUid: this.data.leaderboardLoserUid,
         loserNickname: loserNick ?? null,
+        finishedAtMs: this.data.finishedAtMs,
         deletedUids,
       });
 

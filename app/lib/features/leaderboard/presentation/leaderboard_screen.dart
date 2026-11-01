@@ -173,7 +173,7 @@ class LeaderboardScreen extends ConsumerWidget {
           ),
         ),
 
-        // İlk 50 dışındaki oyuncu için alt yapışkan "Senin Sıran" çubuğu
+        // İlk 100 dışındaki oyuncu için alt yapışkan "Senin Sıran" çubuğu
         if (showStickyMe)
           Positioned(
             left: AppDimens.screenPaddingHorizontal,
@@ -502,7 +502,7 @@ class _RankBadge extends StatelessWidget {
   }
 }
 
-/// İlk 50 dışındaki oyuncunun sırasını gösteren yapışkan çubuk
+/// İlk 100 dışındaki oyuncunun sırasını gösteren yapışkan çubuk
 class _StickyMeBar extends StatelessWidget {
   final LeaderboardMe me;
 

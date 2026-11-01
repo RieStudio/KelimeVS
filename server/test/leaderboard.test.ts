@@ -12,7 +12,7 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-import { Leaderboard, getIstanbulWeekInfo } from '../src/leaderboard';
+import { Leaderboard, getIstanbulWeekInfo, LEADERBOARD_TOP_LIMIT } from '../src/leaderboard';
 import type { Env } from '../src/index';
 
 function createMockCtx() {
@@ -359,16 +359,16 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
     expect(data.top[0].nickname).toBe('YeniHarikaAd');
   });
 
-  it('7. İlk 50 dışındaki kullanıcı için me sırası doğru hesaplanır', async () => {
+  it('7. İlk 100 dışındaki kullanıcı için me sırası doğru hesaplanır', async () => {
     const ctx = createMockCtx();
     const env = createEnv();
     const lb = new Leaderboard(ctx, env);
     const baseTime = new Date('2026-10-14T12:00:00Z').getTime();
 
-    // 55 farklı kullanıcıya galibiyet yazalım
-    // user_1 .. user_50: 10 galibiyet
-    // user_51 .. user_55: 1 galibiyet
-    for (let i = 1; i <= 50; i++) {
+    // 105 farklı kullanıcıya galibiyet yazalım
+    // user_1 .. user_100: 10 galibiyet
+    // user_101 .. user_105: 1 galibiyet
+    for (let i = 1; i <= 100; i++) {
       await lb.recordMatchResult({
         matchId: `top_${i}`,
         winnerUid: `uid_${i}`,
@@ -379,26 +379,26 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       });
     }
 
-    // caller: user_53
-    for (let i = 51; i <= 55; i++) {
+    // caller: user_103
+    for (let i = 101; i <= 105; i++) {
       await lb.recordMatchResult({
         matchId: `low_${i}`,
         winnerUid: `uid_${i}`,
         winnerNickname: `Low_${i}`,
         loserUid: 'dummy_loser',
         loserNickname: 'Loser',
-        finishedAtMs: baseTime + 1000 + i * 10,
+        finishedAtMs: baseTime + 2000 + i * 10,
       });
     }
 
-    const res = await lb.getLeaderboard('uid_53', baseTime + 5000);
-    // top uzunluğu en fazla 50 olmalıdır
-    expect(res.top).toHaveLength(50);
-    // top listesinde uid_53 olmamalıdır
-    expect(res.top.some((e) => e.nickname === 'Low_53')).toBe(false);
-    // me nesnesi 53. sırada olduğunu ve 1 galibiyeti olduğunu göstermelidir
+    const res = await lb.getLeaderboard('uid_103', baseTime + 5000);
+    // top uzunluğu en fazla LEADERBOARD_TOP_LIMIT (100) olmalıdır
+    expect(res.top).toHaveLength(LEADERBOARD_TOP_LIMIT);
+    // top listesinde uid_103 olmamalıdır
+    expect(res.top.some((e) => e.nickname === 'Low_103')).toBe(false);
+    // me nesnesi 103. sırada olduğunu ve 1 galibiyeti olduğunu göstermelidir
     expect(res.me).toEqual({
-      rank: 53,
+      rank: 103,
       wins: 1,
     });
   });
@@ -530,6 +530,74 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       .exec('SELECT * FROM pair_wins WHERE winner_uid = ? OR loser_uid = ?', 'bob', 'bob')
       .toArray();
     expect(pairRows).toHaveLength(0);
+  });
+
+  it('11. recordMatchResult hafta geçişi sınır durumları: Pazar 23:59:59.999 eski haftaya, Pazartesi 00:00:00.000 yeni haftaya yazılır', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv();
+    const lb = new Leaderboard(ctx, env);
+
+    // 18 Ekim 2026 Pazar 23:59:59.999 Istanbul = 20:59:59.999 UTC (2026-W42)
+    const sunFinishMs = new Date('2026-10-18T20:59:59.999Z').getTime();
+    // 19 Ekim 2026 Pazartesi 00:00:00.000 Istanbul = 21:00:00.000 UTC (2026-W43)
+    const monFinishMs = new Date('2026-10-18T21:00:00.000Z').getTime();
+
+    // 1) Pazar 23:59:59.999'da biten maç (gecikmeli/sonradan kaydedilse bile finishedAtMs ile eski haftaya yazılır)
+    await lb.recordMatchResult({
+      matchId: 'match_sun_boundary',
+      winnerUid: 'uid_sun',
+      winnerNickname: 'SunWinner',
+      loserUid: 'uid_sun_loser',
+      loserNickname: 'SunLoser',
+      finishedAtMs: sunFinishMs,
+    });
+
+    // 2) Pazartesi 00:00:00.000'da biten maç (yeni haftaya yazılır)
+    await lb.recordMatchResult({
+      matchId: 'match_mon_boundary',
+      winnerUid: 'uid_mon',
+      winnerNickname: 'MonWinner',
+      loserUid: 'uid_mon_loser',
+      loserNickname: 'MonLoser',
+      finishedAtMs: monFinishMs,
+    });
+
+    // Pazar anındaki leaderboard (2026-W42)
+    const sunLeaderboard = await lb.getLeaderboard('uid_sun', sunFinishMs);
+    expect(sunLeaderboard.weekKey).toBe('2026-W42');
+    expect(sunLeaderboard.top).toHaveLength(1);
+    expect(sunLeaderboard.top[0].nickname).toBe('SunWinner');
+    expect(sunLeaderboard.top[0].isMe).toBe(true);
+    expect(sunLeaderboard.me).toEqual({ rank: 1, wins: 1 });
+
+    // Pazar tablosunda Pazartesi kazananı OLMAMALIDIR
+    const monInSunWeek = await lb.getLeaderboard('uid_mon', sunFinishMs);
+    expect(monInSunWeek.top.some((e) => e.nickname === 'MonWinner')).toBe(false);
+    expect(monInSunWeek.me).toBeNull();
+
+    // Pazartesi anındaki leaderboard (2026-W43)
+    const monLeaderboard = await lb.getLeaderboard('uid_mon', monFinishMs);
+    expect(monLeaderboard.weekKey).toBe('2026-W43');
+    expect(monLeaderboard.top).toHaveLength(1);
+    expect(monLeaderboard.top[0].nickname).toBe('MonWinner');
+    expect(monLeaderboard.top[0].isMe).toBe(true);
+    expect(monLeaderboard.me).toEqual({ rank: 1, wins: 1 });
+
+    // Pazartesi tablosunda Pazar kazananı OLMAMALIDIR
+    const sunInMonWeek = await lb.getLeaderboard('uid_sun', monFinishMs);
+    expect(sunInMonWeek.top.some((e) => e.nickname === 'SunWinner')).toBe(false);
+    expect(sunInMonWeek.me).toBeNull();
+
+    // week_wins tablosundaki week_key kayıtlarını doğrudan doğrula
+    const sunRows = (ctx.storage as any).sql
+      .exec('SELECT week_key FROM week_wins WHERE uid = ?', 'uid_sun')
+      .toArray();
+    expect(sunRows).toEqual([{ week_key: '2026-W42' }]);
+
+    const monRows = (ctx.storage as any).sql
+      .exec('SELECT week_key FROM week_wins WHERE uid = ?', 'uid_mon')
+      .toArray();
+    expect(monRows).toEqual([{ week_key: '2026-W43' }]);
   });
 });
 

@@ -161,7 +161,7 @@ Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad
 ### 5.4 Liderlik tablosu
 
 - **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
-- Tabloda ilk 50 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
+- Tabloda ilk 100 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
 - Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
 - Aynı rakibe karşı bir haftada en fazla **3 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
 - Takma adı henüz olmayan oyuncu tabloda görünmez.
