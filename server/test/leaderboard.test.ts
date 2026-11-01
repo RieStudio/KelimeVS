@@ -599,5 +599,79 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       .toArray();
     expect(monRows).toEqual([{ week_key: '2026-W43' }]);
   });
+
+  it('12. seedUsers ve clearSeedUsers: sadece seed_ ön ekli kullanıcıları ekler ve temizler, gerçek kullanıcılara dokunmaz', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv();
+    const lb = new Leaderboard(ctx, env);
+    const nowMs = new Date('2026-10-14T12:00:00Z').getTime();
+
+    // Önce gerçek bir kullanıcının maç galibiyeti olsun
+    await lb.recordMatchResult({
+      matchId: 'real_match_1',
+      winnerUid: 'real_user_42',
+      winnerNickname: 'GercekOyuncu',
+      loserUid: 'real_loser_1',
+      loserNickname: 'Loser',
+      finishedAtMs: nowMs,
+    });
+
+    // 1) seedUsers: seed_ olmayan UID yoksayılmalı, seed_ olanlar eklenmeli
+    const seedResult = await lb.seedUsers(
+      [
+        {
+          uid: 'real_hacker_trying_seed',
+          nickname: 'Hacker',
+          wins: 99,
+          losses: 0,
+          reachedAt: nowMs,
+          frame: 'classic',
+        },
+        {
+          uid: 'seed_001',
+          nickname: 'Test 001',
+          wins: 40,
+          losses: 1,
+          reachedAt: nowMs,
+          frame: 'vine',
+        },
+        {
+          uid: 'seed_002',
+          nickname: 'Test 002',
+          wins: 38,
+          losses: 2,
+          reachedAt: nowMs,
+          frame: 'sakura',
+        },
+      ],
+      nowMs
+    );
+
+    // Yalnızca 2 adet seed_ kullanıcısı eklenmiş olmalı, real_hacker atlanmalı
+    expect(seedResult.inserted).toBe(2);
+
+    // Liderlik tablosunu çek
+    const lbResult = await lb.getLeaderboard('seed_001', nowMs);
+    // seed_001 (40W), seed_002 (38W), real_user_42 (1W)
+    expect(lbResult.top).toHaveLength(3);
+    expect(lbResult.top[0].nickname).toBe('Test 001');
+    expect(lbResult.top[0].wins).toBe(40);
+    expect(lbResult.top[0].frame).toBe('vine');
+    expect(lbResult.top[0].isMe).toBe(true);
+
+    expect(lbResult.top[1].nickname).toBe('Test 002');
+    expect(lbResult.top[1].frame).toBe('sakura');
+
+    expect(lbResult.top[2].nickname).toBe('GercekOyuncu');
+
+    // 2) clearSeedUsers: Yalnızca seed_ kayıtları silinmeli, gerçek oyuncu KORUNMALI
+    const clearResult = await lb.clearSeedUsers();
+    expect(clearResult.deleted).toBe(2);
+
+    const afterClear = await lb.getLeaderboard('real_user_42', nowMs);
+    expect(afterClear.top).toHaveLength(1);
+    expect(afterClear.top[0].nickname).toBe('GercekOyuncu');
+    expect(afterClear.top[0].isMe).toBe(true);
+  });
 });
 

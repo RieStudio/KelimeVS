@@ -1,78 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './index';
+import { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry } from './weekInfo';
 
-const daysMap: Record<string, number> = {
-  Mon: 0,
-  Tue: 1,
-  Wed: 2,
-  Thu: 3,
-  Fri: 4,
-  Sat: 5,
-  Sun: 6,
-};
-
-export interface IstanbulWeekInfo {
-  readonly weekKey: string;
-  readonly startOfWeekMs: number;
-  readonly endsAtMs: number;
-}
-
-/**
- * Verilen tarihe göre Türkiye (Europe/Istanbul) saat diliminde
- * haftanın başlangıcı (Pazartesi 00:00:00), bitişi (sonraki Pazartesi 00:00:00)
- * ve ISO hafta anahtarını (örn. "2026-W42") hesaplar.
- */
-export function getIstanbulWeekInfo(date: Date = new Date()): IstanbulWeekInfo {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Istanbul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    weekday: 'short',
-    hourCycle: 'h23',
-  });
-
-  const map: Record<string, string> = {};
-  for (const p of formatter.formatToParts(date)) {
-    map[p.type] = p.value;
-  }
-
-  const daysSinceMonday = daysMap[map.weekday] ?? 0;
-  const hour = parseInt(map.hour, 10);
-  const min = parseInt(map.minute, 10);
-  const sec = parseInt(map.second, 10);
-  const ms = date.getUTCMilliseconds();
-
-  const elapsedSinceMondayMs =
-    (daysSinceMonday * 86400 + hour * 3600 + min * 60 + sec) * 1000 + ms;
-  const startOfWeekMs = date.getTime() - elapsedSinceMondayMs;
-  const endsAtMs = startOfWeekMs + 7 * 86400 * 1000;
-
-  // ISO 8601 hafta numarası: Haftanın Perşembe gününün takvim yılı ve haftası belirler
-  const thursday = new Date(startOfWeekMs + 3 * 86400 * 1000 + 12 * 3600 * 1000);
-  const thuMap: Record<string, string> = {};
-  for (const p of formatter.formatToParts(thursday)) {
-    thuMap[p.type] = p.value;
-  }
-  const thuYear = parseInt(thuMap.year, 10);
-  const thuMonth = parseInt(thuMap.month, 10);
-  const thuDay = parseInt(thuMap.day, 10);
-
-  const thuUtc = Date.UTC(thuYear, thuMonth - 1, thuDay);
-  const jan1Day = new Date(Date.UTC(thuYear, 0, 1)).getUTCDay();
-  const firstThursdayUtc = Date.UTC(thuYear, 0, 1 + ((4 - jan1Day + 7) % 7));
-  const weekNumber = 1 + Math.round((thuUtc - firstThursdayUtc) / (7 * 86400 * 1000));
-  const weekKey = `${thuYear}-W${String(weekNumber).padStart(2, '0')}`;
-
-  return {
-    weekKey,
-    startOfWeekMs,
-    endsAtMs,
-  };
-}
+export { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry };
 
 export const LEADERBOARD_TOP_LIMIT = 100;
 
@@ -340,6 +270,76 @@ export class Leaderboard extends DurableObject<Env> {
       trimmed,
       uid
     );
+  }
+
+  /**
+   * Yerel test için toplu sahte oyuncu verisi ekler.
+   * Güvenlik: Yalnızca 'seed_' ile başlayan UID'leri kabul eder; gerçek kullanıcılara dokunmaz.
+   */
+  async seedUsers(
+    entries: readonly LeaderboardSeedEntry[],
+    atMs: number = Date.now()
+  ): Promise<{ inserted: number }> {
+    this.ensureSchema();
+
+    const weekInfo = getIstanbulWeekInfo(new Date(atMs));
+    const weekKey = weekInfo.weekKey;
+
+    let inserted = 0;
+    for (const entry of entries) {
+      if (!entry.uid.startsWith('seed_')) {
+        continue;
+      }
+      const nickname = entry.nickname.trim();
+      if (!nickname) {
+        continue;
+      }
+      const frame = entry.frame.trim() || 'classic';
+      const wins = Math.max(0, Math.floor(entry.wins));
+      const losses = Math.max(0, Math.floor(entry.losses));
+      const reachedAt = entry.reachedAt || atMs;
+
+      this.ctx.storage.sql.exec(
+        `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at, frame)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(week_key, uid) DO UPDATE SET
+           nickname = excluded.nickname,
+           wins = excluded.wins,
+           losses = excluded.losses,
+           reached_at = excluded.reached_at,
+           frame = excluded.frame`,
+        weekKey,
+        entry.uid,
+        nickname,
+        wins,
+        losses,
+        reachedAt,
+        frame
+      );
+      inserted++;
+    }
+
+    return { inserted };
+  }
+
+  /**
+   * Yerel test için eklenmiş 'seed_' ön ekli kayıtları liderlik tablosundan temizler.
+   * Güvenlik: Yalnızca 'seed_%' desenine uyan kayıtları siler, gerçek kullanıcılara dokunmaz.
+   */
+  async clearSeedUsers(): Promise<{ deleted: number }> {
+    this.ensureSchema();
+
+    const countRow = this.ctx.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) as count FROM week_wins WHERE uid LIKE 'seed_%'")
+      .toArray();
+    const count = countRow[0]?.count ?? 0;
+
+    this.ctx.storage.sql.exec("DELETE FROM week_wins WHERE uid LIKE 'seed_%'");
+    this.ctx.storage.sql.exec(
+      "DELETE FROM pair_wins WHERE winner_uid LIKE 'seed_%' OR loser_uid LIKE 'seed_%'"
+    );
+
+    return { deleted: count };
   }
 
   /**

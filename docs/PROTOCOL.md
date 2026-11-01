@@ -553,5 +553,7 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 
 ### Liderlik Tablosu
 - `GET /leaderboard`: Haftalık ilk 100 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.
+- `POST /admin/leaderboard/seed` (Yalnızca Yerel Geliştirme): Güncel hafta için toplu test oyuncusu ekler (`{ "entries": [...] }`). Canlı ortamda 403 Forbidden ile engellenmiştir.
+- `POST /admin/leaderboard/clear` (Yalnızca Yerel Geliştirme): Tablodaki `seed_` ön ekli test oyuncularını temizler. Gerçek kullanıcılara dokunmaz. Canlı ortamda 403 Forbidden ile engellenmiştir.
 
 

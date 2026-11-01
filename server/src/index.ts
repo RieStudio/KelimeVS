@@ -3,7 +3,7 @@ import type { EnergyEnv } from './energy';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile } from './userProfile';
-import { Leaderboard } from './leaderboard';
+import { Leaderboard, type LeaderboardSeedEntry } from './leaderboard';
 import { ReportStore } from './reportStore';
 
 export { Matchmaker, MatchRoom, UserProfile, Leaderboard, ReportStore };
@@ -1051,6 +1051,63 @@ export default {
           { status: 500, headers: jsonHeaders }
         );
       }
+    }
+
+    // Yerel Test Liderlik Tablosu Seed: POST /admin/leaderboard/seed
+    if (request.method === 'POST' && pathname === '/admin/leaderboard/seed') {
+      if (env.ALLOW_DEV_AUTH !== 'true') {
+        return new Response('Not Found', { status: 404 });
+      }
+
+      console.log(`[leaderboard:seed] hostname=${url.hostname}, pathname=${pathname}`);
+
+      if (!env.LEADERBOARD) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const body = (await request.json().catch(() => ({}))) as {
+        entries?: LeaderboardSeedEntry[];
+      };
+
+      if (!Array.isArray(body.entries) || body.entries.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_request', message: 'entries array is required' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+      const result = await leaderboardStub.seedUsers(body.entries);
+      return new Response(JSON.stringify({ success: true, ...result }), {
+        status: 200,
+        headers: jsonHeaders,
+      });
+    }
+
+    // Yerel Test Liderlik Tablosu Temizleme: POST /admin/leaderboard/clear
+    if (request.method === 'POST' && pathname === '/admin/leaderboard/clear') {
+      if (env.ALLOW_DEV_AUTH !== 'true') {
+        return new Response('Not Found', { status: 404 });
+      }
+
+      console.log(`[leaderboard:clear] hostname=${url.hostname}, pathname=${pathname}`);
+
+      if (!env.LEADERBOARD) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      const leaderboardStub = env.LEADERBOARD.get(env.LEADERBOARD.idFromName('global'));
+      const result = await leaderboardStub.clearSeedUsers();
+      return new Response(JSON.stringify({ success: true, ...result }), {
+        status: 200,
+        headers: jsonHeaders,
+      });
     }
 
     return new Response('Not Found', { status: 404 });

@@ -200,6 +200,90 @@ npm run ghost -- --mode=play --rounds=3
 npm run ghost -- --url=wss://api.riestudio.com.tr --api-key=AIzaSy... --mode=play
 ```
 
+### 5. Liderlik Tablosu Yerel Tohumlama Aracı (seed-leaderboard)
+Liderlik tablosunu yerel ortamda test etmek, 100 satırlık listenin kaydırılmasını, eşitlik kurallarını ve yeni görsel avatar çerçevelerini incelemek için kullanılan test verisi tohumlama aracıdır.
+
+#### 🛡️ Güvenlik Garantisi:
+- Bu araç canlı sunucuya (`api.riestudio.com.tr`) **KESİNLİKLE BAĞLANMAZ VE VERİ YAZMAZ**.
+- Hedeflenen sunucu adresi `127.0.0.1` veya `localhost` dışında ise araç anında hata vererek çalışmayı durdurur.
+- Eklenen tüm oyuncu kayıtları `seed_` ön ekine (`seed_001` .. `seed_100`) sahiptir; gerçek kullanıcı verilerine ASLA dokunmaz.
+
+#### Özellikler:
+- **100 Sahte Oyuncu:** `seed_001` .. `seed_100`, takma adlar `Test 001` .. `Test 100`.
+- **Galibiyet Dağılımı:** 1 ile 40 arasında dengeli azalan dağılım.
+- **Eşitlik Bozucu Kuralların Doğrulanması:**
+  1. `wins DESC` (Galibiyeti çok olan üstte)
+  2. `losses ASC` (Eşit galibiyette az mağlubiyeti olan üstte, örn: 38G/1M > 38G/4M)
+  3. `reached_at ASC` (Eşit galibiyet ve mağlubiyette skora daha erken ulaşan üstte)
+  4. `uid ASC` (Tam eşitlikte alfabetik deterministik sıra)
+- **Çerçeve Dağılımı:** Hem `classic` hem de 9 yeni görsel çerçeveyi (`vine`, `silver_engraved`, `bronze_engraved`, `gold_leaf`, `emerald`, `sakura`, `ice`, `gear`, `nazar`) 10'ar kez dengeli olarak içerir.
+
+#### Kullanım Komutları:
+
+```bash
+# 1. 100 sahte oyuncuyu yerel liderlik tablosuna tohumla:
+npm run seed:lb
+
+# 2. Sahte oyuncuları tablodan temizle:
+npm run seed:lb -- --clear
+
+# 3. İsteğe bağlı farklı yerel port belirtme (varsayılan: http://127.0.0.1:8787):
+npm run seed:lb -- --server=http://127.0.0.1:8788
+```
+
+---
+
+## 📱 Flutter Uygulamasını Yerel Sunucuya Bağlama Adım Adım Kılavuzu
+
+Flutter uygulaması varsayılan olarak canlı sunucuya (`https://api.riestudio.com.tr`) bağlanır. Geliştirme yaparken yerel `wrangler dev` sunucusuna bağlanmak için:
+
+### 1. Adım: Yerel Sunucuyu Başlatın
+```bash
+cd server
+npm run dev
+# Sunucu http://127.0.0.1:8787 adresinde dinlemeye başlar
+```
+*(Eğer gerçek fiziksel cihazdan test yapacaksanız sunucuyu yerel ağa açmak için `npx wrangler dev --ip 0.0.0.0` kullanabilirsiniz).*
+
+### 2. Adım: Liderlik Tablosunu Tohumlayın
+```bash
+cd server
+npm run seed:lb
+```
+
+### 3. Adım: Flutter Uygulamasını İlgili Hedefe Göre Çalıştırın
+
+- **Android Emülatör (Önerilen):**
+  Android emülatörü bilgisayarın `127.0.0.1` adresine `10.0.2.2` özel sanal IP'si üzerinden erişir:
+  ```bash
+  cd app
+  flutter run --dart-define=SERVER_URL=http://10.0.2.2:8787
+  ```
+
+- **Gerçek Android veya iOS Cihazı (Aynı Wi-Fi):**
+  1. Bilgisayarınızın yerel Wi-Fi IP adresini öğrenin (Windows: `ipconfig`, macOS/Linux: `ifconfig` - örn: `192.168.1.35`).
+  2. Sunucuyu `npx wrangler dev --ip 0.0.0.0` ile başlatın.
+  3. Uygulamayı çalıştırın:
+     ```bash
+     cd app
+     flutter run --dart-define=SERVER_URL=http://192.168.1.35:8787
+     ```
+  *(Not: Android 9+ cihazlarda yerel ağdaki şifresiz HTTP trafiği için debug derlemesi cleartext bağlantıyı destekler).*
+
+- **Windows Masaüstü / macOS / iOS Simülatör:**
+  Simülatör veya masaüstü doğrudan makinenin yerel döngü adresini kullanabilir:
+  ```bash
+  cd app
+  flutter run --dart-define=SERVER_URL=http://127.0.0.1:8787
+  ```
+
+### 4. Adım: Test Sonrası Temizleme
+Liderlik tablosundaki test kayıtlarını silmek için:
+```bash
+cd server
+npm run seed:lb -- --clear
+```
+
 ---
 
 ## 📂 Dizin Yapısı
