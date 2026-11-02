@@ -338,13 +338,15 @@ BoxDecoration _buildCardDecoration({
   Color color = AppColors.card,
   Color borderColor = AppColors.ink,
   bool isThickBorder = false,
+  double? borderWidth,
 }) {
   return BoxDecoration(
     color: color,
     borderRadius: AppDimens.borderRadiusListCard,
     border: Border.all(
       color: borderColor,
-      width: isThickBorder ? AppDimens.borderThick : AppDimens.borderThin,
+      width: borderWidth ??
+          (isThickBorder ? AppDimens.borderThick : AppDimens.borderThin),
     ),
     boxShadow: AppDimens.shadowQuestionCard,
   );
@@ -767,7 +769,9 @@ class _EmptyView extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimens.screenPaddingHorizontal),
         child: Container(
           padding: const EdgeInsets.all(AppDimens.space24),
-          decoration: _buildCardDecoration(),
+          decoration: _buildCardDecoration(
+            borderWidth: AppDimens.borderThick,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -108,7 +108,7 @@ void main() {
       expect(find.text(AppStrings.emptyLeaderboardSubtitle), findsOneWidget);
       expect(find.text(AppStrings.quickMatch), findsOneWidget);
 
-      // Boş durum kartının kenarlık stilini doğrula: AppColors.ink, borderThin, gölge ve köşe yarıçapı
+      // Boş durum kartının kenarlık stilini doğrula: AppColors.ink, borderThick (SecondaryButton ile aynı), gölge ve köşe yarıçapı
       final emptyContainer = tester.firstWidget<Container>(
         find.descendant(
           of: find.byKey(const Key('leaderboard_empty')),
@@ -116,8 +116,12 @@ void main() {
         ),
       );
       final emptyDecoration = emptyContainer.decoration as BoxDecoration;
-      expect(emptyDecoration.border?.top.color, AppColors.ink);
-      expect(emptyDecoration.border?.top.width, AppDimens.borderThin);
+      final border = emptyDecoration.border as Border?;
+      expect(border?.top.color, AppColors.ink);
+      expect(border?.top.width, AppDimens.borderThick);
+      expect(border?.left.width, AppDimens.borderThick);
+      expect(border?.right.width, AppDimens.borderThick);
+      expect(border?.bottom.width, AppDimens.borderThick);
       expect(emptyDecoration.borderRadius, AppDimens.borderRadiusListCard);
       expect(emptyDecoration.boxShadow, AppDimens.shadowQuestionCard);
     });
