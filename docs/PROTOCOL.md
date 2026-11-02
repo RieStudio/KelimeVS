@@ -474,7 +474,8 @@ Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
 Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmiş hesaplar tüm uçlardan `410 Gone` alır.
 
 ### Profil ve Hesap
-- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `createdAt`, `equippedFrame`, `energy`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `createdAt`, `equippedFrame`, `energy`, `isGuest`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+  - **Misafir (Anonim) Kullanıcılar:** Token'daki `firebase.sign_in_provider === 'anonymous'` olduğunda sunucu `isGuest: true` işaretler ve kullanıcıya otomatik olarak deterministik `"M-" + 4 haneli rakam` (örn. `M-4821`, 1000..9999 aralığında) takma adı atar. Mevcut tüm misafir hesaplar ilk istekte tembelce bu ada çevrilir. Misafirlik bayrağı tek yönlüdür (`1 -> 0`); Google'a bağlanan hesap bir daha misafir olamaz.
   - **İadeli Çerçeve Geçişi (`frameMigration`):** `clientBuild >= 11` istemciden gelen istekte kullanıcının sahip olduğu emekli çerçeveler varsa otomatik olarak envanterden silinir, bedelleri bakiye (`coins`) alanına eklenir ve kuşanılmışsa çerçeve `'classic'`e çekilir. Bu geçiş ilk kez yapıldığında yanıtta opsiyonel `frameMigration` nesnesi döner:
     ```json
     {
@@ -486,10 +487,17 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
     ```
     Geçiş daha önce yapılmışsa veya emekli çerçeve yoksa bu alan yanıtta yer almaz. İade jetonları `daily_coins` sayacını etkilemez (günlük maç kazanç tavanına dahil edilmez).
 - `PUT /me/nickname`: Takma ad belirler veya günceller (`{ "nickname": "..." }`).
-  - İlk takma ad belirleme serbesttir.
+  - **Misafir (Anonim) Kilidi:** Misafir kullanıcılar takma ad belirleyemez veya değiştiremez. Misafir token ile yapılan isteklerde kural olarak `403 Forbidden` döner (`{ "error": "guest_nickname_locked", "message": "Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın." }`).
+  - **Geriye Dönük Uyumluluk Katmanı (`X-App-Build < 13`):**
+    - Yayındaki eski istemcilerin (v1.0.0+12 ve öncesi) misafir açılışında takma ad sorma ekranında kilitlenip kalmasını önlemek için geçici bir uyum katmanı devrededir (`GUEST_NICKNAME_LOCK_MIN_BUILD = 13`, ortam değişkeniyle üzerine yazılabilir).
+    - İstemciden gelen `X-App-Build < 13` (veya başlık yok/0) ise:
+      Sunucu gönderilen yeni takma adı yok sayar, profili değiştirmez ve `200 OK` ile mevcut `M-####` sistem adını döner (`{ "ok": true, "nickname": "M-####" }`). Eski istemci bunu başarı kabul ederek ana ekrana ilerler ve yerel önbelleğine doğru `M-####` adını kaydeder.
+    - İstemci `X-App-Build >= 13` ise: Doğrudan `403 Forbidden` (`guest_nickname_locked`) döner.
+    - **Kaldırılma Planı:** Yapı 13 (v1.0.0+13) mağaza dağıtımı tamamlanıp eski sürümlerin trafiği kritik eşiğin altına indiğinde, bu uyum katmanı sunucudan kaldırılacak ve tüm misafir `PUT /me/nickname` istekleri koşulsuz olarak 403 dönecektir.
+  - İlk takma ad belirleme serbesttir (Google hesabına bağlandıktan sonra otomatik atanan sistem adı `M-####` ilk özel adla değiştirilirken 24 saatlik cooldown uygulanmaz).
   - Sonraki takma ad değişiklikleri arasında **24 saatlik bekleme süresi (cooldown)** uygulanır.
   - Sınır dolmadan gelen isteklerde `429 Too Many Requests` döner (`{ "error": "nickname_cooldown", "message": "Takma adınızı 24 saatte bir değiştirebilirsiniz", "remainingSeconds": 86340 }`). Yanıtta ayrıca `Retry-After: <saniye>` başlığı bulunur.
-  - Sistem tarafından ayrılmış takma adlar (RESERVED: admin, moderator, sistem, destek, support, kelimevs, riestudio, yetkili, official vb. varyasyonları) seçilemez; seçilirse `400 Bad Request` döner (`{ "error": "reserved_nickname", "message": "Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin." }`).
+  - Sistem tarafından ayrılmış takma adlar (RESERVED: admin, moderator, sistem, destek, support, kelimevs, riestudio, yetkili, official vb. varyasyonları) ve misafir oyuncular için ayrılmış `M-####` kalıbı (M-1234, m-1234, M 1234, m_1234 vb.) seçilemez; seçilirse `400 Bad Request` döner (`{ "error": "reserved_nickname", "message": "Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin." }`).
   - Takma ad 3-16 karakter uzunluğunda olmalı, yalnızca harf, rakam ve alt çizgi içermelidir (`400 invalid_nickname`).
 - `DELETE /me`: Hesabı siler (`200 OK`, 24 saatlik tombstone kaydı bırakır).
 - `PUT /me/frame`: Avatar çerçevesini kuşandırır (`{ "frameId": "..." }`).

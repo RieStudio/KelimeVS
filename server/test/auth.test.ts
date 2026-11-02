@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  authenticateAuth,
   authenticateRequest,
   createKeyCache,
+  verifyAuth,
   verifyToken,
   type AuthEnv,
   type FetchFunction,
@@ -639,5 +641,76 @@ describe('Firebase ID Token & Dev Auth (Adım 4.3b)', () => {
     expect(uid3).toBeNull();
     expect(fetchCount).toBe(2); // Yeniden denendi
     expect(cache.lastFetchedAtMs).toBe(t1 + 16000);
+  });
+
+  // 9. Misafir (Anonim) Tespiti ve AuthContext (verifyAuth / authenticateAuth)
+  describe('Misafir (Anonim) Tespiti (verifyAuth)', () => {
+    it('Firebase token: sign_in_provider === "anonymous" ise isGuest: true döner', async () => {
+      const { keyPair, jwk } = await generateTestKeyPair('key-anon');
+      const mock = createMockFetch([jwk]);
+      const cache = createKeyCache();
+
+      const payload = createValidPayload({
+        sub: 'anon-user-123',
+        firebase: { sign_in_provider: 'anonymous' },
+      });
+      const token = await signJwt({ alg: 'RS256', kid: 'key-anon' }, payload, keyPair.privateKey);
+
+      const auth = await verifyAuth(token, validEnv, {
+        nowMs,
+        keyCache: cache,
+        fetchFn: mock.fetchFn,
+      });
+
+      expect(auth).not.toBeNull();
+      expect(auth?.uid).toBe('anon-user-123');
+      expect(auth?.isGuest).toBe(true);
+      expect(auth?.provider).toBe('anonymous');
+    });
+
+    it('Firebase token: sign_in_provider === "google.com" ise isGuest: false döner', async () => {
+      const { keyPair, jwk } = await generateTestKeyPair('key-google');
+      const mock = createMockFetch([jwk]);
+      const cache = createKeyCache();
+
+      const payload = createValidPayload({
+        sub: 'google-user-456',
+        firebase: { sign_in_provider: 'google.com' },
+      });
+      const token = await signJwt({ alg: 'RS256', kid: 'key-google' }, payload, keyPair.privateKey);
+
+      const auth = await verifyAuth(token, validEnv, {
+        nowMs,
+        keyCache: cache,
+        fetchFn: mock.fetchFn,
+      });
+
+      expect(auth).not.toBeNull();
+      expect(auth?.uid).toBe('google-user-456');
+      expect(auth?.isGuest).toBe(false);
+      expect(auth?.provider).toBe('google.com');
+    });
+
+    it('dev token: standart dev:<uid> isGuest: false kabul edilir', async () => {
+      const auth = await verifyAuth('dev:alice', { ALLOW_DEV_AUTH: 'true' });
+      expect(auth).not.toBeNull();
+      expect(auth?.uid).toBe('alice');
+      expect(auth?.isGuest).toBe(false);
+      expect(auth?.provider).toBe('dev');
+    });
+
+    it('dev token: dev:guest:<uid> veya dev:guest-<uid> isGuest: true döner', async () => {
+      const auth1 = await verifyAuth('dev:guest:bob', { ALLOW_DEV_AUTH: 'true' });
+      expect(auth1).not.toBeNull();
+      expect(auth1?.uid).toBe('bob');
+      expect(auth1?.isGuest).toBe(true);
+      expect(auth1?.provider).toBe('anonymous');
+
+      const auth2 = await verifyAuth('dev:guest-charlie', { ALLOW_DEV_AUTH: 'true' });
+      expect(auth2).not.toBeNull();
+      expect(auth2?.uid).toBe('guest-charlie');
+      expect(auth2?.isGuest).toBe(true);
+      expect(auth2?.provider).toBe('anonymous');
+    });
   });
 });

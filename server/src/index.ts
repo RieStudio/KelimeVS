@@ -1,12 +1,20 @@
-import { authenticateRequest, type AuthEnv } from './auth';
+import { authenticateRequest, authenticateAuth, type AuthEnv, type AuthContext } from './auth';
 import type { EnergyEnv } from './energy';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
-import { UserProfile } from './userProfile';
+import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild } from './userProfile';
 import { Leaderboard, type LeaderboardSeedEntry } from './leaderboard';
 import { ReportStore } from './reportStore';
 
-export { Matchmaker, MatchRoom, UserProfile, Leaderboard, ReportStore };
+export {
+  Matchmaker,
+  MatchRoom,
+  UserProfile,
+  Leaderboard,
+  ReportStore,
+  GUEST_NICKNAME_LOCK_MIN_BUILD,
+  getGuestNicknameLockMinBuild,
+};
 
 export interface Env extends AuthEnv, EnergyEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
@@ -34,6 +42,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly EXTRA_TIME_SECONDS?: string;
   readonly VISUAL_FRAMES_MIN_BUILD?: string;
   readonly RETIRED_FRAMES_BUILD?: string;
+  readonly GUEST_NICKNAME_LOCK_MIN_BUILD?: string;
 }
 
 export function parseClientBuild(request: Request): number {
@@ -88,24 +97,26 @@ export default {
 
     // Profil sorgulama rotası: GET /me
     if (request.method === 'GET' && pathname === '/me') {
-      const uid = await authenticateRequest(request, env);
-      if (!uid) {
+      const auth = await authenticateAuth(request, env);
+      if (!auth) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), {
           status: 401,
           headers: jsonHeaders,
         });
       }
+      const uid = auth.uid;
 
       const clientBuild = parseClientBuild(request);
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const profile = await profileStub.getProfile(uid, clientBuild);
+        const profile = await profileStub.getProfile(uid, clientBuild, auth.isGuest);
         const serverNowMs = Date.now();
         const energyState = await profileStub.getEnergyState(uid, serverNowMs);
         return new Response(
           JSON.stringify({
             ...profile,
+            isGuest: profile.isGuest ?? auth.isGuest,
             serverNowMs,
             energy: energyState,
           }),
@@ -134,13 +145,70 @@ export default {
 
     // Takma ad güncelleme rotası: PUT /me/nickname
     if (request.method === 'PUT' && pathname === '/me/nickname') {
-      const uid = await authenticateRequest(request, env);
-      if (!uid) {
+      const auth = await authenticateAuth(request, env);
+      if (!auth) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), {
           status: 401,
           headers: jsonHeaders,
         });
       }
+
+      if (auth.isGuest) {
+        const clientBuild = parseClientBuild(request);
+        const lockMinBuild = getGuestNicknameLockMinBuild(env);
+
+        if (clientBuild < lockMinBuild) {
+          // Uyum katmanı (eski istemci: build < 13 veya eksik başlık):
+          // Gönderilen adı yok say, profili DEĞİŞTİRME, normal başarılı yanıtı mevcut M-#### adıyla 200 dön.
+          const uid = auth.uid;
+          try {
+            const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+            const profile = await profileStub.getProfile(uid, 0, true);
+            return new Response(
+              JSON.stringify({
+                ok: true,
+                nickname: profile.nickname,
+              }),
+              {
+                status: 200,
+                headers: jsonHeaders,
+              }
+            );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg === 'account_deleted') {
+              return new Response(
+                JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+                {
+                  status: 410,
+                  headers: jsonHeaders,
+                }
+              );
+            }
+            return new Response(
+              JSON.stringify({ error: 'internal_error', message: msg }),
+              {
+                status: 500,
+                headers: jsonHeaders,
+              }
+            );
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            error: 'guest_nickname_locked',
+            message:
+              'Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın.',
+          }),
+          {
+            status: 403,
+            headers: jsonHeaders,
+          }
+        );
+      }
+
+      const uid = auth.uid;
 
       let body: unknown;
       try {
@@ -168,7 +236,7 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        const result = await profileStub.setNickname(nickname, uid);
+        const result = await profileStub.setNickname(nickname, uid, Date.now(), auth.isGuest);
 
         // Leaderboard tablosundaki eski takma adı da güncelle
         if (env.LEADERBOARD) {
@@ -186,6 +254,19 @@ export default {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'guest_nickname_locked') {
+          return new Response(
+            JSON.stringify({
+              error: 'guest_nickname_locked',
+              message:
+                'Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın.',
+            }),
+            {
+              status: 403,
+              headers: jsonHeaders,
+            }
+          );
+        }
         if (msg === 'account_deleted') {
           return new Response(
             JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),

@@ -63,6 +63,9 @@ class FakeAuthRepository implements AuthRepository {
   Stream<User?> authStateChanges() => _controller.stream;
 
   @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async => 'fake_token';
+
+  @override
   Future<AuthLinkResult> linkWithGoogle() async => const AuthLinkSuccess();
 
   @override
@@ -75,6 +78,9 @@ class FakeAuthRepository implements AuthRepository {
     }
     return signInResultToReturn;
   }
+
+  @override
+  Future<void> signInAnonymously() async {}
 
   @override
   Future<void> signInWithConflictCredential(AuthCredential credential) async {}

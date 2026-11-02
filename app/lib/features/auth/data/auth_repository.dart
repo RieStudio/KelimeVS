@@ -16,8 +16,10 @@ abstract interface class AuthRepository {
 
   Future<AuthLinkResult> linkWithGoogle();
   Future<AuthLinkResult> signInWithGoogle();
+  Future<void> signInAnonymously();
   Future<void> signInWithConflictCredential(AuthCredential credential);
   Future<void> signOutAndResetToAnonymous();
+  Future<String?> getIdToken({bool forceRefresh = false});
 
   Future<AuthLinkResult> reauthenticateGoogle();
   Future<void> deleteFirebaseUser();
@@ -70,6 +72,13 @@ class FirebaseAuthRepository implements AuthRepository {
       }
     }
     return user.email;
+  }
+
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async {
+    final user = currentUser;
+    if (user == null) return null;
+    return user.getIdToken(forceRefresh);
   }
 
   @override
@@ -144,6 +153,15 @@ class FirebaseAuthRepository implements AuthRepository {
       return AuthLinkError(e.message ?? AppStrings.authGenericError);
     } catch (_) {
       return const AuthLinkError(AppStrings.authGenericError);
+    }
+  }
+
+  @override
+  Future<void> signInAnonymously() async {
+    final a = _auth;
+    if (a == null) throw StateError('Firebase henüz başlatılmadı.');
+    if (a.currentUser == null) {
+      await a.signInAnonymously();
     }
   }
 

@@ -77,6 +77,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
     final result = await repo.linkWithGoogle();
 
     if (result is AuthLinkSuccess) {
+      await repo.getIdToken(forceRefresh: true);
+      await ref.read(profileProvider.notifier).syncWithServer();
+      _refresh();
       state = state.copyWith(
         isLoading: false,
         isGoogleLinked: true,
@@ -101,6 +104,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
       final result = await repo.signInWithGoogle();
 
       if (result is AuthLinkSuccess) {
+        await repo.getIdToken(forceRefresh: true);
         // Yerel depoları ve önbellekleri sıfırla
         await ref.read(matchHistoryRepositoryProvider).clear();
         ref.invalidate(matchHistoryProvider);
@@ -112,6 +116,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
 
         // Yeni hesabın profilini sunucudan yükle
         await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
+        await ref.read(profileProvider.notifier).syncWithServer();
 
         _refresh();
         state = state.copyWith(
@@ -138,11 +143,34 @@ class AuthNotifier extends Notifier<AuthUiState> {
     }
   }
 
+  Future<void> signInAsGuest() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      await repo.signInAnonymously();
+      await repo.getIdToken(forceRefresh: true);
+      await ref.read(profileProvider.notifier).syncWithServer();
+      _refresh();
+      state = state.copyWith(
+        isLoading: false,
+        isGoogleLinked: false,
+        linkedEmail: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
   Future<void> resolveConflict(AuthCredential credential) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final repo = ref.read(authRepositoryProvider);
       await repo.signInWithConflictCredential(credential);
+      await repo.getIdToken(forceRefresh: true);
 
       // Yerel depoları ve önbellekleri sıfırla
       await ref.read(matchHistoryRepositoryProvider).clear();
@@ -153,6 +181,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
       ref.invalidate(onlineMatchSessionProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
+      await ref.read(profileProvider.notifier).syncWithServer();
 
       _refresh();
       state = state.copyWith(isLoading: false);

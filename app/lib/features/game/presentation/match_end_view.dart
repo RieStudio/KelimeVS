@@ -265,7 +265,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final int? coinsAwarded = uiState.coinsAwarded;
     final bool isFriendly = uiState.isFriendly ||
         (uiState.lastSavedMatch?.isFriendly ?? false);
-    final bool isOnlineRanked = mode == MatchSessionMode.online && !isFriendly;
 
     final Widget content = Container(
       color: AppColors.surface,
@@ -433,58 +432,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: AppColors.ink,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ] else if (isOnlineRanked && coinsAwarded == null) ...[
-                const SizedBox(height: AppDimens.space20),
-                Semantics(
-                  container: true,
-                  label: 'Ödül hesaplanıyor',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space20,
-                      vertical: AppDimens.space8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusFull,
-                      border: Border.all(
-                        color: AppColors.mint,
-                        width: AppDimens.borderThin,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: AppColors.coin.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppDimens.space8),
-                        Text(
-                          'Ödül hesaplanıyor...',
-                          style: AppTextStyles.bodyText.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.muted,
-                            fontSize: 13,
                           ),
                         ),
                       ],

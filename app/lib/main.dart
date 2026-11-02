@@ -16,6 +16,8 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/font_licenses.dart';
 import 'core/widgets/app_widgets.dart';
 import 'core/widgets/avatar_frame_registry.dart';
+import 'features/auth/application/auth_notifier.dart';
+import 'features/auth/presentation/welcome_screen.dart';
 import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/leaderboard/application/leaderboard_providers.dart';
@@ -312,7 +314,11 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     if (!profile.hasNickname) {
-      return const OnboardingNicknameScreen();
+      final authState = ref.watch(authNotifierProvider);
+      if (authState.isGoogleLinked) {
+        return const OnboardingNicknameScreen();
+      }
+      return const WelcomeScreen();
     }
 
     ref.listen<int>(bottomNavIndexProvider, (prev, next) {

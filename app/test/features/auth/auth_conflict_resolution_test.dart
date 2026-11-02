@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
-import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/application/auth_notifier.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/auth/domain/auth_link_result.dart';
@@ -16,6 +15,7 @@ import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
+import 'package:app/features/auth/presentation/welcome_screen.dart';
 import 'package:app/features/profile/presentation/onboarding_nickname_screen.dart';
 import 'package:app/features/store/application/store_notifier.dart';
 import 'package:app/main.dart';
@@ -31,6 +31,7 @@ class FakeAuthRepository implements AuthRepository {
   AuthLinkResult signInResultToReturn = const AuthLinkSuccess(email: 'user@example.com');
   bool signInWithConflictCalled = false;
   bool signInWithGoogleCalled = false;
+  bool signInAnonymouslyCalled = false;
   bool signOutCalled = false;
   bool completeAccountDeletionCalled = false;
 
@@ -50,6 +51,9 @@ class FakeAuthRepository implements AuthRepository {
   Stream<User?> authStateChanges() => _controller.stream;
 
   @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async => 'fake_token';
+
+  @override
   Future<AuthLinkResult> linkWithGoogle() async => linkResultToReturn;
 
   @override
@@ -61,6 +65,12 @@ class FakeAuthRepository implements AuthRepository {
       _controller.add(null);
     }
     return signInResultToReturn;
+  }
+
+  @override
+  Future<void> signInAnonymously() async {
+    signInAnonymouslyCalled = true;
+    _controller.add(null);
   }
 
   @override
@@ -380,7 +390,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+      expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(find.byType(HomeScreen), findsNothing);
 
       // Google ile giriş yapıldığında sunucudaki Google profili gelir
@@ -390,10 +400,11 @@ void main() {
         coins: 750,
       );
 
-      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.tap(find.text(AppStrings.signInWithGoogle));
       await tester.pumpAndSettle();
 
       expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(WelcomeScreen), findsNothing);
       expect(find.byType(HomeScreen), findsOneWidget);
 
       final container = ProviderScope.containerOf(tester.element(find.byType(MainShell)));
@@ -424,12 +435,12 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
-      expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
+      expect(find.byType(WelcomeScreen), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.tap(find.text(AppStrings.signInWithGoogle));
       await tester.pumpAndSettle();
 
+      expect(find.byType(WelcomeScreen), findsNothing);
       expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
       expect(find.byType(HomeScreen), findsNothing);
       expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
@@ -457,14 +468,15 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+      expect(find.byType(WelcomeScreen), findsOneWidget);
 
       // Google ile giriş anında sunucu hatası alınıyor
       apiClient.shouldThrow = true;
 
-      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+      await tester.tap(find.text(AppStrings.signInWithGoogle));
       await tester.pumpAndSettle();
 
+      expect(find.byType(WelcomeScreen), findsNothing);
       expect(find.byType(OnboardingNicknameScreen), findsNothing);
       expect(find.byKey(const Key('profile_load_error_screen')), findsOneWidget);
 

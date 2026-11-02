@@ -459,11 +459,64 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: AppDimens.space24),
 
-              // Adı Değiştir Butonu
-              SecondaryButton(
-                text: AppStrings.changeNickname,
-                onPressed: () => _showChangeNicknameDialog(context, nickname),
-              ),
+              // Adı Değiştir Butonu VEYA Misafir Bilgi & Giriş Yönlendirmesi
+              if (authState.isGoogleLinked) ...[
+                SecondaryButton(
+                  text: AppStrings.changeNickname,
+                  onPressed: () => _showChangeNicknameDialog(context, nickname),
+                ),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(AppDimens.space16),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: AppDimens.borderRadiusListCard,
+                    border: Border.all(
+                      color: AppColors.ink,
+                      width: AppDimens.borderThin,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppColors.ink,
+                        offset: Offset(0, 3),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            size: 20,
+                            color: AppColors.ink,
+                          ),
+                          const SizedBox(width: AppDimens.space8),
+                          Expanded(
+                            child: Text(
+                              AppStrings.guestNicknameInfo,
+                              style: AppTextStyles.bodyText.copyWith(
+                                fontSize: 13,
+                                color: AppColors.ink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      SecondaryButton(
+                        text: AppStrings.linkGoogle,
+                        onPressed: authState.isLoading
+                            ? null
+                            : () => _handleLinkGoogle(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: AppDimens.space16),
 
@@ -472,15 +525,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               const SizedBox(height: AppDimens.space16),
 
-              // Google ile Bağla VEYA Bağlı Hesap Kartı + Çıkış Yap
-              if (!authState.isGoogleLinked)
-                SecondaryButton(
-                  text: AppStrings.linkGoogle,
-                  onPressed: authState.isLoading
-                      ? null
-                      : () => _handleLinkGoogle(context),
-                )
-              else ...[
+              // Bağlı Hesap Kartı (Yalnızca Google bağlıysa)
+              if (authState.isGoogleLinked) ...[
                 // Bağlı Hesap Kartı
                 Container(
                   padding: const EdgeInsets.symmetric(

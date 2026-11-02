@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { validateNickname } from './engine/nicknameValidator';
+import { validateNickname, isGuestPatternNickname } from './engine/nicknameValidator';
 import {
   FRAME_CATALOG,
   getFrameCatalogItem,
@@ -23,6 +23,16 @@ import {
   type EnergyState,
   type EnergyPack,
 } from './energy';
+
+export const GUEST_NICKNAME_LOCK_MIN_BUILD = 13;
+
+export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUILD?: string }): number {
+  if (env?.GUEST_NICKNAME_LOCK_MIN_BUILD) {
+    const parsed = parseInt(env.GUEST_NICKNAME_LOCK_MIN_BUILD, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return GUEST_NICKNAME_LOCK_MIN_BUILD;
+}
 import type { Env } from './index';
 
 export type MatchRewardOutcome =
@@ -50,6 +60,8 @@ export interface UserProfileData {
   readonly stats: UserStats;
   readonly createdAt: number;
   readonly equippedFrame: string;
+  readonly isGuest?: boolean;
+  readonly isSystemNickname?: boolean;
   readonly frameMigration?: FrameMigrationResult;
 }
 
@@ -201,6 +213,19 @@ export interface BlockedUserItem {
   readonly blockedAt: number;
 }
 
+/**
+ * Misafir kullanıcılar için deterministik "M-####" formatında takma ad üretir.
+ * 1000 ile 9999 arasında 4 haneli bir sayı üretir; "M-0000" gibi uç durumlar oluşmaz.
+ */
+export function generateGuestNickname(uid: string): string {
+  let hash = 0;
+  for (let i = 0; i < uid.length; i++) {
+    hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+  }
+  const num = 1000 + (hash % 9000);
+  return `M-${num}`;
+}
+
 export class UserProfile extends DurableObject<Env> {
   private initialized = false;
 
@@ -315,6 +340,34 @@ export class UserProfile extends DurableObject<Env> {
       this.ctx.storage.sql.exec(
         'ALTER TABLE profiles ADD COLUMN nickname_updated_at INTEGER NOT NULL DEFAULT 0'
       );
+    }
+
+    const hasIsGuest = profileCols.some((c) => c.name === 'is_guest');
+    if (!hasIsGuest) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 1'
+      );
+    }
+
+    const hasIsSystemNickname = profileCols.some((c) => c.name === 'is_system_nickname');
+    if (!hasIsSystemNickname) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN is_system_nickname INTEGER NOT NULL DEFAULT 0'
+      );
+      // Mevcut satırlar için: Eğer nickname null ise veya M-#### kalıbına uyuyorsa is_system_nickname = 1,
+      // aksi takdirde (özel adlı mevcut kullanıcılar, örn. "Sevbans") is_system_nickname = 0 olarak kalır.
+      const rows = this.ctx.storage.sql
+        .exec<{ uid: string; nickname: string | null }>('SELECT uid, nickname FROM profiles')
+        .toArray();
+      for (const row of rows) {
+        const isSys = !row.nickname || isGuestPatternNickname(row.nickname);
+        if (isSys) {
+          this.ctx.storage.sql.exec(
+            'UPDATE profiles SET is_system_nickname = 1 WHERE uid = ?',
+            row.uid
+          );
+        }
+      }
     }
 
     this.initialized = true;
@@ -520,7 +573,11 @@ export class UserProfile extends DurableObject<Env> {
   /**
    * Kullanıcının profilini döndürür; mevcut değilse varsayılan başlangıç bakiyesiyle oluşturur.
    */
-  async getProfile(uid?: string, clientBuild = 0): Promise<UserProfileData> {
+  async getProfile(
+    uid?: string,
+    clientBuild = 0,
+    isGuest?: boolean
+  ): Promise<UserProfileData> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
@@ -536,15 +593,56 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
-      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame FROM profiles LIMIT 1'
+      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname FROM profiles LIMIT 1'
     );
     const rows = cursor.toArray();
 
     if (rows.length > 0) {
       const row = rows[0];
+      let currentIsGuest = (row.is_guest as number | undefined) ?? 0;
+      let currentIsSystem = (row.is_system_nickname as number | undefined) ?? 0;
+      let currentNickname = row.nickname;
+
+      // 1) Misafirlik bayrağı tek yönlü kuralı: profiles.is_guest yalnızca 1 -> 0 geçebilir.
+      // Bir kez 0 olduktan sonra (Google'a bağlanmış), eski anonim token gelse bile ASLA tekrar 1 yapma!
+      if (currentIsGuest === 1 && isGuest === false) {
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET is_guest = 0 WHERE uid = ?',
+          row.uid
+        );
+        currentIsGuest = 0;
+      }
+
+      // 2) Tembel migrasyon: YALNIZCA token isGuest === true VE DB'de is_guest hâlâ 1 iken çalışır!
+      // Token Google (isGuest === false) ya da token tanımsız (isGuest !== true) ise ASLA çalışmaz!
+      if (currentIsGuest === 1 && isGuest === true) {
+        const autoName = generateGuestNickname(row.uid);
+        if (currentNickname !== autoName) {
+          this.ctx.storage.sql.exec(
+            'UPDATE profiles SET nickname = ?, is_system_nickname = 1, nickname_updated_at = 0 WHERE uid = ?',
+            autoName,
+            row.uid
+          );
+          currentNickname = autoName;
+          currentIsSystem = 1;
+
+          // Leaderboard tablosundaki adı da güncelle
+          if (this.env.LEADERBOARD) {
+            try {
+              const leaderboardStub = this.env.LEADERBOARD.get(
+                this.env.LEADERBOARD.idFromName('global')
+              );
+              await leaderboardStub.updateNickname(row.uid, autoName);
+            } catch (lbErr) {
+              console.error('Leaderboard updateNickname failed for guest migration:', lbErr);
+            }
+          }
+        }
+      }
+
       return {
         uid: row.uid,
-        nickname: row.nickname,
+        nickname: currentNickname,
         coins: row.coins,
         stats: {
           played: row.played,
@@ -554,6 +652,8 @@ export class UserProfile extends DurableObject<Env> {
         },
         createdAt: row.created_at,
         equippedFrame: (row.equipped_frame as string) || 'classic',
+        isGuest: currentIsGuest === 1,
+        isSystemNickname: currentIsSystem === 1,
         ...(frameMigration ? { frameMigration } : {}),
       };
     }
@@ -564,22 +664,31 @@ export class UserProfile extends DurableObject<Env> {
     const nowMs = Date.now();
     const maxEnergy = getEnergyMax(this.env);
 
+    const initialIsGuest = isGuest === true ? 1 : 0;
+    const initialNickname = isGuest === true ? generateGuestNickname(effectiveUid) : null;
+    const initialIsSystem = isGuest === true ? 1 : 0;
+
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at)
-       VALUES (?, NULL, ?, 0, 0, 0, 0, ?, 'classic', ?, 0)`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at, is_guest, is_system_nickname)
+       VALUES (?, ?, ?, 0, 0, 0, 0, ?, 'classic', ?, 0, ?, ?)`,
       effectiveUid,
+      initialNickname,
       initialCoins,
       nowMs,
-      maxEnergy
+      maxEnergy,
+      initialIsGuest,
+      initialIsSystem
     );
 
     return {
       uid: effectiveUid,
-      nickname: null,
+      nickname: initialNickname,
       coins: initialCoins,
       stats: { played: 0, won: 0, lost: 0, correctAnswers: 0 },
       createdAt: nowMs,
       equippedFrame: 'classic',
+      isGuest: initialIsGuest === 1,
+      isSystemNickname: initialIsSystem === 1,
     };
   }
 
@@ -590,12 +699,17 @@ export class UserProfile extends DurableObject<Env> {
   async setNickname(
     nickname: string,
     uid?: string,
-    nowMs = Date.now()
+    nowMs = Date.now(),
+    isGuest?: boolean
   ): Promise<{ ok: true; nickname: string }> {
     this.ensureSchema();
 
     if (this.isDeleted()) {
       throw new Error('account_deleted');
+    }
+
+    if (isGuest === true) {
+      throw new Error('guest_nickname_locked');
     }
 
     const validation = validateNickname(nickname);
@@ -609,25 +723,39 @@ export class UserProfile extends DurableObject<Env> {
     const normalized = validation.normalized;
 
     // Profil yoksa önce oluştur
-    await this.getProfile(uid);
+    await this.getProfile(uid, 0, isGuest);
 
-    // 24 saat bekleme süresi (cooldown) kontrolü:
-    // İlk takma ad belirleme serbest (mevcut ad null/boş ise veya nickname_updated_at <= 0 ise).
-    // Sonraki değişikliklerde 24 saat (86.400.000 ms) bekleme süresi şartı aranır.
+    // 24 saat bekleme süresi (cooldown) ve misafir kilidi kontrolü:
     const rows = this.ctx.storage.sql
-      .exec<{ nickname: string | null; nickname_updated_at: number | null }>(
-        'SELECT nickname, nickname_updated_at FROM profiles LIMIT 1'
+      .exec<{
+        nickname: string | null;
+        nickname_updated_at: number | null;
+        is_guest: number | null;
+        is_system_nickname: number | null;
+      }>(
+        'SELECT nickname, nickname_updated_at, is_guest, is_system_nickname FROM profiles LIMIT 1'
       )
       .toArray();
 
     if (rows.length > 0) {
+      if (rows[0].is_guest === 1) {
+        throw new Error('guest_nickname_locked');
+      }
+
       const currentNickname = rows[0].nickname;
       const lastUpdatedAt = rows[0].nickname_updated_at ?? 0;
+      const isSystemNickname = rows[0].is_system_nickname ?? 0;
 
       const hasExistingNickname =
         typeof currentNickname === 'string' && currentNickname.trim().length > 0;
 
-      if (hasExistingNickname && lastUpdatedAt > 0) {
+      // Cooldown kontrolü:
+      // Eğer mevcut ad null/boş ise VEYA sistem tarafından atanmışsa (is_system_nickname === 1)
+      // VEYA lastUpdatedAt <= 0 ise: İLK ÖZEL AD SEÇİMİDİR -> Cooldown uygulanmaz!
+      const isFirstCustomNickname =
+        !hasExistingNickname || isSystemNickname === 1 || lastUpdatedAt <= 0;
+
+      if (!isFirstCustomNickname) {
         const NICKNAME_COOLDOWN_MS = 24 * 60 * 60 * 1000;
         const elapsed = nowMs - lastUpdatedAt;
         if (elapsed < NICKNAME_COOLDOWN_MS) {
@@ -640,7 +768,7 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     this.ctx.storage.sql.exec(
-      'UPDATE profiles SET nickname = ?, nickname_updated_at = ?',
+      'UPDATE profiles SET nickname = ?, nickname_updated_at = ?, is_system_nickname = 0',
       normalized,
       nowMs
     );
@@ -1701,6 +1829,16 @@ export class UserProfile extends DurableObject<Env> {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'guest_nickname_locked') {
+          return new Response(
+            JSON.stringify({
+              error: 'guest_nickname_locked',
+              message:
+                'Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın.',
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
         if (msg === 'account_deleted') {
           return new Response(
             JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
@@ -1730,6 +1868,16 @@ export class UserProfile extends DurableObject<Env> {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'guest_nickname_locked') {
+          return new Response(
+            JSON.stringify({
+              error: 'guest_nickname_locked',
+              message:
+                'Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın.',
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
         if (msg === 'account_deleted') {
           return new Response(
             JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
@@ -1763,6 +1911,16 @@ export class UserProfile extends DurableObject<Env> {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'guest_nickname_locked') {
+          return new Response(
+            JSON.stringify({
+              error: 'guest_nickname_locked',
+              message:
+                'Misafir hesaplar takma ad değiştiremez. Özel takma ad belirlemek için Google ile giriş yapmalısın.',
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
         if (msg === 'account_deleted') {
           return new Response(
             JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),

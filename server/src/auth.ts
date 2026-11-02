@@ -94,6 +94,17 @@ interface JwtPayload {
   readonly exp?: number;
   readonly iat?: number;
   readonly auth_time?: number;
+  readonly firebase?: {
+    readonly sign_in_provider?: string;
+    readonly identities?: Record<string, unknown>;
+  };
+  readonly provider_id?: string;
+}
+
+export interface AuthContext {
+  readonly uid: string;
+  readonly isGuest: boolean;
+  readonly provider: string;
 }
 
 /**
@@ -182,21 +193,32 @@ async function getOrFetchKey(
 }
 
 /**
- * Firebase ID Token veya geliştirme token'ını doğrular.
- * Başarılı olursa kullanıcı kimliğini (`uid`), aksi halde `null` döner.
+ * Firebase ID Token veya geliştirme token'ını doğrular ve detaylı kimlik bilgilerini döner.
+ * Başarılı olursa { uid, isGuest, provider }, aksi halde `null` döner.
  */
-export async function verifyToken(
+export async function verifyAuth(
   token: string | null,
   env: AuthEnv,
   options?: VerifyTokenOptions
-): Promise<string | null> {
+): Promise<AuthContext | null> {
   if (!token) return null;
 
   // 1. Geliştirme modu token'ı: dev:<uid>
   if (token.startsWith('dev:')) {
     if (env.ALLOW_DEV_AUTH === 'true') {
-      const uid = token.slice(4).trim();
-      return uid.length > 0 ? uid : null;
+      const rawUid = token.slice(4).trim();
+      if (!rawUid) return null;
+
+      // Misafir simülasyonu: dev:guest:<uid> veya dev:guest-...
+      const isGuest = rawUid.startsWith('guest:') || rawUid.startsWith('guest-');
+      const uid = rawUid.startsWith('guest:') ? rawUid.slice(6).trim() : rawUid;
+      if (!uid) return null;
+
+      return {
+        uid,
+        isGuest,
+        provider: isGuest ? 'anonymous' : 'dev',
+      };
     }
     return null;
   }
@@ -293,26 +315,42 @@ export async function verifyToken(
       signedData
     );
 
-    return isValid ? payload.sub : null;
+    if (!isValid) return null;
+
+    const signInProvider = payload.firebase?.sign_in_provider ?? payload.provider_id ?? 'unknown';
+    const isGuest = signInProvider === 'anonymous';
+
+    return {
+      uid: payload.sub,
+      isGuest,
+      provider: signInProvider,
+    };
   } catch {
     return null;
   }
 }
 
 /**
- * Gelen HTTP/WebSocket isteğinden kimliği doğrular.
- *
- * Taşıma kuralları:
- * - Tercih edilen yöntem: `Authorization: Bearer <jeton>` başlığı.
- * - Geliştirme modu kolaylığı: `?token=dev:<uid>` sorgu parametresi YALNIZCA ALLOW_DEV_AUTH=true iken kabul edilir.
- * - Üretim modunda sorgu parametresi KESİNLİKLE reddedilir (URL loglama güvenliği).
- * - Firebase ID token'ları sorgu parametresiyle ASLA taşınamaz.
+ * Firebase ID Token veya geliştirme token'ını doğrular.
+ * Başarılı olursa kullanıcı kimliğini (`uid`), aksi halde `null` döner.
  */
-export async function authenticateRequest(
-  request: Request,
+export async function verifyToken(
+  token: string | null,
   env: AuthEnv,
   options?: VerifyTokenOptions
 ): Promise<string | null> {
+  const auth = await verifyAuth(token, env, options);
+  return auth ? auth.uid : null;
+}
+
+/**
+ * Gelen HTTP/WebSocket isteğinden tam kimlik ve misafirlik bilgilerini doğrular.
+ */
+export async function authenticateAuth(
+  request: Request,
+  env: AuthEnv,
+  options?: VerifyTokenOptions
+): Promise<AuthContext | null> {
   const url = new URL(request.url);
   const tokenParam = url.searchParams.get('token');
 
@@ -325,7 +363,7 @@ export async function authenticateRequest(
     if (!tokenParam.startsWith('dev:')) {
       return null;
     }
-    return verifyToken(tokenParam, env, options);
+    return verifyAuth(tokenParam, env, options);
   }
 
   const authHeader = request.headers.get('Authorization');
@@ -334,8 +372,21 @@ export async function authenticateRequest(
     if (!match) return null;
     const bearerToken = match[1].trim();
     if (!bearerToken) return null;
-    return verifyToken(bearerToken, env, options);
+    return verifyAuth(bearerToken, env, options);
   }
 
   return null;
+}
+
+/**
+ * Gelen HTTP/WebSocket isteğinden kimliği doğrular.
+ * Geriye dönük uyumluluk için yalnızca `uid` döndürür.
+ */
+export async function authenticateRequest(
+  request: Request,
+  env: AuthEnv,
+  options?: VerifyTokenOptions
+): Promise<string | null> {
+  const auth = await authenticateAuth(request, env, options);
+  return auth ? auth.uid : null;
 }

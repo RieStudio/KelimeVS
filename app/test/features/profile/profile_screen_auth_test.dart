@@ -34,6 +34,8 @@ class FakeAuthRepository implements AuthRepository {
   AuthLinkResult reauthResultToReturn;
   bool signInWithConflictCalled = false;
   bool signOutCalled = false;
+  bool getIdTokenCalled = false;
+  bool? lastForceRefreshValue;
 
   final _controller = StreamController<User?>.broadcast();
 
@@ -51,6 +53,13 @@ class FakeAuthRepository implements AuthRepository {
   Stream<User?> authStateChanges() => _controller.stream;
 
   @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async {
+    getIdTokenCalled = true;
+    lastForceRefreshValue = forceRefresh;
+    return 'fake_token';
+  }
+
+  @override
   Future<AuthLinkResult> signInWithGoogle() async => const AuthLinkSuccess();
 
   @override
@@ -61,6 +70,11 @@ class FakeAuthRepository implements AuthRepository {
       _controller.add(null);
     }
     return linkResultToReturn;
+  }
+
+  @override
+  Future<void> signInAnonymously() async {
+    _controller.add(null);
   }
 
   @override
@@ -635,6 +649,63 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text(AppStrings.signOut), findsOneWidget);
       expect(find.text(AppStrings.deleteAccount), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '17. Misafir hesap: Takma ad değiştirme kapalı, misafir bilgi kartı ve Google yönlendirmesi görünür',
+    (tester) async {
+      final repo = FakeAuthRepository(isGoogleLinked: false);
+      await tester.pumpWidget(buildTestScreen(repo));
+      await tester.pumpAndSettle();
+
+      // "Adı Değiştir" butonu görünmez
+      expect(
+        find.widgetWithText(SecondaryButton, AppStrings.changeNickname),
+        findsNothing,
+      );
+
+      // Misafir yönlendirme metni görünür
+      expect(find.text(AppStrings.guestNicknameInfo), findsOneWidget);
+
+      // Google ile Bağla butonu kartın içinde görünür
+      expect(
+        find.widgetWithText(SecondaryButton, AppStrings.linkGoogle),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    '18. Google bağlama sonrası: getIdToken(forceRefresh: true) çağrılır, Adı Değiştir görünür',
+    (tester) async {
+      final repo = FakeAuthRepository(
+        isGoogleLinked: false,
+        linkResultToReturn: const AuthLinkSuccess(email: 'user@example.com'),
+      );
+      await tester.pumpWidget(buildTestScreen(repo));
+      await tester.pumpAndSettle();
+
+      // Başlangıçta Adı Değiştir yok
+      expect(
+        find.widgetWithText(SecondaryButton, AppStrings.changeNickname),
+        findsNothing,
+      );
+
+      // Google ile Bağla butonuna tıkla
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.linkGoogle));
+      await tester.pumpAndSettle();
+
+      // getIdToken(forceRefresh: true) çağrıldı mı?
+      expect(repo.getIdTokenCalled, isTrue);
+      expect(repo.lastForceRefreshValue, isTrue);
+
+      // Artık Adı Değiştir butonu görünüyor, bilgi kartı kayboldu
+      expect(
+        find.widgetWithText(SecondaryButton, AppStrings.changeNickname),
+        findsOneWidget,
+      );
+      expect(find.text(AppStrings.guestNicknameInfo), findsNothing);
     },
   );
 }

@@ -21,6 +21,7 @@ class ProfileState {
   final int? serverNowMs;
   final UserStats stats;
   final FrameMigrationInfo? pendingMigrationNotice;
+  final bool isGuest;
 
   const ProfileState({
     this.nickname,
@@ -33,6 +34,7 @@ class ProfileState {
     this.serverNowMs,
     this.stats = const UserStats(),
     this.pendingMigrationNotice,
+    this.isGuest = false,
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -51,6 +53,7 @@ class ProfileState {
     UserStats? stats,
     FrameMigrationInfo? pendingMigrationNotice,
     bool clearMigrationNotice = false,
+    bool? isGuest,
   }) {
     return ProfileState(
       nickname: clearNickname ? null : (nickname ?? this.nickname),
@@ -65,6 +68,7 @@ class ProfileState {
       pendingMigrationNotice: clearMigrationNotice
           ? null
           : (pendingMigrationNotice ?? this.pendingMigrationNotice),
+      isGuest: isGuest ?? this.isGuest,
     );
   }
 }
@@ -144,6 +148,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           energy: remote.energy,
           serverNowMs: remote.serverNowMs,
           stats: remote.stats,
+          isGuest: remote.isGuest,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
         );
@@ -261,6 +266,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
             stats: remote.stats,
             isLoaded: true,
             isSyncing: false,
+            isGuest: remote.isGuest,
           );
         } else {
           // Sunucuda profil var ama takma ad meşru olarak boş
@@ -273,6 +279,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
             stats: remote.stats,
             isLoaded: true,
             isSyncing: false,
+            isGuest: remote.isGuest,
           );
         }
       } else {

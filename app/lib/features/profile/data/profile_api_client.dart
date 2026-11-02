@@ -97,6 +97,7 @@ class UserProfileModel {
   final EnergyState? energy;
   final int? serverNowMs;
   final FrameMigrationInfo? frameMigration;
+  final bool isGuest;
 
   const UserProfileModel({
     required this.uid,
@@ -108,6 +109,7 @@ class UserProfileModel {
     this.energy,
     this.serverNowMs,
     this.frameMigration,
+    this.isGuest = false,
   });
 
   int get played => stats.played;
@@ -133,6 +135,7 @@ class UserProfileModel {
       frameMigration: migrationJson != null
           ? FrameMigrationInfo.fromJson(migrationJson)
           : null,
+      isGuest: json['isGuest'] as bool? ?? false,
     );
   }
 }
@@ -234,6 +237,13 @@ class HttpProfileApiClient implements ProfileApiClient {
       } else if (response.statusCode == 410) {
         onAccountDeleted?.call();
         return const ProfileUpdateNetworkError('account_deleted');
+      } else if (response.statusCode == 403) {
+        String msg = AppStrings.guestNicknameLocked;
+        try {
+          final decoded = response.decodeJsonMap();
+          msg = decoded['message'] as String? ?? msg;
+        } catch (_) {}
+        return ProfileUpdateInvalidNickname(msg);
       } else if (response.statusCode == 429) {
         int remainingSeconds = 86400;
         String msg = AppStrings.nicknameCooldownError;

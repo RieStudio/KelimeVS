@@ -45,6 +45,13 @@ abstract final class NicknameValidator {
     'resmi',
   ];
 
+  static final RegExp _guestPatternRegex = RegExp(r'^m\d{4}$');
+
+  static bool isGuestPattern(String raw) {
+    final stripped = raw.replaceAll(RegExp(r'[\s\-_]'), '').toLowerCase();
+    return _guestPatternRegex.hasMatch(stripped);
+  }
+
   static bool isReserved(String raw) {
     final normalized = TextNormalizer.normalize(raw);
     final stripped = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
@@ -84,14 +91,21 @@ abstract final class NicknameValidator {
       );
     }
 
-    // 3. Yalnızca harf (Türkçe harfler dahil), rakam, boşluk ve alt çizgi
+    // 3. Misafir oyuncu kalıbı (M-####) kontrolü (özel karakter/tire filtrelemesinden önce kontrol edilir)
+    if (isGuestPattern(trimmed)) {
+      return const NicknameValidationResult.invalid(
+        AppStrings.nicknameGuestPatternError,
+      );
+    }
+
+    // 4. Yalnızca harf (Türkçe harfler dahil), rakam, boşluk ve alt çizgi
     if (!_allowedCharsRegex.hasMatch(trimmed)) {
       return const NicknameValidationResult.invalid(
         'Yalnızca harf, rakam, boşluk ve alt çizgi (_) kullanabilirsin.',
       );
     }
 
-    // 4. Yasaklı / Sistem rezervli unvan kontrolü
+    // 5. Yasaklı / Sistem rezervli unvan kontrolü
     if (isReserved(trimmed)) {
       return const NicknameValidationResult.invalid(
         AppStrings.nicknameReservedError,

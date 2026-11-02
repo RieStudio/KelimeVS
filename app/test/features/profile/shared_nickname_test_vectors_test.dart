@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/core/strings/app_strings.dart';
 import 'package:app/features/profile/domain/nickname_validator.dart';
 import 'package:app/features/profile/domain/profanity_words.dart';
 
@@ -107,6 +108,18 @@ void main() {
       expect(
         NicknameValidator.validate('kelimevs_bot').errorMessage,
         equals('Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.'),
+      );
+      expect(
+        NicknameValidator.validate('M-4821').errorMessage,
+        equals(AppStrings.nicknameGuestPatternError),
+      );
+      expect(
+        NicknameValidator.validate('m_1234').errorMessage,
+        equals(AppStrings.nicknameGuestPatternError),
+      );
+      expect(
+        NicknameValidator.validate('M 9999').errorMessage,
+        equals(AppStrings.nicknameGuestPatternError),
       );
     });
   });

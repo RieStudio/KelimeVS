@@ -27,6 +27,15 @@ export const RESERVED_NICKNAMES: readonly string[] = [
   'resmi',
 ];
 
+/**
+ * M-#### misafir takma ad kalıbını (büyük/küçük harf, boşluk/tire/alt çizgi varyasyonları) kontrol eder.
+ * Örn: M-4821, m-4821, M 4821, M_4821, m4821, M - 4821
+ */
+export function isGuestPatternNickname(raw: string): boolean {
+  const stripped = raw.replace(/[\s\-_]/g, '').toLowerCase();
+  return /^m\d{4}$/.test(stripped);
+}
+
 export function isReservedNickname(raw: string): boolean {
   const normalized = normalize(raw);
   const stripped = normalized.replace(/[^a-z0-9]/g, '');
@@ -57,7 +66,17 @@ export function validateNickname(raw: unknown): NicknameValidationResult {
     };
   }
 
-  // 3. İzin verilen karakterler (Türkçe harfler, rakamlar, boşluk, alt çizgi)
+  // 3. Misafir oyuncu kalıbı (M-####) kontrolü (özel karakter/tire filtrelemesinden önce kontrol edilir)
+  if (isGuestPatternNickname(trimmed)) {
+    return {
+      isValid: false,
+      normalized: null,
+      error: 'reserved',
+      errorMessage: 'Bu takma ad kalıbı (M-####) misafir oyuncular için ayrılmıştır.',
+    };
+  }
+
+  // 4. İzin verilen karakterler (Türkçe harfler, rakamlar, boşluk, alt çizgi)
   if (!ALLOWED_CHARS_REGEX.test(trimmed)) {
     return {
       isValid: false,
@@ -67,7 +86,7 @@ export function validateNickname(raw: unknown): NicknameValidationResult {
     };
   }
 
-  // 4. Yasaklı / Sistem rezervli unvan kontrolü (Normalizasyonlu ve boşluk/özel karakter dayanıklı)
+  // 5. Yasaklı / Sistem rezervli unvan kontrolü (Normalizasyonlu ve boşluk/özel karakter dayanıklı)
   if (isReservedNickname(trimmed)) {
     return {
       isValid: false,

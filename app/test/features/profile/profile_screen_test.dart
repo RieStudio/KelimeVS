@@ -6,8 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/secondary_button.dart';
+import 'package:app/features/auth/application/auth_notifier.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
+
+class _TestAuthNotifier extends AuthNotifier {
+  final bool isGoogleLinked;
+  _TestAuthNotifier({this.isGoogleLinked = true});
+
+  @override
+  AuthUiState build() => AuthUiState(isGoogleLinked: isGoogleLinked);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,9 +27,12 @@ void main() {
     });
   });
 
-  Widget buildTestScreen() {
-    return const ProviderScope(
-      child: MaterialApp(
+  Widget buildTestScreen({bool isGoogleLinked = true}) {
+    return ProviderScope(
+      overrides: [
+        authNotifierProvider.overrideWith(() => _TestAuthNotifier(isGoogleLinked: isGoogleLinked)),
+      ],
+      child: const MaterialApp(
         home: ProfileScreen(),
       ),
     );

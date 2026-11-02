@@ -269,7 +269,10 @@ abstract final class AppStrings {
 
   // Google Hesap Bağlama ve Çıkış
   static const String linkGoogle = 'Google ile Bağla';
-  static const String signInWithGoogle = 'Google ile Devam Et';
+  static const String signInWithGoogle = 'Google ile Giriş Yap';
+  static const String continueAsGuest = 'Misafir Olarak Devam Et';
+  static const String guestNoticeInWelcome =
+      'Misafir olarak oynarsan adın otomatik atanır. Daha sonra Google ile giriş yaparak kendi adını seçebilirsin.';
   static const String signInWithGoogleHint =
       'Önceki hesabın varsa Google ile devam et.';
   static const String googleLinkedNoProfileNotice =
@@ -281,6 +284,12 @@ abstract final class AppStrings {
       'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu Google hesabına geçersen şu anki misafir ilerlemen (jetonlar, çerçeveler, istatistikler ve maç geçmişi) yeni hesaba taşınmaz ve kaybolur. Devam edilsin mi?';
   static const String nicknameReservedError =
       'Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.';
+  static const String nicknameGuestPatternError =
+      'Bu takma ad kalıbı (M-####) misafir oyuncular için ayrılmıştır.';
+  static const String guestNicknameInfo =
+      'Misafir hesabın otomatik bir ad kullanır. Google ile giriş yaparak kendi adını seçebilirsin.';
+  static const String guestNicknameLocked =
+      'Misafir hesaplar takma ad değiştiremez.';
   static const String nicknameCooldownError =
       'Takma adınızı 24 saatte bir değiştirebilirsiniz.';
   static const String profileLoadErrorTitle = 'Profil yüklenemedi';

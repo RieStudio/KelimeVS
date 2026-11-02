@@ -158,6 +158,51 @@
     "input": "Zeynep",
     "valid": true,
     "normalized": "Zeynep"
+  },
+  {
+    "input": "M-4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "m-4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "M 4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "m_4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "M4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "m4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "M - 4821",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "M-0000",
+    "valid": false,
+    "normalized": null
+  },
+  {
+    "input": "Master1234",
+    "valid": true,
+    "normalized": "Master1234"
   }
 ]
 
