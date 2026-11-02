@@ -35,6 +35,17 @@ class EnergyPack {
   int get hashCode => Object.hash(id, cost, energy);
 }
 
+bool _parseBool(dynamic val, {bool defaultValue = false}) {
+  if (val is bool) return val;
+  if (val is num) return val != 0;
+  if (val is String) {
+    final s = val.toLowerCase().trim();
+    if (s == 'true' || s == '1') return true;
+    if (s == 'false' || s == '0') return false;
+  }
+  return defaultValue;
+}
+
 @immutable
 class EnergyState {
   final bool enabled;
@@ -54,16 +65,22 @@ class EnergyState {
   });
 
   factory EnergyState.fromJson(Map<String, dynamic> json) {
-    final rawPacks = json['packs'] as List<dynamic>? ?? [];
+    final rawPacks = json['packs'] is List ? (json['packs'] as List) : const [];
+    final regenSec = (json['regenSeconds'] as num?)?.toInt() ??
+        ((json['regenMinutes'] as num?) != null
+            ? ((json['regenMinutes'] as num) * 60).toInt()
+            : 1200);
     return EnergyState(
-      enabled: json['enabled'] as bool? ?? false,
+      enabled: _parseBool(json['enabled']),
       current: (json['current'] as num?)?.toInt() ?? 5,
       max: (json['max'] as num?)?.toInt() ?? 5,
-      nextEnergyAtMs: (json['nextEnergyAtMs'] as num?)?.toInt(),
-      regenSeconds: (json['regenSeconds'] as num?)?.toInt() ?? 1200,
-      packs: rawPacks
-          .map((e) => EnergyPack.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      nextEnergyAtMs: (json['nextEnergyAtMs'] ?? json['next_energy_at_ms'] as num?)?.toInt(),
+      regenSeconds: regenSec,
+      packs: rawPacks.map((e) {
+        if (e is Map<String, dynamic>) return EnergyPack.fromJson(e);
+        if (e is Map) return EnergyPack.fromJson(Map<String, dynamic>.from(e));
+        return const EnergyPack(id: '', cost: 0, energy: 0);
+      }).toList(),
     );
   }
 

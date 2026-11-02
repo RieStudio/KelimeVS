@@ -271,8 +271,10 @@ abstract final class AppStrings {
   static const String linkGoogle = 'Google ile Bağla';
   static const String signInWithGoogle = 'Google ile Giriş Yap';
   static const String continueAsGuest = 'Misafir Olarak Devam Et';
-  static const String guestNoticeInWelcome =
-      'Misafir olarak oynarsan adın otomatik atanır. Daha sonra Google ile giriş yaparak kendi adını seçebilirsin.';
+  static const String authServiceError =
+      'Giriş servisine ulaşılamadı. Lütfen tekrar dene.';
+  static const String serverProfileLoadError =
+      'Sunucu profili yüklenemedi. Lütfen tekrar dene.';
   static const String signInWithGoogleHint =
       'Önceki hesabın varsa Google ile devam et.';
   static const String googleLinkedNoProfileNotice =

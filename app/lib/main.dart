@@ -179,7 +179,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _authError = null;
     await _initAuth();
     if (mounted) {
-      ref.read(profileProvider.notifier).syncWithServer();
+      ref.read(profileProvider.notifier).syncWithServer(force: true);
       ref.read(matchReconcilerProvider).reconcile();
     }
   }
@@ -303,7 +303,7 @@ class _MainShellState extends ConsumerState<MainShell>
                   onPressed: profile.isSyncing
                       ? null
                       : () =>
-                          ref.read(profileProvider.notifier).syncWithServer(),
+                          ref.read(profileProvider.notifier).syncWithServer(force: true),
                 ),
                 const SizedBox(height: AppDimens.space24),
               ],

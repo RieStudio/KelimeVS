@@ -116,7 +116,7 @@ export default {
         return new Response(
           JSON.stringify({
             ...profile,
-            isGuest: profile.isGuest ?? auth.isGuest,
+            isGuest: profile.isGuest !== undefined ? profile.isGuest : auth.isGuest,
             serverNowMs,
             energy: energyState,
           }),

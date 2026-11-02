@@ -18,7 +18,7 @@ class _MockProfileNotifier extends ProfileNotifier {
   ProfileState build() => _mockState;
 
   @override
-  Future<void> syncWithServer() async {}
+  Future<bool> syncWithServer({bool force = false}) async => true;
 }
 
 void main() {

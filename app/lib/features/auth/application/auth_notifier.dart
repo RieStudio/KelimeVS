@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
@@ -9,6 +10,7 @@ import '../../game/application/objection_provider.dart';
 import '../../leaderboard/application/leaderboard_providers.dart';
 import '../../profile/application/blocked_users_notifier.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/data/profile_api_client.dart';
 import '../../store/application/store_notifier.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_link_result.dart';
@@ -78,7 +80,12 @@ class AuthNotifier extends Notifier<AuthUiState> {
 
     if (result is AuthLinkSuccess) {
       await repo.getIdToken(forceRefresh: true);
-      await ref.read(profileProvider.notifier).syncWithServer();
+      final synced = await ref
+          .read(profileProvider.notifier)
+          .syncWithServer(force: true);
+      if (!synced && kDebugMode) {
+        debugPrint('[AuthNotifier] linkGoogle: post-link sync failed');
+      }
       _refresh();
       state = state.copyWith(
         isLoading: false,
@@ -116,7 +123,12 @@ class AuthNotifier extends Notifier<AuthUiState> {
 
         // Yeni hesabın profilini sunucudan yükle
         await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
-        await ref.read(profileProvider.notifier).syncWithServer();
+        final synced = await ref
+            .read(profileProvider.notifier)
+            .syncWithServer(force: true);
+        if (!synced && kDebugMode) {
+          debugPrint('[AuthNotifier] signInWithGoogle: post-sign-in sync failed');
+        }
 
         _refresh();
         state = state.copyWith(
@@ -134,7 +146,10 @@ class AuthNotifier extends Notifier<AuthUiState> {
       }
 
       return result;
-    } catch (e) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] signInWithGoogle failed: $e\n$st');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -149,14 +164,22 @@ class AuthNotifier extends Notifier<AuthUiState> {
       final repo = ref.read(authRepositoryProvider);
       await repo.signInAnonymously();
       await repo.getIdToken(forceRefresh: true);
-      await ref.read(profileProvider.notifier).syncWithServer();
+      final synced = await ref
+          .read(profileProvider.notifier)
+          .syncWithServer(force: true);
+      if (!synced || !ref.read(profileProvider).hasNickname) {
+        throw const ProfileSyncException();
+      }
       _refresh();
       state = state.copyWith(
         isLoading: false,
         isGoogleLinked: false,
         linkedEmail: null,
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] signInAsGuest failed: $e\n$st');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -181,11 +204,19 @@ class AuthNotifier extends Notifier<AuthUiState> {
       ref.invalidate(onlineMatchSessionProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
-      await ref.read(profileProvider.notifier).syncWithServer();
+      final synced = await ref
+          .read(profileProvider.notifier)
+          .syncWithServer(force: true);
+      if (!synced && kDebugMode) {
+        debugPrint('[AuthNotifier] resolveConflict: post-resolve sync failed');
+      }
 
       _refresh();
       state = state.copyWith(isLoading: false);
-    } catch (e) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] resolveConflict failed: $e\n$st');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),

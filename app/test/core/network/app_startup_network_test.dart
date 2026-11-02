@@ -71,8 +71,9 @@ class FakeProfileNotifier extends ProfileNotifier {
   }
 
   @override
-  Future<void> syncWithServer() async {
+  Future<bool> syncWithServer({bool force = false}) async {
     syncCallCount++;
+    return true;
   }
 }
 

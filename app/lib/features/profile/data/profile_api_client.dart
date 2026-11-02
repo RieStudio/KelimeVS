@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 import '../../../core/config/server_config.dart';
 import '../../../core/network/auth_http_executor.dart';
@@ -41,7 +44,7 @@ class UserStats {
       played: (json['played'] as num?)?.toInt() ?? 0,
       won: (json['won'] as num?)?.toInt() ?? 0,
       lost: (json['lost'] as num?)?.toInt() ?? 0,
-      correctAnswers: (json['correctAnswers'] as num?)?.toInt() ?? 0,
+      correctAnswers: (json['correctAnswers'] ?? json['correct_answers'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -78,13 +81,39 @@ class FrameMigrationInfo {
 
   factory FrameMigrationInfo.fromJson(Map<String, dynamic> json) {
     return FrameMigrationInfo(
-      refundedCoins: (json['refundedCoins'] as num?)?.toInt() ?? 0,
-      removedFrames: (json['removedFrames'] as List<dynamic>?)
+      refundedCoins: (json['refundedCoins'] ?? json['refunded_coins'] as num?)?.toInt() ?? 0,
+      removedFrames: ((json['removedFrames'] ?? json['removed_frames']) as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
     );
   }
+}
+
+class ProfileSyncException implements Exception {
+  final String message;
+  const ProfileSyncException([this.message = 'Sunucu profili yüklenemedi.']);
+
+  @override
+  String toString() => 'ProfileSyncException: $message';
+}
+
+bool _parseBool(dynamic val, {bool defaultValue = false}) {
+  if (val is bool) return val;
+  if (val is num) return val != 0;
+  if (val is String) {
+    final s = val.toLowerCase().trim();
+    if (s == 'true' || s == '1') return true;
+    if (s == 'false' || s == '0') return false;
+  }
+  return defaultValue;
+}
+
+Map<String, dynamic>? _asMap(dynamic val) {
+  if (val == null) return null;
+  if (val is Map<String, dynamic>) return val;
+  if (val is Map) return Map<String, dynamic>.from(val);
+  return null;
 }
 
 class UserProfileModel {
@@ -120,22 +149,22 @@ class UserProfileModel {
   String get winRateDisplay => stats.winRateDisplay;
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
-    final statsJson = json['stats'] as Map<String, dynamic>?;
-    final energyJson = json['energy'] as Map<String, dynamic>?;
-    final migrationJson = json['frameMigration'] as Map<String, dynamic>?;
+    final statsJson = _asMap(json['stats']);
+    final energyJson = _asMap(json['energy']);
+    final migrationJson = _asMap(json['frameMigration'] ?? json['frame_migration']);
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
       nickname: json['nickname'] as String?,
       coins: (json['coins'] as num?)?.toInt() ?? 100,
-      stats: UserStats.fromJson(statsJson),
-      createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
-      equippedFrame: json['equippedFrame'] as String? ?? 'classic',
+      stats: UserStats.fromJson(statsJson ?? json),
+      createdAt: (json['createdAt'] ?? json['created_at'] as num?)?.toInt() ?? 0,
+      equippedFrame: (json['equippedFrame'] ?? json['equipped_frame']) as String? ?? 'classic',
       energy: energyJson != null ? EnergyState.fromJson(energyJson) : null,
-      serverNowMs: (json['serverNowMs'] as num?)?.toInt(),
+      serverNowMs: (json['serverNowMs'] ?? json['server_now_ms'] as num?)?.toInt(),
       frameMigration: migrationJson != null
           ? FrameMigrationInfo.fromJson(migrationJson)
           : null,
-      isGuest: json['isGuest'] as bool? ?? false,
+      isGuest: _parseBool(json['isGuest'] ?? json['is_guest']),
     );
   }
 }
@@ -197,18 +226,59 @@ class HttpProfileApiClient implements ProfileApiClient {
         clientFactory: clientFactory,
       );
 
-      if (response == null) return null;
+      if (response == null) {
+        if (kDebugMode) {
+          debugPrint('[HttpProfileApiClient] getProfile: response is null (token unavailable or network failure)');
+        }
+        return null;
+      }
 
       if (response.statusCode == 200) {
-        final decoded = response.decodeJsonMap();
-        return UserProfileModel.fromJson(decoded);
+        final Map<String, dynamic> decoded;
+        try {
+          decoded = response.decodeJsonMap();
+        } catch (jsonErr, jsonSt) {
+          if (kDebugMode) {
+            debugPrint(
+              '[HttpProfileApiClient] getProfile JSON decode error: $jsonErr\n$jsonSt\nHTTP 200',
+            );
+          }
+          return null;
+        }
+
+        try {
+          return UserProfileModel.fromJson(decoded);
+        } catch (parseError, st) {
+          if (kDebugMode) {
+            final keys = decoded.keys.toList();
+            debugPrint(
+              '[HttpProfileApiClient] getProfile UserProfileModel parse error: $parseError\n$st\nHTTP 200, responseKeys: $keys',
+            );
+          }
+          return null;
+        }
       } else if (response.statusCode == 410) {
         onAccountDeleted?.call();
         return null;
       }
+
+      if (kDebugMode) {
+        List<String>? bodyKeys;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map) {
+            bodyKeys = decoded.keys.map((k) => k.toString()).toList();
+          }
+        } catch (_) {}
+        debugPrint(
+          '[HttpProfileApiClient] getProfile unexpected HTTP status: ${response.statusCode}, bodyKeys: $bodyKeys',
+        );
+      }
       return null;
-    } catch (_) {
-      // Ağ hatasında sessizce null döner (çevrimdışı dayanıklılık)
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[HttpProfileApiClient] getProfile exception: $e\n$st');
+      }
       return null;
     }
   }

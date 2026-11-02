@@ -1,10 +1,10 @@
-import '../../auth/application/auth_notifier.dart';
-
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../auth/application/auth_notifier.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../data/profile_api_client.dart';
 import '../data/profile_repository.dart';
@@ -92,6 +92,32 @@ final profileApiClientProvider = Provider<ProfileApiClient>((ref) {
 
 class ProfileNotifier extends Notifier<ProfileState> {
   bool _isSyncing = false;
+  Completer<void>? _currentSyncCompleter;
+
+  @visibleForTesting
+  void simulateSyncStateForTesting({
+    required bool isSyncing,
+    Completer<void>? completer,
+  }) {
+    _isSyncing = isSyncing;
+    _currentSyncCompleter = completer;
+  }
+
+  /// Devam eden bir senkronizasyon varsa bitmesini bekler.
+  /// Döngü KULLANMAZ; mevcut completer'ı yerel değişkene alıp tek sefer bekler.
+  /// Completer null ise veya zaten tamamlanmışsa uygulamayı dondurmadan hemen devam eder.
+  Future<void> _awaitCurrentSync() async {
+    final completer = _currentSyncCompleter;
+    if (completer != null && !completer.isCompleted) {
+      try {
+        await completer.future;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[ProfileNotifier] _awaitCurrentSync error: $e');
+        }
+      }
+    }
+  }
 
   @override
   ProfileState build() {
@@ -120,9 +146,20 @@ class ProfileNotifier extends Notifier<ProfileState> {
   }
 
   /// Sunucuyla profili ve takma adı senkronlar.
-  Future<void> syncWithServer() async {
-    if (_isSyncing) return;
+  /// [force] true ise devam eden bir senkronizasyon varsa bitmesini bekler,
+  /// ardından güncel oturum bilgileriyle yeni bir senkronizasyon çalıştırır.
+  /// Başarıyla takma ad güncellenmiş/mevcutsa true, aksi halde false döner.
+  Future<bool> syncWithServer({bool force = false}) async {
+    if (_isSyncing) {
+      await _awaitCurrentSync();
+      if (!force) {
+        return state.hasNickname;
+      }
+    }
+
     _isSyncing = true;
+    final completer = Completer<void>();
+    _currentSyncCompleter = completer;
     if (ref.mounted) {
       state = state.copyWith(isSyncing: true);
     }
@@ -135,13 +172,13 @@ class ProfileNotifier extends Notifier<ProfileState> {
             const Duration(seconds: 10),
             onTimeout: () => null,
           );
-      if (!ref.mounted) return;
+      if (!ref.mounted) return false;
       if (remote != null) {
         // 1. Jeton bakiyesini, enerjiyi ve istatistikleri senkronla
         await repo.setCoins(remote.coins);
         await repo.setEquippedFrame(remote.equippedFrame);
         await repo.setStats(remote.uid, remote.stats);
-        if (!ref.mounted) return;
+        if (!ref.mounted) return false;
         state = state.copyWith(
           coins: remote.coins,
           equippedFrame: remote.equippedFrame,
@@ -155,7 +192,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
 
         // 2. Takma ad senkronizasyonu (Kural 2)
         final localNick = state.nickname ?? await repo.getNickname();
-        if (!ref.mounted) return;
+        if (!ref.mounted) return false;
         if (remote.nickname != null && remote.nickname!.trim().isNotEmpty) {
           // Bulutta ad varsa bulut esas alınır, yerel güncellenir
           final cloudNick = remote.nickname!.trim();
@@ -167,7 +204,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
         } else if (localNick != null && localNick.trim().isNotEmpty) {
           // Bulutta ad yok ama yerelde geçerli takma ad varsa (Mevcut yerel takma ad göçü)
           final uploadRes = await apiClient.updateNickname(localNick.trim());
-          if (!ref.mounted) return;
+          if (!ref.mounted) return false;
           if (uploadRes is ProfileUpdateSuccess) {
             await repo.setNickname(uploadRes.nickname);
             await repo.setNicknameSyncPending(false);
@@ -190,10 +227,22 @@ class ProfileNotifier extends Notifier<ProfileState> {
               state = state.copyWith(syncError: uploadRes.message);
             }
           }
+        } else {
+          if (kDebugMode) {
+            debugPrint(
+              '[ProfileNotifier] syncWithServer: remote.nickname is null or empty, and local nickname is empty (uid: ${remote.uid}, isGuest: ${remote.isGuest})',
+            );
+          }
         }
       } else {
+        if (kDebugMode) {
+          debugPrint(
+            '[ProfileNotifier] syncWithServer: remote profile is null (fetch/parse failed or timed out). hasNickname=${state.hasNickname}',
+          );
+        }
         // Çevrimdışı veya sunucuya ulaşılamadı; bekleyen ad varsa işaretli kalsın
         final pending = await repo.isNicknameSyncPending();
+        if (!ref.mounted) return false;
         if (pending && state.hasNickname) {
           // Gelecek bağlantıda tekrar denenecek
         }
@@ -203,8 +252,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
           );
         }
       }
-    } catch (_) {
-      if (!ref.mounted) return;
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[ProfileNotifier] syncWithServer error: $e\n$st');
+      }
+      if (!ref.mounted) return false;
       if (!state.hasNickname) {
         state = state.copyWith(
           syncError: AppStrings.profileLoadErrorTitle,
@@ -212,10 +264,23 @@ class ProfileNotifier extends Notifier<ProfileState> {
       }
     } finally {
       _isSyncing = false;
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+      if (_currentSyncCompleter == completer) {
+        _currentSyncCompleter = null;
+      }
       if (ref.mounted) {
         state = state.copyWith(isSyncing: false);
       }
     }
+    if (!ref.mounted) return false;
+    if (kDebugMode && !state.hasNickname) {
+      debugPrint(
+        '[ProfileNotifier] syncWithServer returning false because state.hasNickname is false',
+      );
+    }
+    return state.hasNickname;
   }
 
   /// Bir Google hesabı çakışması çözüldüğünde (mevcut bir hesaba geçildiğinde) çağrılır.
@@ -228,6 +293,8 @@ class ProfileNotifier extends Notifier<ProfileState> {
   ///      (MainShell OnboardingNicknameScreen YERİNE "Profil yüklenemedi, Tekrar Dene" durumunu gösterir;
   ///       böylece mevcut hesabın takma adının üzerine yazılamaz).
   Future<void> loadProfileForSwitchedAccount() async {
+    await _awaitCurrentSync();
+
     state = state.copyWith(
       isLoaded: false,
       isSyncing: true,
@@ -389,6 +456,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
   }
 
   Future<void> clearNickname() async {
+    await _awaitCurrentSync();
     final repo = ref.read(profileRepositoryProvider);
     await repo.clear();
     state = const ProfileState(

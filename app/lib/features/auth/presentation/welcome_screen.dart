@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,9 +14,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
+import '../../profile/application/profile_notifier.dart';
+import '../../profile/data/profile_api_client.dart';
 import '../application/auth_notifier.dart';
 import '../domain/auth_link_result.dart';
-import '../../profile/application/profile_notifier.dart';
 
 /// Giriş (Karşılama) Ekranı.
 ///
@@ -32,6 +38,31 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   bool _isBusy = false;
 
+  String _mapErrorToMessage(Object error) {
+    if (error is ProfileSyncException) {
+      return AppStrings.serverProfileLoadError;
+    }
+    if (error is SocketException ||
+        error is HttpException ||
+        error is TimeoutException) {
+      return AppStrings.networkError;
+    }
+    if (error is FirebaseAuthException) {
+      if (error.code == 'network-request-failed') {
+        return AppStrings.networkError;
+      }
+      return AppStrings.authServiceError;
+    }
+    final errStr = error.toString().toLowerCase();
+    if (errStr.contains('socket') ||
+        errStr.contains('network') ||
+        errStr.contains('connection') ||
+        errStr.contains('timed out')) {
+      return AppStrings.networkError;
+    }
+    return AppStrings.authGenericError;
+  }
+
   Future<void> _handleGuestSignIn() async {
     if (_isBusy) return;
     if (!ensureNetworkConnected(context, ref)) return;
@@ -46,13 +77,17 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         widget.onComplete?.call();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.authGenericError)),
+          const SnackBar(content: Text(AppStrings.serverProfileLoadError)),
         );
       }
-    } catch (_) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[WelcomeScreen] _handleGuestSignIn error: $e\n$st');
+      }
       if (mounted) {
+        final message = _mapErrorToMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.authGenericError)),
+          SnackBar(content: Text(message)),
         );
       }
     } finally {
@@ -83,10 +118,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           widget.onComplete?.call();
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[WelcomeScreen] _handleGoogleSignIn error: $e\n$st');
+      }
       if (mounted) {
+        final message = _mapErrorToMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.authGenericError)),
+          SnackBar(content: Text(message)),
         );
       }
     } finally {
@@ -170,42 +209,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     key: const Key('welcome_guest_sign_in_button'),
                     text: AppStrings.continueAsGuest,
                     onPressed: isBusy ? null : _handleGuestSignIn,
-                  ),
-                  const SizedBox(height: AppDimens.space20),
-
-                  // 3. Misafir Bilgilendirme Notu
-                  Container(
-                    key: const Key('welcome_guest_notice_card'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space16,
-                      vertical: AppDimens.space12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusAlertBox,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: AppDimens.borderThin,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(0, 2),
-                          blurRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: const Text(
-                      AppStrings.guestNoticeInWelcome,
-                      style: TextStyle(
-                        fontFamily: AppTextStyles.fontNunito,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
                   ),
                 ],
               ),

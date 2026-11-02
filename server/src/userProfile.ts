@@ -613,17 +613,20 @@ export class UserProfile extends DurableObject<Env> {
         currentIsGuest = 0;
       }
 
-      // 2) Tembel migrasyon: YALNIZCA token isGuest === true VE DB'de is_guest hâlâ 1 iken çalışır!
-      // Token Google (isGuest === false) ya da token tanımsız (isGuest !== true) ise ASLA çalışmaz!
-      if (currentIsGuest === 1 && isGuest === true) {
+      // 2) Tembel migrasyon & Misafir takma ad atama:
+      // A) Token isGuest === true VE DB'de is_guest hâlâ 1 iken (tüm misafirler M-#### yapılır).
+      // B) Token isGuest === true VE DB'de nickname NULL/boş iken (takma adsız kalmış misafir profilleri).
+      // YALNIZCA DB'de is_guest === 0 VE mevcut özel bir takma adı olan (Google'a bağlanmış) hesaplarda anonim token gelse bile ad DEĞİŞMEZ.
+      if (isGuest === true && (currentIsGuest === 1 || !currentNickname)) {
         const autoName = generateGuestNickname(row.uid);
-        if (currentNickname !== autoName) {
+        if (currentNickname !== autoName || currentIsGuest !== 1 || currentIsSystem !== 1) {
           this.ctx.storage.sql.exec(
-            'UPDATE profiles SET nickname = ?, is_system_nickname = 1, nickname_updated_at = 0 WHERE uid = ?',
+            'UPDATE profiles SET nickname = ?, is_guest = 1, is_system_nickname = 1, nickname_updated_at = 0 WHERE uid = ?',
             autoName,
             row.uid
           );
           currentNickname = autoName;
+          currentIsGuest = 1;
           currentIsSystem = 1;
 
           // Leaderboard tablosundaki adı da güncelle

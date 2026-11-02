@@ -53,6 +53,9 @@ class FakeProfileNotifier extends ProfileNotifier {
   ProfileState build() {
     return ProfileState(nickname: nickname, coins: coins, isLoaded: true);
   }
+
+  @override
+  Future<bool> syncWithServer({bool force = false}) async => true;
 }
 
 Widget _buildMainShellApp({

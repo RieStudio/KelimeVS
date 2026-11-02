@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/online/data/auth_token_provider.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
+import 'package:app/features/profile/domain/energy_state.dart';
 
 class FakeHttpClient implements HttpClient {
   final int statusCode;
@@ -102,6 +103,8 @@ class FakeHttpClientResponse extends Stream<List<int>> implements HttpClientResp
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('HttpProfileApiClient Tests', () {
     test('1. getProfile() başarılı 200 yanıtında profili doğru modeller', () async {
       final fakeAuth = FakeAuthTokenProvider(token: 'token_123');
@@ -127,6 +130,170 @@ void main() {
       expect(profile.played, 3);
       expect(profile.won, 2);
       expect(profile.lost, 1);
+    });
+
+    test('1b. getProfile() gerçek sunucu misafir JSON yanıtını (isGuest, M-####, energy, serverNowMs) eksiksiz ayrıştırır', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_guest_123');
+      final realServerJson = {
+        'uid': 'guest_firebase_uid_999',
+        'nickname': 'M-4821',
+        'coins': 100,
+        'stats': {
+          'played': 0,
+          'won': 0,
+          'lost': 0,
+          'correctAnswers': 0,
+        },
+        'createdAt': 1730000000000,
+        'equippedFrame': 'classic',
+        'isGuest': true,
+        'isSystemNickname': true,
+        'serverNowMs': 1730000000500,
+        'energy': {
+          'enabled': true,
+          'current': 5,
+          'max': 5,
+          'nextEnergyAtMs': null,
+          'regenSeconds': 1200,
+          'packs': [
+            {'id': 'one', 'cost': 100, 'energy': 1},
+            {'id': 'full', 'cost': 400, 'energy': 5},
+          ],
+        },
+      };
+
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 200,
+          responseBody: jsonEncode(realServerJson),
+        ),
+      );
+
+      final profile = await client.getProfile();
+      expect(profile, isNotNull);
+      expect(profile!.uid, 'guest_firebase_uid_999');
+      expect(profile.nickname, 'M-4821');
+      expect(profile.coins, 100);
+      expect(profile.isGuest, isTrue);
+      expect(profile.stats.correctAnswers, 0);
+      expect(profile.serverNowMs, 1730000000500);
+      expect(profile.energy, isNotNull);
+      expect(profile.energy!.enabled, isTrue);
+      expect(profile.energy!.current, 5);
+      expect(profile.energy!.packs.length, 2);
+      expect(profile.energy!.packs.first.id, 'one');
+    });
+
+    test('1c. getProfile() canlı sunucu şeması ile birebir uyumlu ayrıştırma (equipped_frame, regenMinutes/regenSeconds, packs "one" ve "full", frameMigration, serverNowMs)', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_live_test');
+      final livePayload = {
+        'uid': 'guest_live_uid_4821',
+        'nickname': 'M-4821',
+        'coins': 100,
+        'played': 1,
+        'won': 1,
+        'lost': 0,
+        'stats': {
+          'played': 1,
+          'won': 1,
+          'lost': 0,
+          'correctAnswers': 4,
+        },
+        'createdAt': 1730000000000,
+        'equipped_frame': 'gold_frame',
+        'is_guest': 1,
+        'isSystemNickname': true,
+        'serverNowMs': 1730000000500,
+        'frameMigration': {
+          'refundedCoins': 150,
+          'removedFrames': ['retro_neon'],
+        },
+        'energy': {
+          'enabled': true,
+          'current': 3,
+          'max': 5,
+          'nextEnergyAtMs': 1730000001000,
+          'regenMinutes': 20,
+          'regenSeconds': 1200,
+          'packs': [
+            {'id': 'one', 'cost': 20, 'energy': 1},
+            {'id': 'full', 'cost': 80, 'energy': 5},
+          ],
+        },
+      };
+
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 200,
+          responseBody: jsonEncode(livePayload),
+        ),
+      );
+
+      final profile = await client.getProfile();
+      expect(profile, isNotNull);
+      expect(profile!.uid, 'guest_live_uid_4821');
+      expect(profile.nickname, 'M-4821');
+      expect(profile.coins, 100);
+      expect(profile.isGuest, isTrue);
+      expect(profile.equippedFrame, 'gold_frame');
+      expect(profile.stats.played, 1);
+      expect(profile.stats.won, 1);
+      expect(profile.stats.correctAnswers, 4);
+      expect(profile.serverNowMs, 1730000000500);
+
+      // frameMigration kontrolü
+      expect(profile.frameMigration, isNotNull);
+      expect(profile.frameMigration!.refundedCoins, 150);
+      expect(profile.frameMigration!.removedFrames, ['retro_neon']);
+
+      // energy kontrolü
+      expect(profile.energy, isNotNull);
+      expect(profile.energy!.enabled, isTrue);
+      expect(profile.energy!.current, 3);
+      expect(profile.energy!.max, 5);
+      expect(profile.energy!.nextEnergyAtMs, 1730000001000);
+      expect(profile.energy!.regenSeconds, 1200);
+      expect(profile.energy!.packs.length, 2);
+
+      final packOne = profile.energy!.packs[0];
+      expect(packOne.id, 'one');
+      expect(packOne.cost, 20);
+      expect(packOne.energy, 1);
+
+      final packFull = profile.energy!.packs[1];
+      expect(packFull.id, 'full');
+      expect(packFull.cost, 80);
+      expect(packFull.energy, 5);
+    });
+
+    test('1d. EnergyState.fromJson bağımsız olarak packs ("one" ve "full") ile ENERGY_ENABLED=true durumunda başarıyla parse edilir', () {
+      final json = {
+        'enabled': true,
+        'current': 4,
+        'max': 5,
+        'nextEnergyAtMs': 1730000000000,
+        'regenMinutes': 20,
+        'packs': [
+          {'id': 'one', 'cost': 20, 'energy': 1},
+          {'id': 'full', 'cost': 80, 'energy': 5},
+        ],
+      };
+
+      final state = EnergyState.fromJson(json);
+      expect(state.enabled, isTrue);
+      expect(state.current, 4);
+      expect(state.max, 5);
+      expect(state.regenSeconds, 1200); // 20 * 60
+      expect(state.nextEnergyAtMs, 1730000000000);
+      expect(state.packs.length, 2);
+      expect(state.packs[0].id, 'one');
+      expect(state.packs[0].cost, 20);
+      expect(state.packs[0].energy, 1);
+      expect(state.packs[1].id, 'full');
+      expect(state.packs[1].cost, 80);
+      expect(state.packs[1].energy, 5);
     });
 
     test('2. getProfile() ağ hatasında sessizce null döner', () async {

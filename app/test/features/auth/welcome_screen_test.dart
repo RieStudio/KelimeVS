@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,7 @@ class FakeWelcomeAuthRepo implements AuthRepository {
   bool signInWithGoogleCalled = false;
   AuthLinkResult googleResultToReturn = const AuthLinkSuccess(email: 'user@google.com');
   Completer<void>? signInCompleter;
+  Object? errorToThrowOnSignInAnonymously;
 
   final _controller = StreamController<User?>.broadcast();
 
@@ -43,6 +45,9 @@ class FakeWelcomeAuthRepo implements AuthRepository {
 
   @override
   Future<void> signInAnonymously() async {
+    if (errorToThrowOnSignInAnonymously != null) {
+      throw errorToThrowOnSignInAnonymously!;
+    }
     signInAnonymouslyCalled = true;
     if (signInCompleter != null) {
       await signInCompleter!.future;
@@ -87,11 +92,12 @@ class FakeWelcomeAuthRepo implements AuthRepository {
 class FakeWelcomeProfileApiClient implements ProfileApiClient {
   UserProfileModel? mockProfile;
   bool shouldThrow = false;
+  Object? errorToThrow;
 
   @override
   Future<UserProfileModel?> getProfile() async {
     if (shouldThrow) {
-      throw Exception('Ağ hatası');
+      throw errorToThrow ?? Exception('Ağ hatası');
     }
     return mockProfile;
   }
@@ -150,7 +156,7 @@ void main() {
       expect(find.text(AppStrings.slogan), findsOneWidget);
     });
 
-    testWidgets('2. İki buton bulunur: Google ile Giriş Yap (Primary) ve Misafir Olarak Devam Et (Secondary)', (tester) async {
+    testWidgets('2. İki buton bulunur ve bilgilendirme kartı tamamen kaldırılmıştır', (tester) async {
       await tester.pumpWidget(buildWelcomeScreen());
       await tester.pumpAndSettle();
 
@@ -166,9 +172,8 @@ void main() {
         findsOneWidget,
       );
 
-      // Açıklama kartı
-      expect(find.byKey(const Key('welcome_guest_notice_card')), findsOneWidget);
-      expect(find.text(AppStrings.guestNoticeInWelcome), findsOneWidget);
+      // Açıklama kartı KESİNLİKLE kaldırılmış olmalıdır!
+      expect(find.byKey(const Key('welcome_guest_notice_card')), findsNothing);
     });
 
     testWidgets('3. Misafir Olarak Devam Et: Firebase anonim girişi tetiklenir, M-#### senkronlanır ve OnboardingNicknameScreen açılmaz', (tester) async {
@@ -295,6 +300,56 @@ void main() {
 
       expect(find.text('Google servisine ulaşılamadı'), findsOneWidget);
       expect(find.byType(WelcomeScreen), findsOneWidget);
+    });
+
+    testWidgets('8. Sunucu profil yükleme hatasında (profil boş/senkron başarısız) serverProfileLoadError mesajı gösterilir', (tester) async {
+      final authRepo = FakeWelcomeAuthRepo();
+      final apiClient = FakeWelcomeProfileApiClient()
+        ..mockProfile = null; // Sunucudan profil gelmedi
+
+      await tester.pumpWidget(buildWelcomeScreen(
+        authRepo: authRepo,
+        apiClient: apiClient,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.continueAsGuest));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.serverProfileLoadError), findsOneWidget);
+    });
+
+    testWidgets('9. Ağ istisnasında (SocketException) networkError mesajı gösterilir', (tester) async {
+      final authRepo = FakeWelcomeAuthRepo()
+        ..errorToThrowOnSignInAnonymously = const SocketException('Bağlantı koptu');
+
+      await tester.pumpWidget(buildWelcomeScreen(
+        authRepo: authRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.continueAsGuest));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.networkError), findsOneWidget);
+    });
+
+    testWidgets('10. Auth servis hatasında (FirebaseAuthException) authServiceError mesajı gösterilir', (tester) async {
+      final authRepo = FakeWelcomeAuthRepo()
+        ..errorToThrowOnSignInAnonymously = FirebaseAuthException(
+          code: 'service-unavailable',
+          message: 'Auth service down',
+        );
+
+      await tester.pumpWidget(buildWelcomeScreen(
+        authRepo: authRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.continueAsGuest));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.authServiceError), findsOneWidget);
     });
   });
 }

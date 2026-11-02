@@ -14,6 +14,52 @@ vi.mock('cloudflare:workers', () => ({
 
 import worker, { type Env } from '../src/index';
 import { UserProfile } from '../src/userProfile';
+import { GOOGLE_JWK_URL, resetDefaultKeyCache, type JwkKey } from '../src/auth';
+
+function uint8ArrayToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function utf8ToBase64Url(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  return uint8ArrayToBase64Url(bytes);
+}
+
+async function generateTestKeyPair(kid = 'key-anon-test') {
+  const keyPair = (await crypto.subtle.generateKey(
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256',
+    },
+    true,
+    ['sign', 'verify']
+  )) as CryptoKeyPair;
+
+  const exported = (await crypto.subtle.exportKey('jwk', keyPair.publicKey)) as JwkKey;
+  const jwk: JwkKey = {
+    ...exported,
+    kid,
+    alg: 'RS256',
+    use: 'sig',
+  };
+
+  return { keyPair, jwk };
+}
+
+async function signJwt(header: object, payload: object, privateKey: CryptoKey): Promise<string> {
+  const headerB64 = utf8ToBase64Url(JSON.stringify(header));
+  const payloadB64 = utf8ToBase64Url(JSON.stringify(payload));
+  const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+  const sigBytes = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, data);
+  const sigB64 = uint8ArrayToBase64Url(new Uint8Array(sigBytes));
+  return `${headerB64}.${payloadB64}.${sigB64}`;
+}
 
 function createMockCtx() {
   const db = new DatabaseSync(':memory:');
@@ -574,6 +620,307 @@ describe('API Routes: /me & /me/nickname (auth & validation)', () => {
     expect(anonBody.nickname).toMatch(/^M-[1-9]\d{3}$/);
     expect(anonBody.nickname).not.toBe('EskiAnonimAd');
     expect(anonBody.isGuest).toBe(true);
+  });
+
+  describe('10. Gerçek Firebase Anonim JWT ile GET /me ve Boşluksuz (Gapless) Misafir Profil Yönetimi', () => {
+    const TEST_PROJECT_ID = 'kelimego-prod';
+
+    it('10a. Hiç profili olmayan yeni anonim Firebase kullanıcısının İLK GET /me çağrısı M-#### adı ve isGuest: true döner', async () => {
+      resetDefaultKeyCache();
+      const { keyPair, jwk } = await generateTestKeyPair('key-anon-live-1');
+
+      // Google JWK endpoint mock'ı
+      const originalFetch = globalThis.fetch;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (info, init) => {
+        const urlStr = typeof info === 'string' ? info : info instanceof Request ? info.url : String(info);
+        if (urlStr === GOOGLE_JWK_URL) {
+          return new Response(JSON.stringify({ keys: [jwk] }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=3600',
+            },
+          });
+        }
+        return originalFetch(info, init);
+      });
+
+      try {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const payload = {
+          aud: TEST_PROJECT_ID,
+          iss: `https://securetoken.google.com/${TEST_PROJECT_ID}`,
+          sub: 'fresh_anon_firebase_uid_1001',
+          auth_time: nowSec - 5,
+          iat: nowSec - 5,
+          exp: nowSec + 3600,
+          firebase: {
+            identities: {},
+            sign_in_provider: 'anonymous',
+          },
+        };
+
+        const token = await signJwt({ alg: 'RS256', kid: 'key-anon-live-1' }, payload, keyPair.privateKey);
+
+        const env = createEnv({
+          ALLOW_DEV_AUTH: undefined, // Üretim modu (yalnızca gerçek Firebase token kabul edilir)
+          FIREBASE_PROJECT_ID: TEST_PROJECT_ID,
+        });
+
+        const req = new Request('http://127.0.0.1/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const res = await worker.fetch(req, env);
+        expect(res.status).toBe(200);
+
+        const body = (await res.json()) as any;
+        expect(body.uid).toBe('fresh_anon_firebase_uid_1001');
+        expect(body.nickname).toMatch(/^M-[1-9]\d{3}$/);
+        expect(body.isGuest).toBe(true);
+        expect(body.isSystemNickname).toBe(true);
+        expect(body.coins).toBe(100);
+        expect(body.stats).toEqual({ played: 0, won: 0, lost: 0, correctAnswers: 0 });
+        expect(body.equippedFrame).toBe('classic');
+        expect(body.serverNowMs).toBeTypeOf('number');
+        expect(body.energy).toBeDefined();
+        expect(body.energy.max).toBe(5);
+        expect(body.energy.packs).toBeDefined();
+      } finally {
+        fetchSpy.mockRestore();
+        resetDefaultKeyCache();
+      }
+    });
+
+    it('10b. Tembel migrasyon boşluk kapatma: is_guest=0 ve nickname=NULL olan profile anonim token gelince M-#### atanır ve is_guest=1 olur', async () => {
+      resetDefaultKeyCache();
+      const { keyPair, jwk } = await generateTestKeyPair('key-anon-live-2');
+
+      const originalFetch = globalThis.fetch;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (info, init) => {
+        const urlStr = typeof info === 'string' ? info : info instanceof Request ? info.url : String(info);
+        if (urlStr === GOOGLE_JWK_URL) {
+          return new Response(JSON.stringify({ keys: [jwk] }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=3600',
+            },
+          });
+        }
+        return originalFetch(info, init);
+      });
+
+      try {
+        const targetUid = 'gap_profile_user_2002';
+        const profilesMap = new Map<string, UserProfile>();
+        const mockCtx = createMockCtx();
+
+        // 1. Şemayı başlat ve nickname=null, is_guest=0 olan bir profil simüle et
+        mockCtx.storage.sql.exec(`
+          CREATE TABLE IF NOT EXISTS profiles (
+            uid TEXT PRIMARY KEY,
+            nickname TEXT,
+            coins INTEGER NOT NULL,
+            played INTEGER NOT NULL DEFAULT 0,
+            won INTEGER NOT NULL DEFAULT 0,
+            lost INTEGER NOT NULL DEFAULT 0,
+            correct_answers INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            equipped_frame TEXT NOT NULL DEFAULT 'classic',
+            energy INTEGER NOT NULL DEFAULT 5,
+            energy_updated_at INTEGER NOT NULL DEFAULT 0,
+            nickname_updated_at INTEGER NOT NULL DEFAULT 0,
+            is_guest INTEGER NOT NULL DEFAULT 0,
+            is_system_nickname INTEGER NOT NULL DEFAULT 0
+          );
+          INSERT INTO profiles (uid, nickname, coins, is_guest, is_system_nickname, created_at)
+          VALUES ('${targetUid}', NULL, 100, 0, 0, 1000);
+        `);
+
+        const userProfileNamespace = {
+          idFromName(name: string) {
+            return { toString: () => `id_${name}` };
+          },
+          get(id: { toString: () => string }) {
+            const key = id.toString();
+            if (!profilesMap.has(key)) {
+              profilesMap.set(key, new UserProfile(mockCtx, env));
+            }
+            return profilesMap.get(key)!;
+          },
+        } as unknown as DurableObjectNamespace<UserProfile>;
+
+        const env = createEnv({
+          ALLOW_DEV_AUTH: undefined,
+          FIREBASE_PROJECT_ID: TEST_PROJECT_ID,
+          USER_PROFILE: userProfileNamespace,
+        });
+
+        // 2. Anonim token ile GET /me çağır
+        const nowSec = Math.floor(Date.now() / 1000);
+        const payload = {
+          aud: TEST_PROJECT_ID,
+          iss: `https://securetoken.google.com/${TEST_PROJECT_ID}`,
+          sub: targetUid,
+          auth_time: nowSec - 5,
+          iat: nowSec - 5,
+          exp: nowSec + 3600,
+          firebase: {
+            identities: {},
+            sign_in_provider: 'anonymous',
+          },
+        };
+
+        const token = await signJwt({ alg: 'RS256', kid: 'key-anon-live-2' }, payload, keyPair.privateKey);
+
+        const req = new Request('http://127.0.0.1/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const res = await worker.fetch(req, env);
+        expect(res.status).toBe(200);
+
+        const body = (await res.json()) as any;
+        expect(body.uid).toBe(targetUid);
+        // Boşluk kapatıldı: Takma ad NULL kalmaz, otomatik M-#### atanır!
+        expect(body.nickname).toMatch(/^M-[1-9]\d{3}$/);
+        expect(body.isGuest).toBe(true);
+
+        // Veritabanında is_guest ve is_system_nickname 1'e çekilmiştir
+        const dbRow = mockCtx.storage.sql
+          .exec<{ is_guest: number; is_system_nickname: number; nickname: string }>(
+            'SELECT is_guest, is_system_nickname, nickname FROM profiles WHERE uid = ?',
+            targetUid
+          )
+          .one();
+        expect(dbRow.is_guest).toBe(1);
+        expect(dbRow.is_system_nickname).toBe(1);
+        expect(dbRow.nickname).toBe(body.nickname);
+      } finally {
+        fetchSpy.mockRestore();
+        resetDefaultKeyCache();
+      }
+    });
+
+    it('10c. Google ile bağlanmış özel takma adlı kullanıcıya anonim token gelse bile adı ve is_guest=0 durumu korunur (Tek Yönlü Kural)', async () => {
+      resetDefaultKeyCache();
+      const { keyPair, jwk } = await generateTestKeyPair('key-anon-live-3');
+
+      const originalFetch = globalThis.fetch;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (info, init) => {
+        const urlStr = typeof info === 'string' ? info : info instanceof Request ? info.url : String(info);
+        if (urlStr === GOOGLE_JWK_URL) {
+          return new Response(JSON.stringify({ keys: [jwk] }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=3600',
+            },
+          });
+        }
+        return originalFetch(info, init);
+      });
+
+      try {
+        const targetUid = 'linked_google_user_3003';
+        const profilesMap = new Map<string, UserProfile>();
+        const mockCtx = createMockCtx();
+
+        // Google ile bağlanmış, özel adlı kullanıcı (is_guest = 0, nickname = 'Sevbans')
+        mockCtx.storage.sql.exec(`
+          CREATE TABLE IF NOT EXISTS profiles (
+            uid TEXT PRIMARY KEY,
+            nickname TEXT,
+            coins INTEGER NOT NULL,
+            played INTEGER NOT NULL DEFAULT 0,
+            won INTEGER NOT NULL DEFAULT 0,
+            lost INTEGER NOT NULL DEFAULT 0,
+            correct_answers INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            equipped_frame TEXT NOT NULL DEFAULT 'classic',
+            energy INTEGER NOT NULL DEFAULT 5,
+            energy_updated_at INTEGER NOT NULL DEFAULT 0,
+            nickname_updated_at INTEGER NOT NULL DEFAULT 0,
+            is_guest INTEGER NOT NULL DEFAULT 0,
+            is_system_nickname INTEGER NOT NULL DEFAULT 0
+          );
+          INSERT INTO profiles (uid, nickname, coins, is_guest, is_system_nickname, created_at)
+          VALUES ('${targetUid}', 'Sevbans', 250, 0, 0, 1000);
+        `);
+
+        const userProfileNamespace = {
+          idFromName(name: string) {
+            return { toString: () => `id_${name}` };
+          },
+          get(id: { toString: () => string }) {
+            const key = id.toString();
+            if (!profilesMap.has(key)) {
+              profilesMap.set(key, new UserProfile(mockCtx, env));
+            }
+            return profilesMap.get(key)!;
+          },
+        } as unknown as DurableObjectNamespace<UserProfile>;
+
+        const env = createEnv({
+          ALLOW_DEV_AUTH: undefined,
+          FIREBASE_PROJECT_ID: TEST_PROJECT_ID,
+          USER_PROFILE: userProfileNamespace,
+        });
+
+        // Anonim token gönderiliyor
+        const nowSec = Math.floor(Date.now() / 1000);
+        const payload = {
+          aud: TEST_PROJECT_ID,
+          iss: `https://securetoken.google.com/${TEST_PROJECT_ID}`,
+          sub: targetUid,
+          auth_time: nowSec - 5,
+          iat: nowSec - 5,
+          exp: nowSec + 3600,
+          firebase: {
+            identities: {},
+            sign_in_provider: 'anonymous',
+          },
+        };
+
+        const token = await signJwt({ alg: 'RS256', kid: 'key-anon-live-3' }, payload, keyPair.privateKey);
+
+        const req = new Request('http://127.0.0.1/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const res = await worker.fetch(req, env);
+        expect(res.status).toBe(200);
+
+        const body = (await res.json()) as any;
+        expect(body.uid).toBe(targetUid);
+        // Özel ad "Sevbans" ezilmemelidir!
+        expect(body.nickname).toBe('Sevbans');
+        expect(body.isGuest).toBe(false);
+
+        // Veritabanında is_guest hâlâ 0 olarak kalmalıdır
+        const dbRow = mockCtx.storage.sql
+          .exec<{ is_guest: number; nickname: string }>(
+            'SELECT is_guest, nickname FROM profiles WHERE uid = ?',
+            targetUid
+          )
+          .one();
+        expect(dbRow.is_guest).toBe(0);
+        expect(dbRow.nickname).toBe('Sevbans');
+      } finally {
+        fetchSpy.mockRestore();
+        resetDefaultKeyCache();
+      }
+    });
   });
 });
 

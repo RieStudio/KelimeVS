@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
@@ -31,7 +33,6 @@ class FakeProfileRepository implements ProfileRepository {
   @override
   Future<void> setCoins(int coins) async {
     _coins = coins;
-
   }
 
   @override
@@ -108,6 +109,7 @@ void main() {
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
       );
+      addTearDown(container.dispose);
 
       // syncWithServer'ın bitmesini bekle
       await container.read(profileProvider.notifier).syncWithServer();
@@ -133,6 +135,7 @@ void main() {
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
       );
+      addTearDown(container.dispose);
 
       await container.read(profileProvider.notifier).syncWithServer();
 
@@ -154,6 +157,7 @@ void main() {
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
       );
+      addTearDown(container.dispose);
 
       // Ağ hatası olsa bile oyun engellenmez, yerelde geçerli olur
       await container.read(profileProvider.notifier).setNickname('CevrimdisiAd');
@@ -180,6 +184,7 @@ void main() {
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
       );
+      addTearDown(container.dispose);
 
       await expectLater(
         () => container.read(profileProvider.notifier).setNickname('YasakAd'),
@@ -200,6 +205,7 @@ void main() {
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
       );
+      addTearDown(container.dispose);
 
       expect(container.read(profileProvider).coins, 100);
 
@@ -211,6 +217,63 @@ void main() {
       await container.read(profileProvider.notifier).updateCoins(130);
       expect(container.read(profileProvider).coins, 130);
       expect(await fakeRepo.getCoins(), 130);
+    });
+
+    test('6. Güvenli Senkron: _isSyncing true ama completer null iken clearNickname, loadProfileForSwitchedAccount ve syncWithServer DONDURMAZ', () async {
+      final fakeRepo = FakeProfileRepository(initialNickname: 'TestUser');
+      final fakeApi = FakeProfileApiClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          profileRepositoryProvider.overrideWithValue(fakeRepo),
+          profileApiClientProvider.overrideWithValue(fakeApi),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(profileProvider.notifier);
+
+      // Simüle et: _isSyncing = true ancak completer = null (potansiyel sonsuz mikro görev döngüsü riski)
+      notifier.simulateSyncStateForTesting(isSyncing: true, completer: null);
+
+      // clearNickname kilitlenmeden anında tamamlanmalıdır (200 ms timeout ile doğrula)
+      await notifier.clearNickname().timeout(const Duration(milliseconds: 200));
+      expect(container.read(profileProvider).hasNickname, isFalse);
+
+      // loadProfileForSwitchedAccount kilitlenmeden tamamlanmalıdır
+      notifier.simulateSyncStateForTesting(isSyncing: true, completer: null);
+      await notifier.loadProfileForSwitchedAccount().timeout(const Duration(milliseconds: 200));
+
+      // syncWithServer kilitlenmeden tamamlanmalıdır
+      notifier.simulateSyncStateForTesting(isSyncing: true, completer: null);
+      final syncResult = await notifier.syncWithServer(force: true).timeout(const Duration(milliseconds: 500));
+      expect(syncResult, isA<bool>());
+    });
+
+    test('7. Güvenli Senkron: completer zaten tamamlanmış (isCompleted=true) iken bekleme mikro görev döngüsüne girmeden hemen devam eder', () async {
+      final fakeRepo = FakeProfileRepository(initialNickname: 'TestUser2');
+      final fakeApi = FakeProfileApiClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          profileRepositoryProvider.overrideWithValue(fakeRepo),
+          profileApiClientProvider.overrideWithValue(fakeApi),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(profileProvider.notifier);
+
+      final alreadyCompletedCompleter = Completer<void>()..complete();
+      notifier.simulateSyncStateForTesting(isSyncing: true, completer: alreadyCompletedCompleter);
+
+      // clearNickname hemen dönmeli
+      await notifier.clearNickname().timeout(const Duration(milliseconds: 200));
+      expect(container.read(profileProvider).hasNickname, isFalse);
+
+      // syncWithServer force: true hemen yeni senkron başlatıp tamamlanmalı
+      notifier.simulateSyncStateForTesting(isSyncing: true, completer: alreadyCompletedCompleter);
+      await notifier.syncWithServer(force: true).timeout(const Duration(milliseconds: 500));
     });
   });
 }
