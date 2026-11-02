@@ -583,6 +583,9 @@ abstract final class AppStrings {
   static const String settingsSectionDeveloper = 'Geliştirici';
   static const String privacyPolicy = 'Gizlilik Politikası';
   static const String thirdPartyLicenses = 'Üçüncü Taraf Lisansları';
+  static const String licensesTitle = 'Lisanslar';
+  static String licenseCount(int count) => '$count lisans';
+  static const String noLicensesFound = 'Lisans bulunamadı.';
   static const String contactSupport = 'İletişim ve Destek';
   static const String devComponentGallery = 'Bileşen Galerisi (Geliştirici)';
   static const String linkOpenError =

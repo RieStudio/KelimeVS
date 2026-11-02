@@ -10,6 +10,7 @@ import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/home/presentation/home_screen.dart';
+import 'package:app/features/settings/presentation/licenses_screen.dart';
 import 'package:app/features/settings/presentation/settings_screen.dart';
 import 'package:app/gallery/component_gallery.dart';
 
@@ -247,14 +248,21 @@ void main() {
       expect(find.text(AppStrings.linkOpenError), findsOneWidget);
     });
 
-    testWidgets('tapping Third Party Licenses opens showLicensePage', (tester) async {
+    testWidgets('tapping Third Party Licenses opens custom LicensesScreen without Powered by Flutter', (tester) async {
       await tester.pumpWidget(createWidget());
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('settings_licenses')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(LicensePage), findsOneWidget);
+      expect(find.byType(LicensesScreen), findsOneWidget);
+      expect(find.text(AppStrings.licensesTitle), findsOneWidget);
+      expect(find.text('KelimeVS'), findsOneWidget);
+      expect(find.text('v1.2.3 (45)'), findsOneWidget);
+      expect(find.text(AppStrings.copyright), findsOneWidget);
+      expect(find.textContaining('Powered by Flutter'), findsNothing);
+      expect(find.textContaining('Flutter ile geliştirildi'), findsNothing);
+      expect(find.byType(FlutterLogo), findsNothing);
     });
 
     testWidgets('back button pops SettingsScreen', (tester) async {

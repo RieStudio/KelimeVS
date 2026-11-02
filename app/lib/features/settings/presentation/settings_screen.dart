@@ -13,6 +13,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../gallery/component_gallery.dart';
+import 'licenses_screen.dart';
 
 /// Provider for retrieving application package information asynchronously.
 final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
@@ -156,13 +157,16 @@ class SettingsScreen extends ConsumerWidget {
                             ),
                             onTap: () {
                               final info = versionAsync.asData?.value;
-                              showLicensePage(
-                                context: context,
-                                applicationName: 'KelimeVS',
-                                applicationVersion: info != null
-                                    ? 'v${info.version} (${info.buildNumber})'
-                                    : null,
-                                applicationLegalese: AppStrings.copyright,
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => LicensesScreen(
+                                    applicationName: 'KelimeVS',
+                                    applicationVersion: info != null
+                                        ? 'v${info.version} (${info.buildNumber})'
+                                        : null,
+                                    applicationLegalese: AppStrings.copyright,
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -385,7 +389,7 @@ class _SettingsTile extends StatelessWidget {
 
 class _RieStudioFooterLogo extends StatelessWidget {
   /// RieStudio alt bilgi (footer) logosunun ekrandaki dikey yüksekliği (dp).
-  static const double footerLogoHeight = 15.0;
+  static const double footerLogoHeight = AppDimens.footerLogoHeight;
 
   const _RieStudioFooterLogo();
 

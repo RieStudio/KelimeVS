@@ -71,6 +71,7 @@ abstract final class AppDimens {
   static const double avatarMatch = 36.0;
   static const double avatarSearch = 92.0;
   static const double avatarEnd = 104.0;
+  static const double footerLogoHeight = 15.0;
 
   // Press offsets
   static const double primaryButtonPressOffset = 4.0;
