@@ -9,6 +9,7 @@ import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/coin_icon.dart';
 import '../../../../core/widgets/energy_icon.dart';
 import '../../../profile/domain/energy_state.dart';
 import '../../application/store_notifier.dart';
@@ -385,24 +386,7 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(
-                              color: AppColors.card,
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'G',
-                              style: TextStyle(
-                                fontFamily: AppTextStyles.fontFredoka,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 9,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ),
+                          const CoinIcon(size: 18),
                           const SizedBox(width: 4),
                           Text(
                             '${pack.cost}',

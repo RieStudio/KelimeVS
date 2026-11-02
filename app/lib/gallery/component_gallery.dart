@@ -537,6 +537,66 @@ class ComponentGallery extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppDimens.space24),
+
+            // 11. JETON İKONU (CoinIcon - Farklı Boyutlar)
+            const SectionLabel('Jeton İkonu (CoinIcon - Farklı Boyutlar)'),
+            const SizedBox(height: AppDimens.space10),
+            Wrap(
+              spacing: AppDimens.space16,
+              runSpacing: AppDimens.space16,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: const [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 16),
+                    SizedBox(height: 4),
+                    Text('16dp (Küçük)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 24),
+                    SizedBox(height: 4),
+                    Text('24dp (Kapsül)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 32),
+                    SizedBox(height: 4),
+                    Text('32dp (Ödül)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 48),
+                    SizedBox(height: 4),
+                    Text('48dp (Orta)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 72),
+                    SizedBox(height: 4),
+                    Text('72dp (Mağaza)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoinIcon(size: 32, opacity: 0.5),
+                    SizedBox(height: 4),
+                    Text('32dp (Soluk)', style: TextStyle(fontSize: 10, color: AppColors.muted)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space24),
           ],
         ),
       ),

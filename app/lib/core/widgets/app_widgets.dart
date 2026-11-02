@@ -10,6 +10,7 @@ export 'answer_input_bar.dart';
 export 'secondary_button.dart';
 export 'section_label.dart';
 export 'result_circle.dart';
+export 'coin_icon.dart';
 export 'coin_pill.dart';
 export 'energy_icon.dart';
 export 'energy_pill.dart';

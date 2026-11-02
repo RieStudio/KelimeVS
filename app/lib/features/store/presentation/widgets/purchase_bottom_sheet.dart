@@ -7,6 +7,7 @@ import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_icon_button.dart';
 import '../../../../core/widgets/avatar_frame_registry.dart';
+import '../../../../core/widgets/coin_icon.dart';
 import '../../../../core/widgets/player_avatar.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/secondary_button.dart';
@@ -125,29 +126,7 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: AppColors.coin,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.ink,
-                            width: 1,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'G',
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontFredoka,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: AppColors.ink,
-                            height: 1.0,
-                          ),
-                        ),
-                      ),
+                      const CoinIcon(size: 24),
                       const SizedBox(width: AppDimens.space8),
                       Text(
                         '${item.price} Jeton',

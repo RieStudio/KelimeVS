@@ -642,29 +642,7 @@ class _ExtraTimePowerupButton extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppDimens.space4),
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: AppColors.coin,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.ink,
-                      width: 1,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'G',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFredoka,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 8,
-                      color: AppColors.ink,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
+                const CoinIcon(size: 14, opacity: 0.5),
                 const SizedBox(width: 2),
                 Text(
                   '$cost',
@@ -740,29 +718,7 @@ class _ExtraTimePowerupButton extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppDimens.space4),
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: isInteractive ? AppColors.card : AppColors.coin,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.ink,
-                      width: 1,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'G',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFredoka,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 8,
-                      color: AppColors.ink,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
+                const CoinIcon(size: 14),
                 const SizedBox(width: 2),
                 Text(
                   '$cost',

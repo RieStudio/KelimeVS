@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/result_circle.dart';
@@ -264,6 +265,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final int? coinsAwarded = uiState.coinsAwarded;
     final bool isFriendly = uiState.isFriendly ||
         (uiState.lastSavedMatch?.isFriendly ?? false);
+    final bool isOnlineRanked = mode == MatchSessionMode.online && !isFriendly;
 
     final Widget content = Container(
       color: AppColors.surface,
@@ -422,30 +424,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Jeton Dairesi ("G")
-                        Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: AppColors.coin,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.ink,
-                              width: AppDimens.borderThin,
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            'G',
-                            style: TextStyle(
-                              fontFamily: AppTextStyles.fontFredoka,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color: AppColors.ink,
-                              height: 1.0,
-                            ),
-                          ),
-                        ),
+                        // Jeton Simgesi (CoinIcon)
+                        const CoinIcon(size: 32),
                         const SizedBox(width: AppDimens.space10),
                         Text(
                           '+$coinsAwarded${AppStrings.coinSuffix}',
@@ -453,6 +433,58 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: AppColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else if (isOnlineRanked && coinsAwarded == null) ...[
+                const SizedBox(height: AppDimens.space20),
+                Semantics(
+                  container: true,
+                  label: 'Ödül hesaplanıyor',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space20,
+                      vertical: AppDimens.space8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: AppDimens.borderRadiusFull,
+                      border: Border.all(
+                        color: AppColors.mint,
+                        width: AppDimens.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.coin.withValues(alpha: 0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppDimens.space8),
+                        Text(
+                          'Ödül hesaplanıyor...',
+                          style: AppTextStyles.bodyText.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.muted,
+                            fontSize: 13,
                           ),
                         ),
                       ],

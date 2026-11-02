@@ -4,6 +4,7 @@ import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'coin_icon.dart';
 import 'energy_icon.dart';
 
 /// DESIGN.md Bölüm 7: Jeton ve Enerji Rozeti (CoinPill)
@@ -30,29 +31,7 @@ class CoinPill extends StatelessWidget {
   bool get _isCombined => energyCurrent != null;
 
   Widget _buildCoinIcon() {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: AppColors.coin,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: AppColors.ink,
-          width: AppDimens.borderThin,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: const Text(
-        'G',
-        style: TextStyle(
-          fontFamily: AppTextStyles.fontFredoka,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-          color: AppColors.ink,
-          height: 1.0,
-        ),
-      ),
-    );
+    return const CoinIcon(size: 24);
   }
 
   Widget _buildEnergyIcon() {
@@ -86,7 +65,7 @@ class CoinPill extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _buildCoinIcon(),
-              const SizedBox(width: AppDimens.space8),
+              const SizedBox(width: AppDimens.space6),
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -125,7 +104,7 @@ class CoinPill extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _buildCoinIcon(),
-        const SizedBox(width: AppDimens.space6),
+        const SizedBox(width: AppDimens.space4),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 48.0),
           child: FittedBox(

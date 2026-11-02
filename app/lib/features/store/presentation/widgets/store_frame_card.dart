@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/avatar_frame_registry.dart';
+import '../../../../core/widgets/coin_icon.dart';
 import '../../../../core/widgets/player_avatar.dart';
 import '../../domain/models/store_item.dart';
 
@@ -245,28 +246,9 @@ class StoreFrameCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: canAfford ? AppColors.card : AppColors.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: canAfford ? AppColors.ink : AppColors.muted,
-                      width: 1,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'G',
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.fontFredoka,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      color: textColor,
-                      height: 1.0,
-                    ),
-                  ),
+                CoinIcon(
+                  size: 18,
+                  opacity: canAfford ? 1.0 : 0.5,
                 ),
                 const SizedBox(width: 6),
                 Text(
