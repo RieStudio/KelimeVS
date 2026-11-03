@@ -21,6 +21,7 @@ import '../domain/match/match_state.dart';
 import '../domain/history/match_history_entry.dart';
 import '../domain/models.dart';
 import '../domain/text_filter.dart';
+import '../../profile/application/profile_notifier.dart';
 import 'match_history_provider.dart';
 import 'match_providers.dart';
 import 'match_session.dart';
@@ -55,6 +56,7 @@ class MatchController extends Notifier<MatchUiState>
   final MatchConfig? _injectedMatchConfig;
   final TextFilter? _injectedTextFilter;
   final SharedPreferences? _injectedPrefs;
+  final String? _injectedSelfNickname;
   final int roundTransitionDelayMs;
 
   MatchController({
@@ -65,6 +67,7 @@ class MatchController extends Notifier<MatchUiState>
     MatchConfig? matchConfig,
     TextFilter? textFilter,
     SharedPreferences? prefs,
+    String? selfNickname,
     this.roundTransitionDelayMs = 3000,
   })  : _injectedClock = clock,
         _injectedRandom = random,
@@ -72,7 +75,8 @@ class MatchController extends Notifier<MatchUiState>
         _injectedBotConfig = botConfig,
         _injectedMatchConfig = matchConfig,
         _injectedTextFilter = textFilter,
-        _injectedPrefs = prefs;
+        _injectedPrefs = prefs,
+        _injectedSelfNickname = selfNickname;
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -349,13 +353,24 @@ class MatchController extends Notifier<MatchUiState>
 
     _loadedQuestions = pool;
 
-    final chosenOpponent = opponentName ??
-        BotOpponentNames.pickOpponentName(
-          random: random,
-          recentNames: _injectedPrefs != null
-              ? BotOpponentNames.loadRecentNames(_injectedPrefs)
-              : const [],
-        );
+    final String chosenOpponent;
+    if (opponentName != null) {
+      chosenOpponent = opponentName;
+    } else {
+      String? selfNickname = _injectedSelfNickname;
+      if (selfNickname == null) {
+        try {
+          selfNickname = ref.read(profileProvider).nickname?.trim();
+        } catch (_) {}
+      }
+      chosenOpponent = BotOpponentNames.pickOpponentName(
+        random: random,
+        recentNames: _injectedPrefs != null
+            ? BotOpponentNames.loadRecentNames(_injectedPrefs)
+            : const [],
+        excludeName: selfNickname,
+      );
+    }
 
     if (_injectedPrefs != null) {
       unawaited(BotOpponentNames.recordRecentName(chosenOpponent, _injectedPrefs));

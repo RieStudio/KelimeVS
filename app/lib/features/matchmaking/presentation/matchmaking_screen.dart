@@ -49,8 +49,6 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
     this.matchmakingClient,
   });
 
-  static List<String> get opponentNames => BotOpponentNames.pool;
-
   @override
   ConsumerState<MatchmakingScreen> createState() => _MatchmakingScreenState();
 }
@@ -83,9 +81,13 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         _suppressionNotifier.suppress();
       }
     });
+    final myNickname = ref.read(profileProvider).nickname?.trim();
     final rng = widget.random ?? math.Random();
     _fallbackOpponentName = widget.initialOpponentName ??
-        BotOpponentNames.pickOpponentName(random: rng);
+        BotOpponentNames.pickOpponentName(
+          random: rng,
+          excludeName: myNickname,
+        );
     _opponentName = _fallbackOpponentName;
 
     // Son karşılaşılan bot adlarını asenkron yükleyip henüz eşleşme olmadan havuzdan dışla
@@ -96,6 +98,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         final refinedName = BotOpponentNames.pickOpponentName(
           random: rng,
           recentNames: recent,
+          excludeName: myNickname,
         );
         setState(() {
           _fallbackOpponentName = refinedName;

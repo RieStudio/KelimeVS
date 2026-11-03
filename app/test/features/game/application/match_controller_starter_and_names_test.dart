@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/features/profile/domain/nickname_validator.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/domain/bot/bot_config.dart';
@@ -29,6 +30,14 @@ class FakeClock implements GameClock {
   }
 }
 
+class _TestProfileNotifier extends ProfileNotifier {
+  final ProfileState _initial;
+  _TestProfileNotifier(this._initial);
+
+  @override
+  ProfileState build() => _initial;
+}
+
 Question _createQuestion(String id, String text, List<String> answers) {
   return Question(
     id: id,
@@ -46,6 +55,7 @@ Question _createQuestion(String id, String text, List<String> answers) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late List<Question> sampleQuestions;
 
   setUp(() {
@@ -180,6 +190,7 @@ void main() {
     });
 
     test('4. Bot maçı fiilen başladığında rakip ismi kelimevs_recent_bot_names deposuna azami 3 kayıtla yazılır', () async {
+      expect(BotOpponentNames.storageKey, equals('kelimevs_recent_bot_names'));
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
 
@@ -190,65 +201,100 @@ void main() {
       );
       final controller = container.read(matchControllerProvider.notifier);
 
-      // 1. Maç başlat: Kaan34
+      // 1. Maç başlat: M-1234
       await controller.startMatch(
         questions: sampleQuestions,
-        opponentName: 'Kaan34',
+        opponentName: 'M-1234',
       );
-      expect(BotOpponentNames.loadRecentNames(prefs), equals(['Kaan34']));
+      expect(BotOpponentNames.loadRecentNames(prefs), equals(['M-1234']));
 
-      // 2. Maç başlat: ayse_k
+      // 2. Maç başlat: M-2345
       await controller.startMatch(
         questions: sampleQuestions,
-        opponentName: 'ayse_k',
+        opponentName: 'M-2345',
       );
-      expect(BotOpponentNames.loadRecentNames(prefs), equals(['Kaan34', 'ayse_k']));
+      expect(BotOpponentNames.loadRecentNames(prefs), equals(['M-1234', 'M-2345']));
 
-      // 3. Maç başlat: Deniz07
+      // 3. Maç başlat: M-3456
       await controller.startMatch(
         questions: sampleQuestions,
-        opponentName: 'Deniz07',
+        opponentName: 'M-3456',
       );
-      expect(BotOpponentNames.loadRecentNames(prefs), equals(['Kaan34', 'ayse_k', 'Deniz07']));
+      expect(BotOpponentNames.loadRecentNames(prefs), equals(['M-1234', 'M-2345', 'M-3456']));
 
-      // 4. Maç başlat: mert_yilmaz -> En eski 'Kaan34' silinmeli (azami 3 kayıt)
+      // 4. Maç başlat: M-4567 -> En eski 'M-1234' silinmeli (azami 3 kayıt)
       await controller.startMatch(
         questions: sampleQuestions,
-        opponentName: 'mert_yilmaz',
+        opponentName: 'M-4567',
       );
-      expect(BotOpponentNames.loadRecentNames(prefs), equals(['ayse_k', 'Deniz07', 'mert_yilmaz']));
+      expect(BotOpponentNames.loadRecentNames(prefs), equals(['M-2345', 'M-3456', 'M-4567']));
 
       container.dispose();
     });
 
-    test('5. BotOpponentNames: Havuzdaki tüm 60 isim geçerlidir ve son 3 isim dışlanır', () {
-      expect(BotOpponentNames.pool.length, greaterThanOrEqualTo(50));
+    test('5. BotOpponentNames: Misafir formatında (M-####, 1000-9999) ad üretilir, oyuncu adını ve son 3 rakibi dışlar', () {
+      final guestRegex = RegExp(r'^M-([1-9]\d{3})$');
+      final recent = ['M-1001', 'M-1002', 'M-1003'];
+      const myNickname = 'M-4821';
 
-      for (final name in BotOpponentNames.pool) {
-        final valRes = NicknameValidator.validate(name);
-        expect(
-          valRes.isValid,
-          isTrue,
-          reason: '$name geçerli olmalı fakat hata: ${valRes.errorMessage}',
-        );
-        expect(
-          NicknameValidator.isGuestPattern(name),
-          isFalse,
-          reason: '$name misafir M-#### kalıbında olamaz',
-        );
-      }
-
-      final recent = ['ayse_k', 'Deniz07', 'mert_yilmaz'];
-      final rng = math.Random(42);
-
-      for (int i = 0; i < 50; i++) {
+      for (int i = 0; i < 100; i++) {
+        final rng = math.Random(100 + i);
         final chosen = BotOpponentNames.pickOpponentName(
           random: rng,
           recentNames: recent,
+          excludeName: myNickname,
         );
-        expect(recent, isNot(contains(chosen)));
-        expect(BotOpponentNames.pool, contains(chosen));
+
+        // Format kontrolü: M-#### ve 1000..9999
+        final match = guestRegex.firstMatch(chosen);
+        expect(match, isNotNull, reason: '$chosen misafir formatına (M-####) uymalı');
+        final num = int.parse(match!.group(1)!);
+        expect(num, inInclusiveRange(1000, 9999));
+
+        // Misafir kalıbı kontrolü
+        expect(NicknameValidator.isGuestPattern(chosen), isTrue);
+
+        // Son 3 rakip dışlanmalı
+        expect(recent, isNot(contains(chosen)), reason: '$chosen son rakipler arasında olamaz');
+
+        // Oyuncunun kendi adı (büyük/küçük harf farketmeksizin) dışlanmalı
+        expect(chosen.toUpperCase(), isNot(equals(myNickname.toUpperCase())));
       }
+
+      // Oyuncunun adı küçük harfle gelse dahi çakışma engellenmeli
+      final chosenCaseInsensitive = BotOpponentNames.pickOpponentName(
+        random: math.Random(42),
+        excludeName: 'm-4821',
+      );
+      expect(chosenCaseInsensitive.toUpperCase(), isNot(equals('M-4821')));
+    });
+
+    test('6. MatchController: opponentName verilmediğinde profileProvider\'daki oyuncu adını çakışmayacak şekilde M-#### üretir', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+
+      final container = ProviderContainer(
+        overrides: [
+          profileProvider.overrideWith(() => _TestProfileNotifier(const ProfileState(nickname: 'M-5555'))),
+          matchControllerProvider.overrideWith(() => MatchController(prefs: prefs)),
+        ],
+      );
+      final controller = container.read(matchControllerProvider.notifier);
+
+      await controller.startMatch(
+        questions: sampleQuestions,
+      );
+
+      final state = container.read(matchControllerProvider);
+      final oppName = state.opponentName;
+      expect(oppName, isNotEmpty);
+      expect(RegExp(r'^M-[1-9]\d{3}$').hasMatch(oppName), isTrue);
+      expect(oppName, isNot(equals('M-5555')), reason: 'Oyuncunun kendi adı bot adı olarak seçilemez');
+
+      // prefs'e kaydedildiğini doğrula
+      expect(BotOpponentNames.loadRecentNames(prefs), contains(oppName));
+
+      container.dispose();
     });
   });
 }
