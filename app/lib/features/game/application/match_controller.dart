@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/utils/bot_frame_resolver.dart';
 
@@ -11,6 +12,7 @@ import '../data/question_repository.dart';
 import '../domain/attempt_text_sanitizer.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/bot/bot_decision.dart';
+import '../domain/bot/bot_opponent_names.dart';
 import '../domain/bot/bot_player.dart';
 import '../domain/match/match_config.dart';
 import '../domain/match/match_engine.dart';
@@ -52,6 +54,7 @@ class MatchController extends Notifier<MatchUiState>
   final BotConfig? _injectedBotConfig;
   final MatchConfig? _injectedMatchConfig;
   final TextFilter? _injectedTextFilter;
+  final SharedPreferences? _injectedPrefs;
   final int roundTransitionDelayMs;
 
   MatchController({
@@ -61,13 +64,15 @@ class MatchController extends Notifier<MatchUiState>
     BotConfig? botConfig,
     MatchConfig? matchConfig,
     TextFilter? textFilter,
+    SharedPreferences? prefs,
     this.roundTransitionDelayMs = 3000,
   })  : _injectedClock = clock,
         _injectedRandom = random,
         _injectedRepo = repository,
         _injectedBotConfig = botConfig,
         _injectedMatchConfig = matchConfig,
-        _injectedTextFilter = textFilter;
+        _injectedTextFilter = textFilter,
+        _injectedPrefs = prefs;
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -258,18 +263,8 @@ class MatchController extends Notifier<MatchUiState>
     _startTickTimer(clock);
   }
 
-  static const List<String> _opponentNames = [
-    'Ahmet',
-    'Zeynep',
-    'Mehmet',
-    'Ayşe',
-    'Can',
-    'Elif',
-    'Emre',
-    'Burak',
-    'Selin',
-    'Deniz',
-  ];
+  BotConfig? _activeBotConfig;
+  int _roundBotSuccessCount = 0;
 
   @override
   MatchUiState build() {
@@ -282,7 +277,14 @@ class MatchController extends Notifier<MatchUiState>
   GameClock get _clock => _injectedClock ?? ref.read(gameClockProvider);
   math.Random get _random => _injectedRandom ?? ref.read(randomProvider);
   QuestionRepository get _repo => _injectedRepo ?? ref.read(questionRepositoryProvider);
-  BotConfig get _botConfig => _injectedBotConfig ?? ref.read(botConfigProvider);
+  BotConfig get _botConfig {
+    if (_injectedBotConfig != null) return _injectedBotConfig;
+    final provided = ref.read(botConfigProvider);
+    if (provided != const BotConfig()) {
+      return provided;
+    }
+    return _activeBotConfig ?? provided;
+  }
   MatchConfig get _matchConfig => _injectedMatchConfig ?? ref.read(matchConfigProvider);
   TextFilter get _textFilter => _injectedTextFilter ?? ref.read(textFilterProvider);
 
@@ -290,6 +292,8 @@ class MatchController extends Notifier<MatchUiState>
   Future<void> startMatch({
     List<Question>? questions,
     String? opponentName,
+    String? initialTurnPlayerId,
+    BotConfig? botConfig,
   }) async {
     _cancelAllTimers();
     _isMatchSaved = false;
@@ -298,7 +302,11 @@ class MatchController extends Notifier<MatchUiState>
     _frozenRemainingBotDelayMs = null;
     _botDeadlineMs = null;
     _frozenRemainingTransitionMs = null;
+    _roundBotSuccessCount = 0;
     _registerLifecycleObserver();
+
+    final random = _random;
+    final clock = _clock;
 
     state = state.copyWith(
       isPaused: false,
@@ -340,19 +348,48 @@ class MatchController extends Notifier<MatchUiState>
     }
 
     _loadedQuestions = pool;
-    final random = _random;
-    final clock = _clock;
 
-    final chosenOpponent = opponentName ?? _opponentNames[random.nextInt(_opponentNames.length)];
+    final chosenOpponent = opponentName ??
+        BotOpponentNames.pickOpponentName(
+          random: random,
+          recentNames: _injectedPrefs != null
+              ? BotOpponentNames.loadRecentNames(_injectedPrefs)
+              : const [],
+        );
+
+    if (_injectedPrefs != null) {
+      unawaited(BotOpponentNames.recordRecentName(chosenOpponent, _injectedPrefs));
+    } else {
+      SharedPreferences.getInstance().then((prefs) {
+        BotOpponentNames.recordRecentName(chosenOpponent, prefs);
+      }).catchError((_) {});
+    }
+
     final now = clock.nowMs();
+
+    final firstPlayerIsMe = initialTurnPlayerId != null
+        ? (initialTurnPlayerId == 'me')
+        : random.nextBool();
+    final playerIds = firstPlayerIsMe ? ['me', 'bot'] : ['bot', 'me'];
 
     final engineResult = MatchEngine.start(
       config: _matchConfig,
-      playerIds: ['me', 'bot'],
+      playerIds: playerIds,
       questions: pool,
       random: random,
       nowMs: now,
     );
+
+    final providedConfig = _injectedBotConfig ?? ref.read(botConfigProvider);
+    if (botConfig != null) {
+      _activeBotConfig = botConfig;
+    } else if (providedConfig != const BotConfig()) {
+      _activeBotConfig = providedConfig;
+    } else {
+      _activeBotConfig = BotConfig.forPersona(
+        BotPersona.values[random.nextInt(BotPersona.values.length)],
+      );
+    }
 
     _applyEngineResult(
       engineResult: engineResult,
@@ -513,6 +550,9 @@ class MatchController extends Notifier<MatchUiState>
     MatchFeedbackType? newFeedback;
     for (final event in events) {
       if (event is AnswerAccepted) {
+        if (event.playerId == 'bot') {
+          _roundBotSuccessCount++;
+        }
         updatedAcceptedAnswers.add(
           AcceptedAnswerUiModel(
             playerId: event.playerId,
@@ -650,6 +690,9 @@ class MatchController extends Notifier<MatchUiState>
       usedAnswerIds: match.usedAnswerIds,
       random: random,
       config: _botConfig,
+      roundBotSuccessCount: _roundBotSuccessCount,
+      humanScore: match.scores['me'] ?? 0,
+      botScore: match.scores['bot'] ?? 0,
     );
 
     if (decision.actions.isNotEmpty) {
@@ -709,6 +752,7 @@ class MatchController extends Notifier<MatchUiState>
   }
 
   void _startNextRound(GameClock clock, math.Random random) {
+    _roundBotSuccessCount = 0;
     final match = state.matchState;
     if (match == null || match.phase != MatchPhase.roundEnded) return;
 

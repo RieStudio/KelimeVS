@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
@@ -18,6 +19,7 @@ import '../../../core/widgets/secondary_button.dart';
 import '../../../main.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
+import '../../game/domain/bot/bot_opponent_names.dart';
 import '../../game/presentation/match_screen.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
@@ -47,25 +49,14 @@ class MatchmakingScreen extends ConsumerStatefulWidget {
     this.matchmakingClient,
   });
 
-  static const List<String> opponentNames = [
-    'Ahmet',
-    'Zeynep',
-    'Mert',
-    'Elif',
-    'Burak',
-    'Can',
-    'Selin',
-    'Deniz',
-    'Mehmet',
-    'Ayşe',
-  ];
+  static List<String> get opponentNames => BotOpponentNames.pool;
 
   @override
   ConsumerState<MatchmakingScreen> createState() => _MatchmakingScreenState();
 }
 
 class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
-  late final String _fallbackOpponentName;
+  late String _fallbackOpponentName;
   String _opponentName = '';
   String _opponentFrame = 'classic';
   String? _matchedMatchId;
@@ -93,12 +84,26 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       }
     });
     final rng = widget.random ?? math.Random();
-    _fallbackOpponentName =
-        widget.initialOpponentName ??
-        MatchmakingScreen.opponentNames[rng.nextInt(
-          MatchmakingScreen.opponentNames.length,
-        )];
+    _fallbackOpponentName = widget.initialOpponentName ??
+        BotOpponentNames.pickOpponentName(random: rng);
     _opponentName = _fallbackOpponentName;
+
+    // Son karşılaşılan bot adlarını asenkron yükleyip henüz eşleşme olmadan havuzdan dışla
+    if (widget.initialOpponentName == null) {
+      SharedPreferences.getInstance().then((prefs) {
+        if (!mounted || _isOpponentFound || _isOnlineMatch) return;
+        final recent = BotOpponentNames.loadRecentNames(prefs);
+        final refinedName = BotOpponentNames.pickOpponentName(
+          random: rng,
+          recentNames: recent,
+        );
+        setState(() {
+          _fallbackOpponentName = refinedName;
+          _opponentName = refinedName;
+          _opponentFrame = BotFrameResolver.resolve(refinedName);
+        });
+      }).catchError((_) {});
+    }
 
     // Üç noktanın periyodik animasyonu
     _dotsTimer = Timer.periodic(const Duration(milliseconds: 350), (_) {

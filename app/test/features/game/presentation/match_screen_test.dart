@@ -1,3 +1,4 @@
+import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,8 @@ class FakeMatchController extends MatchController {
   Future<void> startMatch({
     List<Question>? questions,
     String? opponentName,
+    String? initialTurnPlayerId,
+    BotConfig? botConfig,
   }) async {
     startMatchCalled = true;
   }

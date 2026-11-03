@@ -5,6 +5,7 @@ import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:app/features/game/domain/bot/bot_player.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/domain/text_normalizer.dart';
+import 'package:app/features/game/domain/answer_matcher.dart';
 
 Question _makeTestQuestion({
   required String id,
@@ -244,6 +245,127 @@ void main() {
         expect(totalDelay, greaterThanOrEqualTo(3000));
         expect(totalDelay, lessThanOrEqualTo(4000));
       }
+    });
+
+    test('7. 3 Persona tanımları tek doğruluk kaynağından ve doğru değerlerle üretilir', () {
+      final dengeli = BotConfig.forPersona(BotPersona.dengeli);
+      final aceleci = BotConfig.forPersona(BotPersona.aceleci);
+      final dusunur = BotConfig.forPersona(BotPersona.dusunur);
+
+      expect(dengeli.persona, equals(BotPersona.dengeli));
+      expect(aceleci.persona, equals(BotPersona.aceleci));
+      expect(dusunur.persona, equals(BotPersona.dusunur));
+
+      // Aceleci daha hızlı ve daha çok hata yapar
+      expect(aceleci.thinkMinMs, lessThan(dengeli.thinkMinMs));
+      expect(aceleci.thinkMaxMs, lessThan(dengeli.thinkMaxMs));
+      expect(aceleci.wrongAnswerChance, greaterThan(dengeli.wrongAnswerChance));
+
+      // Düşünür daha yavaş ve daha az hata yapar
+      expect(dusunur.thinkMinMs, greaterThan(dengeli.thinkMinMs));
+      expect(dusunur.thinkMaxMs, greaterThan(dengeli.thinkMaxMs));
+      expect(dusunur.wrongAnswerChance, lessThan(dengeli.wrongAnswerChance));
+    });
+
+    test('8. Yanlış cevap üretimi (typo ve AnswerMatcher): Asla doğru cevapla eşleşmez', () {
+      final matcher = AnswerMatcher(question);
+      final random = math.Random(999);
+
+      for (int i = 0; i < 100; i++) {
+        final wrongWord = BotPlayer.generateWrongAnswer(
+          question: question,
+          matcher: matcher,
+          random: random,
+        );
+
+        final result = matcher.check(wrongWord, const {});
+        expect(result.isWrong, isTrue, reason: 'Üretilen "$wrongWord" doğru sayılmamalı!');
+      }
+    });
+
+    test('9. Tur içi yorulma (fatigue): 3. doğrudan sonra bilme şansı istatistiksel olarak azalır', () {
+      const config = BotConfig(
+        baseKnowChance: 0.50,
+        extraKnowChance: 0.0,
+        wrongAnswerChance: 1.0,
+      );
+      const samples = 300;
+
+      int freshKnew = 0;
+      final rngFresh = math.Random(42);
+      for (int i = 0; i < samples; i++) {
+        final dec = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: rngFresh,
+          config: config,
+          roundBotSuccessCount: 0,
+        );
+        final isCorrect = dec.actions.isNotEmpty &&
+            question.answers.any((a) => a.id == TextNormalizer.normalize(dec.actions.last.input));
+        if (isCorrect) freshKnew++;
+      }
+
+      int fatiguedKnew = 0;
+      final rngFatigued = math.Random(42);
+      for (int i = 0; i < samples; i++) {
+        final dec = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: rngFatigued,
+          config: config,
+          roundBotSuccessCount: BotConfig.fatigueAnswerThreshold,
+        );
+        final isCorrect = dec.actions.isNotEmpty &&
+            question.answers.any((a) => a.id == TextNormalizer.normalize(dec.actions.last.input));
+        if (isCorrect) fatiguedKnew++;
+      }
+
+      expect(fatiguedKnew, lessThan(freshKnew));
+    });
+
+    test('10. Telafi (rubber-banding): Bot öndeyken bilme şansı düşer, bot gerideyken artar', () {
+      const config = BotConfig(
+        baseKnowChance: 0.50,
+        extraKnowChance: 0.0,
+        thinkMinMs: 3000,
+        thinkMaxMs: 6000,
+      );
+      const samples = 300;
+
+      int behindKnew = 0;
+      final rngBehind = math.Random(123);
+      for (int i = 0; i < samples; i++) {
+        final dec = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: rngBehind,
+          config: config,
+          humanScore: 2,
+          botScore: 0,
+        );
+        final isCorrect = dec.actions.isNotEmpty &&
+            question.answers.any((a) => a.id == TextNormalizer.normalize(dec.actions.last.input));
+        if (isCorrect) behindKnew++;
+      }
+
+      int aheadKnew = 0;
+      final rngAhead = math.Random(123);
+      for (int i = 0; i < samples; i++) {
+        final dec = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: rngAhead,
+          config: config,
+          humanScore: 0,
+          botScore: 2,
+        );
+        final isCorrect = dec.actions.isNotEmpty &&
+            question.answers.any((a) => a.id == TextNormalizer.normalize(dec.actions.last.input));
+        if (isCorrect) aheadKnew++;
+      }
+
+      expect(aheadKnew, lessThan(behindKnew));
     });
   });
 }

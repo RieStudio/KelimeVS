@@ -102,6 +102,7 @@ void main() {
       controller.startMatch(
         questions: [q1, q2, q3],
         opponentName: 'Ahmet',
+        initialTurnPlayerId: 'me',
       );
 
       // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)
@@ -281,6 +282,7 @@ void main() {
         controller.startMatch(
           questions: [q1, q2, q3],
           opponentName: 'Normal Bot Rakip',
+          initialTurnPlayerId: 'me',
         );
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)

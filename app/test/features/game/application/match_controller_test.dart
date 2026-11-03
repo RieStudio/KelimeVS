@@ -110,7 +110,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
         expect(state.isLoading, isFalse);
@@ -172,7 +172,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // Kullanıcı doğru cevap verir -> Sıra bota geçer
         controller.submit('elma');
@@ -218,7 +218,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
         expect(state.isMyTurn, isTrue);
@@ -258,7 +258,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // Yanlış cevap gönderilir
         controller.submit('tamamen_yanlis_ve_alakasiz_bir_cevap');
@@ -302,7 +302,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // Süre aşımı ile turu bitir
         async.elapse(const Duration(milliseconds: 15200));
@@ -354,7 +354,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Tur: Sıra me'de. Süre aşımı ile Bot 1-0 kazanır
         async.elapse(const Duration(milliseconds: 15200));
@@ -429,7 +429,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 1-0 kazanır
         async.elapse(const Duration(milliseconds: 15200));
@@ -499,7 +499,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         controller.leaveMatch();
 
@@ -532,7 +532,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(opponentName: 'RepoBot');
+        controller.startMatch(opponentName: 'RepoBot', initialTurnPlayerId: 'me');
         async.flushMicrotasks();
 
         final state = container.read(matchControllerProvider);
@@ -562,14 +562,14 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'Bot1');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'Bot1', initialTurnPlayerId: 'me');
 
         async.elapse(const Duration(milliseconds: 5000));
         var state = container.read(matchControllerProvider);
         expect(state.remainingMs, lessThanOrEqualTo(10000));
 
         // Yeniden maç başlat
-        controller.startMatch(questions: sampleQuestions, opponentName: 'Bot2');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'Bot2', initialTurnPlayerId: 'me');
         state = container.read(matchControllerProvider);
         expect(state.opponentName, 'Bot2');
         expect(state.remainingMs, 15000);
@@ -598,7 +598,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Yanlış cevap
         async.elapse(const Duration(milliseconds: 700));
@@ -650,7 +650,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
         expect(state.isMyTurn, isTrue);
@@ -737,7 +737,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
         final validAnswer = state.matchState!.currentQuestion!.answers.first.display;
@@ -773,7 +773,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // Başı-sonu boşluklu ve ardışık boşluklu yanlış metin
         async.elapse(const Duration(milliseconds: 700));
@@ -804,7 +804,7 @@ void main() {
         );
 
         final controller = container.read(matchControllerProvider.notifier);
-        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot');
+        controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // İlk deneme (yanlış)
         async.elapse(const Duration(milliseconds: 700));
@@ -851,7 +851,7 @@ void main() {
             Answer(id: 'ferrari', display: 'Ferrari', aliases: ['ferrari']),
           ],
         );
-        controller.startMatch(questions: [customQ], opponentName: 'TestBot');
+        controller.startMatch(questions: [customQ], opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
 
@@ -925,7 +925,7 @@ void main() {
             Answer(id: 'fenerbahce', display: 'Fenerbahçe', aliases: ['fenerbahce', 'fb']),
           ],
         );
-        controller.startMatch(questions: [customQ], opponentName: 'TestBot');
+        controller.startMatch(questions: [customQ], opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         var state = container.read(matchControllerProvider);
 

@@ -12,6 +12,7 @@ import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
+import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
@@ -40,6 +41,8 @@ class FakeMatchController extends MatchController {
   Future<void> startMatch({
     List<Question>? questions,
     String? opponentName,
+    String? initialTurnPlayerId,
+    BotConfig? botConfig,
   }) async {
     startMatchCalled = true;
   }
