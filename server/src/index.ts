@@ -12,8 +12,6 @@ export {
   UserProfile,
   Leaderboard,
   ReportStore,
-  GUEST_NICKNAME_LOCK_MIN_BUILD,
-  getGuestNicknameLockMinBuild,
 };
 
 export interface Env extends AuthEnv, EnergyEnv {
@@ -45,7 +43,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly GUEST_NICKNAME_LOCK_MIN_BUILD?: string;
 }
 
-export function parseClientBuild(request: Request): number {
+function parseClientBuild(request: Request): number {
   const header = request.headers.get('x-app-build');
   if (!header) return 0;
   const parsed = parseInt(header.trim(), 10);
