@@ -68,7 +68,7 @@ abstract final class AppDimens {
 
   static const double avatarHome = 44.0;
   static const double avatarList = 40.0;
-  static const double avatarMatch = 36.0;
+  static const double avatarMatch = 34.0;
   static const double avatarSearch = 92.0;
   static const double avatarEnd = 104.0;
   static const double footerLogoHeight = 15.0;

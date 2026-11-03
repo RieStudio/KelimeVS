@@ -94,23 +94,50 @@ class PlayerCard extends StatelessWidget {
             // İçerik: Avatar, Ad (+ opsiyonel Durum Notu / Kalan Süre) ve Skor
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.space10,
+                horizontal: AppDimens.space8,
                 vertical: AppDimens.space8,
               ),
               child: Row(
                 children: [
                   avatar,
-                  const SizedBox(width: AppDimens.space8),
+                  const SizedBox(width: AppDimens.space6),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: AppTextStyles.playerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            // M-#### ve kısa adlar her zaman küçülerek TAM görünsün;
+                            // Uzun özel takma adlar için aşırı küçülmeyi önleyen kısaltma (…) korunsun.
+                            final bool isLongName = name.length > 8;
+                            return FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: isLongName
+                                  ? ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: constraints.maxWidth.isFinite
+                                            ? (constraints.maxWidth > 0
+                                                ? constraints.maxWidth * 1.5
+                                                : 0.0)
+                                            : double.infinity,
+                                      ),
+                                      child: Text(
+                                        name,
+                                        style: AppTextStyles.playerName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    )
+                                  : Text(
+                                      name,
+                                      style: AppTextStyles.playerName,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                    ),
+                            );
+                          },
                         ),
                         if (isActive && clampedSec != null)
                           Text(
@@ -120,7 +147,7 @@ class PlayerCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: AppDimens.space8),
+                  const SizedBox(width: AppDimens.space6),
                   Text(
                     '$score',
                     style: AppTextStyles.scoreSmall,

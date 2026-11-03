@@ -1,7 +1,10 @@
 import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:app/features/profile/application/profile_notifier.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
@@ -50,15 +53,34 @@ class FakeMatchController extends MatchController {
   }
 }
 
-Widget _buildTestApp(FakeMatchController controller, {Key? key}) {
+class _FakeProfileNotifier extends ProfileNotifier {
+  final ProfileState _state;
+  _FakeProfileNotifier(this._state);
+
+  @override
+  ProfileState build() => _state;
+}
+
+Widget _buildTestApp(
+  FakeMatchController controller, {
+  Key? key,
+  ProfileState? profileState,
+  MediaQueryData? mediaQueryData,
+}) {
+  Widget app = const MaterialApp(
+    home: MatchScreen(),
+  );
+  if (mediaQueryData != null) {
+    app = MediaQuery(data: mediaQueryData, child: app);
+  }
   return ProviderScope(
     key: key ?? ValueKey(controller),
     overrides: [
       matchControllerProvider.overrideWith(() => controller),
+      if (profileState != null)
+        profileProvider.overrideWith(() => _FakeProfileNotifier(profileState)),
     ],
-    child: const MaterialApp(
-      home: MatchScreen(),
-    ),
+    child: app,
   );
 }
 
@@ -475,5 +497,85 @@ void main() {
 
     expect(find.text(AppStrings.leaveMatchConfirmTitle), findsOneWidget);
     expect(find.text(AppStrings.leaveMatchPrompt), findsOneWidget);
+  });
+
+  testWidgets('11. Kendi avatarında "?" yerine oyuncunun baş harfi (misafir için M, özel ad için baş harf) görünür, kart adı "Sen" kalır', (tester) async {
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'M-9633',
+      remainingMs: 10000,
+    );
+
+    // A: Misafir oyuncu ("M-4821")
+    await tester.pumpWidget(_buildTestApp(
+      FakeMatchController(state),
+      profileState: const ProfileState(nickname: 'M-4821'),
+    ));
+    await tester.pump();
+
+    // Kartta "Sen" yazısı korunmalı
+    expect(find.text(AppStrings.you), findsOneWidget);
+    // Kendi avatarında soru işareti '?' olmamalı
+    expect(find.text('?'), findsNothing);
+    // Misafir adının baş harfi 'M' kendi avatarında ve rakip avatarında görünür
+    expect(find.text('M'), findsNWidgets(2)); // Biri kendi avatarı, diğeri M-9633 rakip avatarı
+
+    // B: Özel adlı oyuncu ("Ahmet")
+    await tester.pumpWidget(_buildTestApp(
+      FakeMatchController(state),
+      key: const ValueKey('ahmet_profile'),
+      profileState: const ProfileState(nickname: 'Ahmet'),
+    ));
+    await tester.pump();
+
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('?'), findsNothing);
+    expect(find.text('A'), findsOneWidget); // Kendi avatarında 'A' görünür
+
+    // C: Takma ad henüz yoksa / null ise fallback olarak "Sen"in baş harfi 'S' görünmeli, '?' değil
+    await tester.pumpWidget(_buildTestApp(
+      FakeMatchController(state),
+      key: const ValueKey('null_profile'),
+      profileState: const ProfileState(nickname: null),
+    ));
+    await tester.pump();
+
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('?'), findsNothing);
+    expect(find.text('S'), findsOneWidget); // 'Sen'in 'S' harfi
+  });
+
+  testWidgets('12. Küçük ekran (360 dp) ve textScale 1.3 altında MatchScreen rakip kartında M-9633 kırpılmaz', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'M-9633',
+      remainingMs: 10000,
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(
+      controller,
+      mediaQueryData: const MediaQueryData(
+        size: Size(360, 640),
+        textScaler: TextScaler.linear(1.3),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final opponentTextFinder = find.text('M-9633');
+    expect(opponentTextFinder, findsOneWidget);
+    final renderParagraph = tester.renderObject<RenderParagraph>(opponentTextFinder);
+    expect(
+      renderParagraph.didExceedMaxLines,
+      isFalse,
+      reason: '360 dp ekranda ve textScale 1.3 iken M-9633 rakip kartında kırpılmamalıdır',
+    );
   });
 }

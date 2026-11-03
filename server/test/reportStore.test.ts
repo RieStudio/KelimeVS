@@ -187,5 +187,61 @@ describe('ReportStore Durable Object Tests', () => {
     expect(summary[1].reportedUid).toBe('user_mild');
     expect(summary[1].reportCount).toBe(1);
   });
+
+  it('5. 90 günden eski bildirimler alarm ile otomatik silinir ve sonraki alarm yeniden kurulur', async () => {
+    const ctx = createMockCtx();
+    const store = new ReportStore(ctx, mockEnv);
+
+    // Tablo şemasının hazır olması için
+    await store.getReports();
+
+    const nowMs = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const ninetyOneDaysAgo = nowMs - 91 * oneDayMs;
+    const eightyNineDaysAgo = nowMs - 89 * oneDayMs;
+
+    ctx.storage.sql.exec(
+      `INSERT INTO reports (
+        id, reporter_uid, reported_uid, match_id, reason, reported_nickname, answers_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      'report_91_days_old',
+      'reporter_1',
+      'target_1',
+      'match_91',
+      'cheating',
+      'EskiOyuncu',
+      '[]',
+      ninetyOneDaysAgo
+    );
+
+    ctx.storage.sql.exec(
+      `INSERT INTO reports (
+        id, reporter_uid, reported_uid, match_id, reason, reported_nickname, answers_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      'report_89_days_old',
+      'reporter_2',
+      'target_2',
+      'match_89',
+      'cheating',
+      'YeniOyuncu',
+      '[]',
+      eightyNineDaysAgo
+    );
+
+    const initialList = await store.getReports();
+    expect(initialList.total).toBe(2);
+
+    await store.alarm();
+
+    // 91 günlük silinmiş, 89 günlük kalmış olmalı
+    const afterList = await store.getReports();
+    expect(afterList.total).toBe(1);
+    expect(afterList.reports[0].id).toBe('report_89_days_old');
+
+    // Bir sonraki alarm yeniden kurulmuş olmalı
+    const nextAlarm = await ctx.storage.getAlarm();
+    expect(nextAlarm).not.toBeNull();
+    expect(nextAlarm).toBeGreaterThanOrEqual(nowMs + 24 * 60 * 60 * 1000);
+  });
 });
 

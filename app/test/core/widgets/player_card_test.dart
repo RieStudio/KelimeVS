@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -201,6 +202,111 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         expect(getBox().widthFactor, lessThan(0.5));
+      },
+    );
+
+    testWidgets(
+      'Küçük ekran (360 dp) ve textScale 1.3 altında M-#### adı kırpılmaz, uzun ad kısaltılır',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 360 dp ekranda iki oyuncu kartı yatay düzende (MatchScreen düzeni gibi)
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(360, 640),
+                textScaler: TextScaler.linear(1.3),
+              ),
+              child: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: const [
+                      Expanded(
+                        child: PlayerCard(
+                          name: 'Sen',
+                          score: 0,
+                          avatar: SizedBox(width: 34, height: 34),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: PlayerCard(
+                          name: 'M-9633',
+                          score: 0,
+                          avatar: SizedBox(width: 34, height: 34),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // M-9633 metninin kırpılmadığını (didExceedMaxLines == false) doğrula
+        final mTextFinder = find.text('M-9633');
+        expect(mTextFinder, findsOneWidget);
+        final mParagraph = tester.renderObject<RenderParagraph>(mTextFinder);
+        expect(
+          mParagraph.didExceedMaxLines,
+          isFalse,
+          reason: 'M-9633 metni 360 dp ve textScale 1.3 iken kırpılmamalı/kısaltılmamalıdır',
+        );
+
+        // Şimdi çok uzun takma ad içeren kart test edilsin
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(360, 640),
+                textScaler: TextScaler.linear(1.3),
+              ),
+              child: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: const [
+                      Expanded(
+                        child: PlayerCard(
+                          name: 'Sen',
+                          score: 0,
+                          avatar: SizedBox(width: 34, height: 34),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: PlayerCard(
+                          name: 'CokUzunTakmaAd1234',
+                          score: 0,
+                          avatar: SizedBox(width: 34, height: 34),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final longTextFinder = find.text('CokUzunTakmaAd1234');
+        expect(longTextFinder, findsOneWidget);
+        final longParagraph = tester.renderObject<RenderParagraph>(longTextFinder);
+        expect(
+          longParagraph.didExceedMaxLines,
+          isTrue,
+          reason: 'Çok uzun takma ad için kısaltma (…) davranışı korunmalıdır',
+        );
       },
     );
   });

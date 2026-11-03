@@ -181,6 +181,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     final uiState = ref.watch(activeMatchUiStateProvider);
     final matchState = uiState.matchState;
 
+    final profile = ref.watch(profileProvider);
+    final myNickname = profile.nickname?.trim();
+
     final decisiveRounds = matchState?.decisiveRounds ?? 0;
     final roundNumber = math.min(3, decisiveRounds + 1);
 
@@ -274,7 +277,10 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               name: AppStrings.you,
                               score: matchState?.scores['me'] ?? 0,
                               avatar: PlayerAvatar.selfMatch(
-                                frame: ref.watch(profileProvider).equippedFrame,
+                                name: (myNickname != null && myNickname.isNotEmpty)
+                                    ? myNickname
+                                    : AppStrings.you,
+                                frame: profile.equippedFrame,
                               ),
                               isActive: isMyTurn,
                               remainingSeconds: isMyTurn ? remainingSec : null,
@@ -291,7 +297,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                                 cost: uiState.extraTimeCost ?? 30,
                                 seconds: uiState.extraTimeSeconds ?? 5,
                                 isLoading: uiState.isUsingPowerup,
-                                userCoins: ref.watch(profileProvider).coins,
+                                userCoins: profile.coins,
                                 onTap: () {
                                   ref
                                       .read(activeMatchSessionProvider)
@@ -313,7 +319,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: AppDimens.space10),
+                      const SizedBox(width: AppDimens.space8),
                       Expanded(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
