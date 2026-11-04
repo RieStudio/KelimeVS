@@ -33,6 +33,7 @@ class MatchmakingMatched extends MatchmakingEvent {
   final String opponentFrame;
   final MatchedEnergyInfo? energy;
   final int? serverNowMs;
+  final FirstQuestionPreview? firstQuestion;
 
   const MatchmakingMatched({
     required this.matchId,
@@ -40,11 +41,12 @@ class MatchmakingMatched extends MatchmakingEvent {
     this.opponentFrame = 'classic',
     this.energy,
     this.serverNowMs,
+    this.firstQuestion,
   });
 
   @override
   String toString() =>
-      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame, energy: $energy)';
+      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame, energy: $energy, firstQuestion: $firstQuestion)';
 }
 
 /// Kullanıcı veya sistem tarafından eşleştirme iptal edildi.
@@ -240,6 +242,7 @@ class MatchmakingClient {
           opponentFrame: msg.opponentFrame,
           energy: msg.energy,
           serverNowMs: msg.serverNowMs,
+          firstQuestion: msg.firstQuestion,
         ),
       );
       _finishAndClose();

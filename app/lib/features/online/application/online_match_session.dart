@@ -479,6 +479,17 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         : state.opponentName;
     final updatedOpponentFrame = onlineState.opponentFrame;
 
+    final String? nextQText;
+    final String? nextQId;
+    if (mappedPhase == MatchPhase.roundEnded &&
+        onlineState.nextQuestion != null) {
+      nextQText = onlineState.nextQuestion!.text;
+      nextQId = onlineState.nextQuestion!.id;
+    } else {
+      nextQText = null;
+      nextQId = null;
+    }
+
     state = state.copyWith(
       matchState: mappedMatchState,
       remainingMs: remainingMs,
@@ -492,6 +503,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       isFinalReveal: false,
       roundTransitionRemainingMs: transitionRemainingMs,
       roundTransitionTotalMs: transitionTotalMs,
+      nextQuestionText: nextQText,
+      nextQuestionId: nextQId,
+      clearNextQuestion: nextQText == null,
       extraTimeCost: extraTimeCost,
       extraTimeSeconds: extraTimeSeconds,
       extraTimeRemainingUses: extraTimeRemainingUses,

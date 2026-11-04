@@ -13,14 +13,17 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/app_progress_bar.dart';
 import '../../../core/widgets/avatar_frame_registry.dart';
 import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/player_avatar.dart';
+import '../../../core/widgets/question_preview_card.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../main.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/domain/bot/bot_opponent_names.dart';
+import '../../game/domain/models.dart';
 import '../../game/presentation/match_screen.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
@@ -29,11 +32,17 @@ import '../domain/match_tip_selector.dart';
 
 /// DESIGN.md Bölüm 7: 2) Eşleşme Bekleme Ekranı
 ///
-/// Sol üstte kapat.
-/// Ortada: kendi avatarın (92) · "VS" · kesik çizgili "?" avatarı.
-/// "Rakip aranıyor…" (Fredoka 30/700), altında "Birazdan başlıyoruz".
-/// Üç noktalı yükleme göstergesi (primary/bright/mint, sırayla yanıp söner).
-/// Altta ipucu kartı ve "Vazgeç" ikincil butonu.
+/// Ekran 1 (Arama):
+/// - Sol üstte kapat butonu.
+/// - Ortada: Kendi profilimiz + kullanıcı adımız · "VS" · animasyonlu "?" yer tutucu avatarı.
+/// - "Rakip aranıyor…" (Fredoka 30/700) ve 3 noktalı yükleme göstergesi.
+/// - Altta: İpucu kartı ve kırmızı "Vazgeç" butonu.
+///
+/// Ekran 2 (Rakip Bulundu & Soru Önizleme):
+/// - Eşleşme olunca avatarlar yukarı kayar.
+/// - Kendi avatarımızın altında "Sen", sağda rakip adı ve avatarı.
+/// - Ortada: 1. Tur Soru Kartı (kategori önizleme). Online maçta sunucu göndermezse gösterilmez.
+/// - Altta: 3.5 sn'de dolan ince, metinsiz ilerleme çubuğu. Kapat ve Vazgeç butonları kilitli.
 class MatchmakingScreen extends ConsumerStatefulWidget {
   final Duration? searchDuration;
   final String? initialOpponentName;
@@ -64,6 +73,10 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   bool _isCancelled = false;
   bool _isMatchedLocked = false;
 
+  String? _onlineFirstQuestionText;
+  Question? _preselectedBotQuestion;
+  List<Question> _localQuestions = const [];
+
   MatchmakingClient? _client;
   StreamSubscription<MatchmakingEvent>? _subscription;
   Timer? _searchTimer;
@@ -86,6 +99,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
         _suppressionNotifier.suppress();
       }
     });
+
     final myNickname = ref.read(profileProvider).nickname?.trim();
     final rng = widget.random ?? math.Random();
     _fallbackOpponentName = widget.initialOpponentName ??
@@ -94,6 +108,9 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
           excludeName: myNickname,
         );
     _opponentName = _fallbackOpponentName;
+
+    // Yerel soru havuzunu bot eşleşmesi / çevrimdışı fallback için arka planda hazırla
+    _loadLocalQuestions();
 
     // Son karşılaşılan bot adlarını asenkron yükleyip henüz eşleşme olmadan havuzdan dışla
     if (widget.initialOpponentName == null) {
@@ -124,7 +141,6 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
     final onlineEnabled = ref.read(onlineMatchmakingEnabledProvider);
     if (!onlineEnabled || widget.forceBotFallback) {
-      // Devre kesici kapalıysa veya voided sonrası doğrudan botlu maça düşülüyorsa
       _isOnlineMatch = false;
       _matchedMatchId = null;
       _opponentFrame = BotFrameResolver.resolve(_opponentName);
@@ -135,6 +151,23 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     } else {
       _startOnlineMatchmaking();
     }
+  }
+
+  Future<void> _loadLocalQuestions() async {
+    try {
+      final repo = ref.read(questionRepositoryProvider);
+      final questions = await repo.loadAll();
+      if (!mounted) return;
+      _localQuestions = questions;
+      if (questions.isNotEmpty && _preselectedBotQuestion == null) {
+        final rng = widget.random ?? math.Random();
+        final minAnswers = ref.read(matchConfigProvider).minAnswersPerQuestion;
+        final eligible =
+            questions.where((q) => q.answers.length >= minAnswers).toList();
+        final pool = eligible.isNotEmpty ? eligible : questions;
+        _preselectedBotQuestion = pool[rng.nextInt(pool.length)];
+      }
+    } catch (_) {}
   }
 
   void _startOnlineMatchmaking() {
@@ -154,6 +187,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
             ? event.opponentName
             : _fallbackOpponentName;
         _opponentFrame = event.opponentFrame;
+        _onlineFirstQuestionText = event.firstQuestion?.text;
 
         // DESIGN.md 9b: Sunucu matched mesajıyla güncel enerjiyi bildirdiğinde anında güncelle
         if (event.energy != null) {
@@ -214,7 +248,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
 
     // Minimum arama süresi kontrolü: 1.5 sn dolmadıysa kalan süre kadar bekle
     final elapsedMs = _searchStopwatch?.elapsedMilliseconds ?? 0;
-    final remainingSearchMs = AppDimens.matchmakingMinSearchDurationMs - elapsedMs;
+    final remainingSearchMs =
+        AppDimens.matchmakingMinSearchDurationMs - elapsedMs;
 
     if (remainingSearchMs > 0) {
       _minSearchTimer?.cancel();
@@ -232,11 +267,23 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
     _dotsTimer?.cancel();
     _dotsTimer = null;
 
+    // Bot maçı için henüz soru seçilmediyse ve havuz yüklendiyse seç
+    if (!_isOnlineMatch &&
+        _preselectedBotQuestion == null &&
+        _localQuestions.isNotEmpty) {
+      final rng = widget.random ?? math.Random();
+      final minAnswers = ref.read(matchConfigProvider).minAnswersPerQuestion;
+      final eligible =
+          _localQuestions.where((q) => q.answers.length >= minAnswers).toList();
+      final pool = eligible.isNotEmpty ? eligible : _localQuestions;
+      _preselectedBotQuestion = pool[rng.nextInt(pool.length)];
+    }
+
     setState(() {
       _isOpponentFound = true;
     });
 
-    // Tanıtım süresi boyunca rakip ve "Rakip bulundu!" gösterilir, sonra maça geçilir
+    // Tanıtım süresi (3.5 sn) boyunca rakip, soru kartı ve dolan ilerleme çubuğu gösterilir
     _transitionTimer = Timer(
       AppDimens.matchmakingRevealDuration,
       _navigateToMatch,
@@ -281,7 +328,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       unawaited(
         ref
             .read(matchControllerProvider.notifier)
-            .startMatch(opponentName: oppName),
+            .startMatch(
+              opponentName: oppName,
+              preselectedQuestionId: _preselectedBotQuestion?.id,
+              questions: _localQuestions.isNotEmpty ? _localQuestions : null,
+            ),
       );
     }
   }
@@ -346,6 +397,19 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.of(context).disableAnimations;
 
+    final myNickname = ref.watch(profileProvider).nickname?.trim();
+    final myDisplayName = (myNickname != null && myNickname.isNotEmpty)
+        ? myNickname
+        : AppStrings.defaultPlayerName;
+    final selfName = _isOpponentFound ? AppStrings.you : myDisplayName;
+
+    // İlk soru kategori metni: Online maçta sunucudan gelmişse, bot maçında yerel seçimden
+    final String? categoryText = _isOnlineMatch
+        ? _onlineFirstQuestionText
+        : _preselectedBotQuestion?.text;
+    final bool hasCategory =
+        categoryText != null && categoryText.trim().isNotEmpty;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -355,309 +419,363 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.screenPaddingHorizontal,
-                      vertical: AppDimens.space12,
-                    ),
-                    child: Column(
-            children: [
-              // 1. Üst Kapat Butonu (Tanıtım anında veya çevrimiçi eşleşmede kilitlendiğinde devre dışı kalır)
-              SizedBox(
-                height: AppDimens.minTouchTarget,
-                child: Row(
-                  children: [
-                    if (!_isOpponentFound)
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 200),
-                        opacity: _isMatchedLocked ? 0.0 : 1.0,
-                        child: IgnorePointer(
-                          ignoring: _isMatchedLocked,
-                          child: AppIconButton(
-                            icon: AppIcons.close,
-                            semanticLabel: AppStrings.cancel,
-                            onTap: _cancelAndExit,
-                          ),
-                        ),
-                      )
-                    else
-                      const SizedBox(
-                        width: AppDimens.minTouchTarget,
-                        height: AppDimens.minTouchTarget,
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.screenPaddingHorizontal,
+                        vertical: AppDimens.space12,
                       ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppDimens.space24),
-
-              // 2. Ortadaki Avatarlar (Sen VS Rakip)
-              // Her iki taraf için sabit genişlikte yuva (en geniş çerçeve olan Sarmaşık / vine boyutu)
-              () {
-                final avatarSize = AppDimens.avatarSearch;
-                final avatarSlotSize = VisualFrameRegistry.maxFrameSizeFor(
-                  avatarSize,
-                );
-                final avatarBottomInSlot = (avatarSlotSize + avatarSize) / 2.0;
-
-                final selfFrame = ref.watch(profileProvider).equippedFrame;
-                final selfOverflow = VisualFrameRegistry.getFrameOverflow(
-                  avatarSize: avatarSize,
-                  frameId: selfFrame,
-                );
-                final oppOverflow = _isOpponentFound
-                    ? VisualFrameRegistry.getFrameOverflow(
-                        avatarSize: avatarSize,
-                        frameId: _opponentFrame,
-                      )
-                    : 0.0;
-                final maxOverflow = math.max(selfOverflow, oppOverflow);
-                final nameTopOffset = avatarBottomInSlot +
-                    maxOverflow +
-                    AppDimens.matchmakingNameGap;
-
-                final myNickname = ref.watch(profileProvider).nickname?.trim();
-                final myInitial = (myNickname != null && myNickname.isNotEmpty)
-                    ? myNickname
-                    : 'S';
-
-                return FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Sol Avatar Yuvası (Kendi avatarım ve "Sen")
-                      SizedBox(
-                        width: avatarSlotSize,
-                        height: AppDimens.matchmakingAvatarSlotHeight,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.topCenter,
-                          children: [
-                            SizedBox(
-                              width: avatarSlotSize,
-                              height: avatarSlotSize,
-                              child: Center(
-                                child: PlayerAvatar.selfMatch(
-                                  name: myInitial,
-                                  frame: selfFrame,
-                                  size: avatarSize,
-                                  includeFramePadding: true,
-                                ),
-                              ),
-                            ),
-                            if (_isOpponentFound)
-                              Positioned(
-                                top: nameTopOffset,
-                                left: 0,
-                                right: 0,
-                                child: Text(
-                                  AppStrings.you,
-                                  style: AppTextStyles.playerName.copyWith(
-                                    color: AppColors.ink,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // VS Metni Yuvası (Dikeyde avatar merkezleriyle tam hizalı)
-                      SizedBox(
-                        height: AppDimens.matchmakingAvatarSlotHeight,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: SizedBox(
-                            height: avatarSlotSize,
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppDimens.matchmakingVsGap,
-                                ),
-                                child: Text(
-                                  AppStrings.vs,
-                                  style: const TextStyle(
-                                    fontFamily: AppTextStyles.fontFredoka,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.ink,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Sağ Avatar Yuvası (Rakip avatarı ve adı)
-                      SizedBox(
-                        width: avatarSlotSize,
-                        height: AppDimens.matchmakingAvatarSlotHeight,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.topCenter,
-                          children: [
-                            SizedBox(
-                              width: avatarSlotSize,
-                              height: avatarSlotSize,
-                              child: Center(
-                                child: !_isOpponentFound
-                                    ? const PlayerAvatar.unknown(
-                                        size: AppDimens.avatarSearch,
-                                        includeFramePadding: true,
-                                      )
-                                    : PlayerAvatar.opponent(
-                                        name: _opponentName,
-                                        frame: _opponentFrame,
-                                        size: avatarSize,
-                                        includeFramePadding: true,
+                      child: Column(
+                        children: [
+                          // 1. Üst Kapat Butonu (Aramada aktif; Eşleşme kilitlendiğinde veya tanıtımda gizli)
+                          SizedBox(
+                            height: AppDimens.minTouchTarget,
+                            child: Row(
+                              children: [
+                                if (!_isOpponentFound)
+                                  AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 200),
+                                    opacity: _isMatchedLocked ? 0.0 : 1.0,
+                                    child: IgnorePointer(
+                                      ignoring: _isMatchedLocked,
+                                      child: AppIconButton(
+                                        icon: AppIcons.close,
+                                        semanticLabel: AppStrings.cancel,
+                                        onTap: _cancelAndExit,
                                       ),
+                                    ),
+                                  )
+                                else
+                                  const SizedBox(
+                                    width: AppDimens.minTouchTarget,
+                                    height: AppDimens.minTouchTarget,
+                                  ),
+                                const Spacer(),
+                              ],
+                            ),
+                          ),
+
+                          // Eşleşme olunca avatarların yukarı kaymasını sağlayan animasyonlu boşluk
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                            height: _isOpponentFound
+                                ? AppDimens.space8
+                                : AppDimens.space24,
+                          ),
+
+                          // 2. Ortadaki Avatarlar (Sen VS Rakip)
+                          // Her iki taraf için sabit genişlikte yuva (en geniş çerçeve olan Sarmaşık / vine boyutu)
+                          () {
+                            final avatarSize = AppDimens.avatarSearch;
+                            final avatarSlotSize =
+                                VisualFrameRegistry.maxFrameSizeFor(
+                              avatarSize,
+                            );
+                            final avatarBottomInSlot =
+                                (avatarSlotSize + avatarSize) / 2.0;
+
+                            final selfFrame =
+                                ref.watch(profileProvider).equippedFrame;
+                            final selfOverflow =
+                                VisualFrameRegistry.getFrameOverflow(
+                              avatarSize: avatarSize,
+                              frameId: selfFrame,
+                            );
+                            final oppOverflow = _isOpponentFound
+                                ? VisualFrameRegistry.getFrameOverflow(
+                                    avatarSize: avatarSize,
+                                    frameId: _opponentFrame,
+                                  )
+                                : 0.0;
+                            final maxOverflow =
+                                math.max(selfOverflow, oppOverflow);
+                            final nameTopOffset = avatarBottomInSlot +
+                                maxOverflow +
+                                AppDimens.matchmakingNameGap;
+
+                            final myInitial =
+                                (myNickname != null && myNickname.isNotEmpty)
+                                    ? myNickname
+                                    : 'S';
+
+                            return FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Sol Avatar Yuvası (Kendi avatarımız ve kullanıcı adımız / "Sen")
+                                  SizedBox(
+                                    width: avatarSlotSize,
+                                    height:
+                                        AppDimens.matchmakingAvatarSlotHeight,
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      alignment: Alignment.topCenter,
+                                      children: [
+                                        SizedBox(
+                                          width: avatarSlotSize,
+                                          height: avatarSlotSize,
+                                          child: Center(
+                                            child: PlayerAvatar.selfMatch(
+                                              name: myInitial,
+                                              frame: selfFrame,
+                                              size: avatarSize,
+                                              includeFramePadding: true,
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: nameTopOffset,
+                                          left: 0,
+                                          right: 0,
+                                          child: Text(
+                                            selfName,
+                                            style: AppTextStyles.playerName
+                                                .copyWith(
+                                              color: AppColors.ink,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // VS Metni Yuvası (Dikeyde avatar merkezleriyle tam hizalı)
+                                  SizedBox(
+                                    height:
+                                        AppDimens.matchmakingAvatarSlotHeight,
+                                    child: Align(
+                                      alignment: Alignment.topCenter,
+                                      child: SizedBox(
+                                        height: avatarSlotSize,
+                                        child: Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets
+                                                .symmetric(
+                                              horizontal:
+                                                  AppDimens.matchmakingVsGap,
+                                            ),
+                                            child: Text(
+                                              AppStrings.vs,
+                                              style: const TextStyle(
+                                                fontFamily:
+                                                    AppTextStyles.fontFredoka,
+                                                fontSize: 26,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.ink,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Sağ Avatar Yuvası (Arama durumunda dalga animasyonlu "?", bulundu durumunda rakip)
+                                  SizedBox(
+                                    width: avatarSlotSize,
+                                    height:
+                                        AppDimens.matchmakingAvatarSlotHeight,
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      alignment: Alignment.topCenter,
+                                      children: [
+                                        SizedBox(
+                                          width: avatarSlotSize,
+                                          height: avatarSlotSize,
+                                          child: Center(
+                                            child: !_isOpponentFound
+                                                ? _SearchPulseAvatar(
+                                                    size: avatarSize,
+                                                    animate: !disableAnimations,
+                                                  )
+                                                : PlayerAvatar.opponent(
+                                                    name: _opponentName,
+                                                    frame: _opponentFrame,
+                                                    size: avatarSize,
+                                                    includeFramePadding: true,
+                                                  ),
+                                          ),
+                                        ),
+                                        if (_isOpponentFound)
+                                          Positioned(
+                                            top: nameTopOffset,
+                                            left: 0,
+                                            right: 0,
+                                            child: Text(
+                                              _opponentName,
+                                              style: AppTextStyles.playerName
+                                                  .copyWith(
+                                                color: AppColors.ink,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }(),
+
+                          const SizedBox(
+                            height: AppDimens.matchmakingBelowAvatarsGap,
+                          ),
+
+                          // 3. Başlık ("Rakip aranıyor…" -> "Rakip bulundu!")
+                          Semantics(
+                            header: true,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                              child: Text(
+                                _isOpponentFound
+                                    ? AppStrings.opponentFound
+                                    : AppStrings.searchingOpponent,
+                                key: ValueKey<bool>(_isOpponentFound),
+                                style: const TextStyle(
+                                  fontFamily: AppTextStyles.fontFredoka,
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                            if (_isOpponentFound)
-                              Positioned(
-                                top: nameTopOffset,
-                                left: 0,
-                                right: 0,
-                                child: Text(
-                                  _opponentName,
-                                  style: AppTextStyles.playerName.copyWith(
-                                    color: AppColors.ink,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: AppDimens.space12),
+
+                          // 4. Üç Noktalı Yükleme Göstergesi (Yalnızca arama aşamasında)
+                          if (!_isOpponentFound)
+                            Semantics(
+                              label: 'Yükleniyor',
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 300),
+                                opacity: _isOpponentFound ? 0.0 : 1.0,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildDot(0, AppColors.primary,
+                                        disableAnimations),
+                                    const SizedBox(width: AppDimens.space10),
+                                    _buildDot(1, AppColors.bright,
+                                        disableAnimations),
+                                    const SizedBox(width: AppDimens.space10),
+                                    _buildDot(2, AppColors.mint,
+                                        disableAnimations),
+                                  ],
                                 ),
                               ),
+                            ),
+
+                          // 5. İlk Soru (Kategori) Kartı: Ekran 2'de ortada patlama/belirme animasyonuyla görünür
+                          if (_isOpponentFound && hasCategory) ...[
+                            const SizedBox(height: AppDimens.space12),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 400),
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                ),
+                                child: ScaleTransition(
+                                  scale: Tween<double>(begin: 0.9, end: 1.0)
+                                      .animate(
+                                    CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeOutBack,
+                                    ),
+                                  ),
+                                  child: child,
+                                ),
+                              ),
+                              child: QuestionPreviewCard(
+                                key: const ValueKey('first_question_card'),
+                                categoryText: categoryText,
+                              ),
+                            ),
                           ],
-                        ),
+
+                          const Spacer(),
+
+                          // 6. Alt Bölüm: Arama durumunda İpucu Kartı + Vazgeç Butonu;
+                          // Bulundu durumunda ise 3.5 sn'de dolan metinsiz ince ilerleme çubuğu.
+                          if (!_isOpponentFound) ...[
+                            MatchTipCard(
+                              key: const ValueKey('matchmaking_tip_card'),
+                              tip: _tipText,
+                            ),
+                            const SizedBox(height: AppDimens.space16),
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 200),
+                              opacity: _isMatchedLocked ? 0.5 : 1.0,
+                              child: SecondaryButton(
+                                text: AppStrings.cancel,
+                                backgroundColor: AppColors.card,
+                                textColor: AppColors.danger,
+                                borderColor: AppColors.danger,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: AppColors.dangerShadow,
+                                    offset: Offset(0, 4),
+                                    blurRadius: 0,
+                                  ),
+                                ],
+                                onPressed:
+                                    _isMatchedLocked ? null : _cancelAndExit,
+                              ),
+                            ),
+                          ] else ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppDimens.space16,
+                              ),
+                              child: AppProgressBar.filling(
+                                key: const ValueKey('matchmaking_progress_bar'),
+                                fillDuration:
+                                    AppDimens.matchmakingRevealDuration,
+                                maxWidth: 300,
+                              ),
+                            ),
+                          ],
+
+                          const SizedBox(height: AppDimens.space12),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              }(),
-
-              const SizedBox(height: AppDimens.matchmakingBelowAvatarsGap),
-
-              // 3. Başlık ("Rakip aranıyor…" -> "Rakip bulundu!")
-              Semantics(
-                header: true,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  ),
-                  child: Text(
-                    _isOpponentFound
-                        ? AppStrings.opponentFound
-                        : AppStrings.searchingOpponent,
-                    key: ValueKey<bool>(_isOpponentFound),
-                    style: const TextStyle(
-                      fontFamily: AppTextStyles.fontFredoka,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-
-              const SizedBox(height: AppDimens.space20),
-
-              // 4. Üç Noktalı Yükleme Göstergesi
-              Semantics(
-                label: 'Yükleniyor',
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 300),
-                  opacity: _isOpponentFound ? 0.0 : 1.0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildDot(0, AppColors.primary, disableAnimations),
-                      const SizedBox(width: AppDimens.space10),
-                      _buildDot(1, AppColors.bright, disableAnimations),
-                      const SizedBox(width: AppDimens.space10),
-                      _buildDot(2, AppColors.mint, disableAnimations),
-                    ],
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              // 5. İpucu Kartı (Tanıtım anında yumuşak solma ile kaldırılır)
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: child,
-                ),
-                child: !_isOpponentFound
-                    ? MatchTipCard(
-                        key: const ValueKey('matchmaking_tip_card'),
-                        tip: _tipText,
-                      )
-                    : const SizedBox.shrink(
-                        key: ValueKey('matchmaking_tip_empty'),
-                      ),
-              ),
-
-              const SizedBox(height: AppDimens.space16),
-
-              // 6. Vazgeç Butonu (Tanıtım anında düzen kaymasını önlemek için aynı boyutta boş kutu bırakılır)
-              if (!_isOpponentFound)
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: _isMatchedLocked ? 0.5 : 1.0,
-                  child: SecondaryButton(
-                    text: AppStrings.cancel,
-                    backgroundColor: AppColors.card,
-                    textColor: AppColors.danger,
-                    borderColor: AppColors.danger,
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColors.dangerShadow,
-                        offset: Offset(0, 4),
-                        blurRadius: 0,
-                      ),
-                    ],
-                    onPressed: _isMatchedLocked ? null : _cancelAndExit,
-                  ),
-                )
-              else
-                const SizedBox(height: AppDimens.secondaryButtonHeight),
-
-              const SizedBox(height: AppDimens.space12),
-            ],
+              );
+            },
           ),
         ),
       ),
-    ),
-  );
-},
-),
-),
-),
-);
-}
+    );
+  }
 
   Widget _buildDot(int index, Color color, bool disableAnimations) {
     final isActive = index == _activeDotIndex;
@@ -674,6 +792,104 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
           width: 12,
           height: 12,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+      ),
+    );
+  }
+}
+
+/// Arama aşamasında rakip "?" avatarının çevresinde hafifçe yayılan halka dalgası.
+class _SearchPulseAvatar extends StatefulWidget {
+  final double size;
+  final bool animate;
+
+  const _SearchPulseAvatar({
+    required this.size,
+    required this.animate,
+  });
+
+  @override
+  State<_SearchPulseAvatar> createState() => _SearchPulseAvatarState();
+}
+
+class _SearchPulseAvatarState extends State<_SearchPulseAvatar>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1800),
+      )..repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchPulseAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animate && _controller == null) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1800),
+      )..repeat();
+    } else if (!widget.animate && _controller != null) {
+      _controller!.dispose();
+      _controller = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.animate || _controller == null) {
+      return PlayerAvatar.unknown(
+        size: widget.size,
+        includeFramePadding: true,
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _controller!,
+      builder: (context, child) {
+        final t = _controller!.value;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            _buildPulseRing(t),
+            _buildPulseRing((t + 0.5) % 1.0),
+            child!,
+          ],
+        );
+      },
+      child: PlayerAvatar.unknown(
+        size: widget.size,
+        includeFramePadding: true,
+      ),
+    );
+  }
+
+  Widget _buildPulseRing(double progress) {
+    final scale = 1.0 + (progress * 0.32);
+    final opacity = (1.0 - progress) * 0.28;
+    return Transform.scale(
+      scale: scale,
+      child: Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: opacity),
+            width: 2.0,
+          ),
         ),
       ),
     );

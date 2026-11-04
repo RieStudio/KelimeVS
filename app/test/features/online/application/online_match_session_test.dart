@@ -604,9 +604,9 @@ void main() {
       expect(find.byType(MatchmakingScreen), findsOneWidget);
       expect(repo.entries, isEmpty);
 
-      // Min arama (1500 ms) + tanıtım (2000 ms) sonra botlu maça geçer
+      // Min arama (1500 ms) + tanıtım (3500 ms) sonra botlu maça geçer
       await tester.pump(const Duration(milliseconds: 1500));
-      await tester.pump(const Duration(milliseconds: 2050));
+      await tester.pump(const Duration(milliseconds: 3550));
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(MatchScreen), findsOneWidget);

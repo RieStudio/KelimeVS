@@ -130,6 +130,7 @@ class OnlineMatchState {
   final int myScore;
   final int opponentScore;
   final OnlineQuestion? question;
+  final OnlineQuestion? nextQuestion;
   final bool turnIsMine;
   final int deadlineMs;
   final int myHintsLeft;
@@ -152,6 +153,7 @@ class OnlineMatchState {
     required this.myScore,
     required this.opponentScore,
     this.question,
+    this.nextQuestion,
     required this.turnIsMine,
     required this.deadlineMs,
     required this.myHintsLeft,
@@ -206,6 +208,10 @@ class OnlineMatchState {
     final qMap = json['question'] as Map<String, dynamic>?;
     final question = qMap != null ? OnlineQuestion.fromJson(qMap) : null;
 
+    final nextQMap = json['nextQuestion'] as Map<String, dynamic>?;
+    final nextQuestion =
+        nextQMap != null ? OnlineQuestion.fromJson(nextQMap) : null;
+
     final attemptsList = (json['attempts'] as List<dynamic>?)
             ?.map((e) => OnlineAttempt.fromJson(e as Map<String, dynamic>))
             .toList() ??
@@ -230,6 +236,7 @@ class OnlineMatchState {
       myScore: myScore,
       opponentScore: oppScore,
       question: question,
+      nextQuestion: nextQuestion,
       turnIsMine: json['turnIsMine'] as bool? ?? false,
       deadlineMs: (json['deadlineMs'] as num?)?.toInt() ?? 0,
       myHintsLeft: (json['myHintsLeft'] as num?)?.toInt() ?? 0,

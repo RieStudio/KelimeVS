@@ -107,8 +107,8 @@ void main() {
 
       // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)
       async.elapse(const Duration(milliseconds: 15200));
-      // 3 sn geçiş
-      async.elapse(const Duration(milliseconds: 3000));
+      // 3.5 sn geçiş
+      async.elapse(const Duration(milliseconds: 3550));
 
       // 2. Tur: Sıra botta. Bot 1000 ms sonra cevap verir
       async.elapse(const Duration(milliseconds: 1000));
@@ -287,8 +287,8 @@ void main() {
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)
         async.elapse(const Duration(milliseconds: 15200));
-        // 3 sn geçiş
-        async.elapse(const Duration(milliseconds: 3000));
+        // 3.5 sn geçiş
+        async.elapse(const Duration(milliseconds: 3550));
 
         // 2. Tur: Sıra botta. Bot 1000 ms sonra cevap verir
         async.elapse(const Duration(milliseconds: 1000));

@@ -124,4 +124,37 @@ void main() {
       expect(state.kalanSureMs(10000, maxDurationMs: 8000), 8000);
     });
   });
+
+  group('OnlineMatchState - nextQuestion parsing tests', () {
+    test('roundEnded fazında nextQuestion alanı doğru ayrıştırılır', () {
+      final json = {
+        'serverNowMs': 10000,
+        'phase': 'roundEnded',
+        'roundNumber': 1,
+        'scores': {'me': 1, 'opponent': 0},
+        'nextRoundAtMs': 13500,
+        'nextQuestion': {
+          'id': 'q_next_2',
+          'text': 'Türkiye Coğrafyası',
+        },
+      };
+
+      final state = OnlineMatchState.fromJson(json);
+      expect(state.nextQuestion, isNotNull);
+      expect(state.nextQuestion!.id, 'q_next_2');
+      expect(state.nextQuestion!.text, 'Türkiye Coğrafyası');
+    });
+
+    test('nextQuestion alanı yoksa veya null ise state.nextQuestion null olur (geriye uyumluluk)', () {
+      final json = {
+        'serverNowMs': 10000,
+        'phase': 'roundEnded',
+        'roundNumber': 1,
+        'scores': {'me': 1, 'opponent': 0},
+      };
+
+      final state = OnlineMatchState.fromJson(json);
+      expect(state.nextQuestion, isNull);
+    });
+  });
 }

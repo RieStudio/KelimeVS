@@ -333,6 +333,33 @@ abstract final class MatchEngine {
     return EngineResult(finishedState, [MatchFinished(opponentId, 'forfeit')]);
   }
 
+  /// roundEnded fazında iken bir sonraki turda oynanacak soruyu state'i değiştirmeden döner.
+  /// Maç bittiyse veya roundEnded fazında değilse null döner.
+  static Question? peekNextQuestion({
+    required MatchState state,
+    required List<Question> questions,
+    required math.Random random,
+    List<String>? questionOrder,
+  }) {
+    if (state.phase != MatchPhase.roundEnded) {
+      return null;
+    }
+    final eligibleQuestions =
+        _filterQuestions(questions, state.config.minAnswersPerQuestion);
+    if (eligibleQuestions.isEmpty) {
+      return null;
+    }
+    final effectiveOrder = questionOrder ?? state.questionOrder;
+    return _pickNextQuestion(
+      questions: eligibleQuestions,
+      usedQuestionIds: state.usedQuestionIds,
+      roundHistory: state.roundHistory,
+      random: random,
+      questionOrder: effectiveOrder,
+      roundIndex: state.totalRoundsPlayed,
+    );
+  }
+
   /// Tur bittikten sonra (roundEnded fazında) bir sonraki turu başlatır.
   static EngineResult startNextRound({
     required MatchState state,

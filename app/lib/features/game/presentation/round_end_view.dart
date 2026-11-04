@@ -7,8 +7,9 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_progress_bar.dart';
+import '../../../core/widgets/question_preview_card.dart';
 import '../../../core/widgets/result_circle.dart';
-import '../../../core/widgets/smooth_progress_bar.dart';
 import '../application/match_providers.dart';
 import '../domain/match/match_events.dart';
 
@@ -262,7 +263,16 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                 ),
               ),
 
-              const Spacer(flex: 4),
+              if (uiState.nextQuestionText != null && !uiState.isFinalReveal) ...[
+                const Spacer(flex: 1),
+                QuestionPreviewCard(
+                  key: const ValueKey('round_end_next_question_card'),
+                  categoryText: uiState.nextQuestionText!,
+                ),
+                const Spacer(flex: 1),
+              ] else ...[
+                const Spacer(flex: 4),
+              ],
 
               // 6. Alttaki Subtitle Metni
               Text(
@@ -281,31 +291,12 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
               Semantics(
                 label: AppStrings.timeLeftLabel,
                 value: '$remainingMs ms',
-                child: Container(
-                  width: double.infinity,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: AppColors.mint,
-                    borderRadius: AppDimens.borderRadiusFull,
-                    border: Border.all(
-                      color: AppColors.ink,
-                      width: AppDimens.borderThin,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: AppDimens.borderRadiusFull,
-                    child: SmoothProgressBar(
-                      totalDurationMs: totalMs,
-                      remainingMs: remainingMs,
-                      isActive: true,
-                      isPaused: uiState.isPaused,
-                      fillColor: AppColors.primary,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: AppDimens.borderRadiusFull,
-                      ),
-                    ),
-                  ),
+                child: AppProgressBar.countdown(
+                  key: const ValueKey('round_end_progress_bar'),
+                  totalDurationMs: totalMs,
+                  remainingMs: remainingMs,
+                  isActive: true,
+                  isPaused: uiState.isPaused,
                 ),
               ),
 

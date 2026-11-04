@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/theme/app_dimens.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
 
 import '../data/question_repository.dart';
@@ -68,7 +69,7 @@ class MatchController extends Notifier<MatchUiState>
     TextFilter? textFilter,
     SharedPreferences? prefs,
     String? selfNickname,
-    this.roundTransitionDelayMs = 3000,
+    this.roundTransitionDelayMs = AppDimens.roundTransitionDurationMs,
   })  : _injectedClock = clock,
         _injectedRandom = random,
         _injectedRepo = repository,
@@ -89,6 +90,8 @@ class MatchController extends Notifier<MatchUiState>
   List<BotAction> _pendingBotActions = const [];
   int _botActionIndex = 0;
   List<Question> _loadedQuestions = const [];
+  List<String>? _questionOrder;
+  Question? _pendingNextQuestion;
   bool _isMatchSaved = false;
 
   bool _isObserverRegistered = false;
@@ -298,6 +301,8 @@ class MatchController extends Notifier<MatchUiState>
     String? opponentName,
     String? initialTurnPlayerId,
     BotConfig? botConfig,
+    String? preselectedQuestionId,
+    List<String>? questionOrder,
   }) async {
     _cancelAllTimers();
     _isMatchSaved = false;
@@ -307,6 +312,7 @@ class MatchController extends Notifier<MatchUiState>
     _botDeadlineMs = null;
     _frozenRemainingTransitionMs = null;
     _roundBotSuccessCount = 0;
+    _pendingNextQuestion = null;
     _registerLifecycleObserver();
 
     final random = _random;
@@ -387,12 +393,24 @@ class MatchController extends Notifier<MatchUiState>
         : random.nextBool();
     final playerIds = firstPlayerIsMe ? ['me', 'bot'] : ['bot', 'me'];
 
+    List<String>? effectiveQuestionOrder = questionOrder;
+    if (preselectedQuestionId != null) {
+      final remainingIds = pool
+          .map((q) => q.id)
+          .where((id) => id != preselectedQuestionId)
+          .toList()
+        ..shuffle(random);
+      effectiveQuestionOrder = [preselectedQuestionId, ...remainingIds];
+    }
+    _questionOrder = effectiveQuestionOrder;
+
     final engineResult = MatchEngine.start(
       config: _matchConfig,
       playerIds: playerIds,
       questions: pool,
       random: random,
       nowMs: now,
+      questionOrder: effectiveQuestionOrder,
     );
 
     final providedConfig = _injectedBotConfig ?? ref.read(botConfigProvider);
@@ -672,6 +690,23 @@ class MatchController extends Notifier<MatchUiState>
       _cancelTransitionTimer();
     }
 
+    String? nextQuestionText;
+    String? nextQuestionId;
+    if (nextState.phase == MatchPhase.roundEnded) {
+      _pendingNextQuestion ??= MatchEngine.peekNextQuestion(
+        state: nextState,
+        questions: _loadedQuestions,
+        random: random,
+        questionOrder: _questionOrder,
+      );
+      if (_pendingNextQuestion != null) {
+        nextQuestionText = _pendingNextQuestion!.text;
+        nextQuestionId = _pendingNextQuestion!.id;
+      }
+    } else {
+      _pendingNextQuestion = null;
+    }
+
     state = state.copyWith(
       matchState: nextState,
       remainingMs: remaining,
@@ -690,6 +725,9 @@ class MatchController extends Notifier<MatchUiState>
       isFinalReveal: isFinal,
       roundTransitionRemainingMs: transitionRemaining,
       roundTransitionTotalMs: roundTransitionDelayMs,
+      nextQuestionText: nextQuestionText,
+      nextQuestionId: nextQuestionId,
+      clearNextQuestion: nextQuestionText == null,
     );
 
     // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur (state güncellendikten sonra)
@@ -787,11 +825,17 @@ class MatchController extends Notifier<MatchUiState>
     if (match == null || match.phase != MatchPhase.roundEnded) return;
 
     final now = clock.nowMs();
+    final effectiveOrder = _pendingNextQuestion != null
+        ? [_pendingNextQuestion!.id]
+        : _questionOrder;
+    _pendingNextQuestion = null;
+
     final res = MatchEngine.startNextRound(
       state: match,
       questions: _loadedQuestions,
       random: random,
       nowMs: now,
+      questionOrder: effectiveOrder,
     );
 
     _applyEngineResult(

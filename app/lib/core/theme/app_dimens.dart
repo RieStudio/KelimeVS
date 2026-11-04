@@ -84,11 +84,18 @@ abstract final class AppDimens {
 
   // Eşleşme Ekranı Zamanlamaları (ms)
   static const int matchmakingMinSearchDurationMs = 1500;
-  static const int matchmakingRevealDurationMs = 2000;
+  static const int matchmakingRevealDurationMs = 3500;
   static const Duration matchmakingMinSearchDuration =
       Duration(milliseconds: matchmakingMinSearchDurationMs);
   static const Duration matchmakingRevealDuration =
       Duration(milliseconds: matchmakingRevealDurationMs);
+  static const double matchmakingProgressBarHeight = 14.0;
+
+  // Tur Geçiş Zamanlamaları (ms)
+  static const int roundTransitionDurationMs = 3500;
+  static const Duration roundTransitionDuration =
+      Duration(milliseconds: roundTransitionDurationMs);
+  static const double progressBarHeight = 14.0;
 
   // Press offsets
   static const double primaryButtonPressOffset = 4.0;

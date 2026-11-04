@@ -90,6 +90,27 @@ class MatchedEnergyInfo {
   }
 }
 
+/// matched mesajı içinde gelen ilk soru önizleme bilgisi (cevaplar güvenlik için ASLA içermez).
+class FirstQuestionPreview {
+  final String id;
+  final String text;
+
+  const FirstQuestionPreview({
+    required this.id,
+    required this.text,
+  });
+
+  factory FirstQuestionPreview.fromJson(Map<String, dynamic> json) {
+    return FirstQuestionPreview(
+      id: json['id'] as String? ?? '',
+      text: json['text'] as String? ?? '',
+    );
+  }
+
+  @override
+  String toString() => 'FirstQuestionPreview(id: $id, text: $text)';
+}
+
 /// Eşleşme bulundu bildirimi (`matched`).
 class MatchedServerMessage extends ServerMessage {
   final String matchId;
@@ -98,6 +119,7 @@ class MatchedServerMessage extends ServerMessage {
   final String opponentFrame;
   final MatchedEnergyInfo? energy;
   final int? serverNowMs;
+  final FirstQuestionPreview? firstQuestion;
 
   const MatchedServerMessage({
     required this.matchId,
@@ -106,11 +128,12 @@ class MatchedServerMessage extends ServerMessage {
     this.opponentFrame = 'classic',
     this.energy,
     this.serverNowMs,
+    this.firstQuestion,
   });
 
   @override
   String toString() =>
-      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly, energy: $energy)';
+      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly, energy: $energy, firstQuestion: $firstQuestion)';
 }
 
 /// Arkadaş odası kuruldu bildirimi (`room_created`).
@@ -293,6 +316,10 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
             ? MatchedEnergyInfo.fromJson(energyRaw)
             : null;
         final serverNowMs = (json['serverNowMs'] as num?)?.toInt();
+        final firstQuestionRaw = json['firstQuestion'];
+        final firstQuestion = firstQuestionRaw is Map<String, dynamic>
+            ? FirstQuestionPreview.fromJson(firstQuestionRaw)
+            : null;
         return MatchedServerMessage(
           matchId: matchId,
           opponentName: opponentName,
@@ -300,6 +327,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           opponentFrame: opponentFrame,
           energy: energy,
           serverNowMs: serverNowMs,
+          firstQuestion: firstQuestion,
         );
       case 'room_created':
         final code = json['code'] as String?;

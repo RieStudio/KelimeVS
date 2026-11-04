@@ -67,6 +67,8 @@ class FakeMatchmakingClient extends MatchmakingClient {
 
 class FakeMatchController extends MatchController {
   String? startedWithOpponentName;
+  String? startedWithPreselectedQuestionId;
+  List<String>? startedWithQuestionOrder;
   bool startMatchCalled = false;
 
   @override
@@ -78,9 +80,13 @@ class FakeMatchController extends MatchController {
     String? opponentName,
     String? initialTurnPlayerId,
     BotConfig? botConfig,
+    String? preselectedQuestionId,
+    List<String>? questionOrder,
   }) async {
     startMatchCalled = true;
     startedWithOpponentName = opponentName;
+    startedWithPreselectedQuestionId = preselectedQuestionId;
+    startedWithQuestionOrder = questionOrder;
     state = state.copyWith(opponentName: opponentName ?? '', isLoading: true);
   }
 }
@@ -300,8 +306,8 @@ void main() {
       expect(find.text(AppStrings.questionMark), findsNothing);
       expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
-      // 2000 ms tanıtım süresini ilerlet -> MatchScreen açılır ve OnlineMatchSession başlatılır
-      await tester.pump(const Duration(milliseconds: 2050));
+      // 3500 ms tanıtım süresini ilerlet -> MatchScreen açılır ve OnlineMatchSession başlatılır
+      await tester.pump(const Duration(milliseconds: 3550));
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(MatchScreen), findsOneWidget);
@@ -366,8 +372,8 @@ void main() {
         expect(find.text(AppStrings.questionMark), findsNothing);
         expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
-        // 2000 ms tanıtım sonrası yerel bot MatchController ile MatchScreen açılır
-        await tester.pump(const Duration(milliseconds: 2050));
+        // 3500 ms tanıtım sonrası yerel bot MatchController ile MatchScreen açılır
+        await tester.pump(const Duration(milliseconds: 3550));
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(MatchScreen), findsOneWidget);
@@ -419,8 +425,8 @@ void main() {
       expect(find.text('Zeynep'), findsOneWidget);
       expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
-      // 2000 ms tanıtım sonrası maça geçer
-      await tester.pump(const Duration(milliseconds: 2050));
+      // 3500 ms tanıtım sonrası maça geçer
+      await tester.pump(const Duration(milliseconds: 3550));
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(MatchScreen), findsOneWidget);
@@ -759,8 +765,8 @@ void main() {
       expect(mmClient.cancelCalled, isFalse);
       expect(find.byType(MatchmakingScreen), findsOneWidget);
 
-      // 2 sn tanıtım tamamlanınca maça geçer
-      await tester.pump(const Duration(milliseconds: 2000));
+      // 3.5 sn tanıtım tamamlanınca maça geçer
+      await tester.pump(const Duration(milliseconds: 3500));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(MatchScreen), findsOneWidget);
     },
@@ -916,7 +922,7 @@ void main() {
   );
 
   testWidgets(
-    '22. Avatar satırının dikey konumu (dy) arama ve bulundu durumlarında aynıdır (tolerans <= 1 dp)',
+    '22. Avatar satırının dikey konumu (dy) arama ve bulundu durumlarında yukarı kayarak soru kartına yer açar',
     (tester) async {
       final botController = FakeMatchController();
       final onlineSession = FakeOnlineMatchSession();
@@ -945,7 +951,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1550));
-      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
@@ -953,9 +959,9 @@ void main() {
       final foundAvatarTop = tester.getTopLeft(find.byType(PlayerAvatar).first).dy;
       final foundTitleTop = tester.getTopLeft(find.text(AppStrings.opponentFound)).dy;
 
-      // Tolerans <= 1 dp (zıplama yok)
-      expect((searchAvatarTop - foundAvatarTop).abs(), lessThanOrEqualTo(1.0));
-      expect((searchTitleTop - foundTitleTop).abs(), lessThanOrEqualTo(1.0));
+      // Tasarım gereği avatarlar ve başlık soru kartına yer açmak için yumuşakça yukarı kaymıştır
+      expect(foundAvatarTop, lessThan(searchAvatarTop));
+      expect(foundTitleTop, lessThan(searchTitleTop));
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
@@ -1094,6 +1100,189 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(MatchmakingScreen), findsNothing);
       expect(find.text('OpenBot'), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '25a. Online maçta firstQuestion gelirse Soru Kartı 1. TUR KATEGORİSİ ile gösterilir',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_with_q',
+          opponentName: 'Deniz',
+          firstQuestion: FirstQuestionPreview(
+            id: 'q_preview_1',
+            text: 'Afrika Ülkeleri',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+      expect(find.byKey(const ValueKey('first_question_card')), findsOneWidget);
+      // "1. TUR KATEGORİSİ" rozeti kaldırılmıştır, yalnızca kategori metni görünür
+      expect(find.text(AppStrings.firstRoundCategory), findsNothing);
+      expect(find.text('Afrika Ülkeleri'), findsOneWidget);
+
+      // İlerleme çubuğu da görünür ve 14 dp yüksekliktedir
+      expect(find.byKey(const ValueKey('matchmaking_progress_bar')), findsOneWidget);
+      final barSize = tester.getSize(find.byKey(const ValueKey('matchmaking_progress_bar')));
+      expect(barSize.height, 14.0);
+
+      // 3.5 sn tanıtım tamamlanınca maça geçer
+      await tester.pump(const Duration(milliseconds: 3550));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(MatchScreen), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '25b. Online maçta firstQuestion gelmezse (null) soru kartı HİÇ GÖSTERİLMEZ ve maça sorunsuz geçer',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_no_q',
+          opponentName: 'Deniz',
+          firstQuestion: null,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+      // firstQuestion null olduğu için soru kartı HİÇ GÖSTERİLMEZ
+      expect(find.byKey(const ValueKey('first_question_card')), findsNothing);
+      expect(find.text(AppStrings.firstRoundCategory), findsNothing);
+
+      // İlerleme çubuğu yine gösterilir ve akış maça sorunsuz geçer
+      expect(find.byKey(const ValueKey('matchmaking_progress_bar')), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 3550));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(MatchScreen), findsOneWidget);
+      expect(onlineSession.startOnlineMatchCalled, isTrue);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '26. 360 dp ekranda ve textScale 1.3 iken 3 satırlı uzun kategori metni taşma yapmaz (zero overflow)',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          textScale: 1.3,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_overflow_test',
+          opponentName: 'Deniz',
+          firstQuestion: FirstQuestionPreview(
+            id: 'q_long',
+            text: "Güneydoğu Anadolu Bölgesi'ndeki Tarihi ve Turistik Mekanlar",
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+      expect(find.byKey(const ValueKey('first_question_card')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '27. Ekran 1 (Arama) sol avatarın altında kullanıcının adı görünür; Ekran 2 (Bulundu) Sen olarak değişir ve rakip adı görünür',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          profileState: const ProfileState(
+            nickname: 'Canan',
+            equippedFrame: 'classic',
+          ),
+          initialOpponentName: 'M-1234',
+        ),
+      );
+      await tester.pump();
+
+      // Ekran 1 (Arama): Kendi kullanıcı adımız ("Canan") sol avatarın altında görünür
+      expect(find.text('Canan'), findsOneWidget);
+      expect(find.text(AppStrings.you), findsNothing);
+      expect(find.text('M-1234'), findsNothing);
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_names_test',
+          opponentName: 'M-1234',
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Ekran 2 (Bulundu): Kendi adımız "Sen"e dönüşür, sağda ise rakibin adı ("M-1234") görünür
+      expect(find.text(AppStrings.you), findsOneWidget);
+      expect(find.text('Canan'), findsNothing);
+      expect(find.text('M-1234'), findsOneWidget);
+      expect(find.text(AppStrings.questionMark), findsNothing);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

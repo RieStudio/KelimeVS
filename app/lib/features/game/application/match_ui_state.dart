@@ -70,6 +70,8 @@ class MatchUiState {
   final bool isFinalReveal;
   final int roundTransitionRemainingMs;
   final int roundTransitionTotalMs;
+  final String? nextQuestionText;
+  final String? nextQuestionId;
   final MatchHistoryEntry? lastSavedMatch;
   final ConnectionStatus connectionStatus;
   final bool opponentConnected;
@@ -104,7 +106,9 @@ class MatchUiState {
     this.feedbackCounter = 0,
     this.isFinalReveal = false,
     this.roundTransitionRemainingMs = 0,
-    this.roundTransitionTotalMs = 3000,
+    this.roundTransitionTotalMs = 3500,
+    this.nextQuestionText,
+    this.nextQuestionId,
     this.lastSavedMatch,
     this.connectionStatus = ConnectionStatus.connected,
     this.opponentConnected = true,
@@ -177,6 +181,9 @@ class MatchUiState {
     bool? isFinalReveal,
     int? roundTransitionRemainingMs,
     int? roundTransitionTotalMs,
+    String? nextQuestionText,
+    String? nextQuestionId,
+    bool clearNextQuestion = false,
     MatchHistoryEntry? lastSavedMatch,
     ConnectionStatus? connectionStatus,
     bool? opponentConnected,
@@ -215,6 +222,12 @@ class MatchUiState {
           roundTransitionRemainingMs ?? this.roundTransitionRemainingMs,
       roundTransitionTotalMs:
           roundTransitionTotalMs ?? this.roundTransitionTotalMs,
+      nextQuestionText: clearNextQuestion
+          ? null
+          : (nextQuestionText ?? this.nextQuestionText),
+      nextQuestionId: clearNextQuestion
+          ? null
+          : (nextQuestionId ?? this.nextQuestionId),
       lastSavedMatch: lastSavedMatch ?? this.lastSavedMatch,
       connectionStatus: connectionStatus ?? this.connectionStatus,
       opponentConnected: opponentConnected ?? this.opponentConnected,

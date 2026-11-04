@@ -26,6 +26,7 @@ class FakeMatchController extends MatchController {
 Widget _buildTestApp(
   FakeMatchController controller, {
   bool disableAnimations = false,
+  TextScaler? textScaler,
 }) {
   return ProviderScope(
     overrides: [
@@ -33,7 +34,10 @@ Widget _buildTestApp(
     ],
     child: MaterialApp(
       home: MediaQuery(
-        data: MediaQueryData(disableAnimations: disableAnimations),
+        data: MediaQueryData(
+          disableAnimations: disableAnimations,
+          textScaler: textScaler ?? TextScaler.noScaling,
+        ),
         child: const Scaffold(
           body: RoundEndView(),
         ),
@@ -322,5 +326,114 @@ void main() {
       ),
     );
     expect(fractionallySizedBoxPaused.widthFactor, closeTo(0.5, 0.01));
+  });
+
+  testWidgets('8. nextQuestionText mevcut olduğunda QuestionPreviewCard gösterilir; rozet yoktur; bar 14 dp ve mint', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      roundTransitionTotalMs: 3500,
+      roundTransitionRemainingMs: 3000,
+      nextQuestionText: 'Dünya Başkentleri',
+      nextQuestionId: 'q2',
+    );
+
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pump();
+
+    // Soru kartı ve kategori metni görünür
+    expect(find.byKey(const ValueKey('round_end_next_question_card')), findsOneWidget);
+    expect(find.text('Dünya Başkentleri'), findsOneWidget);
+
+    // "1. TUR KATEGORİSİ" veya herhangi bir rozet/etiket BULUNMAZ
+    expect(find.text(AppStrings.firstRoundCategory), findsNothing);
+
+    // İlerleme çubuğu 14 dp yüksekliktedir
+    expect(find.byKey(const ValueKey('round_end_progress_bar')), findsOneWidget);
+    final barSize = tester.getSize(find.byKey(const ValueKey('round_end_progress_bar')));
+    expect(barSize.height, 14.0);
+  });
+
+  testWidgets('9. nextQuestionText null olduğunda veya son turda (isFinalReveal: true) soru kartı GÖSTERİLMEZ', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+
+    // Durum A: nextQuestionText null
+    final uiStateNoNext = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      roundTransitionTotalMs: 3500,
+      roundTransitionRemainingMs: 3000,
+      nextQuestionText: null,
+    );
+
+    final controllerA = FakeMatchController(uiStateNoNext);
+    await tester.pumpWidget(_buildTestApp(controllerA));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('round_end_next_question_card')), findsNothing);
+
+    // Durum B: isFinalReveal true
+    final uiStateFinal = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      roundTransitionTotalMs: 3500,
+      roundTransitionRemainingMs: 3000,
+      nextQuestionText: 'Gizli Soru',
+      isFinalReveal: true,
+    );
+
+    final controllerB = FakeMatchController(uiStateFinal);
+    await tester.pumpWidget(_buildTestApp(controllerB));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('round_end_next_question_card')), findsNothing);
+    expect(find.text('Gizli Soru'), findsNothing);
+  });
+
+  testWidgets('10. 360x640 küçük ekranda ve textScaler 1.3 ile uzun kategori adı taşma (overflow) olmadan çizilir', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'Ahmet',
+      roundTransitionTotalMs: 3500,
+      roundTransitionRemainingMs: 3000,
+      nextQuestionText: 'Cumhuriyet Dönemi Türk Edebiyatı Yazarları ve Eserleri',
+      nextQuestionId: 'q_long',
+    );
+
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(
+      _buildTestApp(
+        controller,
+        textScaler: const TextScaler.linear(1.3),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('round_end_next_question_card')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -235,7 +235,7 @@ void main() {
       });
     });
 
-    test('4. Tur sonu geçişinde (roundEnded 3000ms) paused olunca yeni tur arka planda başlamaz, dönüşte kalan süreyle başlar', () {
+    test('4. Tur sonu geçişinde (roundEnded 3500ms) paused olunca yeni tur arka planda başlamaz, dönüşte kalan süreyle başlar', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
         final container = createContainer(clock: clock, answerSeconds: 15);
@@ -245,12 +245,12 @@ void main() {
         controller.startMatch();
         async.flushMicrotasks();
 
-        // Kullanıcı timeout olsun -> tur biter (roundEnded, 3000 ms geçiş süresi)
+        // Kullanıcı timeout olsun -> tur biter (roundEnded, 3500 ms geçiş süresi)
         async.elapse(const Duration(milliseconds: 15500));
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
         expect(controller.state.roundTransitionRemainingMs, greaterThan(0));
 
-        // 1000 ms geçişten sonra paused olur
+        // 1000 ms geçişten sonra paused olur (3500 - 1000 = 2500 ms kalır)
         async.elapse(const Duration(milliseconds: 1000));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.paused);
         expect(controller.isPausedForTesting, isTrue);
@@ -265,12 +265,12 @@ void main() {
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.resumed);
         expect(controller.isPausedForTesting, isFalse);
 
-        // Kalan ~2000 ms geçiş süresinden 1000 ms geçer -> hala roundEnded
+        // Kalan ~2500 ms geçiş süresinden 1000 ms geçer -> hala roundEnded (1500 ms kalır)
         async.elapse(const Duration(milliseconds: 1000));
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
 
-        // Kalan 1100 ms daha geçer -> 2. tur başlar!
-        async.elapse(const Duration(milliseconds: 1100));
+        // Kalan 1600 ms daha geçer (1000 + 1600 = 2600 ms > 2500 ms) -> 2. tur başlar!
+        async.elapse(const Duration(milliseconds: 1600));
         expect(controller.state.matchState?.phase, MatchPhase.roundActive);
       });
     });

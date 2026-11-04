@@ -1142,5 +1142,88 @@ void main() {
         container.dispose();
       });
     });
+
+    test('preselectedQuestionId ile startMatch çağrılınca 1. tur sorusu tam o sorudur ve havuz karıştırma bunu ezemez', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        // Farklı seed'lerle 10 kez dene; her defasında q3 seçilmelidir
+        for (int seed = 0; seed < 10; seed++) {
+          final container = ProviderContainer(
+            overrides: [
+              gameClockProvider.overrideWithValue(fakeClock),
+              randomProvider.overrideWithValue(math.Random(seed)),
+              questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
+            ],
+          );
+
+          final controller = container.read(matchControllerProvider.notifier);
+          controller.startMatch(
+            questions: sampleQuestions,
+            opponentName: 'Bot Rakip',
+            preselectedQuestionId: 'q3',
+          );
+
+          final matchState = container.read(matchControllerProvider).matchState;
+          expect(matchState, isNotNull);
+          expect(matchState!.currentQuestion, isNotNull);
+          expect(matchState.currentQuestion!.id, equals('q3'));
+          expect(matchState.currentQuestion!.text, equals('Şehirler'));
+
+          container.dispose();
+        }
+      });
+    });
+
+    test('Yerel bot maçında: roundEnded fazındaki nextQuestionText ve nextQuestionId sonraki turda oynanan soruyla BİREBİR AYNIDIR', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(42)),
+            questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1000,
+                thinkMaxMs: 1000,
+                baseKnowChance: 0.0,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(
+          questions: sampleQuestions,
+          opponentName: 'TestBot',
+          initialTurnPlayerId: 'bot',
+        );
+
+        // 1. Tur botun süre aşımıyla biter (16 sn)
+        async.elapse(const Duration(milliseconds: 16000));
+
+        var state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundEnded);
+        expect(state.nextQuestionText, isNotNull);
+        expect(state.nextQuestionId, isNotNull);
+
+        final expectedNextId = state.nextQuestionId;
+        final expectedNextText = state.nextQuestionText;
+
+        // 3.5 sn geçiş süresi tamamlanır ve 2. tur başlar
+        async.elapse(const Duration(milliseconds: 3550));
+
+        state = container.read(matchControllerProvider);
+        expect(state.matchState!.phase, MatchPhase.roundActive);
+        expect(state.matchState!.currentQuestion!.id, equals(expectedNextId));
+        expect(state.matchState!.currentQuestion!.text, equals(expectedNextText));
+
+        // 2. tur başladığında nextQuestion temizlenmiştir
+        expect(state.nextQuestionText, isNull);
+        expect(state.nextQuestionId, isNull);
+
+        container.dispose();
+      });
+    });
   });
 }

@@ -48,6 +48,8 @@ class FakeMatchController extends MatchController {
     String? opponentName,
     String? initialTurnPlayerId,
     BotConfig? botConfig,
+    String? preselectedQuestionId,
+    List<String>? questionOrder,
   }) async {
     startMatchCalled = true;
   }
