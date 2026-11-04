@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/empty_state_card.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
@@ -340,15 +341,11 @@ BoxDecoration _buildCardDecoration({
   bool isThickBorder = false,
   double? borderWidth,
 }) {
-  return BoxDecoration(
+  return EmptyStateCard.buildDecoration(
     color: color,
-    borderRadius: AppDimens.borderRadiusListCard,
-    border: Border.all(
-      color: borderColor,
-      width: borderWidth ??
-          (isThickBorder ? AppDimens.borderThick : AppDimens.borderThin),
-    ),
-    boxShadow: AppDimens.shadowQuestionCard,
+    borderColor: borderColor,
+    borderWidth: borderWidth ??
+        (isThickBorder ? AppDimens.borderThick : AppDimens.borderThin),
   );
 }
 
@@ -767,11 +764,7 @@ class _EmptyView extends StatelessWidget {
       key: const Key('leaderboard_empty'),
       child: Padding(
         padding: const EdgeInsets.all(AppDimens.screenPaddingHorizontal),
-        child: Container(
-          padding: const EdgeInsets.all(AppDimens.space24),
-          decoration: _buildCardDecoration(
-            borderWidth: AppDimens.borderThick,
-          ),
+        child: EmptyStateCard(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

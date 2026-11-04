@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/widgets/empty_state_card.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/profile/application/blocked_users_notifier.dart';
 import 'package:app/features/profile/data/blocked_users_api_client.dart';
@@ -53,7 +56,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Engel listesi boşken boş durum kartı gösterilir', (tester) async {
+  testWidgets('1. Engel listesi boşken boş durum kartı gösterilir ve ortak EmptyStateCard dekorasyonunu kullanır', (tester) async {
     final client = FakeBlockedUsersApiClient(usersToReturn: []);
     await tester.pumpWidget(buildTestScreen(client));
     await tester.pumpAndSettle();
@@ -61,6 +64,19 @@ void main() {
     expect(find.text(AppStrings.blockedUsersTitle), findsOneWidget);
     expect(find.text(AppStrings.emptyBlockedUsers), findsOneWidget);
     expect(find.text(AppStrings.emptyBlockedUsersSubtitle), findsOneWidget);
+
+    final emptyCardFinder = find.byType(EmptyStateCard);
+    expect(emptyCardFinder, findsOneWidget);
+
+    final container = tester.widget<Container>(
+      find.descendant(of: emptyCardFinder, matching: find.byType(Container)).first,
+    );
+    final decoration = container.decoration as BoxDecoration;
+    expect(decoration.color, AppColors.card);
+    expect(decoration.borderRadius, AppDimens.borderRadiusListCard);
+    expect(decoration.border?.top.color, AppColors.ink);
+    expect(decoration.border?.top.width, AppDimens.borderThick);
+    expect(decoration.boxShadow, AppDimens.shadowQuestionCard);
   });
 
   testWidgets('2. Engellenen kullanıcılar listelenir', (tester) async {

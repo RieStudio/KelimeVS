@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/empty_state_card.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../application/blocked_users_notifier.dart';
 import '../domain/blocked_user_model.dart';
@@ -88,16 +89,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(AppDimens.space24),
-                        child: Container(
-                          padding: const EdgeInsets.all(AppDimens.space24),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: AppDimens.borderRadiusListCard,
-                            border: Border.all(
-                              color: AppColors.mint,
-                              width: AppDimens.borderThin,
-                            ),
-                          ),
+                        child: EmptyStateCard(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
