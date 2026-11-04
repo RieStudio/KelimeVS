@@ -168,7 +168,7 @@ abstract final class BotPlayer {
     }
 
     if (!willKnow) {
-      // Bilmeyen bot: 0-2 yanlış deneme, sonra sessiz kal (süre dolsun)
+      // Bilmeyen bot: 0-1 yanlış deneme, sonra sessiz kal (süre dolsun)
       return _makeUnknowingDecision(
         totalDelayMs: totalDelayMs,
         config: config,
@@ -178,9 +178,13 @@ abstract final class BotPlayer {
     }
 
     // Bilen bot: Olasılıkla (wrongBeforeChance) önce 1 yanlış deneme, sonra doğru cevap
-    if (random.nextDouble() < config.wrongBeforeChance && totalDelayMs >= 1400) {
-      final availableSpread = totalDelayMs - 1400;
-      final delay2 = 700 + (availableSpread > 0 ? random.nextInt(availableSpread + 1) : 0);
+    // İki bot mesajı arası en az minCorrectionIntervalMs (1.5 sn) olmalıdır;
+    // toplam süre yetersizse (totalDelayMs < minFirstAttemptMs + minCorrectionIntervalMs) ilk yanlış hiç atılmaz.
+    const minRequiredMs = BotConfig.minFirstAttemptMs + BotConfig.minCorrectionIntervalMs;
+    if (random.nextDouble() < config.wrongBeforeChance && totalDelayMs >= minRequiredMs) {
+      final availableSpread = totalDelayMs - minRequiredMs;
+      final extra2 = availableSpread > 0 ? random.nextInt(availableSpread + 1) : 0;
+      final delay2 = BotConfig.minCorrectionIntervalMs + extra2;
       final delay1 = totalDelayMs - delay2;
       final wrongWord = getWrongWords(1, base: correctText).first;
 
@@ -210,28 +214,13 @@ abstract final class BotPlayer {
       return const BotDecision(actions: []);
     }
 
-    // 1 veya 2 yanlış deneme
-    final wrongCount = 1 + random.nextInt(2); // 1 veya 2
-    final wrongWords = getWrongWords(wrongCount);
-
-    if (wrongCount == 1) {
-      return BotDecision(
-        actions: [
-          BotAction(totalDelayMs, wrongWords[0]),
-        ],
-      );
-    } else {
-      final effectiveTotal = math.max(1400, totalDelayMs);
-      final availableSpread = effectiveTotal - 1400;
-      final delay2 = 700 + (availableSpread > 0 ? random.nextInt(availableSpread + 1) : 0);
-      final delay1 = effectiveTotal - delay2;
-
-      return BotDecision(
-        actions: [
-          BotAction(delay1, wrongWords[0]),
-          BotAction(delay2, wrongWords[1]),
-        ],
-      );
-    }
+    // Bilmeyen bot en fazla 1 yanlış deneme yapar (0 veya 1), asla peş peşe 2 hatalı mesaj atmaz.
+    // Tek hatalı denemeden sonra süre dolana kadar sessiz kalır.
+    final wrongWords = getWrongWords(1);
+    return BotDecision(
+      actions: [
+        BotAction(totalDelayMs, wrongWords[0]),
+      ],
+    );
   }
 }

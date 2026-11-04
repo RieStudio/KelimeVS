@@ -670,10 +670,6 @@ class MatchController extends Notifier<MatchUiState>
       });
     } else if (nextState.phase == MatchPhase.roundActive) {
       _cancelTransitionTimer();
-      // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur
-      if (!wasBotActive && nextState.turnPlayerId == 'bot') {
-        _scheduleBotTurn(nextState, clock, random);
-      }
     }
 
     state = state.copyWith(
@@ -695,6 +691,13 @@ class MatchController extends Notifier<MatchUiState>
       roundTransitionRemainingMs: transitionRemaining,
       roundTransitionTotalMs: roundTransitionDelayMs,
     );
+
+    // Sıra bota YENİ geçtiyse bot zamanlayıcısını kur (state güncellendikten sonra)
+    if (nextState.phase == MatchPhase.roundActive &&
+        !wasBotActive &&
+        nextState.turnPlayerId == 'bot') {
+      _scheduleBotTurn(nextState, clock, random);
+    }
   }
 
   void _scheduleBotTurn(MatchState match, GameClock clock, math.Random random) {
@@ -722,6 +725,13 @@ class MatchController extends Notifier<MatchUiState>
     if (_botActionIndex >= _pendingBotActions.length) return;
     final action = _pendingBotActions[_botActionIndex];
 
+    final currentMatch = state.matchState;
+    if (currentMatch != null &&
+        clock.nowMs() + action.delayMs >= currentMatch.deadlineMs) {
+      // Eylemin süresi turun bitiş süresini aşıyorsa zamanlama yapılmaz; süre aşımı doğal olarak tamamlansın.
+      return;
+    }
+
     _botDeadlineMs = clock.nowMs() + action.delayMs;
     _botTimer = Timer(Duration(milliseconds: action.delayMs), () {
       _executeBotAction(clock, random);
@@ -738,10 +748,15 @@ class MatchController extends Notifier<MatchUiState>
       return;
     }
 
+    final now = clock.nowMs();
+    if (now >= currentMatch.deadlineMs) {
+      // Süre dolmuşsa eylem gönderilmez; motorun süre aşımı kontrolüne bırakılır.
+      return;
+    }
+
     if (_botActionIndex >= _pendingBotActions.length) return;
     final action = _pendingBotActions[_botActionIndex];
 
-    final now = clock.nowMs();
     final res = MatchEngine.submit(
       state: currentMatch,
       playerId: 'bot',

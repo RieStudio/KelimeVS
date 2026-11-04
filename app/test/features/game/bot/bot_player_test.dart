@@ -46,7 +46,7 @@ void main() {
       );
     });
 
-    test('1. Gecikmeler thinkMinMs ve thinkMaxMs aralığındadır ve denemeler arası en az 700ms dir', () {
+    test('1. Gecikmeler thinkMinMs ve thinkMaxMs aralığındadır ve denemeler arası en az 1500ms dir', () {
       const config = BotConfig(thinkMinMs: 3000, thinkMaxMs: 7000, wrongBeforeChance: 0.5);
       final random = math.Random(42);
 
@@ -65,7 +65,7 @@ void main() {
 
           if (decision.actions.length > 1) {
             for (int k = 1; k < decision.actions.length; k++) {
-              expect(decision.actions[k].delayMs, greaterThanOrEqualTo(700));
+              expect(decision.actions[k].delayMs, greaterThanOrEqualTo(BotConfig.minCorrectionIntervalMs));
             }
           }
         }
@@ -168,7 +168,7 @@ void main() {
       }
     });
 
-    test('5. Bilmeyen bot: 0-2 yanlış deneme yapar, sonra sessiz kalır', () {
+    test('5. Bilmeyen bot: en fazla 1 yanlış deneme yapar (0 veya 1), asla 2 yanlış deneme yapmaz, sonra sessiz kalır', () {
       const config = BotConfig(
         baseKnowChance: 0.0,
         extraKnowChance: 0.0,
@@ -178,7 +178,6 @@ void main() {
 
       int silentCount = 0;
       int oneWrongCount = 0;
-      int twoWrongCount = 0;
 
       for (int i = 0; i < 150; i++) {
         final decision = BotPlayer.decide(
@@ -190,22 +189,19 @@ void main() {
 
         final allAnswerIds = question.answers.map((a) => a.id).toSet();
 
+        expect(decision.actions.length, lessThanOrEqualTo(1));
         if (decision.actions.isEmpty) {
           silentCount++;
-        } else if (decision.actions.length == 1) {
+        } else {
           oneWrongCount++;
           expect(allAnswerIds, isNot(contains(TextNormalizer.normalize(decision.actions[0].input))));
-        } else if (decision.actions.length == 2) {
-          twoWrongCount++;
-          expect(allAnswerIds, isNot(contains(TextNormalizer.normalize(decision.actions[0].input))));
-          expect(allAnswerIds, isNot(contains(TextNormalizer.normalize(decision.actions[1].input))));
-          expect(decision.actions[1].delayMs, greaterThanOrEqualTo(700));
+          expect(decision.actions[0].delayMs, greaterThanOrEqualTo(config.thinkMinMs));
+          expect(decision.actions[0].delayMs, lessThanOrEqualTo(config.thinkMaxMs));
         }
       }
 
       expect(silentCount, greaterThan(20));
       expect(oneWrongCount, greaterThan(20));
-      expect(twoWrongCount, greaterThan(20));
     });
 
     test('6. Bilen bot wrongBeforeChance ile önce 1 yanlış deneme, sonra doğru cevap verir', () {
@@ -237,13 +233,61 @@ void main() {
         final secondNorm = TextNormalizer.normalize(decision.actions[1].input);
         expect(allAnswerIds, contains(secondNorm));
 
-        // Denemeler arası en az 700 ms
-        expect(decision.actions[1].delayMs, greaterThanOrEqualTo(700));
+        // Denemeler arası en az 1500 ms (minCorrectionIntervalMs)
+        expect(decision.actions[1].delayMs, greaterThanOrEqualTo(BotConfig.minCorrectionIntervalMs));
 
         // Toplam süre thinkMin..thinkMax
         final totalDelay = decision.actions[0].delayMs + decision.actions[1].delayMs;
         expect(totalDelay, greaterThanOrEqualTo(3000));
         expect(totalDelay, lessThanOrEqualTo(4000));
+      }
+    });
+
+    test('6b. Bilen bot: Süre yetersizse (< 3000ms) wrongBefore tetiklense bile ilk yanlış atılmaz, direkt doğru cevap verilir', () {
+      const config = BotConfig(
+        baseKnowChance: 1.0,
+        extraKnowChance: 0.0,
+        wrongBeforeChance: 1.0, // Her zaman yanlış deneme istemi
+        thinkMinMs: 1500,
+        thinkMaxMs: 2500, // < 3000ms eşiği
+      );
+      final random = math.Random(42);
+
+      final allAnswerIds = question.answers.map((a) => a.id).toSet();
+
+      for (int i = 0; i < 20; i++) {
+        final decision = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: random,
+          config: config,
+        );
+
+        // İki mesaj için 1.5 + 1.5 = 3 sn gerektiğinden, ilk yanlış atılmamalı, doğrudan 1 doğru cevap gelmeli
+        expect(decision.actions.length, equals(1));
+        final norm = TextNormalizer.normalize(decision.actions.first.input);
+        expect(allAnswerIds, contains(norm));
+        expect(decision.actions.first.delayMs, greaterThanOrEqualTo(1500));
+        expect(decision.actions.first.delayMs, lessThanOrEqualTo(2500));
+      }
+    });
+
+    test('6c. Bot hiçbir koşulda aynı turda 2den fazla aksiyon üretmez', () {
+      final random = math.Random(12345);
+
+      for (int i = 0; i < 200; i++) {
+        final persona = BotPersona.values[random.nextInt(BotPersona.values.length)];
+        final config = BotConfig.forPersona(persona);
+
+        final decision = BotPlayer.decide(
+          question: question,
+          usedAnswerIds: {},
+          random: random,
+          config: config,
+        );
+
+        expect(decision.actions.length, lessThanOrEqualTo(2),
+            reason: 'Bir turdaki bot eylem sayısı asla 2yi geçemez!');
       }
     });
 

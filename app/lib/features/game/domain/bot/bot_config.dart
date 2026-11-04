@@ -65,6 +65,13 @@ class BotConfig {
   /// Karakter başına milisaniye gecikme farkı
   static const int wordLengthPerCharMs = 120;
 
+  // --- Bot Yanıt Aralık Sabitleri ---
+  /// Bilen botta iki mesaj (yanlış deneme -> düzeltme) arasındaki minimum aralık
+  static const int minCorrectionIntervalMs = 1500;
+
+  /// Yanlış deneme öncesi minimum bekleme süresi
+  static const int minFirstAttemptMs = 1500;
+
   /// Aktif kişilik
   final BotPersona persona;
 

@@ -979,5 +979,168 @@ void main() {
         container.dispose();
       });
     });
+
+    test('Bilmeyen bot tur boyunca en fazla 1 yanlış deneme yapar, asla peş peşe 2 hatalı mesaj atmaz ve süre aşımına kadar bekler', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(42)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 1500,
+                thinkMaxMs: 1500,
+                baseKnowChance: 0.0,
+                extraKnowChance: 0.0,
+                wrongAnswerChance: 1.0, // Her zaman yanlış deneme yapsın
+              ),
+            ),
+            matchControllerProvider.overrideWith(
+              () => MatchController(roundTransitionDelayMs: 3000),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                roundsToWin: 2,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(
+          questions: sampleQuestions,
+          opponentName: 'M-1234',
+          initialTurnPlayerId: 'bot',
+        );
+
+        // 1500ms sonra bot tam olarak 1 yanlış cevap gönderir
+        async.elapse(const Duration(milliseconds: 1600));
+        var state = container.read(matchControllerProvider);
+        final rawBotAttempts = state.matchState!.currentRoundAttempts.where((a) => a.playerId == 'bot').toList();
+
+        // Tam olarak 1 yanlış/yakın deneme olmalı, asla 2 değil ve doğru olmamalı
+        expect(rawBotAttempts.length, 1);
+        expect(rawBotAttempts.first.resultType, isNot(equals(AttemptResultType.correct)));
+
+        // Tur sonuna kadar (14.000 ms daha) bekletilir: Bot başka hiçbir şey göndermez
+        async.elapse(const Duration(milliseconds: 14000));
+        state = container.read(matchControllerProvider);
+
+        final finalRawBotAttempts = state.matchState!.currentRoundAttempts.where((a) => a.playerId == 'bot').toList();
+        expect(finalRawBotAttempts.length, 1, reason: 'Bot maç biterken ikinci bir hatalı deneme atmamalı!');
+        expect(state.matchState!.phase, MatchPhase.roundEnded);
+        expect(state.matchState!.scores['me'], 1);
+
+        container.dispose();
+      });
+    });
+
+    test('Tur veya maç bittiğinde bekleyen bot zamanlayıcıları iptal edilir ve süre bitiminden sonra bot mesajı gelmez', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(1)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 4000,
+                thinkMaxMs: 4000,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+              ),
+            ),
+            matchControllerProvider.overrideWith(
+              () => MatchController(roundTransitionDelayMs: 3000),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                roundsToWin: 2,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(
+          questions: sampleQuestions,
+          opponentName: 'M-5555',
+          initialTurnPlayerId: 'bot',
+        );
+
+        // Henüz 4000ms dolmadan (2000ms'de) maç terk edilir
+        async.elapse(const Duration(milliseconds: 2000));
+        controller.leaveMatch();
+
+        var state = container.read(matchControllerProvider);
+        expect(state.isMatchFinished, isTrue);
+
+        // 5000ms daha bekletilir (botun 4000ms zamanlayıcısı bu sırada tetiklenmeye çalışsa bile iptal edilmiş olmalı)
+        async.elapse(const Duration(milliseconds: 5000));
+        state = container.read(matchControllerProvider);
+
+        // Hiçbir bot cevabı kaydedilmemiş olmalı
+        expect(state.matchState!.currentRoundAttempts, isEmpty);
+        expect(state.acceptedAnswers, isEmpty);
+
+        container.dispose();
+      });
+    });
+
+    test('Tur süresinin son ~1.5 saniyesinde bot hiçbir zaman 1den fazla mesaj göndermez', () {
+      fakeAsync((async) {
+        final fakeClock = FakeClock(async);
+        final container = ProviderContainer(
+          overrides: [
+            gameClockProvider.overrideWithValue(fakeClock),
+            randomProvider.overrideWithValue(math.Random(99)),
+            botConfigProvider.overrideWithValue(
+              const BotConfig(
+                thinkMinMs: 13000,
+                thinkMaxMs: 14500,
+                baseKnowChance: 1.0,
+                extraKnowChance: 0.0,
+                wrongBeforeChance: 1.0, // wrongBefore tetiklense bile
+              ),
+            ),
+            matchControllerProvider.overrideWith(
+              () => MatchController(roundTransitionDelayMs: 3000),
+            ),
+            matchConfigProvider.overrideWithValue(
+              const MatchConfig(
+                answerSeconds: 15,
+                roundsToWin: 2,
+              ),
+            ),
+          ],
+        );
+
+        final controller = container.read(matchControllerProvider.notifier);
+        controller.startMatch(
+          questions: sampleQuestions,
+          opponentName: 'M-7777',
+          initialTurnPlayerId: 'bot',
+        );
+
+        // 13.500 ms'ye kadar ilerlet (son 1.5 sn başlangıcı)
+        async.elapse(const Duration(milliseconds: 13500));
+        var state = container.read(matchControllerProvider);
+        final attemptsBeforeLast1500 = state.matchState!.currentRoundAttempts.length;
+
+        // Kalan 1.500 ms + süre aşımı toleransını ilerlet
+        async.elapse(const Duration(milliseconds: 1700));
+        state = container.read(matchControllerProvider);
+        final attemptsAfterLast1500 = state.matchState!.currentRoundAttempts.length;
+
+        final messagesInLast1500 = attemptsAfterLast1500 - attemptsBeforeLast1500;
+        expect(messagesInLast1500, lessThanOrEqualTo(1),
+            reason: 'Son 1.5 saniyede bot en fazla 1 mesaj gönderebilir!');
+
+        container.dispose();
+      });
+    });
   });
 }
