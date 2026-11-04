@@ -637,7 +637,7 @@ void main() {
   );
 
   testWidgets(
-    '17. Dokunma davranışları: Enerjiye dokununca Mağaza Enerji sekmesine geçer, jetona dokunulunca sayfa değişmez',
+    '17. Dokunma davranışları: Enerjiye dokununca Mağaza Enerji sekmesine geçer, jetona dokunulunca Mağaza Jeton sekmesine geçer',
     (tester) async {
       final repo = FakeMatchHistoryRepository([]);
       const profile = ProfileState(
@@ -673,8 +673,14 @@ void main() {
       // Başlangıç: Ana Sayfa sekmesi (index 0)
       expect(container.read(bottomNavIndexProvider), 0);
 
-      // 1. Jeton bölümüne dokun (herhangi bir rota/sekme değişikliği olmamalı)
-      await tester.tap(find.text('100'));
+      // 1. Jeton bölümüne dokun (Mağaza sekmesine ve Jeton alt sekmesine geçmeli)
+      await tester.tap(find.byKey(const Key('coin_pill_button')));
+      await tester.pumpAndSettle();
+      expect(container.read(bottomNavIndexProvider), 2);
+      expect(container.read(storeNotifierProvider).selectedTab, StoreTab.coins);
+
+      // Ana Sayfaya geri dön
+      container.read(bottomNavIndexProvider.notifier).setIndex(0);
       await tester.pumpAndSettle();
       expect(container.read(bottomNavIndexProvider), 0);
 

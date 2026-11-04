@@ -137,14 +137,8 @@ class HomeScreen extends ConsumerWidget {
                             ? profile.energy!.current
                             : null,
                         energyMax: profile.energy?.max ?? 5,
-                        onEnergyTap: () {
-                          ref
-                              .read(bottomNavIndexProvider.notifier)
-                              .setIndex(2);
-                          ref
-                              .read(storeNotifierProvider.notifier)
-                              .setTab(StoreTab.energy);
-                        },
+                        onCoinTap: () => _openStoreTab(ref, StoreTab.coins),
+                        onEnergyTap: () => _openStoreTab(ref, StoreTab.energy),
                       ),
 
                       const SizedBox(width: AppDimens.space8),
@@ -355,5 +349,10 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _openStoreTab(WidgetRef ref, StoreTab tab) {
+    ref.read(bottomNavIndexProvider.notifier).setIndex(2);
+    ref.read(storeNotifierProvider.notifier).setTab(tab);
   }
 }

@@ -192,7 +192,14 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                         ),
                       ),
                       const Spacer(),
-                      CoinPill(amount: storeState.coins),
+                      CoinPill(
+                        amount: storeState.coins,
+                        onCoinTap: () {
+                          ref
+                              .read(storeNotifierProvider.notifier)
+                              .setTab(StoreTab.coins);
+                        },
+                      ),
                     ],
                   ),
                 ),

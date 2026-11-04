@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/coin_pill.dart';
 import 'package:app/core/widgets/player_avatar.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
@@ -10,6 +11,7 @@ import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
+import 'package:app/features/store/application/store_notifier.dart';
 import 'package:app/features/store/data/store_api_client.dart';
 import 'package:app/features/store/domain/models/store_item.dart';
 import 'package:app/features/store/presentation/store_screen.dart';
@@ -493,6 +495,42 @@ void main() {
       expect(fakeClient.equippedFrame, equals('classic'));
       expect(
           fakeClient.equipHistory, equals(['mint', 'gold', 'mint', 'classic']));
+    });
+
+    testWidgets('tapping CoinPill switches tab to StoreTab.coins without pushing a new screen', (tester) async {
+      final fakeClient = FakeStoreApiClient(coins: 500);
+      late ProviderContainer container;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            storeApiClientProvider.overrideWithValue(fakeClient),
+            matchHistoryRepositoryProvider.overrideWithValue(FakeMatchHistoryRepository()),
+          ],
+          child: Consumer(
+            builder: (context, ref, _) {
+              container = ProviderScope.containerOf(context);
+              return const MaterialApp(
+                home: Scaffold(body: StoreScreen()),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Başlangıçta çerçeveler sekmesi varsayılandır
+      expect(container.read(storeNotifierProvider).selectedTab, StoreTab.frames);
+
+      // Üst bardaki CoinPill'e dokun
+      final coinPillFinder = find.byType(CoinPill);
+      expect(coinPillFinder, findsOneWidget);
+      await tester.tap(coinPillFinder);
+      await tester.pumpAndSettle();
+
+      // Sekme StoreTab.coins'e geçmiş olmalıdır ve yeni ekran push edilmemiştir
+      expect(container.read(storeNotifierProvider).selectedTab, StoreTab.coins);
+      expect(find.byType(StoreScreen), findsOneWidget);
     });
 
     testWidgets(
