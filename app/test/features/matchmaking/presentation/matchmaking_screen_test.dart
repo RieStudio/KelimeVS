@@ -188,7 +188,7 @@ void main() {
       expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
       expect(find.byType(MatchTipCard), findsOneWidget);
 
-      // Vazgeç butonu (kırmızı stil tokenleri: kart dolgu, dangerDark kenarlık ve yazı)
+      // Vazgeç butonu (kırmızı stil tokenleri: kart dolgu, danger kenarlık ve yazı, dangerShadow gölge)
       final cancelButtonFinder = find.widgetWithText(
         SecondaryButton,
         AppStrings.cancel,
@@ -196,9 +196,9 @@ void main() {
       expect(cancelButtonFinder, findsOneWidget);
       final cancelButton = tester.widget<SecondaryButton>(cancelButtonFinder);
       expect(cancelButton.backgroundColor, AppColors.card);
-      expect(cancelButton.borderColor, AppColors.dangerDark);
-      expect(cancelButton.textColor, AppColors.dangerDark);
-      expect(cancelButton.boxShadow?.first.color, AppColors.dangerDark);
+      expect(cancelButton.borderColor, AppColors.danger);
+      expect(cancelButton.textColor, AppColors.danger);
+      expect(cancelButton.boxShadow?.first.color, AppColors.dangerShadow);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

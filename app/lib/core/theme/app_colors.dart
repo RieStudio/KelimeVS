@@ -14,6 +14,7 @@ abstract final class AppColors {
   static const Color rankBronze = Color(0xFFE0A96D);
   static const Color danger = Color(0xFFDC2626);
   static const Color dangerDark = Color(0xFF7F1D1D);
+  static const Color dangerShadow = Color(0xFF991B1B);
   static const Color dangerText = Color(0xFFB91C1C);
   static const Color dangerSoft = Color(0xFFFECACA);
   static const Color dangerSurface = Color(0xFFFEF2F2);

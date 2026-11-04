@@ -630,11 +630,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
                   child: SecondaryButton(
                     text: AppStrings.cancel,
                     backgroundColor: AppColors.card,
-                    textColor: AppColors.dangerDark,
-                    borderColor: AppColors.dangerDark,
+                    textColor: AppColors.danger,
+                    borderColor: AppColors.danger,
                     boxShadow: const [
                       BoxShadow(
-                        color: AppColors.dangerDark,
+                        color: AppColors.dangerShadow,
                         offset: Offset(0, 4),
                         blurRadius: 0,
                       ),
