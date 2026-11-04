@@ -439,6 +439,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   frame: profile.equippedFrame,
                   size: 88,
                   borderWidth: AppDimens.borderThick,
+                  includeFramePadding: true,
                 ),
               ),
               const SizedBox(height: AppDimens.space16),

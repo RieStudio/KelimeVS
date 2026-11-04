@@ -266,8 +266,9 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                 name: AppStrings.you,
                 frame: myFrame,
                 size: 54,
+                includeFramePadding: true,
               ),
-              const SizedBox(height: AppDimens.space6),
+              const SizedBox(height: AppDimens.matchDetailNameGap),
               Text(
                 AppStrings.you,
                 style: AppTextStyles.playerName.copyWith(fontSize: 14),
@@ -349,8 +350,9 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                         ? BotFrameResolver.resolve(oppDisplayName)
                         : widget.match.opponentFrame,
                     size: 54,
+                    includeFramePadding: true,
                   ),
-                  const SizedBox(height: AppDimens.space6),
+                  const SizedBox(height: AppDimens.matchDetailNameGap),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 80),
                     child: Text(

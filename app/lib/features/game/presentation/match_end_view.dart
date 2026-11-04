@@ -470,8 +470,9 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                         name: opponentDisplayName,
                         frame: oppFrame,
                         size: 36,
+                        includeFramePadding: true,
                       ),
-                      const SizedBox(width: AppDimens.space10),
+                      const SizedBox(width: AppDimens.matchEndOpponentNameGap),
 
                       // Rakip Takma Adı
                       Expanded(

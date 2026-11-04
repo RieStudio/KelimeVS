@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/match_tip_card.dart';
+import 'package:app/core/widgets/player_avatar.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
@@ -103,6 +104,14 @@ class FakeOnlineMatchSession extends OnlineMatchSession {
   }
 }
 
+class _TestProfileNotifier extends ProfileNotifier {
+  final ProfileState _state;
+  _TestProfileNotifier(this._state);
+
+  @override
+  ProfileState build() => _state;
+}
+
 Widget _buildTestApp({
   required FakeMatchController botController,
   required FakeOnlineMatchSession onlineSession,
@@ -110,6 +119,8 @@ Widget _buildTestApp({
   bool onlineEnabled = true,
   Duration? searchDuration,
   String? initialOpponentName,
+  ProfileState? profileState,
+  double textScale = 1.0,
 }) {
   return ProviderScope(
     overrides: [
@@ -119,8 +130,18 @@ Widget _buildTestApp({
         () => matchmakingClient,
       ),
       onlineMatchmakingEnabledProvider.overrideWithValue(onlineEnabled),
+      if (profileState != null)
+        profileProvider.overrideWith(() => _TestProfileNotifier(profileState)),
     ],
     child: MaterialApp(
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+          ),
+          child: child!,
+        );
+      },
       home: MatchmakingScreen(
         searchDuration: searchDuration,
         initialOpponentName: initialOpponentName,
@@ -541,6 +562,94 @@ void main() {
       expect(mmClient.cancelCalled, isTrue);
       expect(find.byType(MatchmakingScreen), findsNothing);
       expect(find.text('Open'), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '17. Sol avatar vine çerçeveli, sağ "?" veya klasik/görsel çerçeveliyken VS iki avatarın merkezine eşit uzaklıktadır ve 360 dp altında taşmaz',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // textScale 1.3 ve 360 dp genişlik altında test et
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          textScale: 1.3,
+          profileState: const ProfileState(
+            nickname: 'Arif',
+            equippedFrame: 'vine',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Taşma (overflow) hatası yok
+      expect(tester.takeException(), isNull);
+
+      // 1. Sol vine, sağ "?" yer tutucu
+      var vsCenter = tester.getCenter(find.text(AppStrings.vs));
+      var leftCenter = tester.getCenter(find.byType(PlayerAvatar).first);
+      var rightCenter = tester.getCenter(find.byType(PlayerAvatar).last);
+
+      var leftDist = (vsCenter.dx - leftCenter.dx).abs();
+      var rightDist = (rightCenter.dx - vsCenter.dx).abs();
+      expect((leftDist - rightDist).abs(), lessThanOrEqualTo(1.0));
+      expect((leftCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+      expect((rightCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+
+      // 2. Rakip bulundu: klasik çerçeveli
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'm1',
+          opponentName: 'M-1234',
+          opponentFrame: 'classic',
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      vsCenter = tester.getCenter(find.text(AppStrings.vs));
+      leftCenter = tester.getCenter(find.byType(PlayerAvatar).first);
+      rightCenter = tester.getCenter(find.byType(PlayerAvatar).last);
+
+      leftDist = (vsCenter.dx - leftCenter.dx).abs();
+      rightDist = (rightCenter.dx - vsCenter.dx).abs();
+      expect((leftDist - rightDist).abs(), lessThanOrEqualTo(1.0));
+      expect((leftCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+      expect((rightCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+
+      // 3. Rakip bulundu: görsel çerçeveli (ör. gear)
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'm2',
+          opponentName: 'M-5678',
+          opponentFrame: 'gear',
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      vsCenter = tester.getCenter(find.text(AppStrings.vs));
+      leftCenter = tester.getCenter(find.byType(PlayerAvatar).first);
+      rightCenter = tester.getCenter(find.byType(PlayerAvatar).last);
+
+      leftDist = (vsCenter.dx - leftCenter.dx).abs();
+      rightDist = (rightCenter.dx - vsCenter.dx).abs();
+      expect((leftDist - rightDist).abs(), lessThanOrEqualTo(1.0));
+      expect((leftCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+      expect((rightCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

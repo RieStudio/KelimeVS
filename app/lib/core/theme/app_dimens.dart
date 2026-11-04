@@ -73,6 +73,13 @@ abstract final class AppDimens {
   static const double avatarEnd = 104.0;
   static const double footerLogoHeight = 15.0;
 
+  // Avatar Görsel Çerçeve Düzen Boşlukları
+  static const double matchmakingVsGap = 0.0;
+  static const double matchmakingOpponentNameGap = 8.0;
+  static const double matchmakingBelowAvatarsGap = 20.0;
+  static const double matchDetailNameGap = 8.0;
+  static const double matchEndOpponentNameGap = 10.0;
+
   // Press offsets
   static const double primaryButtonPressOffset = 4.0;
   static const double secondaryButtonPressOffset = 3.0;

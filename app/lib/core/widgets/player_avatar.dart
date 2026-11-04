@@ -23,6 +23,7 @@ class PlayerAvatar extends StatelessWidget {
   final String? frame;
   final double size;
   final double? borderWidth;
+  final bool includeFramePadding;
 
   const PlayerAvatar({
     super.key,
@@ -31,6 +32,7 @@ class PlayerAvatar extends StatelessWidget {
     this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
+    this.includeFramePadding = false,
   });
 
   const PlayerAvatar.selfHome({
@@ -39,6 +41,7 @@ class PlayerAvatar extends StatelessWidget {
     this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
+    this.includeFramePadding = false,
   }) : variant = PlayerAvatarVariant.selfHome;
 
   const PlayerAvatar.selfMatch({
@@ -47,6 +50,7 @@ class PlayerAvatar extends StatelessWidget {
     this.frame = 'classic',
     this.size = AppDimens.avatarMatch,
     this.borderWidth,
+    this.includeFramePadding = false,
   }) : variant = PlayerAvatarVariant.selfMatch;
 
   const PlayerAvatar.opponent({
@@ -55,12 +59,14 @@ class PlayerAvatar extends StatelessWidget {
     this.frame = 'classic',
     this.size = AppDimens.avatarHome,
     this.borderWidth,
+    this.includeFramePadding = false,
   }) : variant = PlayerAvatarVariant.opponent;
 
   const PlayerAvatar.unknown({
     super.key,
     this.size = AppDimens.avatarSearch,
     this.borderWidth,
+    this.includeFramePadding = false,
   })  : variant = PlayerAvatarVariant.unknown,
         name = null,
         frame = null;
@@ -151,9 +157,12 @@ class PlayerAvatar extends StatelessWidget {
       final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
       final cacheW = (dims.frameSize * dpr).round().clamp(1, 1024);
 
+      final layoutWidth = includeFramePadding ? dims.frameSize : size;
+      final layoutHeight = includeFramePadding ? dims.frameSize : size;
+
       avatarContent = SizedBox(
-        width: size,
-        height: size,
+        width: layoutWidth,
+        height: layoutHeight,
         child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
@@ -180,8 +189,8 @@ class PlayerAvatar extends StatelessWidget {
 
             // 2. Dışa Büyüyen Görsel Çerçeve Katmanı (Dokunmaları engellemez)
             Positioned(
-              left: (size - dims.frameSize) / 2,
-              top: (size - dims.frameSize) / 2,
+              left: (layoutWidth - dims.frameSize) / 2,
+              top: (layoutHeight - dims.frameSize) / 2,
               width: dims.frameSize,
               height: dims.frameSize,
               child: IgnorePointer(

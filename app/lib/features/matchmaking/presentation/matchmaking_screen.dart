@@ -13,6 +13,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
+import '../../../core/widgets/avatar_frame_registry.dart';
 import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/secondary_button.dart';
@@ -328,12 +329,18 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       child: Scaffold(
         backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.screenPaddingHorizontal,
-            vertical: AppDimens.space12,
-          ),
-          child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.screenPaddingHorizontal,
+                      vertical: AppDimens.space12,
+                    ),
+                    child: Column(
             children: [
               // 1. Üst Kapat Butonu
               Row(
@@ -350,67 +357,116 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
               const Spacer(flex: 2),
 
               // 2. Ortadaki Avatarlar (Sen VS Rakip)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Kendi Avatarım (92 px, primary zemin, beyaz harf)
-                  PlayerAvatar.selfMatch(
-                    name:
-                        (ref.watch(profileProvider).nickname != null &&
-                            ref
-                                .watch(profileProvider)
-                                .nickname!
-                                .trim()
-                                .isNotEmpty)
-                        ? ref.watch(profileProvider).nickname!.trim()
-                        : 'S',
-                    frame: ref.watch(profileProvider).equippedFrame,
-                    size: AppDimens.avatarSearch,
-                  ),
+              // Her iki taraf için sabit genişlikte yuva (en geniş çerçeve olan Sarmaşık / vine boyutu)
+              () {
+                final avatarSlotSize = VisualFrameRegistry.maxFrameSizeFor(
+                  AppDimens.avatarSearch,
+                );
 
-                  // VS Metni
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space16,
-                    ),
-                    child: Text(
-                      AppStrings.vs,
-                      style: const TextStyle(
-                        fontFamily: AppTextStyles.fontFredoka,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ),
-
-                  // Rakip Avatarı
-                  if (!_isOpponentFound)
-                    const PlayerAvatar.unknown(size: AppDimens.avatarSearch)
-                  else
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PlayerAvatar.opponent(
-                          name: _opponentName,
-                          frame: _opponentFrame,
-                          size: AppDimens.avatarSearch,
+                return FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sol Avatar Yuvası (Kendi avatarım)
+                      SizedBox(
+                        width: avatarSlotSize,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: avatarSlotSize,
+                              height: avatarSlotSize,
+                              child: Center(
+                                child: PlayerAvatar.selfMatch(
+                                  name:
+                                      (ref.watch(profileProvider).nickname != null &&
+                                          ref
+                                              .watch(profileProvider)
+                                              .nickname!
+                                              .trim()
+                                              .isNotEmpty)
+                                      ? ref.watch(profileProvider).nickname!.trim()
+                                      : 'S',
+                                  frame: ref.watch(profileProvider).equippedFrame,
+                                  size: AppDimens.avatarSearch,
+                                  includeFramePadding: true,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: AppDimens.space6),
-                        Text(
-                          _opponentName,
-                          style: AppTextStyles.playerName.copyWith(
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w800,
+                      ),
+
+                      // VS Metni Yuvası (Dikeyde avatar merkezleriyle tam hizalı)
+                      SizedBox(
+                        height: avatarSlotSize,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppDimens.matchmakingVsGap,
+                            ),
+                            child: Text(
+                              AppStrings.vs,
+                              style: const TextStyle(
+                                fontFamily: AppTextStyles.fontFredoka,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                ],
-              ),
+                      ),
 
-              const SizedBox(height: AppDimens.space24),
+                      // Sağ Avatar Yuvası (Rakip avatarı ve adı)
+                      SizedBox(
+                        width: avatarSlotSize,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: avatarSlotSize,
+                              height: avatarSlotSize,
+                              child: Center(
+                                child: !_isOpponentFound
+                                    ? const PlayerAvatar.unknown(
+                                        size: AppDimens.avatarSearch,
+                                        includeFramePadding: true,
+                                      )
+                                    : PlayerAvatar.opponent(
+                                        name: _opponentName,
+                                        frame: _opponentFrame,
+                                        size: AppDimens.avatarSearch,
+                                        includeFramePadding: true,
+                                      ),
+                              ),
+                            ),
+                            if (_isOpponentFound) ...[
+                              const SizedBox(height: AppDimens.matchmakingOpponentNameGap),
+                              Text(
+                                _opponentName,
+                                style: AppTextStyles.playerName.copyWith(
+                                  color: AppColors.ink,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }(),
+
+              const SizedBox(height: AppDimens.matchmakingBelowAvatarsGap),
 
               // 3. Başlık ("Rakip aranıyor…")
               Semantics(
@@ -476,6 +532,11 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen> {
       ),
     ),
   );
+},
+),
+),
+),
+);
 }
 
   Widget _buildDot(int index, Color color, bool disableAnimations) {

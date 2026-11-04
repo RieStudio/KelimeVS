@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/core/widgets/avatar_frame_decorator.dart';
 import 'package:app/core/widgets/avatar_frame_registry.dart';
 import 'package:app/core/widgets/player_avatar.dart';
@@ -479,5 +480,255 @@ void main() {
       // Red guide border should now be visible on all avatar sizes
       expect(redBorderFinder(), findsWidgets);
     });
+  });
+
+  group('Visual Frame Layout Padding & Compact Mode Tests', () {
+    test('VisualFrameRegistry constants and getFrameOverflow are correct', () {
+      expect(VisualFrameRegistry.maxFrameOverflowRatio, closeTo(0.2375, 0.001));
+      expect(VisualFrameRegistry.maxFrameScaleMultiplier, closeTo(1.475, 0.001));
+
+      // Sarmaşık (vine) için taşma miktarı: (92 / 0.678 - 92) / 2 ~= 21.846
+      final vineOverflow = VisualFrameRegistry.getFrameOverflow(
+        avatarSize: 92.0,
+        frameId: 'vine',
+      );
+      expect(vineOverflow, closeTo(21.846, 0.01));
+
+      // Klasik çerçeve için taşma 0.0 olmalı
+      final classicOverflow = VisualFrameRegistry.getFrameOverflow(
+        avatarSize: 92.0,
+        frameId: 'classic',
+      );
+      expect(classicOverflow, equals(0.0));
+
+      final nullOverflow = VisualFrameRegistry.getFrameOverflow(
+        avatarSize: 92.0,
+        frameId: null,
+      );
+      expect(nullOverflow, equals(0.0));
+    });
+
+    testWidgets('Görsel çerçeveli avatarın düzen boyutu includeFramePadding true iken büyür, klasikte değişmez', (tester) async {
+      const baseSize = 92.0;
+
+      // 1. Sarmaşık (vine) çerçeve + includeFramePadding: true
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PlayerAvatar.selfMatch(
+                name: 'Arif',
+                frame: 'vine',
+                size: baseSize,
+                includeFramePadding: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final vineAvatarSize = tester.getSize(find.byType(PlayerAvatar));
+      final expectedFrameSize = baseSize / VisualFrameRegistry.getDefinition('vine')!.innerRatio;
+      expect(vineAvatarSize.width, closeTo(expectedFrameSize, 0.01));
+      expect(vineAvatarSize.height, closeTo(expectedFrameSize, 0.01));
+      expect(vineAvatarSize.width, greaterThan(baseSize));
+
+      // 2. Klasik çerçeve + includeFramePadding: true -> Boyut ASLA değişmez (92x92)
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PlayerAvatar.selfMatch(
+                name: 'Arif',
+                frame: 'classic',
+                size: baseSize,
+                includeFramePadding: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final classicAvatarSize = tester.getSize(find.byType(PlayerAvatar));
+      expect(classicAvatarSize.width, equals(baseSize));
+      expect(classicAvatarSize.height, equals(baseSize));
+    });
+
+    testWidgets('Kompakt modda (includeFramePadding: false) görsel çerçeve takılı olsa dahi düzen boyutu baseSize kalır', (tester) async {
+      const baseSize = 92.0;
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: PlayerAvatar.selfMatch(
+                name: 'Arif',
+                frame: 'vine',
+                size: baseSize,
+                includeFramePadding: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final compactAvatarSize = tester.getSize(find.byType(PlayerAvatar));
+      expect(compactAvatarSize.width, equals(baseSize));
+      expect(compactAvatarSize.height, equals(baseSize));
+    });
+
+    testWidgets('360 dp genişlik ve textScale 1.3 altında eşleşme ve maç detayı ekranlarında taşma (overflow) hatası oluşmaz', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      // Eşleşme ekranı düzeni (Sabit yuva: Sen [vine 92] + VS + Rakip [vine 92])
+      final avatarSlotSize = VisualFrameRegistry.maxFrameSizeFor(92.0);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 640),
+              textScaler: TextScaler.linear(1.3),
+            ),
+            child: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: avatarSlotSize,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: avatarSlotSize,
+                                height: avatarSlotSize,
+                                child: const Center(
+                                  child: PlayerAvatar.selfMatch(
+                                    name: 'Sen',
+                                    frame: 'vine',
+                                    size: 92,
+                                    includeFramePadding: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: avatarSlotSize,
+                          child: const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppDimens.matchmakingVsGap,
+                              ),
+                              child: Text('VS'),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: avatarSlotSize,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: avatarSlotSize,
+                                height: avatarSlotSize,
+                                child: const Center(
+                                  child: PlayerAvatar.opponent(
+                                    name: 'M-9633',
+                                    frame: 'vine',
+                                    size: 92,
+                                    includeFramePadding: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppDimens.matchmakingOpponentNameGap),
+                              const Text('M-9633'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+        // Hiçbir RenderFlex taşma (overflow) istisnası fırlatılmamış olmalı
+        expect(tester.takeException(), isNull);
+
+        // Maç detayı kart düzeni (Sol: Sen [vine 54] + "Sen", Orta: Skor 2-1, Sağ: Rakip [vine 54] + "M-9633")
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(360, 640),
+                textScaler: TextScaler.linear(1.3),
+              ),
+              child: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          PlayerAvatar.selfMatch(
+                            name: 'Sen',
+                            frame: 'vine',
+                            size: 54,
+                            includeFramePadding: true,
+                          ),
+                          SizedBox(height: AppDimens.matchDetailNameGap),
+                          Text('Sen'),
+                        ],
+                      ),
+                      const Expanded(
+                        child: Center(child: Text('2 – 1')),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          PlayerAvatar.opponent(
+                            name: 'M-9633',
+                            frame: 'vine',
+                            size: 54,
+                            includeFramePadding: true,
+                          ),
+                          SizedBox(height: AppDimens.matchDetailNameGap),
+                          Text('M-9633'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

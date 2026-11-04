@@ -23,6 +23,12 @@ abstract final class VisualFrameRegistry {
   /// Küçük alan azami ölçek çarpanı: 1.3 * D
   static const double smallAreaMaxScaleMultiplier = 1.3;
 
+  /// Görsel çerçeveler için azami taşma oranı (en geniş çerçeve olan Sarmaşık/vine baz alınarak: ~%23.75 her kenar)
+  static const double maxFrameOverflowRatio = 0.2375;
+
+  /// Görsel çerçeveler için azami ölçek çarpanı (1 / 0.678 ~= 1.475)
+  static const double maxFrameScaleMultiplier = 1.475;
+
   /// Senkron kayıt tablosu: Katalog Kimliği -> Çerçeve Tanımı
   static const Map<String, VisualFrameDefinition> definitions = {
     'vine': VisualFrameDefinition(
@@ -90,6 +96,21 @@ abstract final class VisualFrameRegistry {
     return getDefinition(frameId) != null;
   }
 
+  /// Verilen avatar boyutu ve çerçeve kimliği için tek taraflı taşma (overflow) miktarını döner.
+  /// Çerçevesiz (classic/null) ise 0.0 döner.
+  static double getFrameOverflow({
+    required double avatarSize,
+    required String? frameId,
+  }) {
+    final def = getDefinition(frameId);
+    if (def == null) return 0.0;
+    final dims = calculateDimensions(
+      baseAvatarSize: avatarSize,
+      innerRatio: def.innerRatio,
+    );
+    return (dims.frameSize - avatarSize) / 2.0;
+  }
+
   /// Verilen avatar boyutu (baseAvatarSize = D) ve innerRatio için
   /// efektif frameSize ve avatarSize değerlerini hesaplar.
   ///
@@ -147,6 +168,16 @@ abstract final class VisualFrameRegistry {
       baseAvatarSize: avatarSize,
       innerRatio: def.innerRatio,
     );
+  }
+
+  /// Verilen avatar boyutu için en geniş görsel çerçevenin (Sarmaşık/vine) düzen boyutunu döner.
+  static double maxFrameSizeFor(double avatarSize) {
+    final vineDef = definitions['vine'];
+    if (vineDef == null) return avatarSize;
+    return calculateDimensions(
+      baseAvatarSize: avatarSize,
+      innerRatio: vineDef.innerRatio,
+    ).frameSize;
   }
 
   /// İlk kareden sonra arka planda görsel çerçeveleri önbelleğe alır.
