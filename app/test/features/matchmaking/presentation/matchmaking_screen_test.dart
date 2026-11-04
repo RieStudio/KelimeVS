@@ -6,6 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/widgets/app_icon_button.dart';
+import 'package:app/core/widgets/avatar_frame_registry.dart';
 import 'package:app/core/widgets/match_tip_card.dart';
 import 'package:app/core/widgets/player_avatar.dart';
 import 'package:app/core/widgets/secondary_button.dart';
@@ -176,19 +180,25 @@ void main() {
       expect(find.text(AppStrings.vs), findsOneWidget);
       expect(find.text(AppStrings.questionMark), findsOneWidget);
 
-      // Başlık ve alt yazı
+      // Başlık ve alt yazı ("Birazdan başlıyoruz" kaldırılmıştır)
       expect(find.text(AppStrings.searchingOpponent), findsOneWidget);
-      expect(find.text(AppStrings.startingSoon), findsOneWidget);
+      expect(find.text('Birazdan başlıyoruz'), findsNothing);
 
       // İpucu kartı
       expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
       expect(find.byType(MatchTipCard), findsOneWidget);
 
-      // Vazgeç butonu
-      expect(
-        find.widgetWithText(SecondaryButton, AppStrings.cancel),
-        findsOneWidget,
+      // Vazgeç butonu (kırmızı stil tokenleri: kart dolgu, dangerDark kenarlık ve yazı)
+      final cancelButtonFinder = find.widgetWithText(
+        SecondaryButton,
+        AppStrings.cancel,
       );
+      expect(cancelButtonFinder, findsOneWidget);
+      final cancelButton = tester.widget<SecondaryButton>(cancelButtonFinder);
+      expect(cancelButton.backgroundColor, AppColors.card);
+      expect(cancelButton.borderColor, AppColors.dangerDark);
+      expect(cancelButton.textColor, AppColors.dangerDark);
+      expect(cancelButton.boxShadow?.first.color, AppColors.dangerDark);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
@@ -243,12 +253,13 @@ void main() {
       expect(find.text('Go'), findsOneWidget);
       expect(botController.startMatchCalled, isFalse);
       expect(onlineSession.startOnlineMatchCalled, isFalse);
+      await tester.pump(const Duration(seconds: 4));
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
 
   testWidgets(
-    '3. MatchmakingMatched gelince rakip avatarı/adı görünür, 800 ms sonra OnlineMatchSession ile maça geçer',
+    '3. MatchmakingMatched gelince min arama süresi (1500 ms) tamamlanınca rakip görünür, 2000 ms tanıtımdan sonra OnlineMatchSession ile maça geçer',
     (tester) async {
       final botController = FakeMatchController();
       final onlineSession = FakeOnlineMatchSession();
@@ -267,7 +278,8 @@ void main() {
       expect(find.text(AppStrings.questionMark), findsOneWidget);
       expect(find.text('Gerçek Rakip'), findsNothing);
 
-      // Sunucu eşleşme buldu
+      // Sunucu 100 ms'de eşleşme buldu
+      await tester.pump(const Duration(milliseconds: 100));
       mmClient.emit(
         const MatchmakingMatched(
           matchId: 'match_online_42',
@@ -276,12 +288,20 @@ void main() {
       );
       await tester.pump();
 
-      // Rakip adı ve avatarı ekranda
+      // Henüz 1.5 sn dolmadığı için hala aranıyor ve "?" görünür
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
+      expect(find.text('Gerçek Rakip'), findsNothing);
+      expect(find.text(AppStrings.searchingOpponent), findsOneWidget);
+
+      // 1.5 sn arama süresi tamamlanınca rakip adı, avatarı ve "Rakip bulundu!" görünür
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Gerçek Rakip'), findsOneWidget);
       expect(find.text(AppStrings.questionMark), findsNothing);
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
-      // 800 ms geçiş süresini ilerlet -> MatchScreen açılır ve OnlineMatchSession başlatılır
-      await tester.pump(const Duration(milliseconds: 850));
+      // 2000 ms tanıtım süresini ilerlet -> MatchScreen açılır ve OnlineMatchSession başlatılır
+      await tester.pump(const Duration(milliseconds: 2050));
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(MatchScreen), findsOneWidget);
@@ -302,7 +322,7 @@ void main() {
   );
 
   testWidgets(
-    '4. MatchmakingNoOpponent / Unavailable / Failed gelince hata göstermeden sessizce botlu maça düşer',
+    '4. MatchmakingNoOpponent / Unavailable / Failed gelince hata göstermeden sessizce botlu maça düşer ve aynı arama/tanıtım süresine uyar',
     (tester) async {
       for (final fallbackEvent in <MatchmakingEvent>[
         const MatchmakingNoOpponent(),
@@ -334,13 +354,20 @@ void main() {
         mmClient.emit(fallbackEvent);
         await tester.pump();
 
-        // Rakip adı görünür (bot ibaresi yok)
+        // Minimum arama süresi (1500 ms) tamamlanana kadar bot adı henüz açılmaz
+        expect(find.text(AppStrings.questionMark), findsOneWidget);
+        expect(find.text('Deniz'), findsNothing);
+
+        await tester.pump(const Duration(milliseconds: 1550));
+
+        // Rakip adı görünür (bot ibaresi yok) ve başlık "Rakip bulundu!" olur
         expect(find.text('Deniz'), findsOneWidget);
         expect(find.textContaining('Bot'), findsNothing);
         expect(find.text(AppStrings.questionMark), findsNothing);
+        expect(find.text(AppStrings.opponentFound), findsOneWidget);
 
-        // 800 ms sonra yerel bot MatchController ile MatchScreen açılır
-        await tester.pump(const Duration(milliseconds: 850));
+        // 2000 ms tanıtım sonrası yerel bot MatchController ile MatchScreen açılır
+        await tester.pump(const Duration(milliseconds: 2050));
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(MatchScreen), findsOneWidget);
@@ -361,7 +388,7 @@ void main() {
   );
 
   testWidgets(
-    '5. ONLINE_MATCHMAKING=false (devre kesici) iken sunucuya hiç gitmeden doğrudan botlu maça geçer',
+    '5. ONLINE_MATCHMAKING=false (devre kesici) iken sunucuya hiç gitmeden min arama ve tanıtım süresiyle doğrudan botlu maça geçer',
     (tester) async {
       final botController = FakeMatchController();
       final onlineSession = FakeOnlineMatchSession();
@@ -382,10 +409,18 @@ void main() {
       // Sunucu istemcisi hiç başlatılmamalı
       expect(mmClient.startCalled, isFalse);
 
+      // searchDuration (200 ms) geçse bile min arama süresi (1500 ms) dolmadan rakip gösterilmez
       await tester.pump(const Duration(milliseconds: 250));
-      expect(find.text('Zeynep'), findsOneWidget);
+      expect(find.text('Zeynep'), findsNothing);
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
 
-      await tester.pump(const Duration(milliseconds: 850));
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Zeynep'), findsOneWidget);
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+
+      // 2000 ms tanıtım sonrası maça geçer
+      await tester.pump(const Duration(milliseconds: 2050));
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(MatchScreen), findsOneWidget);
@@ -650,6 +685,415 @@ void main() {
       expect((leftDist - rightDist).abs(), lessThanOrEqualTo(1.0));
       expect((leftCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
       expect((rightCenter.dy - vsCenter.dy).abs(), lessThanOrEqualTo(1.0));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '18. Tanıtım anında Vazgeç butonu ve üst kapat butonu gizlenir, sistem geri tuşu engellenir',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            onlineMatchmakingEnabledProvider.overrideWithValue(true),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const MatchmakingScreen(initialOpponentName: 'Deniz'),
+                      ),
+                    );
+                  },
+                  child: const Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+      // Arama aşamasında: Vazgeç butonu ve kapat butonu görünür, aktiftir
+      expect(find.widgetWithText(SecondaryButton, AppStrings.cancel), findsOneWidget);
+      expect(find.byType(AppIconButton), findsOneWidget);
+
+      // Rakip bulundu
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_test_reveal',
+          opponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // Min arama süresini ilerlet ve tanıtımı başlat
+      await tester.pump(const Duration(milliseconds: 1500));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+
+      // Tanıtım aşamasında: Vazgeç butonu ve üst kapat butonu GİZLENMİŞTİR
+      expect(find.widgetWithText(SecondaryButton, AppStrings.cancel), findsNothing);
+      expect(find.byType(AppIconButton), findsNothing);
+
+      // Sistem geri hareketini (PopScope) tetikle: canPop false ve _isOpponentFound true olduğu için ekran kapanmamalıdır
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(mmClient.cancelCalled, isFalse);
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+      // 2 sn tanıtım tamamlanınca maça geçer
+      await tester.pump(const Duration(milliseconds: 2000));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(MatchScreen), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '19. Rakip bulundu durumunda MatchTipCard yumuşak solma ile kaldırılır (findsNothing) ve "Birazdan başlıyoruz" hiçbir durumda görünmez',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // 1. Arama Durumu: İpucu kartı var, "Birazdan başlıyoruz" YOK
+      expect(find.byType(MatchTipCard), findsOneWidget);
+      expect(find.text('Birazdan başlıyoruz'), findsNothing);
+
+      // Rakip bulundu
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_19',
+          opponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // Min arama süresini tamamla ve tanıtımı başlat
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+
+      // 2. Bulundu Durumu: MatchTipCard kaldırılmıştır (findsNothing), "Birazdan başlıyoruz" yine YOK
+      expect(find.byType(MatchTipCard), findsNothing);
+      expect(find.text('Birazdan başlıyoruz'), findsNothing);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '20. Rakip bulundu durumunda "Sen" ve rakip adı ortak taban çizgisinde aynı dikey hizadadır, klasik çerçevede boşluk hesaplanan sabite uygundur',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          profileState: const ProfileState(
+            nickname: 'Ahmet',
+            equippedFrame: 'classic',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_20_classic',
+          opponentName: 'M-1234',
+          opponentFrame: 'classic',
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(AppStrings.you), findsOneWidget);
+      expect(find.text('M-1234'), findsOneWidget);
+
+      final classicSenTop = tester.getTopLeft(find.text(AppStrings.you));
+      final classicOppTop = tester.getTopLeft(find.text('M-1234'));
+
+      // İki isim ortak taban çizgisinde tam aynı dikey hizadadır
+      expect((classicSenTop.dy - classicOppTop.dy).abs(), lessThanOrEqualTo(0.5));
+
+      // Klasik çerçevede avatar alt kenarı ile isim arası mesafe: tam AppDimens.matchmakingNameGap (8 dp)
+      final leftAvatarCenter = tester.getCenter(find.byType(PlayerAvatar).first);
+      final avatarCircleBottom = leftAvatarCenter.dy + (AppDimens.avatarSearch / 2.0);
+      final classicGap = classicSenTop.dy - avatarCircleBottom;
+      expect((classicGap - AppDimens.matchmakingNameGap).abs(), lessThanOrEqualTo(0.5));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '21. Görsel çerçevede (vine) ad ile avatar arası boşluk klasik çerçeveye göre daha geniştir',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          profileState: const ProfileState(
+            nickname: 'Ahmet',
+            equippedFrame: 'vine',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_21_vine',
+          opponentName: 'M-5678',
+          opponentFrame: 'classic',
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(AppStrings.you), findsOneWidget);
+      expect(find.text('M-5678'), findsOneWidget);
+
+      final vineSenTop = tester.getTopLeft(find.text(AppStrings.you));
+      final vineOppTop = tester.getTopLeft(find.text('M-5678'));
+
+      // İki isim ortak taban çizgisinde tam aynı dikey hizadadır
+      expect((vineSenTop.dy - vineOppTop.dy).abs(), lessThanOrEqualTo(0.5));
+
+      // Sarmaşık çerçevede boşluk: çerçevenin taşma payı + AppDimens.matchmakingNameGap
+      final vineAvatarCenter = tester.getCenter(find.byType(PlayerAvatar).first);
+      final vineCircleBottom = vineAvatarCenter.dy + (AppDimens.avatarSearch / 2.0);
+      final vineGap = vineSenTop.dy - vineCircleBottom;
+      final vineOverflow = VisualFrameRegistry.getFrameOverflow(
+        avatarSize: AppDimens.avatarSearch,
+        frameId: 'vine',
+      );
+      final expectedVineGap = vineOverflow + AppDimens.matchmakingNameGap;
+
+      expect((vineGap - expectedVineGap).abs(), lessThanOrEqualTo(0.5));
+      expect(vineGap, greaterThan(AppDimens.matchmakingNameGap));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '22. Avatar satırının dikey konumu (dy) arama ve bulundu durumlarında aynıdır (tolerans <= 1 dp)',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // Arama aşamasındaki avatar ve başlık dikey konumu
+      final searchAvatarTop = tester.getTopLeft(find.byType(PlayerAvatar).first).dy;
+      final searchTitleTop = tester.getTopLeft(find.text(AppStrings.searchingOpponent)).dy;
+
+      // Rakip bulundu
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_22',
+          opponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+
+      // Bulundu aşamasındaki avatar ve başlık dikey konumu
+      final foundAvatarTop = tester.getTopLeft(find.byType(PlayerAvatar).first).dy;
+      final foundTitleTop = tester.getTopLeft(find.text(AppStrings.opponentFound)).dy;
+
+      // Tolerans <= 1 dp (zıplama yok)
+      expect((searchAvatarTop - foundAvatarTop).abs(), lessThanOrEqualTo(1.0));
+      expect((searchTitleTop - foundTitleTop).abs(), lessThanOrEqualTo(1.0));
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '23. Çevrim içi eşleşmede matched gelince arama süresi bitmeden vazgeç kilitlenir ve PopScope engellenir',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            onlineMatchmakingEnabledProvider.overrideWithValue(true),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const MatchmakingScreen(initialOpponentName: 'Deniz'),
+                    ),
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Open'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Arama aşamasında: buton aktiftir
+      var cancelButton = tester.widget<SecondaryButton>(
+        find.widgetWithText(SecondaryButton, AppStrings.cancel),
+      );
+      expect(cancelButton.onPressed, isNotNull);
+
+      // Sunucudan matched gelir (minimum 1500 ms arama süresi bitmedi!)
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_lock_test',
+          opponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // Henüz arama aşamasında ("?" görünüyor, henüz tanıtım başlamadı)
+      expect(find.text(AppStrings.questionMark), findsOneWidget);
+
+      // BUTON KİLİTLENMİŞTİR: onPressed null, görsel olarak soluk (opacity 0.5)
+      cancelButton = tester.widget<SecondaryButton>(
+        find.widgetWithText(SecondaryButton, AppStrings.cancel),
+      );
+      expect(cancelButton.onPressed, isNull);
+
+      final animatedOpacity = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.widgetWithText(SecondaryButton, AppStrings.cancel),
+          matching: find.byType(AnimatedOpacity),
+        ).first,
+      );
+      expect(animatedOpacity.opacity, 0.5);
+
+      // Butona dokunulsa bile iptal tetiklenmez
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel), warnIfMissed: false);
+      await tester.pump();
+      expect(mmClient.cancelCalled, isFalse);
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+
+      // PopScope (sistem geri) tetiklense bile ekran kapanmaz
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.byType(MatchmakingScreen), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '24. Bot maçında arama bitene kadar vazgeç kilitlenmez ve basılınca ekran başarıyla kapanır',
+    (tester) async {
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            matchControllerProvider.overrideWith(() => botController),
+            onlineMatchSessionProvider.overrideWith(() => onlineSession),
+            matchmakingClientFactoryProvider.overrideWithValue(() => mmClient),
+            onlineMatchmakingEnabledProvider.overrideWithValue(false),
+          ],
+          child: MaterialApp(
+            home: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MatchmakingScreen(
+                        searchDuration: Duration(milliseconds: 3000),
+                        initialOpponentName: 'Deniz',
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('OpenBot'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('OpenBot'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Bot arama aşamasında: buton kilitli DEĞİLDİR, aktiftir
+      final botCancelButton = tester.widget<SecondaryButton>(
+        find.widgetWithText(SecondaryButton, AppStrings.cancel),
+      );
+      expect(botCancelButton.onPressed, isNotNull);
+
+      // Bot maçında vazgeç basılınca ekran başarıyla kapanır
+      await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.cancel));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(MatchmakingScreen), findsNothing);
+      expect(find.text('OpenBot'), findsOneWidget);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

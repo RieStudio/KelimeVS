@@ -52,7 +52,7 @@ abstract final class AppStrings {
 
   // Eşleşme
   static const String searchingOpponent = 'Rakip aranıyor…';
-  static const String startingSoon = 'Birazdan başlıyoruz';
+  static const String opponentFound = 'Rakip bulundu!';
   static const String vs = 'VS';
   static const String searchTipTitle = 'İPUCU';
   static const String searchTipContent =

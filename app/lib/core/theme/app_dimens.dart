@@ -76,9 +76,19 @@ abstract final class AppDimens {
   // Avatar Görsel Çerçeve Düzen Boşlukları
   static const double matchmakingVsGap = 0.0;
   static const double matchmakingOpponentNameGap = 8.0;
+  static const double matchmakingNameGap = 8.0;
+  static const double matchmakingAvatarSlotHeight = 172.0;
   static const double matchmakingBelowAvatarsGap = 20.0;
   static const double matchDetailNameGap = 8.0;
   static const double matchEndOpponentNameGap = 10.0;
+
+  // Eşleşme Ekranı Zamanlamaları (ms)
+  static const int matchmakingMinSearchDurationMs = 1500;
+  static const int matchmakingRevealDurationMs = 2000;
+  static const Duration matchmakingMinSearchDuration =
+      Duration(milliseconds: matchmakingMinSearchDurationMs);
+  static const Duration matchmakingRevealDuration =
+      Duration(milliseconds: matchmakingRevealDurationMs);
 
   // Press offsets
   static const double primaryButtonPressOffset = 4.0;
