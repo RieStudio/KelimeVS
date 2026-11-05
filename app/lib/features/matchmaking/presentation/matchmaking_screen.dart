@@ -531,8 +531,10 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                     (availableMidGap - searchGroupHeight) / 2.0,
                   );
 
-                  final double currentTopGap =
-                      lerpDouble(searchTopGap, AppDimens.space8, anim)!;
+                  final double foundAvatarsTopOffset =
+                      AppDimens.space8 + titleHeight + AppDimens.space12;
+                  final double currentAvatarsTopOffset =
+                      lerpDouble(searchTopGap, foundAvatarsTopOffset, anim)!;
 
                   const double foundBottomAreaContentHeight =
                       14.0 + (AppDimens.space16 * 2.0);
@@ -583,59 +585,95 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                                 ),
                               ),
 
-                              // Dinamik yukarı boşluk: Aramada dikey ortalar, eşleşince space8'e kaysın
-                              SizedBox(height: currentTopGap),
+                              // Dinamik yukarı alan: Aramada dikey ortalama boşluğu, bulundu durumunda ise üstte "Rakip bulundu!" başlığı + boşluk
+                              SizedBox(
+                                height: currentAvatarsTopOffset,
+                                child: Stack(
+                                  alignment: Alignment.topCenter,
+                                  children: [
+                                    if (_isOpponentFound)
+                                      Positioned(
+                                        top: AppDimens.space8,
+                                        left: 0,
+                                        right: 0,
+                                        child: Opacity(
+                                          opacity: ((anim - 0.2) / 0.8)
+                                              .clamp(0.0, 1.0),
+                                          child: Semantics(
+                                            header: true,
+                                            child: const Text(
+                                              AppStrings.opponentFound,
+                                              style: TextStyle(
+                                                fontFamily:
+                                                    AppTextStyles.fontFredoka,
+                                                fontSize: 30,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.ink,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
 
-                              // 2. Ortadaki Avatarlar + Başlık + Noktalar Tek Grup
+                              // 2. Ortadaki Avatarlar + Arama Başlığı ve Noktaları
                               RepaintBoundary(
                                 key: const ValueKey('matchmaking_group'),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    () {
-                                      final avatarSize = AppDimens.avatarSearch;
-                                      final avatarSlotSize =
-                                          VisualFrameRegistry.maxFrameSizeFor(
-                                        avatarSize,
-                                      );
-                                      final avatarBottomInSlot =
-                                          (avatarSlotSize + avatarSize) / 2.0;
+                                    RepaintBoundary(
+                                      key: const ValueKey(
+                                          'matchmaking_avatars_group'),
+                                      child: () {
+                                        final avatarSize =
+                                            AppDimens.avatarSearch;
+                                        final avatarSlotSize =
+                                            VisualFrameRegistry.maxFrameSizeFor(
+                                          avatarSize,
+                                        );
+                                        final avatarBottomInSlot =
+                                            (avatarSlotSize + avatarSize) / 2.0;
 
-                                      final selfFrame = ref
-                                          .watch(profileProvider)
-                                          .equippedFrame;
-                                      final selfOverflow =
-                                          VisualFrameRegistry.getFrameOverflow(
-                                        avatarSize: avatarSize,
-                                        frameId: selfFrame,
-                                      );
-                                      final oppOverflow = _isOpponentFound
-                                          ? VisualFrameRegistry
-                                              .getFrameOverflow(
-                                              avatarSize: avatarSize,
-                                              frameId: _opponentFrame,
-                                            )
-                                          : 0.0;
-                                      final maxOverflow =
-                                          math.max(selfOverflow, oppOverflow);
-                                      final nameTopOffset =
-                                          avatarBottomInSlot +
-                                              maxOverflow +
-                                              AppDimens.matchmakingNameGap;
+                                        final selfFrame = ref
+                                            .watch(profileProvider)
+                                            .equippedFrame;
+                                        final selfOverflow =
+                                            VisualFrameRegistry
+                                                .getFrameOverflow(
+                                          avatarSize: avatarSize,
+                                          frameId: selfFrame,
+                                        );
+                                        final oppOverflow = _isOpponentFound
+                                            ? VisualFrameRegistry
+                                                .getFrameOverflow(
+                                                avatarSize: avatarSize,
+                                                frameId: _opponentFrame,
+                                              )
+                                            : 0.0;
+                                        final maxOverflow =
+                                            math.max(selfOverflow, oppOverflow);
+                                        final nameTopOffset =
+                                            avatarBottomInSlot +
+                                                maxOverflow +
+                                                AppDimens.matchmakingNameGap;
 
-                                      final myInitial = (myNickname != null &&
-                                              myNickname.isNotEmpty)
-                                          ? myNickname
-                                          : 'S';
+                                        final myInitial = (myNickname != null &&
+                                                myNickname.isNotEmpty)
+                                            ? myNickname
+                                            : 'S';
 
-                                      return FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.center,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
+                                        return FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.center,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             // Sol Avatar Yuvası (Kendi avatarımız ve kullanıcı adımız / "Sen")
@@ -777,115 +815,160 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                                         ),
                                       );
                                     }(),
+                                  ),
 
-                                    const SizedBox(
-                                      height:
-                                          AppDimens.matchmakingBelowAvatarsGap,
-                                    ),
-
-                                    // 3. Başlık ("Rakip aranıyor…" -> "Rakip bulundu!")
-                                    Semantics(
-                                      header: true,
-                                      child: SizedBox(
-                                        height: titleHeight,
+                                    // Arama durumunda avatarların altında başlık ("Rakip aranıyor…") ve noktalar
+                                    if (!_isOpponentFound || anim < 1.0)
+                                      SizedBox(
+                                        height: lerpDouble(
+                                          AppDimens
+                                                  .matchmakingBelowAvatarsGap +
+                                              titleHeight +
+                                              AppDimens.space12 +
+                                              dotsHeight,
+                                          0.0,
+                                          anim,
+                                        )!,
                                         child: Stack(
-                                          alignment: Alignment.center,
+                                          alignment: Alignment.topCenter,
                                           children: [
-                                            if (!_isOpponentFound || anim < 0.5)
-                                              Opacity(
-                                                opacity: _isOpponentFound
-                                                    ? (1.0 - anim * 2.0)
-                                                        .clamp(0.0, 1.0)
-                                                    : 1.0,
-                                                child: const Text(
-                                                  AppStrings.searchingOpponent,
-                                                  style: TextStyle(
-                                                    fontFamily: AppTextStyles
-                                                        .fontFredoka,
-                                                    fontSize: 30,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: AppColors.ink,
+                                            if (!_isOpponentFound ||
+                                                anim < 0.5)
+                                              Positioned(
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                child: Opacity(
+                                                  opacity: _isOpponentFound
+                                                      ? (1.0 - anim * 2.0)
+                                                          .clamp(0.0, 1.0)
+                                                      : 1.0,
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      const SizedBox(
+                                                        height: AppDimens
+                                                            .matchmakingBelowAvatarsGap,
+                                                      ),
+                                                      Semantics(
+                                                        header: true,
+                                                        child: SizedBox(
+                                                          height: titleHeight,
+                                                          child: const Center(
+                                                            child: Text(
+                                                              AppStrings
+                                                                  .searchingOpponent,
+                                                              style: TextStyle(
+                                                                fontFamily:
+                                                                    AppTextStyles
+                                                                        .fontFredoka,
+                                                                fontSize: 30,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color: AppColors
+                                                                    .ink,
+                                                              ),
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .center,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          height: AppDimens
+                                                              .space12),
+                                                      Semantics(
+                                                        label: 'Yükleniyor',
+                                                        child: Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            _buildDot(
+                                                                0,
+                                                                AppColors
+                                                                    .primary,
+                                                                disableAnimations),
+                                                            const SizedBox(
+                                                                width: AppDimens
+                                                                    .space10),
+                                                            _buildDot(
+                                                                1,
+                                                                AppColors
+                                                                    .bright,
+                                                                disableAnimations),
+                                                            const SizedBox(
+                                                                width: AppDimens
+                                                                    .space10),
+                                                            _buildDot(
+                                                                2,
+                                                                AppColors.mint,
+                                                                disableAnimations),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ),
-                                            if (_isOpponentFound)
-                                              Opacity(
-                                                opacity: (anim * 2.0)
-                                                    .clamp(0.0, 1.0),
-                                                child: const Text(
-                                                  AppStrings.opponentFound,
-                                                  style: TextStyle(
-                                                    fontFamily: AppTextStyles
-                                                        .fontFredoka,
-                                                    fontSize: 30,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: AppColors.ink,
-                                                  ),
-                                                  textAlign: TextAlign.center,
                                                 ),
                                               ),
                                           ],
                                         ),
                                       ),
-                                    ),
-
-                                    // 4. Üç Noktalı Yükleme Göstergesi (Yalnızca arama aşamasında)
-                                    if (!_isOpponentFound || anim < 1.0) ...[
-                                      const SizedBox(height: AppDimens.space12),
-                                      Semantics(
-                                        label: 'Yükleniyor',
-                                        child: Opacity(
-                                          opacity: _isOpponentFound
-                                              ? (1.0 - anim * 2.0)
-                                                  .clamp(0.0, 1.0)
-                                              : 1.0,
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              _buildDot(0, AppColors.primary,
-                                                  disableAnimations),
-                                              const SizedBox(
-                                                  width: AppDimens.space10),
-                                              _buildDot(1, AppColors.bright,
-                                                  disableAnimations),
-                                              const SizedBox(
-                                                  width: AppDimens.space10),
-                                              _buildDot(2, AppColors.mint,
-                                                  disableAnimations),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-
-                                    // 5. İlk Soru (Kategori) Kartı: Ekran 2'de ortada belirme animasyonuyla görünür
-                                    if (_isOpponentFound && hasCategory) ...[
-                                      const SizedBox(height: AppDimens.space12),
-                                      Opacity(
-                                        opacity: ((anim - 0.2) / 0.8)
-                                            .clamp(0.0, 1.0),
-                                        child: Transform.scale(
-                                          scale: lerpDouble(
-                                            0.9,
-                                            1.0,
-                                            ((anim - 0.2) / 0.8)
-                                                .clamp(0.0, 1.0),
-                                          )!,
-                                          child: QuestionPreviewCard(
-                                            key: const ValueKey(
-                                                'first_question_card'),
-                                            categoryText: categoryText,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
 
-                              const Spacer(),
+                              // Bulundu durumunda avatarlar ile ilerleme çubuğu arasındaki alanın DİKEY ORTASINDA soru kartı + "İlk soru" etiketi
+                              if (_isOpponentFound &&
+                                  hasCategory &&
+                                  anim >= 0.4) ...[
+                                const Spacer(flex: 1),
+                                Opacity(
+                                  opacity: ((anim - 0.4) / 0.6).clamp(0.0, 1.0),
+                                  child: Transform.scale(
+                                    scale: lerpDouble(
+                                      0.92,
+                                      1.0,
+                                      Curves.easeOutBack.transform(
+                                        ((anim - 0.4) / 0.6).clamp(0.0, 1.0),
+                                      ),
+                                    )!,
+                                    child: Column(
+                                      key: const ValueKey(
+                                          'first_question_card_block'),
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          AppStrings.firstQuestionLabel,
+                                          style: TextStyle(
+                                            fontFamily:
+                                                AppTextStyles.fontNunito,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.ink
+                                                .withValues(alpha: 0.65),
+                                            letterSpacing: 0.3,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(
+                                            height: AppDimens.space6),
+                                        QuestionPreviewCard(
+                                          key: const ValueKey(
+                                              'first_question_card'),
+                                          categoryText: categoryText,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const Spacer(flex: 1),
+                              ] else ...[
+                                const Spacer(),
+                              ],
 
                               // 6. Alt Bölüm: Arama durumunda İpucu Kartı + Vazgeç Butonu;
                               // Bulundu durumunda ise 3.5 sn'de dolan metinsiz ince ilerleme çubuğu.

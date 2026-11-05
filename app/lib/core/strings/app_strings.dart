@@ -54,6 +54,8 @@ abstract final class AppStrings {
   static const String searchingOpponent = 'Rakip aranıyor…';
   static const String opponentFound = 'Rakip bulundu!';
   static const String firstRoundCategory = '1. TUR KATEGORİSİ';
+  static const String firstQuestionLabel = 'İlk soru';
+  static const String nextQuestionLabel = 'Sıradaki soru';
   static const String vs = 'VS';
   static const String searchTipTitle = 'İPUCU';
   static const String searchTipContent =

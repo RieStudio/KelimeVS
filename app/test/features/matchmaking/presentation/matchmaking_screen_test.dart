@@ -1288,7 +1288,7 @@ void main() {
   );
 
   testWidgets(
-    '28. Eşleşme ekranı dikey ortalama, geçiş animasyonu ve nihai konum doğrulama',
+    '28. Eşleşme ekranı: bulundu durumunda başlık avatarların üstünde, soru kartı dikey ortada, etiket üstte ve arama durumu korunur',
     (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -1309,6 +1309,11 @@ void main() {
       await tester.pump();
 
       // 1) Arama durumu:
+      // Başlık ("Rakip aranıyor...") avatarların ALTINDADIR
+      final searchTitleTop = tester.getTopLeft(find.text(AppStrings.searchingOpponent)).dy;
+      final searchAvatarsBottom = tester.getBottomLeft(find.byType(PlayerAvatar).first).dy;
+      expect(searchTitleTop, greaterThan(searchAvatarsBottom));
+
       // Uygun dikey alan = Üst barın alt kenarı (topBarBottom) ile İpucu kartının üst kenarı (tipCardTop) arası
       final topBarBottom = tester.getBottomLeft(find.byType(AppIconButton)).dy;
       final tipCardTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_tip_card'))).dy;
@@ -1318,7 +1323,7 @@ void main() {
       final groupBottom = tester.getBottomLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
       final groupCenterY = (groupTop + groupBottom) / 2.0;
 
-      // Grup dikey merkezi, uygun alan merkezine ±8 dp (pratikte ~0 dp) yakınlıktadır
+      // Grup dikey merkezi, uygun alan merkezine ±8 dp yakınlıktadır
       expect((groupCenterY - eligibleCenterY).abs(), lessThanOrEqualTo(8.0));
 
       // 2) Eşleşme bulundu: geçiş başlar
@@ -1342,15 +1347,33 @@ void main() {
       // Geçiş tamamlanır (toplam 400 ms <= 500 ms)
       await tester.pump(const Duration(milliseconds: 200));
 
-      // 3) Bulundu durumunda nihai konumlar:
-      // Avatarlar yuvası üst barın altına space8 (8 dp) mesafede oturur
-      final foundGroupTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
-      expect((foundGroupTop - (topBarBottom + AppDimens.space8)).abs(), lessThanOrEqualTo(1.0));
+      // 3) Bulundu durumu:
+      // a) "Rakip bulundu!" başlığı avatarların ÜSTÜNDEDİR
+      final foundTitleTop = tester.getTopLeft(find.text(AppStrings.opponentFound)).dy;
+      final foundAvatarTop = tester.getTopLeft(find.byType(PlayerAvatar).first).dy;
+      expect(foundTitleTop, lessThan(foundAvatarTop));
 
-      // İsim satırları ("Sen" ve "Deniz") aynı dikey taban çizgisindedir
+      // b) İsim satırları ("Sen" ve "Deniz") aynı dikey taban çizgisindedir
       final senTop = tester.getTopLeft(find.text(AppStrings.you)).dy;
       final oppTop = tester.getTopLeft(find.text('Deniz')).dy;
       expect((senTop - oppTop).abs(), lessThanOrEqualTo(1.0));
+
+      // c) Soru kartının hemen üstünde "İlk soru" etiketi yer alır
+      expect(find.text(AppStrings.firstQuestionLabel), findsOneWidget);
+      final labelBottom = tester.getBottomLeft(find.text(AppStrings.firstQuestionLabel)).dy;
+      final cardTop = tester.getTopLeft(find.byKey(const ValueKey('first_question_card'))).dy;
+      expect(labelBottom, lessThan(cardTop));
+
+      // d) Soru kartı bloğunun dikey merkezi, avatarların altı ile ilerleme çubuğunun üstü arasındaki alanın merkezine ±8 dp yakındır
+      final avatarsBottom = tester.getBottomLeft(find.byKey(const ValueKey('matchmaking_avatars_group'))).dy;
+      final progressBarTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_progress_bar'))).dy;
+      final betweenCenterY = (avatarsBottom + progressBarTop) / 2.0;
+
+      final cardBlockTop = tester.getTopLeft(find.byKey(const ValueKey('first_question_card_block'))).dy;
+      final cardBlockBottom = tester.getBottomLeft(find.byKey(const ValueKey('first_question_card_block'))).dy;
+      final cardBlockCenterY = (cardBlockTop + cardBlockBottom) / 2.0;
+
+      expect((cardBlockCenterY - betweenCenterY).abs(), lessThanOrEqualTo(8.0));
 
       // Soru kartı ve ilerleme çubuğu görünür
       expect(find.byKey(const ValueKey('first_question_card')), findsOneWidget);

@@ -18,8 +18,8 @@ class QuestionPreviewCard extends StatelessWidget {
     required this.categoryText,
     this.margin = const EdgeInsets.symmetric(horizontal: AppDimens.space8),
     this.padding = const EdgeInsets.symmetric(
-      horizontal: AppDimens.space20,
-      vertical: AppDimens.space14,
+      horizontal: AppDimens.space24,
+      vertical: AppDimens.space16,
     ),
   });
 
@@ -49,7 +49,7 @@ class QuestionPreviewCard extends StatelessWidget {
         categoryText,
         style: const TextStyle(
           fontFamily: AppTextStyles.fontFredoka,
-          fontSize: 22,
+          fontSize: 24,
           fontWeight: FontWeight.w700,
           color: AppColors.ink,
           height: 1.25,

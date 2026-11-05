@@ -265,6 +265,19 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
 
               if (uiState.nextQuestionText != null && !uiState.isFinalReveal) ...[
                 const Spacer(flex: 1),
+                Text(
+                  AppStrings.nextQuestionLabel,
+                  key: const ValueKey('round_end_next_question_label'),
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.fontNunito,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink.withValues(alpha: 0.65),
+                    letterSpacing: 0.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppDimens.space6),
                 QuestionPreviewCard(
                   key: const ValueKey('round_end_next_question_card'),
                   categoryText: uiState.nextQuestionText!,

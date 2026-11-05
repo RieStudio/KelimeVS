@@ -353,7 +353,13 @@ void main() {
     expect(find.byKey(const ValueKey('round_end_next_question_card')), findsOneWidget);
     expect(find.text('Dünya Başkentleri'), findsOneWidget);
 
-    // "1. TUR KATEGORİSİ" veya herhangi bir rozet/etiket BULUNMAZ
+    // Kartın üstünde "Sıradaki soru" etiketi yer alır ve karttan yukarıdadır
+    expect(find.text(AppStrings.nextQuestionLabel), findsOneWidget);
+    final labelBottom = tester.getBottomLeft(find.text(AppStrings.nextQuestionLabel)).dy;
+    final cardTop = tester.getTopLeft(find.byKey(const ValueKey('round_end_next_question_card'))).dy;
+    expect(labelBottom, lessThan(cardTop));
+
+    // "1. TUR KATEGORİSİ" veya herhangi bir rozet BULUNMAZ
     expect(find.text(AppStrings.firstRoundCategory), findsNothing);
 
     // İlerleme çubuğu 14 dp yüksekliktedir
@@ -384,6 +390,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('round_end_next_question_card')), findsNothing);
+    expect(find.text(AppStrings.nextQuestionLabel), findsNothing);
 
     // Durum B: isFinalReveal true
     final uiStateFinal = MatchUiState(
@@ -400,6 +407,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('round_end_next_question_card')), findsNothing);
+    expect(find.text(AppStrings.nextQuestionLabel), findsNothing);
     expect(find.text('Gizli Soru'), findsNothing);
   });
 
