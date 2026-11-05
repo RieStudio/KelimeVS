@@ -1591,6 +1591,21 @@ export class MatchRoom extends DurableObject<Env> {
           },
         };
 
+    let nextQuestion: { readonly id: string; readonly text: string } | undefined;
+    if (state.phase === 'roundEnded' && this.data.questions && this.data.questionOrder) {
+      const nextQ = MatchEngine.peekNextQuestion({
+        state,
+        questions: this.data.questions,
+        questionOrder: this.data.questionOrder,
+      });
+      if (nextQ) {
+        nextQuestion = {
+          id: nextQ.id,
+          text: nextQ.text,
+        };
+      }
+    }
+
     const msg = filterStateForPlayer({
       state,
       playerUid: uid,
@@ -1600,6 +1615,7 @@ export class MatchRoom extends DurableObject<Env> {
       opponentConnected,
       serverNowMs: Date.now(),
       nextRoundAtMs: this.data.schedule.nextRoundAtMs,
+      nextQuestion,
       answerSeconds: this.durations.answerSeconds,
       powerups,
     });

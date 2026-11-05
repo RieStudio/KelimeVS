@@ -94,6 +94,7 @@ export function filterStateForPlayer(params: {
   readonly opponentConnected: boolean;
   readonly serverNowMs: number;
   readonly nextRoundAtMs?: number;
+  readonly nextQuestion?: { readonly id: string; readonly text: string };
   readonly answerSeconds?: number;
   readonly powerups?: {
     readonly extraTime?: {
@@ -112,6 +113,7 @@ export function filterStateForPlayer(params: {
     opponentConnected,
     serverNowMs,
     nextRoundAtMs,
+    nextQuestion,
     answerSeconds,
     powerups,
   } = params;
@@ -185,6 +187,7 @@ export function filterStateForPlayer(params: {
     ...(state.winnerId ? { winnerIsMe: state.winnerId === playerUid } : {}),
     ...(lastRound ? { lastRound } : {}),
     ...(nextRoundAtMs ? { nextRoundAtMs } : {}),
+    ...(nextQuestion ? { nextQuestion } : {}),
     ...(answerSeconds ? { answerSeconds } : {}),
     ...(powerups ? { powerups } : {}),
   };

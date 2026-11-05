@@ -52,6 +52,10 @@ export type MatchmakerServerMessage =
         readonly max: number;
         readonly nextEnergyAtMs: number | null;
       };
+      readonly firstQuestion?: {
+        readonly id: string;
+        readonly text: string;
+      };
     }
   | {
       readonly t: 'error';
@@ -95,6 +99,7 @@ export interface ClientStateMessage {
     readonly reason: string;
   };
   readonly nextRoundAtMs?: number;
+  readonly nextQuestion?: { readonly id: string; readonly text: string };
   readonly answerSeconds?: number;
   readonly powerups?: {
     readonly extraTime?: {

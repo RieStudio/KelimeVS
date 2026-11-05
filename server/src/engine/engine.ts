@@ -571,5 +571,26 @@ export abstract class MatchEngine {
 
     return { state: nextState, events: [] };
   }
+
+  /** roundEnded fazında bir sonraki turun sorusunu durumu değiştirmeden önizler. */
+  static peekNextQuestion(params: {
+    readonly state: MatchState;
+    readonly questions: readonly Question[];
+    readonly questionOrder?: readonly string[];
+  }): Question | null {
+    const { state, questions, questionOrder } = params;
+    if (state.phase !== 'roundEnded') return null;
+
+    const eligibleQuestions = filterQuestions(questions, state.config.minAnswersPerQuestion);
+    if (eligibleQuestions.length === 0) return null;
+
+    const effectiveOrder = questionOrder ?? state.questionOrder;
+    return pickNextQuestion({
+      questions: eligibleQuestions,
+      usedQuestionIds: state.usedQuestionIds,
+      questionOrder: effectiveOrder,
+      roundIndex: state.totalRoundsPlayed,
+    });
+  }
 }
 

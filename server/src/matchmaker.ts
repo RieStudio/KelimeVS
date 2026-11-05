@@ -1178,11 +1178,19 @@ export class Matchmaker extends DurableObject<Env> {
       const p2Sockets = this.ctx.getWebSockets(p2.uid);
       const nowMs = Date.now();
 
+      const firstQuestionData = selectedQuestions.length > 0
+        ? {
+            id: selectedQuestions[0].id,
+            text: selectedQuestions[0].text,
+          }
+        : undefined;
+
       const p1Matched: MatchmakerServerMessage = {
         t: 'matched',
         matchId,
         opponentName: p2.name,
         opponentFrame: p2.frame || 'classic',
+        ...(firstQuestionData ? { firstQuestion: firstQuestionData } : {}),
         ...(p1EnergyData ? { energy: p1EnergyData, serverNowMs: nowMs } : {}),
       };
       const p2Matched: MatchmakerServerMessage = {
@@ -1190,6 +1198,7 @@ export class Matchmaker extends DurableObject<Env> {
         matchId,
         opponentName: p1.name,
         opponentFrame: p1.frame || 'classic',
+        ...(firstQuestionData ? { firstQuestion: firstQuestionData } : {}),
         ...(p2EnergyData ? { energy: p2EnergyData, serverNowMs: nowMs } : {}),
       };
 

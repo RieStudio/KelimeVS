@@ -321,5 +321,121 @@ describe('Matchmaker removeFromQueue', () => {
   });
 });
 
+describe('Matchmaker firstQuestion Security & MatchRoom Sync', () => {
+  it('matched mesajındaki firstQuestion.id, MatchRoom initMatch 1. tur sorusunun id ve metnine eşittir ve cevap listesi sızdırılmaz', async () => {
+    let storedQueue: QueueEntry[] = [];
+    const socketsMap = new Map<string, any[]>();
+    const mockWs1 = {
+      send: vi.fn(),
+      close: vi.fn(),
+      _tags: ['u1', 'ip:127.0.0.1'],
+    };
+    const mockWs2 = {
+      send: vi.fn(),
+      close: vi.fn(),
+      _tags: ['u2', 'ip:127.0.0.1'],
+    };
+    socketsMap.set('u1', [mockWs1]);
+    socketsMap.set('u2', [mockWs2]);
+
+    const mockState = {
+      storage: {
+        get: vi.fn(async () => storedQueue),
+        put: vi.fn(async (_k: string, v: any) => {
+          storedQueue = v;
+        }),
+      },
+      blockConcurrencyWhile: (fn: () => Promise<void>) => fn(),
+      getWebSockets: vi.fn((tag?: string) => (tag ? socketsMap.get(tag) ?? [] : [])),
+      getTags: vi.fn((ws: any) => ws._tags ?? []),
+      waitUntil: vi.fn(),
+      acceptWebSocket: vi.fn(),
+    };
+
+    let initMatchArg: any = null;
+    const mockInitMatch = vi.fn(async (arg: any) => {
+      initMatchArg = arg;
+    });
+
+    const env = {
+      ENERGY_ENABLED: 'false',
+      USER_PROFILE: {
+        idFromName: (uid: string) => uid,
+        get: (uid: string) => ({
+          getBlockedUids: async () => [],
+          getProfile: async () => ({ uid, nickname: uid === 'u1' ? 'Alice' : 'Bob' }),
+          getEnergyState: async () => ({ enabled: false }),
+        }),
+      },
+      MATCH_ROOM: {
+        idFromName: (id: string) => id,
+        get: () => ({
+          initMatch: mockInitMatch,
+        }),
+      },
+    } as unknown as Env;
+
+    const dummyQuestions: Question[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `q_test_${i}`,
+      categoryId: 'cat_test',
+      text: `Kategori Başlığı ${i}`,
+      answers: [
+        { id: `ans_${i}_1`, display: `Gizli Cevap 1`, aliases: ['cevap1'] },
+        { id: `ans_${i}_2`, display: `Gizli Cevap 2`, aliases: ['cevap2'] },
+      ],
+    }));
+
+    const mockContentProvider = {
+      getQuestions: async () => dummyQuestions,
+    };
+
+    const mm = new Matchmaker(
+      mockState as unknown as DurableObjectState,
+      env,
+      mockContentProvider as any
+    );
+
+    // u1 ve u2 sıraya girer
+    await mm.webSocketMessage(mockWs1 as any, JSON.stringify({ t: 'queue', name: 'Alice' }));
+    await mm.webSocketMessage(mockWs2 as any, JSON.stringify({ t: 'queue', name: 'Bob' }));
+
+    // MatchRoom initMatch çağrılmış olmalı
+    expect(mockInitMatch).toHaveBeenCalledTimes(1);
+    expect(initMatchArg).not.toBeNull();
+    const firstRoundQuestionId = initMatchArg.questionOrder[0];
+    const firstRoundQuestionObj = initMatchArg.questions.find((q: Question) => q.id === firstRoundQuestionId);
+
+    // Oyunculara mesajlar gitmiş olmalı: önce queued, sonra matched
+    const p1Messages = mockWs1.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
+    const p2Messages = mockWs2.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
+
+    const p1Matched = p1Messages.find((m: any) => m.t === 'matched');
+    const p2Matched = p2Messages.find((m: any) => m.t === 'matched');
+
+    expect(p1Matched).toBeDefined();
+    expect(p2Matched).toBeDefined();
+
+    // 1. İspat: matched mesajındaki firstQuestion.id, MatchRoom'un 1. tur sorusunun id ve metnine eşittir
+    expect(p1Matched.firstQuestion).toBeDefined();
+    expect(p1Matched.firstQuestion.id).toBe(firstRoundQuestionId);
+    expect(p1Matched.firstQuestion.text).toBe(firstRoundQuestionObj.text);
+
+    expect(p2Matched.firstQuestion).toBeDefined();
+    expect(p2Matched.firstQuestion.id).toBe(firstRoundQuestionId);
+    expect(p2Matched.firstQuestion.text).toBe(firstRoundQuestionObj.text);
+
+    // 2. Güvenlik İspatı: matched mesajında cevap listesi (answers, canonical, accepted) ASLA bulunmaz
+    expect((p1Matched as any).answers).toBeUndefined();
+    expect((p1Matched.firstQuestion as any).answers).toBeUndefined();
+    expect((p1Matched.firstQuestion as any).canonicalAnswers).toBeUndefined();
+    expect((p1Matched.firstQuestion as any).acceptedAnswers).toBeUndefined();
+
+    expect((p2Matched as any).answers).toBeUndefined();
+    expect((p2Matched.firstQuestion as any).answers).toBeUndefined();
+    expect((p2Matched.firstQuestion as any).canonicalAnswers).toBeUndefined();
+    expect((p2Matched.firstQuestion as any).acceptedAnswers).toBeUndefined();
+  });
+});
+
 
 

@@ -1286,4 +1286,122 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
+
+  testWidgets(
+    '28. Eşleşme ekranı dikey ortalama, geçiş animasyonu ve nihai konum doğrulama',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      // 1) Arama durumu:
+      // Uygun dikey alan = Üst barın alt kenarı (topBarBottom) ile İpucu kartının üst kenarı (tipCardTop) arası
+      final topBarBottom = tester.getBottomLeft(find.byType(AppIconButton)).dy;
+      final tipCardTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_tip_card'))).dy;
+      final eligibleCenterY = (topBarBottom + tipCardTop) / 2.0;
+
+      final groupTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
+      final groupBottom = tester.getBottomLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
+      final groupCenterY = (groupTop + groupBottom) / 2.0;
+
+      // Grup dikey merkezi, uygun alan merkezine ±8 dp (pratikte ~0 dp) yakınlıktadır
+      expect((groupCenterY - eligibleCenterY).abs(), lessThanOrEqualTo(8.0));
+
+      // 2) Eşleşme bulundu: geçiş başlar
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_test_28',
+          opponentName: 'Deniz',
+          firstQuestion: FirstQuestionPreview(
+            id: 'q_28',
+            text: 'Müzik Enstrümanları',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+
+      // Geçiş animasyonunun ara anı (200 ms) - geçiş sırasında sıfır overflow
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.takeException(), isNull);
+
+      // Geçiş tamamlanır (toplam 400 ms <= 500 ms)
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // 3) Bulundu durumunda nihai konumlar:
+      // Avatarlar yuvası üst barın altına space8 (8 dp) mesafede oturur
+      final foundGroupTop = tester.getTopLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
+      expect((foundGroupTop - (topBarBottom + AppDimens.space8)).abs(), lessThanOrEqualTo(1.0));
+
+      // İsim satırları ("Sen" ve "Deniz") aynı dikey taban çizgisindedir
+      final senTop = tester.getTopLeft(find.text(AppStrings.you)).dy;
+      final oppTop = tester.getTopLeft(find.text('Deniz')).dy;
+      expect((senTop - oppTop).abs(), lessThanOrEqualTo(1.0));
+
+      // Soru kartı ve ilerleme çubuğu görünür
+      expect(find.byKey(const ValueKey('first_question_card')), findsOneWidget);
+      expect(find.byKey(const ValueKey('matchmaking_progress_bar')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    '29. 360x640 ekranda ve textScale 1.3 iken geçiş ve yerleşimde hiçbir taşma olmaz',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final botController = FakeMatchController();
+      final onlineSession = FakeOnlineMatchSession();
+      final mmClient = FakeMatchmakingClient();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          botController: botController,
+          onlineSession: onlineSession,
+          matchmakingClient: mmClient,
+          textScale: 1.3,
+          initialOpponentName: 'Deniz',
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+
+      mmClient.emit(
+        const MatchmakingMatched(
+          matchId: 'match_test_29',
+          opponentName: 'Deniz',
+          firstQuestion: FirstQuestionPreview(
+            id: 'q_29',
+            text: 'Uzun Kategori Başlığı Test Metni',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1550));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text(AppStrings.opponentFound), findsOneWidget);
+      expect(find.byKey(const ValueKey('first_question_card')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 }
