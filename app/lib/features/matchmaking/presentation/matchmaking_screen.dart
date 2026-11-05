@@ -943,15 +943,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                                       children: [
                                         Text(
                                           AppStrings.firstQuestionLabel,
-                                          style: TextStyle(
-                                            fontFamily:
-                                                AppTextStyles.fontNunito,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.ink
-                                                .withValues(alpha: 0.65),
-                                            letterSpacing: 0.3,
-                                          ),
+                                          style: AppTextStyles
+                                              .questionPreviewLabel,
                                           textAlign: TextAlign.center,
                                         ),
                                         const SizedBox(

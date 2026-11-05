@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'app_dimens.dart';
 
 abstract final class AppTextStyles {
   static const String fontFredoka = 'Fredoka';
@@ -269,6 +270,15 @@ abstract final class AppTextStyles {
     fontWeight: FontWeight.w800,
     color: AppColors.ink,
     height: 1.2,
+  );
+
+  // Soru önizleme etiketi ("İlk soru", "Sıradaki soru") (Nunito, 14, 800, ink %80)
+  static const TextStyle questionPreviewLabel = TextStyle(
+    fontFamily: fontNunito,
+    fontSize: AppDimens.questionPreviewLabelFontSize,
+    fontWeight: FontWeight.w800,
+    color: AppColors.questionPreviewLabel,
+    letterSpacing: AppDimens.questionPreviewLabelLetterSpacing,
   );
 }
 

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/theme/app_text_styles.dart';
 import 'package:app/core/widgets/app_icon_button.dart';
 import 'package:app/core/widgets/avatar_frame_registry.dart';
 import 'package:app/core/widgets/match_tip_card.dart';
@@ -1358,11 +1359,17 @@ void main() {
       final oppTop = tester.getTopLeft(find.text('Deniz')).dy;
       expect((senTop - oppTop).abs(), lessThanOrEqualTo(1.0));
 
-      // c) Soru kartının hemen üstünde "İlk soru" etiketi yer alır
-      expect(find.text(AppStrings.firstQuestionLabel), findsOneWidget);
-      final labelBottom = tester.getBottomLeft(find.text(AppStrings.firstQuestionLabel)).dy;
+      // c) Soru kartının hemen üstünde "İlk soru" etiketi yer alır ve ortak stili kullanır
+      final labelFinder = find.text(AppStrings.firstQuestionLabel);
+      expect(labelFinder, findsOneWidget);
+      final labelWidget = tester.widget<Text>(labelFinder);
+      expect(labelWidget.style, equals(AppTextStyles.questionPreviewLabel));
+      expect(labelWidget.style?.fontSize, AppDimens.questionPreviewLabelFontSize);
+      expect(labelWidget.style?.color, AppColors.questionPreviewLabel);
+      final labelBottom = tester.getBottomLeft(labelFinder).dy;
       final cardTop = tester.getTopLeft(find.byKey(const ValueKey('first_question_card'))).dy;
       expect(labelBottom, lessThan(cardTop));
+      expect(cardTop - labelBottom, closeTo(AppDimens.space6, 0.5));
 
       // d) Soru kartı bloğunun dikey merkezi, avatarların altı ile ilerleme çubuğunun üstü arasındaki alanın merkezine ±8 dp yakındır
       final avatarsBottom = tester.getBottomLeft(find.byKey(const ValueKey('matchmaking_avatars_group'))).dy;

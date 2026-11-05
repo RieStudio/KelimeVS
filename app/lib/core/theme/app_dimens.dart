@@ -97,6 +97,10 @@ abstract final class AppDimens {
       Duration(milliseconds: roundTransitionDurationMs);
   static const double progressBarHeight = 14.0;
 
+  // Soru Önizleme Etiketi ("İlk soru", "Sıradaki soru")
+  static const double questionPreviewLabelFontSize = 14.0;
+  static const double questionPreviewLabelLetterSpacing = 0.3;
+
   // Press offsets
   static const double primaryButtonPressOffset = 4.0;
   static const double secondaryButtonPressOffset = 3.0;

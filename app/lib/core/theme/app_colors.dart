@@ -19,5 +19,9 @@ abstract final class AppColors {
   static const Color dangerSoft = Color(0xFFFECACA);
   static const Color dangerSurface = Color(0xFFFEF2F2);
   static const Color selfHighlight = Color(0xFFFB923C);
+
+  // Soru önizleme etiketi rengi (ink %80 opaklık)
+  static const double questionPreviewLabelOpacity = 0.80;
+  static const Color questionPreviewLabel = Color(0xCC14532D);
 }
 

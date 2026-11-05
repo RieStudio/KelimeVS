@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
+import 'package:app/core/theme/app_text_styles.dart';
 import 'package:app/core/widgets/result_circle.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
@@ -354,10 +357,16 @@ void main() {
     expect(find.text('Dünya Başkentleri'), findsOneWidget);
 
     // Kartın üstünde "Sıradaki soru" etiketi yer alır ve karttan yukarıdadır
-    expect(find.text(AppStrings.nextQuestionLabel), findsOneWidget);
-    final labelBottom = tester.getBottomLeft(find.text(AppStrings.nextQuestionLabel)).dy;
+    final labelFinder = find.text(AppStrings.nextQuestionLabel);
+    expect(labelFinder, findsOneWidget);
+    final labelWidget = tester.widget<Text>(labelFinder);
+    expect(labelWidget.style, equals(AppTextStyles.questionPreviewLabel));
+    expect(labelWidget.style?.fontSize, AppDimens.questionPreviewLabelFontSize);
+    expect(labelWidget.style?.color, AppColors.questionPreviewLabel);
+    final labelBottom = tester.getBottomLeft(labelFinder).dy;
     final cardTop = tester.getTopLeft(find.byKey(const ValueKey('round_end_next_question_card'))).dy;
     expect(labelBottom, lessThan(cardTop));
+    expect(cardTop - labelBottom, closeTo(AppDimens.space6, 0.5));
 
     // "1. TUR KATEGORİSİ" veya herhangi bir rozet BULUNMAZ
     expect(find.text(AppStrings.firstRoundCategory), findsNothing);

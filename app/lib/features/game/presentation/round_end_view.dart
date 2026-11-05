@@ -268,13 +268,7 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                 Text(
                   AppStrings.nextQuestionLabel,
                   key: const ValueKey('round_end_next_question_label'),
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontNunito,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink.withValues(alpha: 0.65),
-                    letterSpacing: 0.3,
-                  ),
+                  style: AppTextStyles.questionPreviewLabel,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppDimens.space6),
