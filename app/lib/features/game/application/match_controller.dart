@@ -519,6 +519,21 @@ class MatchController extends Notifier<MatchUiState>
     final wasBotActive = prevState?.phase == MatchPhase.roundActive &&
         prevState?.turnPlayerId == 'bot';
 
+    // Maç ekranı skor kartı (soru/cevap alanı) skorunun gecikmeli güncellenmesi:
+    // Tur sonu ekranı çıkana kadar maç ekranında eski skor gösterilir.
+    // Yeni tura geçildiğinde (roundActive) veya ilk tur başında güncel skor gösterilir.
+    final Map<String, int> updatedBoardScores;
+    if (nextState.phase == MatchPhase.roundActive) {
+      if (prevState?.phase == MatchPhase.roundEnded || state.boardScores == null) {
+        updatedBoardScores = Map<String, int>.from(nextState.scores);
+      } else {
+        updatedBoardScores = state.boardScores!;
+      }
+    } else {
+      updatedBoardScores =
+          state.boardScores ?? prevState?.scores ?? nextState.scores;
+    }
+
     // Sıra veya faz bota ait değilse bekleyen bot aksiyonunu iptal et
     if (nextState.phase != MatchPhase.roundActive || nextState.turnPlayerId != 'bot') {
       _cancelBotTimer();
@@ -649,6 +664,7 @@ class MatchController extends Notifier<MatchUiState>
 
         state = state.copyWith(
           matchState: boardDisplayState,
+          boardScores: updatedBoardScores,
           remainingMs: 0,
           recentEvents: updatedEvents,
           eventCounter: updatedEventCounter,
@@ -709,6 +725,7 @@ class MatchController extends Notifier<MatchUiState>
 
     state = state.copyWith(
       matchState: nextState,
+      boardScores: updatedBoardScores,
       remainingMs: remaining,
       recentEvents: updatedEvents,
       eventCounter: updatedEventCounter,
@@ -895,6 +912,7 @@ class MatchController extends Notifier<MatchUiState>
     if (finishedState != null) {
       state = state.copyWith(
         matchState: finishedState,
+        boardScores: finishedState.scores,
         summary: finishedSummary,
         isFinalReveal: false,
         roundTransitionRemainingMs: 0,

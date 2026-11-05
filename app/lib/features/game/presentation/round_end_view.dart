@@ -30,6 +30,7 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
+  late final Animation<double> _scorePulseAnim;
 
   @override
   void initState() {
@@ -42,6 +43,18 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
       parent: _animController,
       curve: Curves.easeOut,
     );
+    _scorePulseAnim = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.15)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.15, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 50,
+      ),
+    ]).animate(_animController);
     _animController.forward();
   }
 
@@ -219,9 +232,14 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                               ),
                             ),
                             const SizedBox(height: AppDimens.space4),
-                            Text(
-                              '$myScore',
-                              style: AppTextStyles.scoreLarge,
+                            ScaleTransition(
+                              scale: isWinner
+                                  ? _scorePulseAnim
+                                  : const AlwaysStoppedAnimation(1.0),
+                              child: Text(
+                                '$myScore',
+                                style: AppTextStyles.scoreLarge,
+                              ),
                             ),
                           ],
                         ),
@@ -251,9 +269,14 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                               ),
                             ),
                             const SizedBox(height: AppDimens.space4),
-                            Text(
-                              '$opponentScore',
-                              style: AppTextStyles.scoreLarge,
+                            ScaleTransition(
+                              scale: isLoser
+                                  ? _scorePulseAnim
+                                  : const AlwaysStoppedAnimation(1.0),
+                              child: Text(
+                                '$opponentScore',
+                                style: AppTextStyles.scoreLarge,
+                              ),
                             ),
                           ],
                         ),

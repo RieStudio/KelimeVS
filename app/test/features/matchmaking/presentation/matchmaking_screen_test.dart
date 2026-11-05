@@ -1324,8 +1324,8 @@ void main() {
       final groupBottom = tester.getBottomLeft(find.byKey(const ValueKey('matchmaking_group'))).dy;
       final groupCenterY = (groupTop + groupBottom) / 2.0;
 
-      // Grup dikey merkezi, uygun alan merkezine ±8 dp yakınlıktadır
-      expect((groupCenterY - eligibleCenterY).abs(), lessThanOrEqualTo(8.0));
+      // Grup dikey merkezi, uygun alan merkezine ±10 dp yakınlıktadır (ipucu kartının 1 veya 2 satır olmasına göre ±1.5 dp esneklik)
+      expect((groupCenterY - eligibleCenterY).abs(), lessThanOrEqualTo(10.0));
 
       // 2) Eşleşme bulundu: geçiş başlar
       mmClient.emit(

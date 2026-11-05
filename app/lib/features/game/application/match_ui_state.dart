@@ -88,6 +88,7 @@ class MatchUiState {
   final String? powerupErrorNotice;
   final int powerupErrorCounter;
   final bool isPaused;
+  final Map<String, int>? boardScores;
 
   const MatchUiState({
     this.matchState,
@@ -125,10 +126,17 @@ class MatchUiState {
     this.powerupErrorNotice,
     this.powerupErrorCounter = 0,
     this.isPaused = false,
+    this.boardScores,
   });
 
   ConnectionStatus get kendiBaglanti => connectionStatus;
   bool get rakipBagli => opponentConnected;
+
+  /// Maç ekranındaki (soru/cevap alanı) oyuncu kartlarında gösterilecek skor.
+  /// Tur bittiğinde, tur sonu ekranı çıkana kadar önceki turun skorunu korur;
+  /// yeni tura geçildiğinde güncel skor gösterilir.
+  Map<String, int> get displayedScores =>
+      boardScores ?? matchState?.scores ?? const {'me': 0, 'bot': 0};
 
   /// Güçlendirici ve tur süresinden türetilen dinamik tavan saniye (varsayılan: 15).
   int get maxAllowedSeconds {
@@ -201,6 +209,7 @@ class MatchUiState {
     String? powerupErrorNotice,
     int? powerupErrorCounter,
     bool? isPaused,
+    Map<String, int>? boardScores,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -249,6 +258,7 @@ class MatchUiState {
       powerupErrorNotice: powerupErrorNotice ?? this.powerupErrorNotice,
       powerupErrorCounter: powerupErrorCounter ?? this.powerupErrorCounter,
       isPaused: isPaused ?? this.isPaused,
+      boardScores: boardScores ?? this.boardScores,
     );
   }
 }

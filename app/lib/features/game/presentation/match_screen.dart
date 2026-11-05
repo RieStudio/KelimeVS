@@ -275,7 +275,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           children: [
                             PlayerCard(
                               name: AppStrings.you,
-                              score: matchState?.scores['me'] ?? 0,
+                              score: uiState.displayedScores['me'] ?? 0,
                               avatar: PlayerAvatar.selfMatch(
                                 name: (myNickname != null && myNickname.isNotEmpty)
                                     ? myNickname
@@ -329,7 +329,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                               name: uiState.opponentName.isNotEmpty
                                   ? uiState.opponentName
                                   : AppStrings.opponent,
-                              score: matchState?.scores['bot'] ?? 0,
+                              score: uiState.displayedScores['bot'] ?? 0,
                               avatar: PlayerAvatar.opponent(
                                 name: uiState.opponentName,
                                 frame: uiState.opponentFrame,

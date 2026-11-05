@@ -490,8 +490,42 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       nextQId = null;
     }
 
+    // Maç ekranı skor kartı (soru/cevap alanı) skorunun gecikmeli güncellenmesi:
+    // Tur sonu ekranı (RoundEndView) gösterilene kadar maç ekranında eski skor gösterilir.
+    // Yeni tura geçildiğinde (roundActive) veya ilk tur başında güncel skor gösterilir.
+    final Map<String, int> updatedBoardScores;
+    if (mappedPhase == MatchPhase.roundActive) {
+      if (state.matchState?.phase == MatchPhase.roundEnded ||
+          state.boardScores == null) {
+        updatedBoardScores = {
+          'me': onlineState.myScore,
+          'bot': onlineState.opponentScore,
+        };
+      } else {
+        updatedBoardScores = state.boardScores!;
+      }
+    } else if (mappedPhase == MatchPhase.roundEnded) {
+      if (state.boardScores != null) {
+        updatedBoardScores = state.boardScores!;
+      } else {
+        // Yeniden bağlanma senaryosu: lastRound'dan önceki skor hesaplanır
+        final lr = onlineState.lastRound;
+        final prevMy = (lr != null && lr.winnerIsMe && !lr.draw)
+            ? math.max(0, onlineState.myScore - 1)
+            : onlineState.myScore;
+        final prevOpp = (lr != null && !lr.winnerIsMe && !lr.draw)
+            ? math.max(0, onlineState.opponentScore - 1)
+            : onlineState.opponentScore;
+        updatedBoardScores = {'me': prevMy, 'bot': prevOpp};
+      }
+    } else {
+      updatedBoardScores = state.boardScores ??
+          {'me': onlineState.myScore, 'bot': onlineState.opponentScore};
+    }
+
     state = state.copyWith(
       matchState: mappedMatchState,
+      boardScores: updatedBoardScores,
       remainingMs: remainingMs,
       opponentName: updatedOpponentName,
       opponentFrame: updatedOpponentFrame,
@@ -625,6 +659,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
     state = state.copyWith(
       matchState: finishedMatchState,
+      boardScores: scores,
       remainingMs: 0,
       isLoading: false,
       isFinalReveal: false,
