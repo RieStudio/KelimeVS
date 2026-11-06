@@ -12,6 +12,7 @@ import 'package:app/core/widgets/player_card.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
+import 'package:app/features/game/data/question_repository.dart';
 import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_events.dart';
@@ -58,6 +59,7 @@ const _testQuestion2 = Question(
   text: 'Soru 2',
   answers: [
     Answer(id: 'kedi', display: 'Kedi', aliases: ['kedi']),
+    Answer(id: 'kopek', display: 'Köpek', aliases: ['kopek']),
   ],
 );
 
@@ -473,7 +475,131 @@ void main() {
         );
       },
     );
+
+    test(
+      '7. Uygulama yeni açıldığındaki İLK bot maçında displayedScores 0-0 başlar',
+      () {
+        fakeAsync((async) {
+          final fakeClock = _FakeClock(async);
+          final container = ProviderContainer(
+            overrides: [
+              gameClockProvider.overrideWithValue(fakeClock),
+              randomProvider.overrideWithValue(math.Random(1)),
+              questionRepositoryProvider.overrideWithValue(
+                _FakeQuestionRepository([_testQuestion1, _testQuestion2]),
+              ),
+            ],
+          );
+          addTearDown(container.dispose);
+
+          final controller = container.read(matchControllerProvider.notifier);
+          controller.startMatch(
+            questions: [_testQuestion1, _testQuestion2],
+            opponentName: 'Bot1',
+            initialTurnPlayerId: 'me',
+          );
+          async.flushMicrotasks();
+
+          final state = container.read(matchControllerProvider);
+          expect(state.displayedScores['me'], 0,
+              reason: 'İlk maçta benim skorum 0 olmalı');
+          expect(state.displayedScores['bot'], 0,
+              reason: 'İlk maçta bot skoru 0 olmalı');
+        });
+      },
+    );
+
+    test(
+      '8. Önceki bot maçı bittikten sonra YENİ maç başladığında ilk turun başında displayedScores 0-0 olmalıdır (HATA YENİDEN ÜRETİMİ)',
+      () {
+        fakeAsync((async) {
+          final fakeClock = _FakeClock(async);
+          final container = ProviderContainer(
+            overrides: [
+              gameClockProvider.overrideWithValue(fakeClock),
+              randomProvider.overrideWithValue(math.Random(1)),
+              questionRepositoryProvider.overrideWithValue(
+                _FakeQuestionRepository([_testQuestion1, _testQuestion2]),
+              ),
+            ],
+          );
+          addTearDown(container.dispose);
+
+          final controller = container.read(matchControllerProvider.notifier);
+          const silentBot = BotConfig(
+            thinkMinMs: 999999,
+            thinkMaxMs: 999999,
+            baseKnowChance: 0.0,
+          );
+
+          controller.startMatch(
+            questions: [_testQuestion1, _testQuestion2],
+            opponentName: 'Bot1',
+            initialTurnPlayerId: 'bot',
+            botConfig: silentBot,
+            questionOrder: ['q1', 'q2'],
+          );
+          async.flushMicrotasks();
+
+          // Tur 1: Bot süre aşımına uğrar (me: 1, bot: 0)
+          async.elapse(const Duration(milliseconds: 16000));
+          async.flushMicrotasks();
+
+          // Tur 1 -> Tur 2 geçişi (3.5 sn)
+          async.elapse(const Duration(milliseconds: 3500));
+          async.flushMicrotasks();
+
+          // Tur 2: Kullanıcı doğru cevap verir ('kedi'), bot süre aşımına uğrar -> Maç biter (me: 2, bot: 0)
+          final q = container.read(matchControllerProvider).matchState?.currentQuestion;
+          controller.submit(q!.answers.first.aliases.first);
+          async.elapse(const Duration(milliseconds: 17000));
+          async.flushMicrotasks();
+
+          // 500 ms matchFinishDelayMs sonra maç sonu commit edilir
+          async.elapse(const Duration(milliseconds: 600));
+          async.flushMicrotasks();
+
+          var state = container.read(matchControllerProvider);
+          expect(state.matchState!.phase, MatchPhase.matchFinished);
+          expect(state.boardScores, {'me': 2, 'bot': 0});
+
+          // ŞİMDİ YENİ MAÇ BAŞLATILIYOR (Rematch veya yeni bot maçı)
+          controller.startMatch(
+            questions: [_testQuestion1, _testQuestion2],
+            opponentName: 'Bot2',
+            initialTurnPlayerId: 'me',
+            botConfig: silentBot,
+          );
+          async.flushMicrotasks();
+
+          state = container.read(matchControllerProvider);
+          expect(state.matchState!.phase, MatchPhase.roundActive);
+          expect(state.matchState!.totalRoundsPlayed, 0);
+
+          // İŞTE HATA NOKTASI: Yeni maçın ilk turunda displayedScores 0-0 olmalıdır!
+          expect(
+            state.displayedScores['me'],
+            0,
+            reason:
+                'Yeni maç başlar başlamaz önceki maçtan kalan skor (2) DEĞİL, 0 görünmelidir!',
+          );
+          expect(
+            state.displayedScores['bot'],
+            0,
+            reason: 'Yeni maç başlar başlamaz bot skoru 0 görünmelidir!',
+          );
+        });
+      },
+    );
   });
+}
+
+class _FakeQuestionRepository implements QuestionRepository {
+  final List<Question> questions;
+  const _FakeQuestionRepository(this.questions);
+
+  @override
+  Future<List<Question>> loadAll() async => questions;
 }
 
 class _FakeMatchController extends MatchController {

@@ -1399,6 +1399,118 @@ void main() {
       expect(uiState.coinsAwarded, 50);
     },
   );
+
+  test(
+    '16. Online rematch: önceki maç bittikten sonra yeni startOnlineMatch çağrısında boardScores sıfırlanır (taşıma olmaz)',
+    () async {
+      final clock = FakeManualClock(10000);
+      final client = FakeOnlineMatchClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          gameClockProvider.overrideWithValue(clock),
+          onlineMatchClientFactoryProvider.overrideWithValue(() => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final session = container.read(onlineMatchSessionProvider.notifier);
+
+      // ── Birinci online maç: 2-0 biter ──────────────────────────────────
+      await session.startOnlineMatch(matchId: 'm_first', opponentName: 'Rakip1');
+
+      // İlk tur aktif, skor 0-0
+      client.emit(OnlineMatchStateUpdate(OnlineMatchState(
+        opponentName: 'Rakip1', serverNowMs: 10000, receivedLocalMs: 10000,
+        phase: OnlineMatchPhase.roundActive, roundNumber: 1,
+        turnIsMine: true, myScore: 0, opponentScore: 0, myHintsLeft: 1,
+        question: const OnlineQuestion(id: 'q1', text: 'Meyve'),
+        deadlineMs: 25000, attempts: const [], opponentConnected: true,
+      )));
+      expect(container.read(onlineMatchSessionProvider).displayedScores, {'me': 0, 'bot': 0});
+
+      // Tur 1 bitti: sunucu skor 1-0 gönderir
+      client.emit(OnlineMatchStateUpdate(OnlineMatchState(
+        opponentName: 'Rakip1', serverNowMs: 25000, receivedLocalMs: 25000,
+        phase: OnlineMatchPhase.roundEnded, roundNumber: 1,
+        turnIsMine: false, myScore: 1, opponentScore: 0, myHintsLeft: 1,
+        question: const OnlineQuestion(id: 'q1', text: 'Meyve'),
+        deadlineMs: 25000, attempts: const [], opponentConnected: true,
+        nextRoundAtMs: 28500,
+        lastRound: const OnlineLastRound(winnerIsMe: true, draw: false, reason: 'timeout'),
+      )));
+      // displayedScores tur sonunda eski değerde (0) kalmalı
+      expect(container.read(onlineMatchSessionProvider).displayedScores['me'], 0);
+
+      // Tur 2 aktif, skor 1-0
+      clock.currentMs = 28500;
+      client.emit(OnlineMatchStateUpdate(OnlineMatchState(
+        opponentName: 'Rakip1', serverNowMs: 28500, receivedLocalMs: 28500,
+        phase: OnlineMatchPhase.roundActive, roundNumber: 2,
+        turnIsMine: true, myScore: 1, opponentScore: 0, myHintsLeft: 1,
+        question: const OnlineQuestion(id: 'q2', text: 'Hayvan'),
+        deadlineMs: 43500, attempts: const [], opponentConnected: true,
+      )));
+      expect(container.read(onlineMatchSessionProvider).displayedScores['me'], 1);
+
+      // Tur 2 bitti: sunucu skor 2-0 gönderir (maç bitti)
+      client.emit(OnlineMatchStateUpdate(OnlineMatchState(
+        opponentName: 'Rakip1', serverNowMs: 43500, receivedLocalMs: 43500,
+        phase: OnlineMatchPhase.matchFinished, roundNumber: 2,
+        turnIsMine: false, myScore: 2, opponentScore: 0, myHintsLeft: 1,
+        question: const OnlineQuestion(id: 'q2', text: 'Hayvan'),
+        deadlineMs: 43500, attempts: const [], opponentConnected: true,
+        lastRound: const OnlineLastRound(winnerIsMe: true, draw: false, reason: 'timeout'),
+      )));
+      client.emit(const OnlineMatchFinal(FinalServerMessage(
+        rounds: [],
+        myScore: 2,
+        opponentScore: 0,
+        winnerIsMe: true,
+        endedBy: 'normal',
+      )));
+
+      final firstMatchState = container.read(onlineMatchSessionProvider);
+      expect(firstMatchState.isMatchFinished, isTrue);
+      // boardScores birinci maçta 2-0 olarak işlenmiş olmalı
+      expect(firstMatchState.boardScores, {'me': 2, 'bot': 0});
+
+      // ── İkinci online maç: sıfırdan başlar ─────────────────────────────
+      final client2 = FakeOnlineMatchClient();
+      await session.startOnlineMatch(
+        matchId: 'm_second',
+        opponentName: 'Rakip2',
+        client: client2,
+      );
+
+      final secondInitState = container.read(onlineMatchSessionProvider);
+      // startOnlineMatch yeni MatchUiState() oluşturduğu için boardScores null olmalı
+      expect(
+        secondInitState.boardScores,
+        isNull,
+        reason: 'Yeni online maç başlarken boardScores null olmalıdır (önceki maçtan taşıma olmaz)',
+      );
+
+      // İlk tur aktif, skor 0-0 — displayedScores 0-0 görünmeli
+      client2.emit(OnlineMatchStateUpdate(OnlineMatchState(
+        opponentName: 'Rakip2', serverNowMs: 10000, receivedLocalMs: 10000,
+        phase: OnlineMatchPhase.roundActive, roundNumber: 1,
+        turnIsMine: true, myScore: 0, opponentScore: 0, myHintsLeft: 1,
+        question: const OnlineQuestion(id: 'q3', text: 'Şehir'),
+        deadlineMs: 25000, attempts: const [], opponentConnected: true,
+      )));
+
+      final secondActiveState = container.read(onlineMatchSessionProvider);
+      expect(secondActiveState.isRoundActive, isTrue);
+      expect(
+        secondActiveState.displayedScores['me'],
+        0,
+        reason: 'Yeni online maçın ilk turunda önceki maçtan kalan skor (2) DEĞİL, 0 görünmelidir!',
+      );
+      expect(secondActiveState.displayedScores['bot'], 0);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 }
 
 

@@ -332,6 +332,9 @@ class MatchController extends Notifier<MatchUiState>
       opponentConnected: true,
       isVoided: false,
       isDisconnectedPermanent: false,
+      // Yeni maç başlarken önceki maçtan kalan boardScores kesinlikle temizlenir.
+      // Aksi hâlde eski maçın son skoru yeni maçın ilk turunda görünür.
+      clearBoardScores: true,
     );
 
     final List<Question> pool;

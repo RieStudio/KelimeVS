@@ -210,6 +210,7 @@ class MatchUiState {
     int? powerupErrorCounter,
     bool? isPaused,
     Map<String, int>? boardScores,
+    bool clearBoardScores = false,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -258,7 +259,9 @@ class MatchUiState {
       powerupErrorNotice: powerupErrorNotice ?? this.powerupErrorNotice,
       powerupErrorCounter: powerupErrorCounter ?? this.powerupErrorCounter,
       isPaused: isPaused ?? this.isPaused,
-      boardScores: boardScores ?? this.boardScores,
+      // clearBoardScores=true ise sıfırla (yeni maç başlarken kullanılır),
+      // aksi hâlde verilen değeri al, o da null ise mevcut değeri koru.
+      boardScores: clearBoardScores ? null : (boardScores ?? this.boardScores),
     );
   }
 }
