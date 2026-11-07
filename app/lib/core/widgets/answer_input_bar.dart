@@ -14,7 +14,7 @@ import '../../features/game/domain/attempt_text_sanitizer.dart';
 ///
 /// Giriş alanı: yükseklik 54, 3 px ink kenarlık, köşe 18, Nunito 16/700,
 /// ipucu: "Cevabını yaz…". Yanında 54x54 gönder butonu (primary, beyaz ok, gölge 0 4px 0 ink).
-/// Otomatik düzeltme ve öneri kapalı; klavye "gönder" eylemiyle de gönderilir.
+/// Otomatik düzeltme ve öneri açık; klavye "gönder" eylemiyle de gönderilir.
 /// Sıra bende değilken alan salt okunur ve soluk görünür (klavye kapanmaz).
 /// Boş metin gönderilmez. Gönderince alan temizlenir ve odak korunur.
 ///
@@ -238,10 +238,11 @@ class _AnswerInputBarState extends State<AnswerInputBar>
                       controller: _controller,
                       focusNode: _focusNode,
                       readOnly: !widget.isMyTurn,
+                      keyboardType: TextInputType.text,
                       maxLength: AttemptTextSanitizer.maxLength,
                       buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                      autocorrect: false,
-                      enableSuggestions: false,
+                      autocorrect: true,
+                      enableSuggestions: true,
                       textCapitalization: TextCapitalization.none,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _handleSend(),

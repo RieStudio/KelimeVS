@@ -157,6 +157,9 @@ void main() {
 
     final myTextField = tester.widget<TextField>(find.byType(TextField));
     expect(myTextField.readOnly, isFalse);
+    expect(myTextField.autocorrect, isTrue);
+    expect(myTextField.enableSuggestions, isTrue);
+    expect(myTextField.keyboardType, TextInputType.text);
     expect(myTextField.decoration?.hintText, AppStrings.inputPlaceholder);
 
     // B: Sıra rakipte (turnPlayerId = 'bot')
