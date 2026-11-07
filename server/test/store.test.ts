@@ -1060,7 +1060,6 @@ describe('Store & Avatar Frames - Server Tests', () => {
       const matchReward = await profile.applyMatchReward({
         matchId: 'm_after_migration',
         outcome: 'win',
-        opponentUid: 'opp_1',
         uid,
       });
       expect(matchReward.coinsAwarded).toBe(30);

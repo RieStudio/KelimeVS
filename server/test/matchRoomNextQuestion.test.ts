@@ -148,8 +148,9 @@ describe('MatchRoom nextQuestion Sync and Security Tests', () => {
     aliceMessages.length = 0;
     bobMessages.length = 0;
 
-    // 1. Tur biter (FAST_TIMERS: 3s answer + 0.5s grace = 3.5s; 4s ilerletiyoruz)
-    vi.advanceTimersByTime(4000);
+    // 1. Tur biter (Tam alarm vadesinde ek süre olmadan tetiklenir)
+    const turn1Deadline = (room as any).data.schedule.turnDeadlineMs;
+    vi.setSystemTime(turn1Deadline);
     await room.alarm(); // turnTimeout alarmı tetiklenir
 
     // roundEnded durumundaki state mesajı gönderilmiş olmalı
@@ -169,9 +170,10 @@ describe('MatchRoom nextQuestion Sync and Security Tests', () => {
     expect(round1EndedMsg.nextQuestion.acceptedAnswers).toBeUndefined();
     expect(round1EndedMsg.answers).toBeUndefined();
 
-    // Şimdi fastTimer geçiş süresi (500ms) ilerletilir ve 2. tur başlar
+    // Şimdi fastTimer geçiş süresi (500ms) tam vadesinde ilerletilir ve 2. tur başlar
     aliceMessages.length = 0;
-    vi.advanceTimersByTime(1000);
+    const nextRoundAtMs = (room as any).data.schedule.nextRoundAtMs;
+    vi.setSystemTime(nextRoundAtMs);
     await room.alarm(); // startNextRound tetiklenir
 
     const round2ActiveMsg = aliceMessages.find(

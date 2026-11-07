@@ -19,37 +19,37 @@ import type { Env } from '../../src/index';
 const sampleQuestions: Question[] = [
   {
     id: 'q1',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 1',
     answers: [{ id: 'a1', display: 'Ankara', aliases: ['ankara'] }],
   },
   {
     id: 'q2',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 2',
     answers: [{ id: 'a2', display: 'Cevap 2', aliases: ['cevap2'] }],
   },
   {
     id: 'q3',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 3',
     answers: [{ id: 'a3', display: 'Cevap 3', aliases: ['cevap3'] }],
   },
   {
     id: 'q4',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 4',
     answers: [{ id: 'a4', display: 'Cevap 4', aliases: ['cevap4'] }],
   },
   {
     id: 'q5',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 5',
     answers: [{ id: 'a5', display: 'Cevap 5', aliases: ['cevap5'] }],
   },
   {
     id: 'q6',
-    category: 'genel_kultur',
+    categoryId: 'genel_kultur',
     text: 'Soru 6',
     answers: [{ id: 'a6', display: 'Cevap 6', aliases: ['cevap6'] }],
   },
@@ -526,7 +526,7 @@ describe('MADDE 3: Beraberlik Tavanı (maxTotalRounds = 5) ve Voided Akışı', 
       }
 
       if (postSubmitData.schedule.nextRoundAtMs) {
-        simTime = postSubmitData.schedule.nextRoundAtMs + 10;
+        simTime = postSubmitData.schedule.nextRoundAtMs;
         vi.setSystemTime(simTime);
         await room.alarm();
       }

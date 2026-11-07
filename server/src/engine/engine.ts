@@ -20,7 +20,7 @@ export function opponentOf(state: MatchState, playerId: string): string {
 }
 
 function isTimedOut(state: MatchState, nowMs: number): boolean {
-  return nowMs > state.deadlineMs + state.config.graceMs;
+  return nowMs >= state.deadlineMs + state.config.graceMs;
 }
 
 function filterQuestions(questions: readonly Question[], minAnswers: number): Question[] {

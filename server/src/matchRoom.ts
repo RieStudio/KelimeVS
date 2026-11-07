@@ -403,17 +403,19 @@ export class MatchRoom extends DurableObject<Env> {
           await this.handleMatchFinished();
         }
       } else if (res.state.phase === 'roundEnded') {
-        this.data = {
-          ...this.data,
-          schedule: {
-            ...this.data.schedule,
-            turnDeadlineMs: undefined,
-            nextRoundAtMs: nowMs + this.durations.roundTransitionMs,
-          },
-        };
-        await this.persist();
-        await this.updateAlarm();
-        this.broadcastState();
+        if (this.data.schedule.nextRoundAtMs === undefined) {
+          this.data = {
+            ...this.data,
+            schedule: {
+              ...this.data.schedule,
+              turnDeadlineMs: undefined,
+              nextRoundAtMs: nowMs + this.durations.roundTransitionMs,
+            },
+          };
+          await this.persist();
+          await this.updateAlarm();
+          this.broadcastState();
+        }
       } else {
         this.data = {
           ...this.data,
@@ -637,6 +639,7 @@ export class MatchRoom extends DurableObject<Env> {
           }
 
           const state = deserializeMatchState(this.data.engineState);
+          const prevPhase = state.phase;
           const res = MatchEngine.checkTimeout({
             state,
             nowMs,
@@ -652,18 +655,30 @@ export class MatchRoom extends DurableObject<Env> {
               await this.handleMatchFinished();
             }
           } else if (res.state.phase === 'roundEnded') {
+            if (prevPhase === 'roundActive' || this.data.schedule.nextRoundAtMs === undefined) {
+              this.data = {
+                ...this.data,
+                schedule: {
+                  ...this.data.schedule,
+                  turnDeadlineMs: undefined,
+                  nextRoundAtMs: nowMs + this.durations.roundTransitionMs,
+                },
+              };
+              await this.persist();
+              await this.updateAlarm();
+              this.broadcastState();
+            }
+          } else if (res.state.phase === 'roundActive') {
+            // Self-heal: checkTimeout sonrası tur HÂLÂ roundActive ise takvimde turnDeadlineMs kalmalı
+            const targetDeadline = res.state.deadlineMs + this.turnGraceMs;
+            const recoveredTurnDeadline = targetDeadline > nowMs ? targetDeadline : nowMs + 50;
             this.data = {
               ...this.data,
               schedule: {
                 ...this.data.schedule,
-                turnDeadlineMs: undefined,
-                nextRoundAtMs: nowMs + this.durations.roundTransitionMs,
+                turnDeadlineMs: recoveredTurnDeadline,
               },
             };
-            await this.persist();
-            await this.updateAlarm();
-            this.broadcastState();
-          } else {
             await this.persist();
             await this.updateAlarm();
             this.broadcastState();
@@ -1702,6 +1717,8 @@ export class MatchRoom extends DurableObject<Env> {
     const nextAlarm = computeNextAlarm(this.data.schedule);
     if (nextAlarm !== null) {
       await this.ctx.storage.setAlarm(nextAlarm);
+    } else {
+      await this.ctx.storage.deleteAlarm();
     }
   }
 }

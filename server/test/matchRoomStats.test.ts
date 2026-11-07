@@ -206,8 +206,6 @@ describe('Oyuncu İstatistikleri & MatchRoom Doğru Cevap Doğrulama Testleri', 
       questions,
       questionOrder: ['q1', 'q2', 'q3'],
       matchType: 'ranked',
-      roundsToWin: 2,
-      answerSeconds: 15,
     });
 
     const ws1 = createMockSocket('p1');
@@ -281,8 +279,6 @@ describe('Oyuncu İstatistikleri & MatchRoom Doğru Cevap Doğrulama Testleri', 
       questions,
       questionOrder: ['q1', 'q2', 'q3'],
       matchType: 'ranked',
-      roundsToWin: 2,
-      answerSeconds: 15,
     });
 
     const ws1 = createMockSocket('p1');
@@ -359,8 +355,6 @@ describe('Oyuncu İstatistikleri & MatchRoom Doğru Cevap Doğrulama Testleri', 
       questions,
       questionOrder: ['q1', 'q2', 'q3'],
       matchType: 'ranked',
-      roundsToWin: 2,
-      answerSeconds: 15,
     });
 
     const ws1 = createMockSocket('p1');
@@ -431,8 +425,6 @@ describe('Oyuncu İstatistikleri & MatchRoom Doğru Cevap Doğrulama Testleri', 
       questions,
       questionOrder: ['q1', 'q2', 'q3'],
       matchType: 'ranked',
-      roundsToWin: 2,
-      answerSeconds: 15,
     });
 
     const ws1 = createMockSocket('p1');

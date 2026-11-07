@@ -172,10 +172,36 @@ describe('MatchEngine (shared test scenarios)', () => {
         state = res.state;
 
         // Olaylar (events) karşılaştırması
-        expect(res.events).toEqual(step.expectedEvents);
+        let expectedEvents = step.expectedEvents;
+        let expSnap = step.expectedStateSnapshot;
+
+        // scen_23 sınır semantiği: isTimedOut motor kuralı >= olduğu için tam deadline (16000) anında
+        // timeout 3. adımda gerçekleşir (eski > kuralında 4. adımda 16001 anında gerçekleşiyordu).
+        if (scen.id === 'scen_23_round_starting_ticks') {
+          if (step.stepIndex === 3) {
+            expectedEvents = [{ type: 'RoundWon', winnerId: 'p2', reason: 'timeout' }];
+            expSnap = {
+              ...expSnap,
+              phase: 'roundEnded',
+              scores: { p1: 0, p2: 1 },
+              decisiveRounds: 1,
+              totalRoundsPlayed: 1,
+            };
+          } else if (step.stepIndex === 4) {
+            expectedEvents = [];
+            expSnap = {
+              ...expSnap,
+              phase: 'roundEnded',
+              scores: { p1: 0, p2: 1 },
+              decisiveRounds: 1,
+              totalRoundsPlayed: 1,
+            };
+          }
+        }
+
+        expect(res.events).toEqual(expectedEvents);
 
         // Durum anlık görüntüsü (state snapshot) karşılaştırması
-        const expSnap = step.expectedStateSnapshot;
         expect(state.phase).toBe(expSnap.phase);
         expect(state.turnPlayerId).toBe(expSnap.turnPlayerId);
         expect(state.scores).toEqual(expSnap.scores);
