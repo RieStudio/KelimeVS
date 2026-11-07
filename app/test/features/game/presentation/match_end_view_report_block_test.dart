@@ -157,7 +157,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('CanliRakip'), findsOneWidget);
+    expect(find.text('CanliRakip'), findsNWidgets(2)); // Skor satırı ve rakip kartı
     expect(find.text(AppStrings.reportAction), findsOneWidget);
     expect(find.text(AppStrings.blockAction), findsOneWidget);
   });

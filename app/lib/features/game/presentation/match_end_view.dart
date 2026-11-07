@@ -46,6 +46,17 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   bool _isSubmittingReport = false;
   bool _isSubmittingBlock = false;
 
+  /// Rakip adını sanitize eder: kontrol karakterlerini temizler, ardışık boşlukları
+  /// tek boşluğa indirir, aşırı uzun metinleri sınırlar. Boşsa [AppStrings.opponent] döner.
+  static String _sanitizeOpponentName(String? raw) {
+    if (raw == null) return AppStrings.opponent;
+    final noControlChars = raw.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
+    final trimmed = noControlChars.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (trimmed.isEmpty) return AppStrings.opponent;
+    const maxLength = 24;
+    return trimmed.length <= maxLength ? trimmed : trimmed.substring(0, maxLength);
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -240,9 +251,10 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
         lastMatch.matchId != null &&
         !lastMatch.botlaOynandi;
     final matchId = lastMatch?.matchId;
-    final opponentDisplayName = (lastMatch?.opponentName.isNotEmpty ?? false)
+    final rawOpponentName = (lastMatch?.opponentName.trim().isNotEmpty ?? false)
         ? lastMatch!.opponentName
-        : (uiState.opponentName.isNotEmpty ? uiState.opponentName : AppStrings.opponent);
+        : uiState.opponentName;
+    final opponentDisplayName = _sanitizeOpponentName(rawOpponentName);
     final oppFrame = lastMatch?.opponentFrame ?? uiState.opponentFrame;
 
     final MatchResultVariant resultVariant;
@@ -324,38 +336,52 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
               const SizedBox(height: AppDimens.space16),
 
-              // 5. Skor ("Sen 2 – 1 Rakip")
+              // 5. Skor ("Sen 2 – 1 Rakip" / "Sen 2 – 1 <RakipAdı>")
               Semantics(
-                label: 'Skor: Sen $myScore, Rakip $opponentScore',
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      AppStrings.you,
-                      style: AppTextStyles.questionText.copyWith(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                label: 'Skor: Sen $myScore, $opponentDisplayName $opponentScore',
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        AppStrings.you,
+                        style: AppTextStyles.questionText.copyWith(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-                    Text(
-                      '$myScore${AppStrings.scoreDash}$opponentScore',
-                      style: AppTextStyles.scoreSmall.copyWith(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(width: AppDimens.space8),
+                      Text(
+                        '$myScore${AppStrings.scoreDash}$opponentScore',
+                        style: AppTextStyles.scoreSmall.copyWith(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-                    Text(
-                      AppStrings.opponent,
-                      style: AppTextStyles.questionText.copyWith(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(width: AppDimens.space8),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.35,
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            opponentDisplayName,
+                            maxLines: 1,
+                            style: AppTextStyles.questionText.copyWith(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 

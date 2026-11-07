@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -128,10 +129,10 @@ void main() {
     // Başlık
     expect(find.text(AppStrings.wonExclamation), findsOneWidget);
 
-    // Skor satırı: "Sen", "2 – 1", "Rakip"
+    // Skor satırı: "Sen", "2 – 1", "Ahmet"
     expect(find.text(AppStrings.you), findsOneWidget);
     expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
-    expect(find.text(AppStrings.opponent), findsOneWidget);
+    expect(find.text('Ahmet'), findsOneWidget);
 
     // Jeton ödülü kartı (+30 jeton)
     expect(
@@ -542,8 +543,145 @@ void main() {
       ),
       findsNothing,
     );
+  });
 
+  testWidgets('15. Skor satırında bot adı (M-1234) başarıyla görünür', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'M-1234',
+    );
+    final controller = FakeMatchController(uiState);
 
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
 
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
+    expect(find.text('M-1234'), findsOneWidget);
+  });
+
+  testWidgets('16. Skor satırında uzun ad (20 karakter) görünür ve FittedBox ile sığdırılır', (tester) async {
+    const longName = 'MustafaKemalettin123'; // 20 karakter
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 0},
+      winnerId: 'me',
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: longName,
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(longName), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('17. Rakip adı boş veya sadece boşluklardan oluştuğunda "Rakip" fallback etiketi kullanılır', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 1, 'bot': 2},
+      winnerId: 'bot',
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: '   ',
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('1${AppStrings.scoreDash}2'), findsOneWidget);
+    expect(find.text(AppStrings.opponent), findsOneWidget);
+  });
+
+  testWidgets('18. 360 dp ekranda ve 1.3 yazı ölçeğinde M-9999 ile sıfır taşma oluşur ve didExceedMaxLines false kalır', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'M-9999',
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          matchControllerProvider.overrideWith(() => controller),
+        ],
+        child: const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: Size(360, 640),
+              textScaler: TextScaler.linear(1.3),
+            ),
+            child: Scaffold(
+              body: MatchEndView(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final mFinder = find.text('M-9999');
+    expect(mFinder, findsOneWidget);
+
+    final renderParagraph = tester.renderObject<RenderParagraph>(mFinder);
+    expect(renderParagraph.didExceedMaxLines, isFalse);
+  });
+
+  testWidgets('19. 360 dp ekranda ve 1.3 yazı ölçeğinde uzun ad (20 karakter) ile sıfır taşma oluşur', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    const longName = 'MustafaKemalettin123'; // 20 karakter
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: longName,
+    );
+    final controller = FakeMatchController(uiState);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          matchControllerProvider.overrideWith(() => controller),
+        ],
+        child: const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: Size(360, 640),
+              textScaler: TextScaler.linear(1.3),
+            ),
+            child: Scaffold(
+              body: MatchEndView(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(longName), findsOneWidget);
   });
 }
