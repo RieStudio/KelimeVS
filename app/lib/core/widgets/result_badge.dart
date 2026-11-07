@@ -14,19 +14,39 @@ enum ResultBadgeVariant { won, lost, draw, incomplete }
 /// Yarım kaldı: card zemin + ink yazı + ink kenarlık (nötr etiket).
 class ResultBadge extends StatelessWidget {
   final ResultBadgeVariant variant;
+  final double? width;
+  final EdgeInsetsGeometry padding;
 
   const ResultBadge({
     super.key,
     required this.variant,
+    this.width = AppDimens.resultBadgeWidth,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppDimens.space10),
   });
 
-  const ResultBadge.won({super.key}) : variant = ResultBadgeVariant.won;
+  const ResultBadge.won({
+    super.key,
+    this.width = AppDimens.resultBadgeWidth,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppDimens.space10),
+  }) : variant = ResultBadgeVariant.won;
 
-  const ResultBadge.lost({super.key}) : variant = ResultBadgeVariant.lost;
+  const ResultBadge.lost({
+    super.key,
+    this.width = AppDimens.resultBadgeWidth,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppDimens.space10),
+  }) : variant = ResultBadgeVariant.lost;
 
-  const ResultBadge.draw({super.key}) : variant = ResultBadgeVariant.draw;
+  const ResultBadge.draw({
+    super.key,
+    this.width = AppDimens.resultBadgeWidth,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppDimens.space10),
+  }) : variant = ResultBadgeVariant.draw;
 
-  const ResultBadge.incomplete({super.key}) : variant = ResultBadgeVariant.incomplete;
+  const ResultBadge.incomplete({
+    super.key,
+    this.width = AppDimens.resultBadgeWidth,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppDimens.space10),
+  }) : variant = ResultBadgeVariant.incomplete;
 
   @override
   Widget build(BuildContext context) {
@@ -65,9 +85,9 @@ class ResultBadge extends StatelessWidget {
     return Semantics(
       label: text,
       child: Container(
-        width: AppDimens.resultBadgeWidth,
+        width: width,
         height: 28,
-        alignment: Alignment.center,
+        padding: padding,
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: AppDimens.borderRadiusBadge,
@@ -76,10 +96,16 @@ class ResultBadge extends StatelessWidget {
             width: AppDimens.borderThin,
           ),
         ),
-        child: Text(
-          text,
-          style: AppTextStyles.resultBadge.copyWith(color: textColor),
-          textAlign: TextAlign.center,
+        child: Center(
+          widthFactor: 1.0,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              text,
+              style: AppTextStyles.resultBadge.copyWith(color: textColor),
+              textAlign: TextAlign.center,
+            ),
+          ),
         ),
       ),
     );

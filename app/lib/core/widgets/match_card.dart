@@ -12,8 +12,8 @@ import 'result_badge.dart';
 
 /// DESIGN.md Bölüm 6: Maç Kartı (Ana ekran listesi)
 /// Tüm kart tek dokunma alanı. Soldan sağa:
-/// avatar 40 · ad (Nunito 16/800, tek satır, dikey ortalı) ·
-/// skor (Fredoka 22, sabit 56 genişlik, ortalı) · sonuç etiketi (88) · sağ ok 16.
+/// avatar 40 · ad (Nunito 16/800, tek satır, dikey ortalı, FittedBox) ·
+/// skor (Fredoka 22, içeriği kadar, ortalı) · sonuç etiketi (içeriği kadar) · sağ ok 16.
 /// Kenarlık: kazanılan maç mint, kaybedilen maç dangerSoft.
 class MatchCard extends StatelessWidget {
   final MatchHistoryEntry entry;
@@ -66,71 +66,114 @@ class MatchCard extends StatelessWidget {
                 borderWidth: AppDimens.borderThin,
               ),
 
-              const SizedBox(width: AppDimens.space12),
-
-              // 2. Rakip Adı (Nunito 16/800, tek satır, dikey ortalı, uzunsa kısalt) ve varsa Dostluk rozeti
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        displayName,
-                        style: AppTextStyles.playerName.copyWith(
-                          color: AppColors.ink,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (entry.isFriendly) ...[
-                      const SizedBox(width: AppDimens.space6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.mint.withValues(alpha: 0.2),
-                          borderRadius: AppDimens.borderRadiusFull,
-                          border: Border.all(
-                            color: AppColors.mint,
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          AppStrings.friendDuelBadge,
-                          style: TextStyle(
-                            fontFamily: AppTextStyles.fontNunito,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // 3. Skor (Fredoka 22, sabit 56 genişlik, ortalı)
-              SizedBox(
-                width: 56,
-                child: Text(
-                  '${entry.myScore}${AppStrings.scoreDash}${entry.opponentScore}',
-                  style: const TextStyle(
-                    fontFamily: AppTextStyles.fontFredoka,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
               const SizedBox(width: AppDimens.space10),
 
-              // 4. Sonuç Etiketi (ResultBadge, sabit 88 genişlik)
-              isWon ? const ResultBadge.won() : const ResultBadge.lost(),
+              // 2. Rakip Adı (Expanded, FittedBox ile küçülür, gerekirse ellipsis) ve varsa Dostluk rozeti
+              Expanded(
+                child: entry.isFriendly
+                    ? Row(
+                        children: [
+                          Flexible(
+                            flex: 3,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                displayName,
+                                style: AppTextStyles.playerName.copyWith(
+                                  color: AppColors.ink,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppDimens.space6),
+                          Flexible(
+                            flex: 2,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.mint.withValues(alpha: 0.2),
+                                  borderRadius: AppDimens.borderRadiusFull,
+                                  border: Border.all(
+                                    color: AppColors.mint,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Text(
+                                  AppStrings.friendDuelBadge,
+                                  style: TextStyle(
+                                    fontFamily: AppTextStyles.fontNunito,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          displayName,
+                          style: AppTextStyles.playerName.copyWith(
+                            color: AppColors.ink,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+              ),
+
+              const SizedBox(width: AppDimens.space8),
+
+              // 3. Skor (Fredoka 22, içeriği kadar, ortalı)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 54),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${entry.myScore}${AppStrings.scoreDash}${entry.opponentScore}',
+                    style: const TextStyle(
+                      fontFamily: AppTextStyles.fontFredoka,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: AppDimens.space8),
+
+              // 4. Sonuç Etiketi (ResultBadge, içeriği kadar)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 78),
+                child: isWon
+                    ? const ResultBadge.won(
+                        width: null,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppDimens.space8,
+                        ),
+                      )
+                    : const ResultBadge.lost(
+                        width: null,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppDimens.space8,
+                        ),
+                      ),
+              ),
 
               const SizedBox(width: AppDimens.space8),
 
