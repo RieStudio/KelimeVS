@@ -6,11 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
-import '../../../core/network/network_guard.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../../../core/widgets/secondary_button.dart';
 import '../../auth/application/auth_notifier.dart';
-import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
 import '../domain/nickname_validator.dart';
 
@@ -38,7 +35,7 @@ class _OnboardingNicknameScreenState
   late final TextEditingController _controller;
   String? _errorMessage;
   bool _isSubmitting = false;
-  bool _isGoogleSigningIn = false;
+  bool _isSigningOut = false;
 
   @override
   void initState() {
@@ -70,7 +67,7 @@ class _OnboardingNicknameScreenState
   }
 
   Future<void> _submit() async {
-    if (!_isValid || _isSubmitting || _isGoogleSigningIn) return;
+    if (!_isValid || _isSubmitting || _isSigningOut) return;
 
     final validation = NicknameValidator.validate(_controller.text);
     if (!validation.isValid || validation.normalized == null) {
@@ -97,45 +94,69 @@ class _OnboardingNicknameScreenState
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    if (_isSubmitting || _isGoogleSigningIn) return;
-    if (!ensureNetworkConnected(context, ref)) return;
+  Future<void> _confirmAndSignOut({
+    required String title,
+    required String message,
+    required String confirmText,
+  }) async {
+    if (_isSigningOut || _isSubmitting) return;
 
-    setState(() {
-      _isGoogleSigningIn = true;
-    });
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppDimens.borderRadiusDialog,
+        ),
+        title: Text(
+          title,
+          style: AppTextStyles.cardTitle.copyWith(color: AppColors.ink),
+        ),
+        content: Text(
+          message,
+          style: AppTextStyles.bodyText.copyWith(color: AppColors.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text(
+              AppStrings.cancel,
+              style: TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontWeight: FontWeight.w700,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+          TextButton(
+            key: const Key('onboarding_confirm_sign_out_button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              confirmText,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontWeight: FontWeight.w800,
+                color: AppColors.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
 
-    try {
-      final result =
-          await ref.read(authNotifierProvider.notifier).signInWithGoogle();
-
-      if (!mounted) return;
-
-      if (result is AuthLinkError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.message)),
-        );
-      } else if (result is AuthLinkSuccess) {
-        final profile = ref.read(profileProvider);
-        if (profile.hasNickname) {
-          if (widget.onComplete != null) {
-            widget.onComplete!();
-          } else if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
+    if (confirmed == true && mounted) {
+      if (_isSigningOut) return;
+      setState(() {
+        _isSigningOut = true;
+      });
+      try {
+        await ref.read(authNotifierProvider.notifier).signOut();
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSigningOut = false;
+          });
         }
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.authGenericError)),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isGoogleSigningIn = false;
-        });
       }
     }
   }
@@ -146,202 +167,215 @@ class _OnboardingNicknameScreenState
 
     final authState = ref.watch(authNotifierProvider);
     final profile = ref.watch(profileProvider);
-    final isBusy = _isSubmitting || _isGoogleSigningIn || authState.isLoading;
-    final showGoogleNotice = authState.isGoogleLinked && !profile.hasNickname;
+    final isBusy = _isSubmitting || _isSigningOut || authState.isLoading;
+    final showAccountBar = (authState.isGoogleLinked ||
+            (authState.isAuthenticated && authState.linkedEmail != null)) &&
+        !profile.hasNickname;
 
     return PopScope(
-      canPop: !isBusy,
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (isBusy) return;
+        _confirmAndSignOut(
+          title: AppStrings.exitWithoutNicknameDialogTitle,
+          message: AppStrings.exitWithoutNicknameDialogMessage,
+          confirmText: AppStrings.exit,
+        );
+      },
       child: Scaffold(
         backgroundColor: AppColors.surface,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimens.screenPaddingHorizontal,
-              vertical: AppDimens.screenPaddingTop,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Center(child: KelimeVSLogo()),
-                const SizedBox(height: AppDimens.space24),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.screenPaddingHorizontal,
+                vertical: AppDimens.screenPaddingTop,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Center(child: KelimeVSLogo()),
+                  const SizedBox(height: AppDimens.space24),
 
-                Text(
-                  AppStrings.welcomeTitle,
-                  style: AppTextStyles.screenTitle.copyWith(
-                    color: AppColors.ink,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppDimens.space8),
-
-                Text(
-                  AppStrings.welcomePrompt,
-                  style: AppTextStyles.bodyText.copyWith(
-                    color: AppColors.muted,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (showGoogleNotice) ...[
-                  const SizedBox(height: AppDimens.space16),
-                  Container(
-                    key: const Key('google_linked_no_profile_notice'),
-                    padding: const EdgeInsets.all(AppDimens.space12),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusAlertBox,
-                      border: Border.all(
-                        color: AppColors.mint,
-                        width: AppDimens.borderThin,
-                      ),
+                  Text(
+                    AppStrings.welcomeTitle,
+                    style: AppTextStyles.screenTitle.copyWith(
+                      color: AppColors.ink,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.info_outline_rounded,
-                          color: AppColors.primary,
-                          size: 20,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppDimens.space8),
+
+                  Text(
+                    AppStrings.welcomePrompt,
+                    style: AppTextStyles.bodyText.copyWith(
+                      color: AppColors.muted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (showAccountBar) ...[
+                    const SizedBox(height: AppDimens.space16),
+                    Container(
+                      key: const Key('google_linked_no_profile_notice'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space12,
+                        vertical: AppDimens.space8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: AppDimens.borderRadiusAlertBox,
+                        border: Border.all(
+                          color: AppColors.mint,
+                          width: AppDimens.borderThin,
                         ),
-                        const SizedBox(width: AppDimens.space10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                AppStrings.googleLinkedNoProfileNotice,
-                                style: TextStyle(
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.account_circle_outlined,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppDimens.space8),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                authState.linkedEmail ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
                                   fontFamily: AppTextStyles.fontNunito,
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.ink,
-                                  height: 1.35,
                                 ),
                               ),
-                              if (authState.linkedEmail != null &&
-                                  authState.linkedEmail!.isNotEmpty) ...[
-                                const SizedBox(height: AppDimens.space4),
-                                Text(
-                                  authState.linkedEmail!,
-                                  style: const TextStyle(
-                                    fontFamily: AppTextStyles.fontNunito,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.muted,
-                                  ),
-                                ),
-                              ],
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppDimens.space24),
-
-                // Giriş Kutusu (kart zemin, 3 px ink kenarlık, köşe 18)
-                Container(
-                  height: AppDimens.inputHeight,
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppDimens.borderRadiusInput,
-                    border: Border.all(
-                      color: _errorMessage != null
-                          ? AppColors.dangerSoft
-                          : AppColors.ink,
-                      width: AppDimens.borderThick,
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.space16,
-                  ),
-                  alignment: Alignment.center,
-                  child: TextField(
-                    controller: _controller,
-                    onChanged: _onTextChanged,
-                    onSubmitted: (_) => _submit(),
-                    autofocus: true,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    maxLength: 16,
-                    style: AppTextStyles.inputField,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      counterText: '',
-                      hintText: AppStrings.nicknameHint,
-                      hintStyle: TextStyle(
-                        fontFamily: AppTextStyles.fontNunito,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppDimens.space6),
-
-                // Kural ipucu / hata mesajı ve karakter sayacı
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _errorMessage ?? AppStrings.nicknameRuleHint,
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.fontNunito,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _errorMessage != null
-                              ? AppColors.dangerText
-                              : AppColors.muted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppDimens.space8),
-                    Text(
-                      '$currentLength/16',
-                      style: const TextStyle(
-                        fontFamily: AppTextStyles.fontNunito,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.muted,
+                          const SizedBox(width: AppDimens.space8),
+                          TextButton(
+                            key: const Key('onboarding_switch_account_button'),
+                            onPressed: isBusy
+                                ? null
+                                : () => _confirmAndSignOut(
+                                      title: AppStrings.switchAccountDialogTitle,
+                                      message:
+                                          AppStrings.switchAccountDialogMessage,
+                                      confirmText: AppStrings.switchAccount,
+                                    ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              AppStrings.switchAccount,
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.fontNunito,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: isBusy
+                                    ? AppColors.muted
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: AppDimens.space24),
+                  const SizedBox(height: AppDimens.space24),
 
-                // Devam Butonu
-                PrimaryButton(
-                  text: AppStrings.continueAction,
-                  onPressed: _isValid && !isBusy ? _submit : null,
-                ),
-                const SizedBox(height: AppDimens.space12),
-
-                // Google ile Devam Et Butonu
-                SecondaryButton(
-                  text: AppStrings.signInWithGoogle,
-                  onPressed: isBusy ? null : _handleGoogleSignIn,
-                ),
-                const SizedBox(height: AppDimens.space8),
-                const Text(
-                  AppStrings.signInWithGoogleHint,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.fontNunito,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.muted,
+                  // Giriş Kutusu (kart zemin, 3 px ink kenarlık, köşe 18)
+                  Container(
+                    height: AppDimens.inputHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: AppDimens.borderRadiusInput,
+                      border: Border.all(
+                        color: _errorMessage != null
+                            ? AppColors.dangerSoft
+                            : AppColors.ink,
+                        width: AppDimens.borderThick,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space16,
+                    ),
+                    alignment: Alignment.center,
+                    child: TextField(
+                      controller: _controller,
+                      onChanged: _onTextChanged,
+                      onSubmitted: (_) => _submit(),
+                      autofocus: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      maxLength: 16,
+                      style: AppTextStyles.inputField,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        counterText: '',
+                        hintText: AppStrings.nicknameHint,
+                        hintStyle: TextStyle(
+                          fontFamily: AppTextStyles.fontNunito,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: AppDimens.space6),
+
+                  // Kural ipucu / hata mesajı ve karakter sayacı
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _errorMessage ?? AppStrings.nicknameRuleHint,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.fontNunito,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _errorMessage != null
+                                ? AppColors.dangerText
+                                : AppColors.muted,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppDimens.space8),
+                      Text(
+                        '$currentLength/16',
+                        style: const TextStyle(
+                          fontFamily: AppTextStyles.fontNunito,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.space24),
+
+                  // Devam Butonu
+                  PrimaryButton(
+                    text: AppStrings.continueAction,
+                    onPressed: _isValid && !isBusy ? _submit : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 }

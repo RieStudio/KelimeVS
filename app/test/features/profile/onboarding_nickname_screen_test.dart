@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
-import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/auth/domain/auth_link_result.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
@@ -43,19 +42,21 @@ class FakeAuthRepository implements AuthRepository {
   bool isGoogleLinked;
 
   @override
-  bool isAuthenticated = true;
+  bool isAuthenticated;
 
   @override
   String? linkedEmail;
 
   AuthLinkResult signInResultToReturn;
   bool signInWithGoogleCalled = false;
+  bool signOutCalled = false;
 
   final _controller = StreamController<User?>.broadcast();
 
   FakeAuthRepository({
-    this.isGoogleLinked = false,
-    this.linkedEmail,
+    this.isGoogleLinked = true,
+    this.isAuthenticated = true,
+    this.linkedEmail = 'user@example.com',
     this.signInResultToReturn = const AuthLinkSuccess(email: 'user@example.com'),
   });
 
@@ -89,7 +90,13 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> signInWithConflictCredential(AuthCredential credential) async {}
 
   @override
-  Future<void> signOutAndResetToAnonymous() async {}
+  Future<void> signOutAndResetToAnonymous() async {
+    signOutCalled = true;
+    isAuthenticated = false;
+    isGoogleLinked = false;
+    linkedEmail = null;
+    _controller.add(null);
+  }
 
   @override
   Future<AuthLinkResult> reauthenticateGoogle() async => const AuthLinkSuccess();
@@ -98,7 +105,13 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> deleteFirebaseUser() async {}
 
   @override
-  Future<void> completeAccountDeletionAndReset() async {}
+  Future<void> completeAccountDeletionAndReset() async {
+    signOutCalled = true;
+    isAuthenticated = false;
+    isGoogleLinked = false;
+    linkedEmail = null;
+    _controller.add(null);
+  }
 }
 
 void main() {
@@ -115,7 +128,7 @@ void main() {
   }) {
     return ProviderScope(
       overrides: [
-        if (authRepo != null) authRepositoryProvider.overrideWithValue(authRepo),
+        authRepositoryProvider.overrideWithValue(authRepo ?? FakeAuthRepository()),
         if (apiClient != null) profileApiClientProvider.overrideWithValue(apiClient),
       ],
       child: MaterialApp(
@@ -124,7 +137,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Başlangıç durumu: başlık, ipucu, devre dışı Devam butonu, Google butonu, alt açıklama ve anonimde bilgi kutusu görünmez', (tester) async {
+  testWidgets('1. Başlangıç durumu (Google ile oturum açık): Başlık, ipucu, e-posta, "Hesabı değiştir" görünür; Google butonu YOK; Devam butonu kapalı', (tester) async {
     await tester.pumpWidget(buildTestScreen());
     await tester.pumpAndSettle();
 
@@ -138,15 +151,13 @@ void main() {
     );
     expect(continueButton.onPressed, isNull);
 
-    // Google ile Devam Et butonu ve açıklama metni mevcut
-    final googleButton = tester.widget<SecondaryButton>(
-      find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle),
-    );
-    expect(googleButton.onPressed, isNotNull);
-    expect(find.text(AppStrings.signInWithGoogleHint), findsOneWidget);
+    // Google ile Giriş Yap butonu ARTIK BU EKRANDA YOKTUR
+    expect(find.text(AppStrings.signInWithGoogle), findsNothing);
 
-    // Normal anonim yeni kullanıcıda kalıcı Google bilgi kutusu görünmez
-    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
+    // Hesap çubuğu: e-posta ve "Hesabı değiştir" bağlantısı mevcut
+    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
+    expect(find.text('user@example.com'), findsOneWidget);
+    expect(find.text(AppStrings.switchAccount), findsOneWidget);
   });
 
   testWidgets('2. Geçersiz girdi (kısa ya da küfür): hata mesajı görünür ve Devam butonu kapalı kalır', (tester) async {
@@ -202,128 +213,105 @@ void main() {
     expect(saved, 'Zeynep_01');
   });
 
-  testWidgets('4. Google ile Devam: Kullanıcı pencereyi iptal ederse onboarding ekranında kalır ve hata çıkmaz', (tester) async {
-    final authRepo = FakeAuthRepository(
-      signInResultToReturn: const AuthLinkCanceled(),
-    );
-
+  testWidgets('4. "Hesabı değiştir" butonu: Tıklandığında onay penceresi açılır; Vazgeç\'e basılınca ekranda kalınır ve signOut çağrılmaz', (tester) async {
+    final authRepo = FakeAuthRepository();
     await tester.pumpWidget(buildTestScreen(authRepo: authRepo));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+    // "Hesabı değiştir" bağlantısına tıkla
+    await tester.tap(find.byKey(const Key('onboarding_switch_account_button')));
     await tester.pumpAndSettle();
 
-    expect(authRepo.signInWithGoogleCalled, isTrue);
+    // Onay penceresi görünür
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text(AppStrings.switchAccountDialogMessage), findsOneWidget);
+
+    // "Vazgeç"e bas
+    await tester.tap(find.text(AppStrings.cancel));
+    await tester.pumpAndSettle();
+
+    expect(authRepo.signOutCalled, isFalse);
     expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets('5. Google ile Devam: Hata dönerse SnackBar ile hata gösterilir ve onboardingde kalır', (tester) async {
-    final authRepo = FakeAuthRepository(
-      signInResultToReturn: const AuthLinkError('Google servisine ulaşılamadı'),
-    );
-
+  testWidgets('5. "Hesabı değiştir" butonu: Onaylandığında signOut çağrılır', (tester) async {
+    final authRepo = FakeAuthRepository();
     await tester.pumpWidget(buildTestScreen(authRepo: authRepo));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+    await tester.tap(find.byKey(const Key('onboarding_switch_account_button')));
     await tester.pumpAndSettle();
 
-    expect(authRepo.signInWithGoogleCalled, isTrue);
+    // "Hesabı değiştir" onay butonuna tıkla
+    await tester.tap(find.byKey(const Key('onboarding_confirm_sign_out_button')));
+    await tester.pumpAndSettle();
+
+    expect(authRepo.signOutCalled, isTrue);
+  });
+
+  testWidgets('6. Sistem geri tuşu (PopScope): Geri tuşuna basıldığında onay penceresi açılır; Vazgeç\'e basılınca ekranda kalınır', (tester) async {
+    final authRepo = FakeAuthRepository();
+    await tester.pumpWidget(buildTestScreen(authRepo: authRepo));
+    await tester.pumpAndSettle();
+
+    // Sistem geri tuşunu simüle et
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    // Çıkış onay penceresi açıldı
+    expect(find.text(AppStrings.exitWithoutNicknameDialogTitle), findsOneWidget);
+    expect(find.text(AppStrings.exitWithoutNicknameDialogMessage), findsOneWidget);
+
+    // "Vazgeç"e tıkla
+    await tester.tap(find.text(AppStrings.cancel));
+    await tester.pumpAndSettle();
+
+    expect(authRepo.signOutCalled, isFalse);
     expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
-    expect(find.text('Google servisine ulaşılamadı'), findsOneWidget);
+    expect(find.text(AppStrings.exitWithoutNicknameDialogTitle), findsNothing);
   });
 
-  testWidgets('6. Google ile Devam (Mevcut Hesap): Sunucuda takma adı olan hesapta onComplete tetiklenir', (tester) async {
-    bool completed = false;
-    final authRepo = FakeAuthRepository(
-      signInResultToReturn: const AuthLinkSuccess(email: 'test@gmail.com'),
-    );
-    final apiClient = FakeProfileApiClient()
-      ..mockProfile = const UserProfileModel(
-        uid: 'test_uid',
-        nickname: 'EskiKullanici',
-        coins: 100,
-      );
-
-    await tester.pumpWidget(buildTestScreen(
-      authRepo: authRepo,
-      apiClient: apiClient,
-      onComplete: () => completed = true,
-    ));
+  testWidgets('7. Sistem geri tuşu (PopScope): Onaylandığında signOut çağrılır', (tester) async {
+    final authRepo = FakeAuthRepository();
+    await tester.pumpWidget(buildTestScreen(authRepo: authRepo));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(authRepo.signInWithGoogleCalled, isTrue);
-    expect(completed, isTrue);
+    // Çıkış onay butonuna tıkla ("Çık")
+    await tester.tap(find.byKey(const Key('onboarding_confirm_sign_out_button')));
+    await tester.pumpAndSettle();
+
+    expect(authRepo.signOutCalled, isTrue);
   });
 
-  testWidgets('7. Google ile Devam (Yeni Hesap): Sunucuda takma adı olmayan hesapta kalıcı bilgi kutusu ve e-posta görünür', (tester) async {
-    bool completed = false;
+  testWidgets('8. 360 dp genişlik ve 1.3 yazı ölçeğinde uzun e-posta ile taşma (overflow) olmadan çizilir', (tester) async {
+    tester.view.physicalSize = const Size(360 * 2.0, 800 * 2.0);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final authRepo = FakeAuthRepository(
-      signInResultToReturn: const AuthLinkSuccess(email: 'yeni@google.com'),
+      linkedEmail: 'cok_uzun_bir_google_hesabi_ve_eposta_adresi_test_icin_olusturuldu_123456789@example.com',
     );
-    final apiClient = FakeProfileApiClient()
-      ..mockProfile = const UserProfileModel(
-        uid: 'test_uid_new',
-        nickname: null,
-        coins: 100,
-      );
 
-    await tester.pumpWidget(buildTestScreen(
-      authRepo: authRepo,
-      apiClient: apiClient,
-      onComplete: () => completed = true,
-    ));
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          textScaler: TextScaler.linear(1.3),
+          size: Size(360, 800),
+        ),
+        child: buildTestScreen(authRepo: authRepo),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsNothing);
-
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
-    await tester.pumpAndSettle();
-
-    expect(authRepo.signInWithGoogleCalled, isTrue);
-    expect(completed, isFalse);
     expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
-    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
-    expect(find.text(AppStrings.googleLinkedNoProfileNotice), findsOneWidget);
-    expect(find.text('yeni@google.com'), findsOneWidget);
-  });
-
-  testWidgets('8. Yeni Google hesabı bağlandıktan sonra geçerli takma ad girilip devam edilince kaydedilir', (tester) async {
-    bool completed = false;
-    final authRepo = FakeAuthRepository(
-      signInResultToReturn: const AuthLinkSuccess(email: 'yeni@google.com'),
-    );
-    final apiClient = FakeProfileApiClient()
-      ..mockProfile = const UserProfileModel(
-        uid: 'test_uid_new',
-        nickname: null,
-        coins: 100,
-      );
-
-    await tester.pumpWidget(buildTestScreen(
-      authRepo: authRepo,
-      apiClient: apiClient,
-      onComplete: () => completed = true,
-    ));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('google_linked_no_profile_notice')), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField), 'GoogleOyuncu');
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.continueAction));
-    await tester.pumpAndSettle();
-
-    expect(completed, isTrue);
-    const repo = LocalProfileRepository();
-    expect(await repo.getNickname(), 'GoogleOyuncu');
+    expect(find.text(AppStrings.switchAccount), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -278,11 +278,16 @@ abstract final class AppStrings {
       'Giriş servisine ulaşılamadı. Lütfen tekrar dene.';
   static const String serverProfileLoadError =
       'Sunucu profili yüklenemedi. Lütfen tekrar dene.';
-  static const String signInWithGoogleHint =
-      'Önceki hesabın varsa Google ile devam et.';
   static const String googleLinkedNoProfileNotice =
       'Bu Google hesabında henüz KelimeVS hesabı yok. Bir takma ad seç, hesabın bu Google hesabına bağlı olarak oluşturulsun.';
   static const String linkedAccount = 'Bağlı Hesap';
+  static const String switchAccount = 'Hesabı değiştir';
+  static const String switchAccountDialogTitle = 'Hesabı değiştir';
+  static const String switchAccountDialogMessage =
+      'Mevcut Google oturumun kapatılacak ve giriş ekranına döneceksin. Devam etmek istiyor musun?';
+  static const String exitWithoutNicknameDialogTitle = 'Giriş ekranına dön';
+  static const String exitWithoutNicknameDialogMessage =
+      'Takma ad belirlemeden çıkmak istiyor musun? Giriş ekranına döneceksin.';
   static const String signOut = 'Çıkış Yap';
   static const String linkConflictDialogTitle = 'Farklı Bir Hesap Bulundu';
   static const String linkConflictDialogMessage =

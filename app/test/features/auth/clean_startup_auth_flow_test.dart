@@ -237,6 +237,44 @@ void main() {
       expect(authRepo.signInWithGoogleCallCount, 1);
       expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
       expect(find.byType(HomeScreen), findsNothing);
+      expect(find.widgetWithText(SecondaryButton, AppStrings.signInWithGoogle), findsNothing);
+      expect(find.text(AppStrings.switchAccount), findsOneWidget);
+      expect(find.text('google@test.com'), findsOneWidget);
+    });
+
+    testWidgets('3b. Takma ad ekranından "Hesabı değiştir" onaylanınca signOut çalışır ve WelcomeScreen açılır', (tester) async {
+      final authRepo = _TrackingAuthRepo(initialAuthenticated: false);
+      final apiClient = _TrackingProfileApiClient()
+        ..profileToReturn = const UserProfileModel(
+          uid: 'google_user_new',
+          nickname: null,
+          coins: 100,
+          isGuest: false,
+        );
+
+      await tester.pumpWidget(buildApp(authRepo: authRepo, apiClient: apiClient));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.signInWithGoogle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingNicknameScreen), findsOneWidget);
+
+      // "Hesabı değiştir" butonuna tıkla
+      await tester.tap(find.byKey(const Key('onboarding_switch_account_button')));
+      await tester.pumpAndSettle();
+
+      // Onay penceresi görünür
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text(AppStrings.switchAccountDialogMessage), findsOneWidget);
+
+      // Onayla
+      await tester.tap(find.byKey(const Key('onboarding_confirm_sign_out_button')));
+      await tester.pumpAndSettle();
+
+      expect(authRepo.signOutCallCount, 1);
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
     });
 
     testWidgets('4. Çıkış yapınca (signOut) WelcomeScreen açılır ve YENİ anonim hesap açılmaz', (tester) async {
