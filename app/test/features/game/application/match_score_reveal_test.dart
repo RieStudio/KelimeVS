@@ -134,8 +134,8 @@ void main() {
           expect(uiState.displayedScores['me'], 0);
           expect(uiState.displayedScores['bot'], 0);
 
-          // Tur süresini (15 sn + 500 ms grace) aş
-          async.elapse(const Duration(milliseconds: 16000));
+          // Tur süresini (20 sn + 1000 ms grace) aş
+          async.elapse(const Duration(milliseconds: 21000));
 
           uiState = container.read(matchControllerProvider);
           expect(uiState.isRoundEnded, isTrue);
@@ -193,7 +193,7 @@ void main() {
           controller.submit('elma');
 
           // Bot cevap vermeden sıra bota geçer; botun süresi aşılır
-          async.elapse(const Duration(milliseconds: 16000));
+          async.elapse(const Duration(milliseconds: 21000));
 
           uiState = container.read(matchControllerProvider);
           expect(uiState.isRoundEnded, isTrue);
@@ -410,7 +410,7 @@ void main() {
       '6. Widget testi: MatchScreen içindeki PlayerCard tur sonu ekranı varken displayedScores kullanır ve eski skorda kalır',
       (tester) async {
         final matchState = MatchState(
-          config: const MatchConfig(totalDecisiveRounds: 3, answerSeconds: 15),
+          config: const MatchConfig(totalDecisiveRounds: 3, answerSeconds: 20),
           playerIds: const ['me', 'bot'],
           scores: const {'me': 1, 'bot': 0},
           decisiveRounds: 1,
@@ -419,7 +419,7 @@ void main() {
           currentQuestion: _testQuestion1,
           usedAnswerIds: const {},
           turnPlayerId: 'me',
-          deadlineMs: 15000,
+          deadlineMs: 20000,
           remainingNearMisses: const {'me': 1, 'bot': 1},
           usedQuestionIds: const {'q1'},
           currentRoundAttempts: const [],
@@ -542,7 +542,7 @@ void main() {
           async.flushMicrotasks();
 
           // Tur 1: Bot süre aşımına uğrar (me: 1, bot: 0)
-          async.elapse(const Duration(milliseconds: 16000));
+          async.elapse(const Duration(milliseconds: 21000));
           async.flushMicrotasks();
 
           // Tur 1 -> Tur 2 geçişi (3.5 sn)
@@ -552,7 +552,7 @@ void main() {
           // Tur 2: Kullanıcı doğru cevap verir ('kedi'), bot süre aşımına uğrar -> Maç biter (me: 2, bot: 0)
           final q = container.read(matchControllerProvider).matchState?.currentQuestion;
           controller.submit(q!.answers.first.aliases.first);
-          async.elapse(const Duration(milliseconds: 17000));
+          async.elapse(const Duration(milliseconds: 21000));
           async.flushMicrotasks();
 
           // 500 ms matchFinishDelayMs sonra maç sonu commit edilir

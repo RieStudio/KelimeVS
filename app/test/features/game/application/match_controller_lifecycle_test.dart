@@ -68,7 +68,7 @@ void main() {
   ProviderContainer createContainer({
     required FakeClock clock,
     int thinkMs = 1500,
-    int answerSeconds = 15,
+    int answerSeconds = 20,
   }) {
     return ProviderContainer(
       overrides: [
@@ -145,20 +145,20 @@ void main() {
     test('2. Kullanıcı sırasında paused iken süre akmaz, resumed sonrası kalan süreyle devam eder', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
-        final container = createContainer(clock: clock, answerSeconds: 15);
+        final container = createContainer(clock: clock, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 
         controller.startMatch();
         async.flushMicrotasks();
 
-        // Maç başladı, sıra kullanıcıda ('me'), toplam 15.000 ms
+        // Maç başladı, sıra kullanıcıda ('me'), toplam 20.000 ms
         expect(controller.state.matchState?.turnPlayerId, 'me');
         expect(controller.state.matchState?.phase, MatchPhase.roundActive);
 
         // 3 saniye geçer (tick timer çalışır)
         async.elapse(const Duration(seconds: 3));
-        expect(controller.state.remainingMs, 12000);
+        expect(controller.state.remainingMs, 17000);
 
         // Uygulama arka plana gider (paused)
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.paused);
@@ -176,15 +176,15 @@ void main() {
         expect(controller.isPausedForTesting, isFalse);
         expect(controller.state.isPaused, isFalse);
 
-        // Kalan süre hala ~12.000 ms'dir (20 saniyelik arka plan süresi tüketmemiştir!)
-        expect(controller.state.remainingMs, 12000);
+        // Kalan süre hala ~17.000 ms'dir (20 saniyelik arka plan süresi tüketmemiştir!)
+        expect(controller.state.remainingMs, 17000);
 
-        // Şimdi 6 saniye normal akar -> kalan 6 sn
+        // Şimdi 6 saniye normal akar -> kalan 11 sn
         async.elapse(const Duration(seconds: 6));
-        expect(controller.state.remainingMs, 6000);
+        expect(controller.state.remainingMs, 11000);
 
-        // 6.5 saniye daha geçer -> 12 saniyelik hak dolunca normal timeout gerçekleşir
-        async.elapse(const Duration(milliseconds: 6500));
+        // 11.5 saniye daha geçer -> 17 saniyelik hak dolunca normal timeout gerçekleşir
+        async.elapse(const Duration(milliseconds: 11500));
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
       });
     });
@@ -193,7 +193,7 @@ void main() {
       fakeAsync((async) {
         final clock = FakeClock(async);
         // Bot düşünme süresi 2000 ms
-        final container = createContainer(clock: clock, thinkMs: 2000, answerSeconds: 15);
+        final container = createContainer(clock: clock, thinkMs: 2000, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 
@@ -238,7 +238,7 @@ void main() {
     test('4. Tur sonu geçişinde (roundEnded 3500ms) paused olunca yeni tur arka planda başlamaz, dönüşte kalan süreyle başlar', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
-        final container = createContainer(clock: clock, answerSeconds: 15);
+        final container = createContainer(clock: clock, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 
@@ -246,7 +246,7 @@ void main() {
         async.flushMicrotasks();
 
         // Kullanıcı timeout olsun -> tur biter (roundEnded, 3500 ms geçiş süresi)
-        async.elapse(const Duration(milliseconds: 15500));
+        async.elapse(const Duration(milliseconds: 20500));
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
         expect(controller.state.roundTransitionRemainingMs, greaterThan(0));
 
@@ -255,8 +255,8 @@ void main() {
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.paused);
         expect(controller.isPausedForTesting, isTrue);
 
-        // Arka planda 15 saniye bekletilir
-        async.elapse(const Duration(seconds: 15));
+        // Arka planda 20 saniye bekletilir
+        async.elapse(const Duration(seconds: 20));
 
         // Arka planda yeni tur başlamaz, hala roundEnded kalır
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
@@ -278,36 +278,36 @@ void main() {
     test('5. Çoklu paused / resumed döngüsünde kümülatif süre doğru korunur', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
-        final container = createContainer(clock: clock, answerSeconds: 15);
+        final container = createContainer(clock: clock, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 
         controller.startMatch();
         async.flushMicrotasks();
 
-        // 1. Döngü: 2 sn oyna (kalan 13 sn), 5 sn duraklat
+        // 1. Döngü: 2 sn oyna (kalan 18 sn), 5 sn duraklat
         async.elapse(const Duration(seconds: 2));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.inactive);
         async.elapse(const Duration(seconds: 5));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.resumed);
-        expect(controller.state.remainingMs, 13000);
+        expect(controller.state.remainingMs, 18000);
 
-        // 2. Döngü: 3 sn daha oyna (kalan 10 sn), 10 sn duraklat
+        // 2. Döngü: 3 sn daha oyna (kalan 15 sn), 10 sn duraklat
         async.elapse(const Duration(seconds: 3));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.paused);
         async.elapse(const Duration(seconds: 10));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.resumed);
-        expect(controller.state.remainingMs, 10000);
+        expect(controller.state.remainingMs, 15000);
 
-        // 3. Döngü: 4 sn daha oyna (kalan 6 sn), 7 sn duraklat
+        // 3. Döngü: 4 sn daha oyna (kalan 11 sn), 7 sn duraklat
         async.elapse(const Duration(seconds: 4));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.hidden);
         async.elapse(const Duration(seconds: 7));
         controller.handleAppLifecycleStateForTesting(AppLifecycleState.resumed);
-        expect(controller.state.remainingMs, 6000);
+        expect(controller.state.remainingMs, 11000);
 
-        // Kalan 6 sn normal akar
-        async.elapse(const Duration(milliseconds: 6500));
+        // Kalan 11 sn normal akar
+        async.elapse(const Duration(milliseconds: 11500));
         expect(controller.state.matchState?.phase, MatchPhase.roundEnded);
       });
     });
@@ -315,7 +315,7 @@ void main() {
     test('6. Maç bittikten sonra gelen lifecycle olayları zararsızdır (no-op)', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
-        final container = createContainer(clock: clock, answerSeconds: 15);
+        final container = createContainer(clock: clock, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 
@@ -343,7 +343,7 @@ void main() {
     test('7. Duraklatılmışken savunmacı kontroller: kullanıcı submit yapamaz, motor timeout üretemez', () {
       fakeAsync((async) {
         final clock = FakeClock(async);
-        final container = createContainer(clock: clock, answerSeconds: 15);
+        final container = createContainer(clock: clock, answerSeconds: 20);
         addTearDown(container.dispose);
         final controller = container.read(matchControllerProvider.notifier);
 

@@ -150,7 +150,7 @@ void main() {
       expect(client.connectedMatchId, 'm_1');
 
       // Sunucu saati 50000, yerel alış saati 10000 -> clockOffsetMs = +40000
-      // deadlineMs = 65000 (sunucu saatine göre 15 sn kaldı)
+      // deadlineMs = 70000 (sunucu saatine göre 20 sn kaldı)
       final onlineState = OnlineMatchState(
         serverNowMs: 50000,
         receivedLocalMs: 10000,
@@ -163,7 +163,7 @@ void main() {
           text: 'A ile başlayan şehirler',
         ),
         turnIsMine: true,
-        deadlineMs: 65000,
+        deadlineMs: 70000,
         myHintsLeft: 1,
         attempts: const [
           OnlineAttempt(mine: false, text: 'ankara', result: 'correct'),
@@ -185,7 +185,7 @@ void main() {
       expect(uiState.opponentName, 'Elif');
       expect(uiState.opponentConnected, isTrue);
       expect(uiState.isMyTurn, isTrue);
-      expect(uiState.remainingMs, 15000);
+      expect(uiState.remainingMs, 20000);
 
       final matchState = uiState.matchState!;
       expect(matchState.phase, MatchPhase.roundActive);

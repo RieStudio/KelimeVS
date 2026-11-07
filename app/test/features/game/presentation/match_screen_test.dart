@@ -98,7 +98,7 @@ void main() {
   );
 
   const testMatchState = MatchState(
-    config: MatchConfig(totalDecisiveRounds: 3, answerSeconds: 15),
+    config: MatchConfig(totalDecisiveRounds: 3, answerSeconds: 20),
     playerIds: ['me', 'bot'],
     scores: {'me': 1, 'bot': 0},
     decisiveRounds: 1,
@@ -107,7 +107,7 @@ void main() {
     currentQuestion: testQuestion,
     usedAnswerIds: {'boga', 'baykus'},
     turnPlayerId: 'me',
-    deadlineMs: 15000,
+    deadlineMs: 20000,
     remainingNearMisses: {'me': 1, 'bot': 1},
     usedQuestionIds: {'q_test_1'},
     currentRoundAttempts: [],

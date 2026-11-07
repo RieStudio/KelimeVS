@@ -31,7 +31,7 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 ## 3. Maç kuralları
 
 1. **[KARAR]** Bir maç en fazla 3 tur sürer (3 turun en iyisi). Her turda bir soru (kategori) oynanır.
-2. **[KARAR]** Oyuncular sırayla cevap yazar. Her cevap için süre **15 saniyedir**.
+2. **[KARAR]** Oyuncular sırayla cevap yazar. Her cevap için süre **20 saniyedir**.
 3. **[KARAR]** Sırası gelen oyuncu, süresi dolmadan doğru ve daha önce söylenmemiş bir cevap veremezse o turu kaybeder; rakip o turun puanını alır. **Turu kaybetmenin tek koşulu süre dolmasıdır.** Yanlış ya da daha önce söylenmiş cevap turu kaybettirmez: cevap kabul edilmez, süre akmaya devam eder ve oyuncu istediği kadar yeniden deneyebilir (bölüm 4.5'teki kötüye kullanım sınırları hariç).
 3b. **[KARAR]** Maçı terk eden oyuncu maçı kaybeder; rakip maçı kazanır (mevcut skordan bağımsız).
 3c. **[KARAR]** Oyuncunun yaptığı her deneme (doğru, yanlış ya da tekrar eden) maç sırasında iki oyuncuya da gösterilir; rakip, oyuncunun yazdığı yanlış cevabı da görür. Yok sayılan denemeler (bölüm 4.5) gösterilmez. Kabul edilmeyen denemeler listede kırmızı balonla ayırt edilir. **İstisna:** henüz söylenmemiş bir cevaba "çok yakın" olan denemeler tur bitene kadar rakibe gösterilmez (ipucu hakkı bitmiş olsa bile); aksi halde rakip, düzeltilmiş hâlini yazarak kopya çekebilir. İpucu verilen yakın denemeler ise kimseye balon olarak gösterilmez, oyuncu yalnızca "Çok yakın!" ipucunu görür (rakibin de görüyormuş gibi yanlış anlamaması için). Online maçta sunucu bu denemeleri rakibe hiç iletmez. Tur bitince ve maç detayında herkese görünür (bölüm 4.3).

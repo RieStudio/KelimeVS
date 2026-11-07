@@ -95,7 +95,7 @@ void main() {
       endedBy: endedBy,
       usedAnswerIds: const {},
       turnPlayerId: 'me',
-      deadlineMs: 15000,
+      deadlineMs: 20000,
       remainingNearMisses: const {'me': 1, 'bot': 1},
       usedQuestionIds: const {'q_test_1'},
       currentRoundAttempts: const [],

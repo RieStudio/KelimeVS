@@ -84,7 +84,7 @@ void main() {
           matchHistoryRepositoryProvider.overrideWithValue(fakeRepo),
           matchConfigProvider.overrideWithValue(
             const MatchConfig(
-              answerSeconds: 15,
+              answerSeconds: 20,
               totalDecisiveRounds: 3,
             ),
           ),
@@ -106,14 +106,14 @@ void main() {
       );
 
       // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)
-      async.elapse(const Duration(milliseconds: 15200));
+      async.elapse(const Duration(milliseconds: 20200));
       // 3.5 sn geçiş
       async.elapse(const Duration(milliseconds: 3550));
 
       // 2. Tur: Sıra botta. Bot 1000 ms sonra cevap verir
       async.elapse(const Duration(milliseconds: 1000));
       // Sıra me'ye geçer, me süre aşımına uğrar (bot: 2, me: 0, maç 2-0 ile biter!)
-      async.elapse(const Duration(milliseconds: 15200));
+      async.elapse(const Duration(milliseconds: 20200));
 
       // matchFinished tetiklendi (Best of 3 kuralı: 2 galibiyete ulaşıldı), repo'ya tam 1 kayıt eklenmiş olmalı
       expect(fakeRepo.entries.length, 1);
@@ -147,7 +147,7 @@ void main() {
           matchHistoryRepositoryProvider.overrideWithValue(fakeRepo),
           matchConfigProvider.overrideWithValue(
             const MatchConfig(
-              answerSeconds: 15,
+              answerSeconds: 20,
               totalDecisiveRounds: 3,
             ),
           ),
@@ -215,7 +215,7 @@ void main() {
           randomProvider.overrideWithValue(math.Random(7)),
           matchConfigProvider.overrideWithValue(
             const MatchConfig(
-              answerSeconds: 15,
+              answerSeconds: 20,
               totalDecisiveRounds: 3,
             ),
           ),
@@ -264,7 +264,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -286,14 +286,14 @@ void main() {
         );
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar (bot: 1, me: 0)
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
         // 3.5 sn geçiş
         async.elapse(const Duration(milliseconds: 3550));
 
         // 2. Tur: Sıra botta. Bot 1000 ms sonra cevap verir
         async.elapse(const Duration(milliseconds: 1000));
         // Sıra me'ye geçer, me süre aşımına uğrar (bot: 2, me: 0, maç 2-0 ile biter!)
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
         async.flushMicrotasks();
 
         // Uygulama yeniden başlatılmış gibi YENİ bir LocalMatchHistoryRepository örneğiyle oku

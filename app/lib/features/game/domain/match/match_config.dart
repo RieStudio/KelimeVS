@@ -35,7 +35,7 @@ class MatchConfig {
     int roundsToWin = 2,
     this.maxTotalRounds = 5,
     int? totalDecisiveRounds,
-    this.answerSeconds = 15,
+    this.answerSeconds = 20,
     this.graceMs = 0,
     this.nearMissPerRound = 1,
     this.minAnswersPerQuestion = 0,

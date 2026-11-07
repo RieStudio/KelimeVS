@@ -84,7 +84,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),

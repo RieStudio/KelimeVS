@@ -32,7 +32,7 @@ class PlayerCard extends StatelessWidget {
     this.isActive = false,
     this.remainingSeconds,
     this.timeProgress,
-    this.maxSeconds = 15,
+    this.maxSeconds = 20,
     this.isPaused = false,
   });
 

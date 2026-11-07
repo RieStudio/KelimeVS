@@ -103,7 +103,7 @@ abstract final class AppStrings {
 
   /// Maç öncesi ipucu havuzundaki tüm metinlerin listesi.
   /// [answerSeconds] değeri MatchConfig'ten dinamik geçirilebilir.
-  static List<String> getMatchTips({int answerSeconds = 15}) => [
+  static List<String> getMatchTips({int answerSeconds = 20}) => [
         matchTipBestOfThree,
         matchTipAnswerSeconds(answerSeconds),
         matchTipWrongDoesNotLose,

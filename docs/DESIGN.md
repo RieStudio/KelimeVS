@@ -115,7 +115,7 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 
 **Avatar** – Tam yuvarlak, 3 px (liste için 2 px) `ink` kenarlık, ortada oyuncu adının baş harfi (Fredoka 700). Kendi avatarı: `primary` zemin + beyaz harf (maç içi) ya da `bright` (ana ekran); rakip: `coin` zemin; bilinmeyen rakip: beyaz zemin + kesik çizgili kenarlık + "?".
 
-**Oyuncu kartı (maç ekranı)** – Zemin `card`, 3 px `ink` kenarlık, köşe 20. Avatar 36, ad, skor (Fredoka 34). **Sırası olan oyuncunun kartı süre göstergesidir:** kartın içinde `bright` bir dolgu soldan sağa kalan süre oranında uzanır (15 sn → %100, 0 sn → %0) ve sağdan sola azalır; ad altında "11 sn" yazar. Sırası olmayan oyuncu kartında dolgu ve süre yazısı yoktur. Kart yalnızca bir `LinearProgress` benzeri katmandır, ayrı bir sayaç öğesi yoktur.
+**Oyuncu kartı (maç ekranı)** – Zemin `card`, 3 px `ink` kenarlık, köşe 20. Avatar 36, ad, skor (Fredoka 34). **Sırası olan oyuncunun kartı süre göstergesidir:** kartın içinde `bright` bir dolgu soldan sağa kalan süre oranında uzanır (20 sn → %100, 0 sn → %0) ve sağdan sola azalır; ad altında "11 sn" yazar. Sırası olmayan oyuncu kartında dolgu ve süre yazısı yoktur. Kart yalnızca bir `LinearProgress` benzeri katmandır, ayrı bir sayaç öğesi yoktur.
 - **[VARSAYIM]** Kalan süre 5 saniyeye indiğinde dolgu `danger` tonuna (açık kırmızı) geçer. Renk geçişi 200 ms.
 - Erişilebilirlik: dolgu bir `progressbar` olarak etiketlenir ("Kalan süre").
 

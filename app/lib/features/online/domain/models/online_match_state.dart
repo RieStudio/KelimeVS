@@ -165,7 +165,7 @@ class OnlineMatchState {
     this.winnerIsMe,
     this.lastRound,
     this.nextRoundAtMs,
-    this.answerSeconds = 15,
+    this.answerSeconds = 20,
     this.extraTimePowerup,
   });
 
@@ -221,7 +221,7 @@ class OnlineMatchState {
     final lastRound =
         lastRoundMap != null ? OnlineLastRound.fromJson(lastRoundMap) : null;
 
-    final ansSec = (json['answerSeconds'] as num?)?.toInt() ?? 15;
+    final ansSec = (json['answerSeconds'] as num?)?.toInt() ?? 20;
     final powerupsMap = json['powerups'] as Map<String, dynamic>?;
     final extraTimeMap = powerupsMap?['extraTime'] as Map<String, dynamic>?;
     final extraTimePowerup = extraTimeMap != null

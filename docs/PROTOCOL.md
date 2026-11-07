@@ -369,7 +369,7 @@ Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton veril
 
 6. **Ağ Gecikmesi Toleransı (`TURN_GRACE_MS`):**
    - Sunucu tarafında `TURN_GRACE_MS` (varsayılan: 400 ms) ile cevap kabul toleransı uygulanır (`MatchConfig.graceMs`).
-   - İstemciye giden `state.deadlineMs` nominal kalır; böylece istemci arayüzündeki geri sayım çubuğu nominal 15 saniyeyi gösterir.
+   - İstemciye giden `state.deadlineMs` nominal kalır; böylece istemci arayüzündeki geri sayım çubuğu nominal 20 saniyeyi gösterir.
    - Durable Object `schedule.turnDeadlineMs` alarmı `state.deadlineMs + turnGraceMs` zamanına kurulur.
    - Son milisaniyelerde gönderilen cevaplar ağ gecikmesi olsa dahi tolerans dahilinde kabul edilir.
 
@@ -452,7 +452,7 @@ Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
 
 | Zamanlayıcı | Normal Süre | Hızlı Test Modu (`FAST_TIMERS=true`) | Açıklama |
 |---|---|---|---|
-| Hamle Süresi (`answerSeconds`) | 15 sn | 3 sn | Oyuncunun doğru cevap vermek için sahip olduğu süre |
+| Hamle Süresi (`answerSeconds`) | 20 sn | 3 sn | Oyuncunun doğru cevap vermek için sahip olduğu süre |
 | Tur Geçiş Süresi (`roundTransitionMs`) | 2000 ms | 500 ms | Tur sonu ile yeni turun başlaması arasındaki bekleme |
 | Bağlantı Kopma Toleransı (`disconnectTimeoutMs`) | 30 sn | 3 sn | Kopan oyuncunun geri dönmesi için tanınan süre |
 | İlk Bağlantı Bekleme (`connectTimeoutMs`) | 10 sn | 3 sn | Eşleşme sonrası rakibin odaya ilk bağlantısını bekleme |

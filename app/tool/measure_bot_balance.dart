@@ -85,7 +85,7 @@ void main(List<String> args) {
 
     if (decision.willTimeout) {
       timeoutCount++;
-      delays.add(15000);
+      delays.add(20000);
     } else {
       final totalDelay = decision.actions.fold<int>(0, (sum, a) => sum + a.delayMs);
       delays.add(totalDelay);
@@ -107,7 +107,7 @@ void main(List<String> args) {
 
   delays.sort();
   final avgDelay = delays.reduce((a, b) => a + b) / delays.length;
-  final answeredDelays = delays.where((d) => d < 15000).toList();
+  final answeredDelays = delays.where((d) => d < 20000).toList();
   final avgAnswerDelay = answeredDelays.reduce((a, b) => a + b) / answeredDelays.length;
 
   print('Toplam Karar: $totalDecisions');

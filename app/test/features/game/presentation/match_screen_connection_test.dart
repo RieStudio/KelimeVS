@@ -66,7 +66,7 @@ void main() {
     currentQuestion: testQuestion,
     usedAnswerIds: const {},
     turnPlayerId: 'me',
-    deadlineMs: 15000,
+    deadlineMs: 20000,
     remainingNearMisses: const {'me': 1, 'bot': 0},
     usedQuestionIds: const {},
     currentRoundAttempts: const [],

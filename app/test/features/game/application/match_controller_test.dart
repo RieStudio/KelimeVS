@@ -102,7 +102,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -164,7 +164,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -209,7 +209,7 @@ void main() {
             questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 graceMs: 0,
                 totalDecisiveRounds: 3,
               ),
@@ -226,7 +226,7 @@ void main() {
         expect(state.matchState!.scores['me'], 0);
 
         // Kullanıcı cevap vermeden 15 saniyeyi geçirir (200ms periyodik tick kontrol eder)
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
 
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
@@ -250,7 +250,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -294,7 +294,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -305,7 +305,7 @@ void main() {
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // Süre aşımı ile turu bitir
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
 
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
@@ -346,7 +346,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 roundsToWin: 2,
               ),
             ),
@@ -357,7 +357,7 @@ void main() {
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Tur: Sıra me'de. Süre aşımı ile Bot 1-0 kazanır
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -375,7 +375,7 @@ void main() {
 
         // Me süre aşımına uğrar -> Bot 2-0 kazanır.
         // Best of 3 kuralı: 2 galibiyete ulaşıldığı için motor matchFinished yapar, 3. tur oynanmaz!
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 20200));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.scores['bot'], 2);
         expect(state.matchState!.scores['me'], 0);
@@ -421,7 +421,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 roundsToWin: 2,
               ),
             ),
@@ -432,7 +432,7 @@ void main() {
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 1-0 kazanır
-        async.elapse(const Duration(milliseconds: 15000));
+        async.elapse(const Duration(milliseconds: 20000));
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -445,7 +445,7 @@ void main() {
         expect(state.matchState!.turnPlayerId, 'bot');
 
         // 2. Tur: Sıra botta. Bot bilmediği için cevap vermez, süre aşımına uğrar -> Me 1-1 yapar
-        async.elapse(const Duration(milliseconds: 15000));
+        async.elapse(const Duration(milliseconds: 20000));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -459,7 +459,7 @@ void main() {
         expect(state.matchState!.turnPlayerId, 'me');
 
         // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 2-1 kazanır ve maç biter!
-        async.elapse(const Duration(milliseconds: 15000));
+        async.elapse(const Duration(milliseconds: 20000));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.scores['bot'], 2);
         expect(state.matchState!.scores['me'], 1);
@@ -491,7 +491,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -524,7 +524,7 @@ void main() {
             questionRepositoryProvider.overrideWithValue(FakeQuestionRepository(sampleQuestions)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -554,7 +554,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
               ),
             ),
@@ -566,13 +566,13 @@ void main() {
 
         async.elapse(const Duration(milliseconds: 5000));
         var state = container.read(matchControllerProvider);
-        expect(state.remainingMs, lessThanOrEqualTo(10000));
+        expect(state.remainingMs, lessThanOrEqualTo(15000));
 
         // Yeniden maç başlat
         controller.startMatch(questions: sampleQuestions, opponentName: 'Bot2', initialTurnPlayerId: 'me');
         state = container.read(matchControllerProvider);
         expect(state.opponentName, 'Bot2');
-        expect(state.remainingMs, 15000);
+        expect(state.remainingMs, 20000);
         expect(state.matchState!.scores['bot'], 0);
         expect(state.matchState!.scores['me'], 0);
 
@@ -589,7 +589,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
                 minSubmitIntervalMs: 600,
               ),
@@ -641,7 +641,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
                 minSubmitIntervalMs: 600,
               ),
@@ -795,7 +795,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
                 minSubmitIntervalMs: 600,
               ),
@@ -833,7 +833,7 @@ void main() {
             randomProvider.overrideWithValue(math.Random(1)),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
                 nearMissPerRound: 1,
               ),
@@ -906,7 +906,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 totalDecisiveRounds: 3,
                 nearMissPerRound: 1,
               ),
@@ -1001,7 +1001,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 roundsToWin: 2,
               ),
             ),
@@ -1024,8 +1024,8 @@ void main() {
         expect(rawBotAttempts.length, 1);
         expect(rawBotAttempts.first.resultType, isNot(equals(AttemptResultType.correct)));
 
-        // Tur sonuna kadar (14.000 ms daha) bekletilir: Bot başka hiçbir şey göndermez
-        async.elapse(const Duration(milliseconds: 14000));
+        // Tur sonuna kadar (19.000 ms daha) bekletilir: Bot başka hiçbir şey göndermez
+        async.elapse(const Duration(milliseconds: 19000));
         state = container.read(matchControllerProvider);
 
         final finalRawBotAttempts = state.matchState!.currentRoundAttempts.where((a) => a.playerId == 'bot').toList();
@@ -1057,7 +1057,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 roundsToWin: 2,
               ),
             ),
@@ -1111,7 +1111,7 @@ void main() {
             ),
             matchConfigProvider.overrideWithValue(
               const MatchConfig(
-                answerSeconds: 15,
+                answerSeconds: 20,
                 roundsToWin: 2,
               ),
             ),
@@ -1199,8 +1199,8 @@ void main() {
           initialTurnPlayerId: 'bot',
         );
 
-        // 1. Tur botun süre aşımıyla biter (16 sn)
-        async.elapse(const Duration(milliseconds: 16000));
+        // 1. Tur botun süre aşımıyla biter (21 sn)
+        async.elapse(const Duration(milliseconds: 21000));
 
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);

@@ -30,7 +30,7 @@ void main() {
     });
 
     testWidgets('320 dp dar ekran ve textScaler 1.5 altında tüm havuz metinleri taşma olmadan çizilir', (tester) async {
-      final tips = AppStrings.getMatchTips(answerSeconds: 15);
+      final tips = AppStrings.getMatchTips(answerSeconds: 20);
 
       for (final tip in tips) {
         await tester.pumpWidget(

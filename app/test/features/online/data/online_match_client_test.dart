@@ -32,7 +32,7 @@ void main() {
 
       // 1. State mesajı
       fakeConnection.emitIncoming(
-        '{"t":"state","serverNowMs":1000,"phase":"roundActive","roundNumber":1,"scores":{"me":0,"opponent":0},"question":{"id":"q1","text":"Test?"},"turnIsMine":true,"deadlineMs":15000,"myHintsLeft":1,"attempts":[],"opponentName":"Rakip","opponentConnected":true}',
+        '{"t":"state","serverNowMs":1000,"phase":"roundActive","roundNumber":1,"scores":{"me":0,"opponent":0},"question":{"id":"q1","text":"Test?"},"turnIsMine":true,"deadlineMs":20000,"myHintsLeft":1,"attempts":[],"opponentName":"Rakip","opponentConnected":true}',
       );
       await Future<void>.delayed(Duration.zero);
 

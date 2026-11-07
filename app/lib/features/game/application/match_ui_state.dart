@@ -138,9 +138,9 @@ class MatchUiState {
   Map<String, int> get displayedScores =>
       boardScores ?? matchState?.scores ?? const {'me': 0, 'bot': 0};
 
-  /// Güçlendirici ve tur süresinden türetilen dinamik tavan saniye (varsayılan: 15).
+  /// Güçlendirici ve tur süresinden türetilen dinamik tavan saniye (varsayılan: 20).
   int get maxAllowedSeconds {
-    final base = matchState?.config.answerSeconds ?? 15;
+    final base = matchState?.config.answerSeconds ?? 20;
     final extra = extraTimeSeconds ?? 0;
     return base + extra;
   }
