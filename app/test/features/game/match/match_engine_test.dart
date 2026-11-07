@@ -507,7 +507,7 @@ void main() {
       expect(state.roundHistory.first.winnerId, equals('p2'));
     });
 
-    test('7. Grace period sınır testleri (tam sınırda geçerli, 1ms sonrasında timeout)', () {
+    test('7. Grace period sınır testleri (1ms öncesinde geçerli, tam sınırda ve sonrasında timeout)', () {
       final config = const MatchConfig(answerSeconds: 10, graceMs: 500);
       final random = math.Random(1);
 
@@ -520,14 +520,24 @@ void main() {
       );
       final state = res.state;
 
-      // Tam sınırda gönderilen cevap kabul edilmelidir
+      // 1ms öncesinde gönderilen cevap kabul edilmelidir (11499 < 11500)
       final borderValidRes = MatchEngine.submit(
+        state: state,
+        playerId: 'p1',
+        rawInput: 'audi',
+        nowMs: 11499,
+      );
+      expect(borderValidRes.events.first, isA<AnswerAccepted>());
+
+      // Tam sınırda gönderilen cevap timeout olmalıdır (11500 >= 11500)
+      final borderExactRes = MatchEngine.submit(
         state: state,
         playerId: 'p1',
         rawInput: 'audi',
         nowMs: 11500,
       );
-      expect(borderValidRes.events.first, isA<AnswerAccepted>());
+      expect(borderExactRes.events.first, isA<RoundWon>());
+      expect((borderExactRes.events.first as RoundWon).reason, equals(RoundEndReason.timeout));
 
       // Sınırı 1ms geçen gönderim timeout olmalıdır
       final borderOverRes = MatchEngine.submit(
@@ -539,9 +549,13 @@ void main() {
       expect(borderOverRes.events.first, isA<RoundWon>());
       expect((borderOverRes.events.first as RoundWon).reason, equals(RoundEndReason.timeout));
 
-      // checkTimeout için de tam sınırda timeout oluşmamalı, 1ms sonrasında oluşmalı
-      final checkBorderValid = MatchEngine.checkTimeout(state: state, nowMs: 11500);
-      expect(checkBorderValid.events, isEmpty);
+      // checkTimeout için de 1ms öncesinde timeout oluşmamalı, tam sınırda ve sonrasında oluşmalı
+      final checkBorderBefore = MatchEngine.checkTimeout(state: state, nowMs: 11499);
+      expect(checkBorderBefore.events, isEmpty);
+
+      final checkBorderExact = MatchEngine.checkTimeout(state: state, nowMs: 11500);
+      expect(checkBorderExact.events.first, isA<RoundWon>());
+      expect((checkBorderExact.events.first as RoundWon).reason, equals(RoundEndReason.timeout));
 
       final checkBorderOver = MatchEngine.checkTimeout(state: state, nowMs: 11501);
       expect(checkBorderOver.events.first, isA<RoundWon>());

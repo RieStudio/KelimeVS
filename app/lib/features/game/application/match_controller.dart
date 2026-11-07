@@ -885,7 +885,7 @@ class MatchController extends Notifier<MatchUiState>
         state = state.copyWith(remainingMs: remaining);
 
         // Süre aşımı kontrolü
-        if (now > match.deadlineMs + match.config.graceMs) {
+        if (now >= match.deadlineMs + match.config.graceMs) {
           final res = MatchEngine.checkTimeout(state: match, nowMs: now);
           if (res.events.isNotEmpty) {
             _applyEngineResult(

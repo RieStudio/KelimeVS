@@ -417,7 +417,7 @@ abstract final class MatchEngine {
   // --- Yardımcı Metodlar ---
 
   static bool _isTimedOut(MatchState state, int nowMs) {
-    return nowMs > state.deadlineMs + state.config.graceMs;
+    return nowMs >= state.deadlineMs + state.config.graceMs;
   }
 
   static EngineResult _endRound({

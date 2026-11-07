@@ -432,7 +432,7 @@ void main() {
         controller.startMatch(questions: sampleQuestions, opponentName: 'TestBot', initialTurnPlayerId: 'me');
 
         // 1. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 1-0 kazanır
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 15000));
         var state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -445,7 +445,7 @@ void main() {
         expect(state.matchState!.turnPlayerId, 'bot');
 
         // 2. Tur: Sıra botta. Bot bilmediği için cevap vermez, süre aşımına uğrar -> Me 1-1 yapar
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 15000));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.phase, MatchPhase.roundEnded);
         expect(state.matchState!.scores['bot'], 1);
@@ -459,7 +459,7 @@ void main() {
         expect(state.matchState!.turnPlayerId, 'me');
 
         // 3. Tur: Sıra me'de. Me süre aşımına uğrar -> Bot 2-1 kazanır ve maç biter!
-        async.elapse(const Duration(milliseconds: 15200));
+        async.elapse(const Duration(milliseconds: 15000));
         state = container.read(matchControllerProvider);
         expect(state.matchState!.scores['bot'], 2);
         expect(state.matchState!.scores['me'], 1);

@@ -1377,8 +1377,8 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
       ('tick', {'nowMs': 5000}),
       ('tick', {'nowMs': 10000}),
       ('tick', {'nowMs': 15000}),
-      ('tick', {'nowMs': 16000}), // exactly on deadline -> not timed out yet
-      ('tick', {'nowMs': 16001}), // past deadline -> timeout
+      ('tick', {'nowMs': 16000}), // exactly on deadline (nowMs >= deadlineMs) -> timeout
+      ('tick', {'nowMs': 16001}), // past deadline -> already ended
     ],
   ));
 

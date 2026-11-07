@@ -3766,16 +3766,22 @@
           "payload": {
             "nowMs": 16000
           },
-          "expectedEvents": [],
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
           "expectedStateSnapshot": {
-            "phase": "roundActive",
+            "phase": "roundEnded",
             "turnPlayerId": "p1",
             "scores": {
               "p1": 0,
-              "p2": 0
+              "p2": 1
             },
-            "decisiveRounds": 0,
-            "totalRoundsPlayed": 0,
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
             "currentQuestionId": "q1",
             "winnerId": null,
             "endedBy": null,
@@ -3794,13 +3800,7 @@
           "payload": {
             "nowMs": 16001
           },
-          "expectedEvents": [
-            {
-              "type": "RoundWon",
-              "winnerId": "p2",
-              "reason": "timeout"
-            }
-          ],
+          "expectedEvents": [],
           "expectedStateSnapshot": {
             "phase": "roundEnded",
             "turnPlayerId": "p1",
