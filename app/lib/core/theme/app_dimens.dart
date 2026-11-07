@@ -71,6 +71,7 @@ abstract final class AppDimens {
   static const double avatarMatch = 34.0;
   static const double avatarSearch = 92.0;
   static const double avatarEnd = 104.0;
+  static const double matchEndIcon = 116.0;
   static const double footerLogoHeight = 15.0;
 
   // Avatar Görsel Çerçeve Düzen Boşlukları
@@ -137,26 +138,6 @@ abstract final class AppDimens {
     BoxShadow(
       color: AppColors.ink,
       offset: Offset(0, 3),
-      blurRadius: 0,
-      spreadRadius: 0,
-    ),
-  ];
-
-  static const double borderResultCircle = 4.0;
-
-  static const List<BoxShadow> shadowResultCircleWin = [
-    BoxShadow(
-      color: AppColors.ink,
-      offset: Offset(0, 4),
-      blurRadius: 0,
-      spreadRadius: 0,
-    ),
-  ];
-
-  static const List<BoxShadow> shadowResultCircleLose = [
-    BoxShadow(
-      color: AppColors.dangerDark,
-      offset: Offset(0, 4),
       blurRadius: 0,
       spreadRadius: 0,
     ),

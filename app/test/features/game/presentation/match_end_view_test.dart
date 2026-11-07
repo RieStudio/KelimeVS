@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/config/app_config.dart';
-import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/match_result_icon.dart';
 import 'package:app/core/widgets/primary_button.dart';
-import 'package:app/core/widgets/result_circle.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
@@ -104,7 +103,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Maç kazanıldığında (win): kupa ikonu, "Kazandın!", +30 jeton, skor doğru', (tester) async {
+  testWidgets('1. Maç kazanıldığında (win): match_win.svg ikonu, "Kazandın!", +30 jeton, skor doğru', (tester) async {
     final matchState = createMatchState(
       scores: {'me': 2, 'bot': 1},
       winnerId: 'me',
@@ -119,12 +118,12 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // ResultCircle: win varyantı, trophy ikonu
-    final circleFinder = find.byType(ResultCircle);
-    expect(circleFinder, findsOneWidget);
-    final circle = tester.widget<ResultCircle>(circleFinder);
-    expect(circle.variant, ResultCircleVariant.win);
-    expect(circle.icon, AppIcons.trophy);
+    // MatchResultIcon: win varyantı, match_win.svg
+    final iconFinder = find.byType(MatchResultIcon);
+    expect(iconFinder, findsOneWidget);
+    final icon = tester.widget<MatchResultIcon>(iconFinder);
+    expect(icon.variant, MatchResultVariant.win);
+    expect(icon.assetPath, MatchResultIcon.winAsset);
 
     // Başlık
     expect(find.text(AppStrings.wonExclamation), findsOneWidget);
@@ -145,7 +144,7 @@ void main() {
     expect(find.text(AppStrings.youLeftMatch), findsNothing);
   });
 
-  testWidgets('2. Maç kaybedildiğinde (lose): tekrar ikonu, "Kaybettin", +10 jeton, skor doğru', (tester) async {
+  testWidgets('2. Maç kaybedildiğinde (lose): match_lose.svg ikonu, "Kaybettin", +10 jeton, skor doğru', (tester) async {
     final matchState = createMatchState(
       scores: {'me': 1, 'bot': 2},
       winnerId: 'bot',
@@ -160,12 +159,12 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    // ResultCircle: lose varyantı, refresh ikonu
-    final circleFinder = find.byType(ResultCircle);
-    expect(circleFinder, findsOneWidget);
-    final circle = tester.widget<ResultCircle>(circleFinder);
-    expect(circle.variant, ResultCircleVariant.lose);
-    expect(circle.icon, AppIcons.refresh);
+    // MatchResultIcon: lose varyantı, match_lose.svg
+    final iconFinder = find.byType(MatchResultIcon);
+    expect(iconFinder, findsOneWidget);
+    final icon = tester.widget<MatchResultIcon>(iconFinder);
+    expect(icon.variant, MatchResultVariant.lose);
+    expect(icon.assetPath, MatchResultIcon.loseAsset);
 
     // Başlık (ünlemsiz)
     expect(find.text(AppStrings.lost), findsOneWidget);

@@ -11,7 +11,7 @@ import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../../../core/widgets/result_circle.dart';
+import '../../../core/widgets/match_result_icon.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
@@ -25,7 +25,7 @@ import '../../profile/data/blocked_users_api_client.dart';
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
 ///
 /// Sol üstte kapat (ana ekrana; şimdilik galeriye döner).
-/// Ortada ResultCircle (kazandın: kupa, kaybettin: tekrar oku), başlık,
+/// Ortada MatchResultIcon (kazandın: match_win.svg, kaybettin: match_lose.svg), başlık,
 /// terk notu (varsa), skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı.
 /// Altta "Tekrar Oyna" (ana buton).
 /// // TODO: Sonraki adımda "Maç Detayı" butonu eklenecek.
@@ -245,19 +245,16 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
         : (uiState.opponentName.isNotEmpty ? uiState.opponentName : AppStrings.opponent);
     final oppFrame = lastMatch?.opponentFrame ?? uiState.opponentFrame;
 
-    final ResultCircleVariant circleVariant;
-    final AppIconData icon;
+    final MatchResultVariant resultVariant;
     final String title;
     final TextStyle titleStyle;
 
     if (isWinner) {
-      circleVariant = ResultCircleVariant.win;
-      icon = AppIcons.trophy;
+      resultVariant = MatchResultVariant.win;
       title = AppStrings.wonExclamation;
       titleStyle = AppTextStyles.largeResult;
     } else {
-      circleVariant = ResultCircleVariant.lose;
-      icon = AppIcons.refresh;
+      resultVariant = MatchResultVariant.lose;
       title = AppStrings.lost;
       titleStyle = AppTextStyles.largeResultDanger;
     }
@@ -294,13 +291,12 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
               const Spacer(flex: 3),
 
-              // 2. ResultCircle (104 px)
-              ResultCircle(
-                variant: circleVariant,
-                icon: icon,
+              // 2. Maç Sonu SVG İkonu (116 dp)
+              MatchResultIcon(
+                variant: resultVariant,
               ),
 
-              const SizedBox(height: AppDimens.space20),
+              const SizedBox(height: AppDimens.space12),
 
               // 3. Başlık ("Kazandın!" / "Kaybettin")
               Semantics(
