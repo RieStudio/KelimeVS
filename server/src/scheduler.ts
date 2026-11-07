@@ -42,7 +42,7 @@ export function getRoomDurations(isFastTimers: boolean): RoomDurations {
     };
   }
   return {
-    answerSeconds: 15,
+    answerSeconds: 20,
     roundTransitionMs: 3500,
     disconnectTimeoutMs: 30000,
     connectTimeoutMs: 10000,

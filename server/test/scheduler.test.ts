@@ -10,7 +10,7 @@ describe('Scheduler and Alarm Management', () => {
   describe('getRoomDurations', () => {
     it('FAST_TIMERS false iken standart süreleri döndürür', () => {
       const d = getRoomDurations(false);
-      expect(d.answerSeconds).toBe(15);
+      expect(d.answerSeconds).toBe(20);
       expect(d.roundTransitionMs).toBe(3500);
       expect(d.disconnectTimeoutMs).toBe(30000);
       expect(d.connectTimeoutMs).toBe(10000);

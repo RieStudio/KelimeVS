@@ -161,9 +161,9 @@ describe('MatchRoom Exact-Time Alarm & Self-Heal Tests (Madde 6)', () => {
     await (room as any).handlePlayerConnected('p1');
     await (room as any).handlePlayerConnected('p2');
 
-    // 1. Tur başladı: 15s cevap + 400ms grace = 15400ms -> vadesi: t0 + 15400 = 25400
+    // 1. Tur başladı: 20s cevap + 400ms grace = 20400ms -> vadesi: t0 + 20400 = 30400
     const alarmTime = getAlarmTime();
-    expect(alarmTime).toBe(t0 + 15400);
+    expect(alarmTime).toBe(t0 + 20400);
 
     // EKSTRA MS YOK: Tam alarm vadesine gidilir (nowMs === turnDeadlineMs)
     vi.setSystemTime(alarmTime!);
@@ -208,7 +208,7 @@ describe('MatchRoom Exact-Time Alarm & Self-Heal Tests (Madde 6)', () => {
     await (room as any).handlePlayerConnected('p2');
 
     const alarmTime = getAlarmTime()!;
-    expect(alarmTime).toBe(t0 + 15400);
+    expect(alarmTime).toBe(t0 + 20400);
 
     // checkTimeout'un süre dolmadı dediği senaryoyu simüle et (örneğin motor roundActive dönsün)
     const checkTimeoutSpy = vi.spyOn(MatchEngine, 'checkTimeout').mockImplementation(({ state }) => {

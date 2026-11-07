@@ -32,7 +32,7 @@ describe('Alias Canonical Display Text in State and Final Messages', () => {
 
   const config: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 500,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 3,

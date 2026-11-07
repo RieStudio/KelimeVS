@@ -141,7 +141,7 @@ function createMockRoomCtx() {
 describe('MADDE 1: MatchEngine.submit Sanitization & Length Boundary', () => {
   const baseConfig: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 400,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 0,
@@ -220,7 +220,7 @@ describe('MADDE 1: MatchEngine.submit Sanitization & Length Boundary', () => {
 describe('MADDE 2: TURN_GRACE_MS Ağ Gecikmesi Toleransı', () => {
   const baseConfig: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 400,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 0,
@@ -239,7 +239,7 @@ describe('MADDE 2: TURN_GRACE_MS Ağ Gecikmesi Toleransı', () => {
     });
 
     const deadline = startRes.state.deadlineMs;
-    expect(deadline).toBe(t0 + 15000);
+    expect(deadline).toBe(t0 + 20000);
 
     // 200 ms tolerans içi: deadline + 200 ms <= deadline + 400 ms
     const submitRes = MatchEngine.submit({
@@ -364,7 +364,7 @@ describe('MADDE 2: TURN_GRACE_MS Ağ Gecikmesi Toleransı', () => {
 describe('MADDE 3: Beraberlik Tavanı (maxTotalRounds = 5) ve Voided Akışı', () => {
   const ceilingConfig: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 400,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 0,

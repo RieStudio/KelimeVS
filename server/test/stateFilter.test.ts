@@ -19,7 +19,7 @@ describe('Player-Specific State Filtering & Near-Miss Secrecy', () => {
 
   const config: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 0,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 0,
@@ -188,7 +188,7 @@ describe('Player-Specific State Filtering & Near-Miss Secrecy', () => {
     // p1 timeout olur -> tur biter
     const timeoutRes = MatchEngine.checkTimeout({
       state: s1.state,
-      nowMs: 20000,
+      nowMs: 21000,
     });
 
     expect(timeoutRes.state.phase).toBe('roundEnded');
@@ -199,7 +199,7 @@ describe('Player-Specific State Filtering & Near-Miss Secrecy', () => {
       opponentUid: 'p1',
       opponentName: 'Alice',
       opponentConnected: true,
-      serverNowMs: 20500,
+      serverNowMs: 21500,
     });
 
     // Tur bitince p2 de p1'in yakın denemesini görebilir

@@ -9,7 +9,7 @@
       "description": "P1 wins round 1 by opponent timeout, wins round 2, match finishes 2-0.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -44,7 +44,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -82,14 +82,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 18000
+            "deadlineMs": 23000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 18001
+            "nowMs": 23001
           },
           "expectedEvents": [
             {
@@ -118,14 +118,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 18000
+            "deadlineMs": 23000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 20000
+            "nowMs": 25000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -146,7 +146,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 35000
+            "deadlineMs": 45000
           }
         },
         {
@@ -155,7 +155,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "elma",
-            "nowMs": 22000
+            "nowMs": 27000
           },
           "expectedEvents": [
             {
@@ -184,7 +184,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 37000
+            "deadlineMs": 47000
           }
         },
         {
@@ -193,7 +193,7 @@
           "payload": {
             "playerId": "p1",
             "rawInput": "armut",
-            "nowMs": 25000
+            "nowMs": 30000
           },
           "expectedEvents": [
             {
@@ -223,14 +223,14 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 40000
+            "deadlineMs": 50000
           }
         },
         {
           "stepIndex": 5,
           "action": "tick",
           "payload": {
-            "nowMs": 40001
+            "nowMs": 50001
           },
           "expectedEvents": [
             {
@@ -265,7 +265,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 40000
+            "deadlineMs": 50000
           }
         }
       ]
@@ -276,7 +276,7 @@
       "description": "P2 wins both rounds by P1 timeout, match finishes 0-2.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -310,14 +310,14 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
           "stepIndex": 0,
           "action": "tick",
           "payload": {
-            "nowMs": 16001
+            "nowMs": 21001
           },
           "expectedEvents": [
             {
@@ -344,14 +344,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
           "stepIndex": 1,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 18000
+            "nowMs": 23000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -372,7 +372,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 33000
+            "deadlineMs": 43000
           }
         },
         {
@@ -381,7 +381,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "elma",
-            "nowMs": 20000
+            "nowMs": 25000
           },
           "expectedEvents": [
             {
@@ -410,14 +410,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 35000
+            "deadlineMs": 45000
           }
         },
         {
           "stepIndex": 3,
           "action": "tick",
           "payload": {
-            "nowMs": 35001
+            "nowMs": 45001
           },
           "expectedEvents": [
             {
@@ -451,7 +451,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 35000
+            "deadlineMs": 45000
           }
         }
       ]
@@ -462,7 +462,7 @@
       "description": "P1 wins round 1, P2 wins round 2, P1 wins round 3 (decider).",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -497,7 +497,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -535,14 +535,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -571,14 +571,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -599,7 +599,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         },
         {
@@ -608,7 +608,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "elma",
-            "nowMs": 21000
+            "nowMs": 26000
           },
           "expectedEvents": [
             {
@@ -637,14 +637,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 36000
+            "deadlineMs": 46000
           }
         },
         {
           "stepIndex": 4,
           "action": "tick",
           "payload": {
-            "nowMs": 36001
+            "nowMs": 46001
           },
           "expectedEvents": [
             {
@@ -673,14 +673,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 36000
+            "deadlineMs": 46000
           }
         },
         {
           "stepIndex": 5,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 38000
+            "nowMs": 48000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -701,7 +701,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 53000
+            "deadlineMs": 68000
           }
         },
         {
@@ -710,7 +710,7 @@
           "payload": {
             "playerId": "p1",
             "rawInput": "ankara",
-            "nowMs": 40000
+            "nowMs": 50000
           },
           "expectedEvents": [
             {
@@ -739,14 +739,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 55000
+            "deadlineMs": 70000
           }
         },
         {
           "stepIndex": 7,
           "action": "tick",
           "payload": {
-            "nowMs": 55001
+            "nowMs": 70001
           },
           "expectedEvents": [
             {
@@ -780,7 +780,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 55000
+            "deadlineMs": 70000
           }
         }
       ]
@@ -791,7 +791,7 @@
       "description": "Rounds draw when all question answers are exhausted.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -826,7 +826,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -864,7 +864,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -907,7 +907,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -935,7 +935,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 20000
+            "deadlineMs": 25000
           }
         },
         {
@@ -973,7 +973,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 21000
+            "deadlineMs": 26000
           }
         },
         {
@@ -1016,7 +1016,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 21000
+            "deadlineMs": 26000
           }
         }
       ]
@@ -1027,7 +1027,7 @@
       "description": "Score is 1-1, round 3 draws due to exhausted answers; match continues.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -1063,7 +1063,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -1101,14 +1101,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -1137,14 +1137,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -1165,7 +1165,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         },
         {
@@ -1174,7 +1174,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "elma",
-            "nowMs": 21000
+            "nowMs": 26000
           },
           "expectedEvents": [
             {
@@ -1203,14 +1203,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 36000
+            "deadlineMs": 46000
           }
         },
         {
           "stepIndex": 4,
           "action": "tick",
           "payload": {
-            "nowMs": 36001
+            "nowMs": 46001
           },
           "expectedEvents": [
             {
@@ -1239,14 +1239,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 36000
+            "deadlineMs": 46000
           }
         },
         {
           "stepIndex": 5,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 38000
+            "nowMs": 48000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -1267,7 +1267,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 53000
+            "deadlineMs": 68000
           }
         },
         {
@@ -1276,7 +1276,7 @@
           "payload": {
             "playerId": "p1",
             "rawInput": "evet",
-            "nowMs": 39000
+            "nowMs": 49000
           },
           "expectedEvents": [
             {
@@ -1305,7 +1305,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 54000
+            "deadlineMs": 69000
           }
         },
         {
@@ -1314,7 +1314,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "hayir",
-            "nowMs": 40000
+            "nowMs": 50000
           },
           "expectedEvents": [
             {
@@ -1348,7 +1348,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 54000
+            "deadlineMs": 69000
           }
         }
       ]
@@ -1359,7 +1359,7 @@
       "description": "Starter P1 makes no move and times out; P2 wins round.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -1392,14 +1392,14 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
           "stepIndex": 0,
           "action": "tick",
           "payload": {
-            "nowMs": 16001
+            "nowMs": 21001
           },
           "expectedEvents": [
             {
@@ -1426,7 +1426,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -1437,7 +1437,7 @@
       "description": "P1 answers correctly, P2 non-starter times out; P1 wins round.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -1470,7 +1470,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -1508,14 +1508,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -1544,7 +1544,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         }
       ]
@@ -1555,7 +1555,7 @@
       "description": "P2 times out in round 1; P1 times out in round 2.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -1589,7 +1589,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -1627,14 +1627,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -1663,14 +1663,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -1691,14 +1691,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         },
         {
           "stepIndex": 3,
           "action": "tick",
           "payload": {
-            "nowMs": 34001
+            "nowMs": 44001
           },
           "expectedEvents": [
             {
@@ -1730,7 +1730,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         }
       ]
@@ -1741,7 +1741,7 @@
       "description": "Both players guess all 6 answers of q1; round immediately draws.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -1774,7 +1774,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -1812,7 +1812,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -1851,7 +1851,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 18000
+            "deadlineMs": 23000
           }
         },
         {
@@ -1891,7 +1891,7 @@
               "p2": 1
             },
             "attemptsCount": 3,
-            "deadlineMs": 19000
+            "deadlineMs": 24000
           }
         },
         {
@@ -1932,7 +1932,7 @@
               "p2": 1
             },
             "attemptsCount": 4,
-            "deadlineMs": 20000
+            "deadlineMs": 25000
           }
         },
         {
@@ -1974,7 +1974,7 @@
               "p2": 1
             },
             "attemptsCount": 5,
-            "deadlineMs": 21000
+            "deadlineMs": 26000
           }
         },
         {
@@ -2021,7 +2021,7 @@
               "p2": 1
             },
             "attemptsCount": 6,
-            "deadlineMs": 21000
+            "deadlineMs": 26000
           }
         }
       ]
@@ -2032,7 +2032,7 @@
       "description": "P1 leaves during active round; P2 wins match immediately.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2065,7 +2065,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2100,7 +2100,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -2111,7 +2111,7 @@
       "description": "P2 forfeits during roundEnded phase; P1 wins match.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2145,7 +2145,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2183,14 +2183,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -2219,7 +2219,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -2227,7 +2227,7 @@
           "action": "forfeit",
           "payload": {
             "playerId": "p2",
-            "nowMs": 18000
+            "nowMs": 23000
           },
           "expectedEvents": [
             {
@@ -2256,7 +2256,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         }
       ]
@@ -2267,7 +2267,7 @@
       "description": "Calling forfeit after match is already finished is ignored.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2300,7 +2300,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2335,7 +2335,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -2369,7 +2369,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -2380,7 +2380,7 @@
       "description": "P1 led 1-0 in round 1, then P1 forfeits in round 2; score freezes at 1-0, P2 wins.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2414,7 +2414,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2452,14 +2452,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -2488,14 +2488,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -2516,7 +2516,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         },
         {
@@ -2524,7 +2524,7 @@
           "action": "forfeit",
           "payload": {
             "playerId": "p1",
-            "nowMs": 21000
+            "nowMs": 26000
           },
           "expectedEvents": [
             {
@@ -2551,7 +2551,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         }
       ]
@@ -2562,7 +2562,7 @@
       "description": "Two consecutive forfeit calls on the same tick; second is ignored.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2595,7 +2595,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2630,7 +2630,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -2664,7 +2664,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -2675,7 +2675,7 @@
       "description": "P1 uses 1 near miss (quota 1); next near miss yields WrongAnswer with hintShown=false.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2708,7 +2708,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2746,7 +2746,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -2783,7 +2783,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         }
       ]
@@ -2794,7 +2794,7 @@
       "description": "Near miss attempts are hidden from opponent in visibleAttempts.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2827,7 +2827,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2865,7 +2865,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         }
       ]
@@ -2873,10 +2873,10 @@
     {
       "id": "scen_17_turn_alternation_correct_answer",
       "name": "Turn Alternation on Correct Answer",
-      "description": "P1 answers correctly; turn passes to P2 and deadline resets to nowMs + 15s.",
+      "description": "P1 answers correctly; turn passes to P2 and deadline resets to nowMs + 20s.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2909,7 +2909,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -2947,7 +2947,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 19000
+            "deadlineMs": 24000
           }
         }
       ]
@@ -2958,7 +2958,7 @@
       "description": "Wrong answer emits WrongAnswer event, turn stays with current player, deadline unchanged.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -2991,7 +2991,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3027,7 +3027,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -3038,7 +3038,7 @@
       "description": "Empty or whitespace input emits Ignored(\"empty_input\"), turn does not change.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3071,7 +3071,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3106,7 +3106,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -3141,7 +3141,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -3152,7 +3152,7 @@
       "description": "Previously accepted answer emits AlreadySaid event; turn does not change.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3185,7 +3185,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3223,7 +3223,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
@@ -3261,7 +3261,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         }
       ]
@@ -3272,7 +3272,7 @@
       "description": "Round 1 starter is P1 (index 0); Round 2 starter is P2 (index 1); Round 3 starter is P1.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3307,7 +3307,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3345,14 +3345,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17001
+            "nowMs": 22001
           },
           "expectedEvents": [
             {
@@ -3381,14 +3381,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 17000
+            "deadlineMs": 22000
           }
         },
         {
           "stepIndex": 2,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3409,7 +3409,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         },
         {
@@ -3418,7 +3418,7 @@
           "payload": {
             "playerId": "p2",
             "rawInput": "elma",
-            "nowMs": 20000
+            "nowMs": 25000
           },
           "expectedEvents": [
             {
@@ -3447,14 +3447,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 35000
+            "deadlineMs": 45000
           }
         },
         {
           "stepIndex": 4,
           "action": "tick",
           "payload": {
-            "nowMs": 35001
+            "nowMs": 45001
           },
           "expectedEvents": [
             {
@@ -3483,14 +3483,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 35000
+            "deadlineMs": 45000
           }
         },
         {
           "stepIndex": 5,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 37000
+            "nowMs": 47000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3511,7 +3511,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 52000
+            "deadlineMs": 67000
           }
         }
       ]
@@ -3522,7 +3522,7 @@
       "description": "Remaining seconds bonus calculation from deadlineMs and submit time.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3555,7 +3555,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3593,14 +3593,14 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 20000
+            "deadlineMs": 25000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 20001
+            "nowMs": 25001
           },
           "expectedEvents": [
             {
@@ -3629,7 +3629,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 20000
+            "deadlineMs": 25000
           }
         }
       ]
@@ -3640,7 +3640,7 @@
       "description": "Ticks during active round advance time without ending round until deadline.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3673,7 +3673,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -3701,7 +3701,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -3729,7 +3729,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -3757,14 +3757,42 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
           "stepIndex": 3,
           "action": "tick",
           "payload": {
-            "nowMs": 16000
+            "nowMs": 20000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 21000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 21000
           },
           "expectedEvents": [
             {
@@ -3791,14 +3819,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
-          "stepIndex": 4,
+          "stepIndex": 5,
           "action": "tick",
           "payload": {
-            "nowMs": 16001
+            "nowMs": 21001
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3819,7 +3847,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -3830,7 +3858,7 @@
       "description": "Ticks during roundEnded phase are no-ops; startNextRound initiates next round.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -3864,14 +3892,14 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
           "stepIndex": 0,
           "action": "tick",
           "payload": {
-            "nowMs": 16001
+            "nowMs": 21001
           },
           "expectedEvents": [
             {
@@ -3898,14 +3926,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
           "stepIndex": 1,
           "action": "tick",
           "payload": {
-            "nowMs": 17000
+            "nowMs": 22000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3926,14 +3954,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
           "stepIndex": 2,
           "action": "tick",
           "payload": {
-            "nowMs": 18000
+            "nowMs": 23000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3954,14 +3982,14 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
           "stepIndex": 3,
           "action": "startNextRound",
           "payload": {
-            "nowMs": 19000
+            "nowMs": 24000
           },
           "expectedEvents": [],
           "expectedStateSnapshot": {
@@ -3982,7 +4010,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 34000
+            "deadlineMs": 44000
           }
         }
       ]
@@ -3993,7 +4021,7 @@
       "description": "Submitting too fast (< 600ms) emits tooFast Ignored event.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -4026,7 +4054,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -4062,7 +4090,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -4097,7 +4125,7 @@
               "p2": 1
             },
             "attemptsCount": 1,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         },
         {
@@ -4133,7 +4161,7 @@
               "p2": 1
             },
             "attemptsCount": 2,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]
@@ -4144,7 +4172,7 @@
       "description": "Submitting when it is not player turn emits not_player_turn Ignored event.",
       "config": {
         "roundsToWin": 2,
-        "answerSeconds": 15,
+        "answerSeconds": 20,
         "graceMs": 0,
         "nearMissPerRound": 1,
         "minAnswersPerQuestion": 0,
@@ -4177,7 +4205,7 @@
           "p2": 1
         },
         "attemptsCount": 0,
-        "deadlineMs": 16000
+        "deadlineMs": 21000
       },
       "steps": [
         {
@@ -4212,7 +4240,7 @@
               "p2": 1
             },
             "attemptsCount": 0,
-            "deadlineMs": 16000
+            "deadlineMs": 21000
           }
         }
       ]

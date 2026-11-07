@@ -22,7 +22,7 @@ describe('MatchState Storage Serialization Round-Trip', () => {
 
   const config: MatchConfig = {
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 0,
     nearMissPerRound: 1,
     minAnswersPerQuestion: 0,

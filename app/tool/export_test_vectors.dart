@@ -996,7 +996,7 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
 
   const stdConfig = MatchConfig(
     roundsToWin: 2,
-    answerSeconds: 15,
+    answerSeconds: 20,
     graceMs: 0,
     nearMissPerRound: 1,
     minSubmitIntervalMs: 600,
@@ -1016,11 +1016,11 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 3000}),
-      ('tick', {'nowMs': 18001}), // p2 timeout -> RoundWon(p1, timeout), roundEnded
-      ('startNextRound', {'nowMs': 20000}),
-      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 22000}),
-      ('submit', {'playerId': 'p1', 'rawInput': 'armut', 'nowMs': 25000}),
-      ('tick', {'nowMs': 40001}), // p2 timeout -> RoundWon(p1, timeout), MatchFinished(p1, 'normal')
+      ('tick', {'nowMs': 23001}), // p2 timeout -> RoundWon(p1, timeout), roundEnded
+      ('startNextRound', {'nowMs': 25000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 27000}),
+      ('submit', {'playerId': 'p1', 'rawInput': 'armut', 'nowMs': 30000}),
+      ('tick', {'nowMs': 50001}), // p2 timeout -> RoundWon(p1, timeout), MatchFinished(p1, 'normal')
     ],
   ));
 
@@ -1034,10 +1034,10 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     questionOrder: ['q1', 'q2'],
     initialNowMs: 1000,
     stepPlan: [
-      ('tick', {'nowMs': 16001}), // p1 starter timeout -> RoundWon(p2, timeout), roundEnded
-      ('startNextRound', {'nowMs': 18000}),
-      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 20000}),
-      ('tick', {'nowMs': 35001}), // p1 timeout -> RoundWon(p2, timeout), MatchFinished(p2, 'normal')
+      ('tick', {'nowMs': 21001}), // p1 starter timeout -> RoundWon(p2, timeout), roundEnded
+      ('startNextRound', {'nowMs': 23000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 25000}),
+      ('tick', {'nowMs': 45001}), // p1 timeout -> RoundWon(p2, timeout), MatchFinished(p2, 'normal')
     ],
   ));
 
@@ -1052,13 +1052,13 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // p2 timeout -> p1 wins (1-0)
-      ('startNextRound', {'nowMs': 19000}),
-      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 21000}),
-      ('tick', {'nowMs': 36001}), // p1 timeout -> p2 wins (1-1)
-      ('startNextRound', {'nowMs': 38000}),
-      ('submit', {'playerId': 'p1', 'rawInput': 'ankara', 'nowMs': 40000}),
-      ('tick', {'nowMs': 55001}), // p2 timeout -> p1 wins (2-1), MatchFinished(p1)
+      ('tick', {'nowMs': 22001}), // p2 timeout -> p1 wins (1-0)
+      ('startNextRound', {'nowMs': 24000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 26000}),
+      ('tick', {'nowMs': 46001}), // p1 timeout -> p2 wins (1-1)
+      ('startNextRound', {'nowMs': 48000}),
+      ('submit', {'playerId': 'p1', 'rawInput': 'ankara', 'nowMs': 50000}),
+      ('tick', {'nowMs': 70001}), // p2 timeout -> p1 wins (2-1), MatchFinished(p1)
     ],
   ));
 
@@ -1091,13 +1091,13 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'bmw', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // p1 wins (1-0)
-      ('startNextRound', {'nowMs': 19000}),
-      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 21000}),
-      ('tick', {'nowMs': 36001}), // p2 wins (1-1)
-      ('startNextRound', {'nowMs': 38000}),
-      ('submit', {'playerId': 'p1', 'rawInput': 'evet', 'nowMs': 39000}),
-      ('submit', {'playerId': 'p2', 'rawInput': 'hayir', 'nowMs': 40000}), // round 3 drawn!
+      ('tick', {'nowMs': 22001}), // p1 wins (1-0)
+      ('startNextRound', {'nowMs': 24000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 26000}),
+      ('tick', {'nowMs': 46001}), // p2 wins (1-1)
+      ('startNextRound', {'nowMs': 48000}),
+      ('submit', {'playerId': 'p1', 'rawInput': 'evet', 'nowMs': 49000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'hayir', 'nowMs': 50000}), // round 3 drawn!
     ],
   ));
 
@@ -1111,7 +1111,7 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     questionOrder: ['q1'],
     initialNowMs: 1000,
     stepPlan: [
-      ('tick', {'nowMs': 16001}), // timeout starter p1 -> RoundWon(p2, timeout)
+      ('tick', {'nowMs': 21001}), // timeout starter p1 -> RoundWon(p2, timeout)
     ],
   ));
 
@@ -1126,7 +1126,7 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // timeout non-starter p2 -> RoundWon(p1, timeout)
+      ('tick', {'nowMs': 22001}), // timeout non-starter p2 -> RoundWon(p1, timeout)
     ],
   ));
 
@@ -1141,9 +1141,9 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // P2 timeout -> p1 wins (1-0)
-      ('startNextRound', {'nowMs': 19000}),
-      ('tick', {'nowMs': 34001}), // P2 starter times out -> p1 wins (2-0), MatchFinished(p1)
+      ('tick', {'nowMs': 22001}), // P2 timeout -> p1 wins (1-0)
+      ('startNextRound', {'nowMs': 24000}),
+      ('tick', {'nowMs': 44001}), // P2 starter times out -> p1 wins (2-0), MatchFinished(p1)
     ],
   ));
 
@@ -1191,8 +1191,8 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // round 1 ends
-      ('forfeit', {'playerId': 'p2', 'nowMs': 18000}), // forfeit in roundEnded -> MatchFinished(p1, 'forfeit')
+      ('tick', {'nowMs': 22001}), // round 1 ends
+      ('forfeit', {'playerId': 'p2', 'nowMs': 23000}), // forfeit in roundEnded -> MatchFinished(p1, 'forfeit')
     ],
   ));
 
@@ -1222,9 +1222,9 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // p1 wins round 1 (1-0)
-      ('startNextRound', {'nowMs': 19000}),
-      ('forfeit', {'playerId': 'p1', 'nowMs': 21000}), // p1 forfeits -> p2 wins match, scores stay 1-0
+      ('tick', {'nowMs': 22001}), // p1 wins round 1 (1-0)
+      ('startNextRound', {'nowMs': 24000}),
+      ('forfeit', {'playerId': 'p1', 'nowMs': 26000}), // p1 forfeits -> p2 wins match, scores stay 1-0
     ],
   ));
 
@@ -1276,7 +1276,7 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
   scenarios.add(runScenario(
     id: 'scen_17_turn_alternation_correct_answer',
     name: 'Turn Alternation on Correct Answer',
-    description: 'P1 answers correctly; turn passes to P2 and deadline resets to nowMs + 15s.',
+    description: 'P1 answers correctly; turn passes to P2 and deadline resets to nowMs + 20s.',
     config: stdConfig,
     playerIds: ['p1', 'p2'],
     questionOrder: ['q1'],
@@ -1341,11 +1341,11 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     initialNowMs: 1000,
     stepPlan: [
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
-      ('tick', {'nowMs': 17001}), // round 1 ends
-      ('startNextRound', {'nowMs': 19000}), // round 2 starter is p2
-      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 20000}),
-      ('tick', {'nowMs': 35001}), // round 2 ends
-      ('startNextRound', {'nowMs': 37000}), // round 3 starter is p1
+      ('tick', {'nowMs': 22001}), // round 1 ends
+      ('startNextRound', {'nowMs': 24000}), // round 2 starter is p2
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 25000}),
+      ('tick', {'nowMs': 45001}), // round 2 ends
+      ('startNextRound', {'nowMs': 47000}), // round 3 starter is p1
     ],
   ));
 
@@ -1359,8 +1359,8 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     questionOrder: ['q1'],
     initialNowMs: 1000,
     stepPlan: [
-      ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 5000}), // 11s left
-      ('tick', {'nowMs': 20001}), // p2 times out
+      ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 5000}), // 16s left
+      ('tick', {'nowMs': 25001}), // p2 times out
     ],
   ));
 
@@ -1377,8 +1377,9 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
       ('tick', {'nowMs': 5000}),
       ('tick', {'nowMs': 10000}),
       ('tick', {'nowMs': 15000}),
-      ('tick', {'nowMs': 16000}), // exactly on deadline (nowMs >= deadlineMs) -> timeout
-      ('tick', {'nowMs': 16001}), // past deadline -> already ended
+      ('tick', {'nowMs': 20000}),
+      ('tick', {'nowMs': 21000}), // exactly on deadline (nowMs >= deadlineMs) -> timeout
+      ('tick', {'nowMs': 21001}), // past deadline -> already ended
     ],
   ));
 
@@ -1392,10 +1393,10 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     questionOrder: ['q1', 'q2'],
     initialNowMs: 1000,
     stepPlan: [
-      ('tick', {'nowMs': 16001}), // round 1 ends
-      ('tick', {'nowMs': 17000}), // tick during roundEnded
-      ('tick', {'nowMs': 18000}), // tick during roundEnded
-      ('startNextRound', {'nowMs': 19000}),
+      ('tick', {'nowMs': 21001}), // round 1 ends
+      ('tick', {'nowMs': 22000}), // tick during roundEnded
+      ('tick', {'nowMs': 23000}), // tick during roundEnded
+      ('startNextRound', {'nowMs': 24000}),
     ],
   ));
 
