@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/core/theme/app_text_styles.dart';
-import 'package:app/core/widgets/result_circle.dart';
+import 'package:app/core/widgets/round_result_icon.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
@@ -113,12 +112,12 @@ void main() {
     // Üst hap: Tur 1
     expect(find.text(AppStrings.round(1)), findsOneWidget);
 
-    // ResultCircle: win varyantı, check ikonu
-    final circleFinder = find.byType(ResultCircle);
-    expect(circleFinder, findsOneWidget);
-    final circle = tester.widget<ResultCircle>(circleFinder);
-    expect(circle.variant, ResultCircleVariant.win);
-    expect(circle.icon, AppIcons.check);
+    // RoundResultIcon: win varyantı, round_win.svg
+    final iconFinder = find.byType(RoundResultIcon);
+    expect(iconFinder, findsOneWidget);
+    final icon = tester.widget<RoundResultIcon>(iconFinder);
+    expect(icon.variant, RoundResultVariant.win);
+    expect(icon.assetPath, RoundResultIcon.winAsset);
 
     // Başlık ve neden
     expect(find.text(AppStrings.roundWonTitle), findsOneWidget);
@@ -157,12 +156,12 @@ void main() {
     // Üst hap: Tur 2
     expect(find.text(AppStrings.round(2)), findsOneWidget);
 
-    // ResultCircle: lose varyantı, close ikonu
-    final circleFinder = find.byType(ResultCircle);
-    expect(circleFinder, findsOneWidget);
-    final circle = tester.widget<ResultCircle>(circleFinder);
-    expect(circle.variant, ResultCircleVariant.lose);
-    expect(circle.icon, AppIcons.close);
+    // RoundResultIcon: lose varyantı, round_lose.svg
+    final iconFinder = find.byType(RoundResultIcon);
+    expect(iconFinder, findsOneWidget);
+    final icon = tester.widget<RoundResultIcon>(iconFinder);
+    expect(icon.variant, RoundResultVariant.lose);
+    expect(icon.assetPath, RoundResultIcon.loseAsset);
 
     // Başlık ve neden (ünlemsiz)
     expect(find.text(AppStrings.roundLostTitle), findsOneWidget);
@@ -194,12 +193,12 @@ void main() {
     // Üst hap: decisiveRounds + 1 = Tur 2
     expect(find.text(AppStrings.round(2)), findsOneWidget);
 
-    // ResultCircle: draw varyantı, equal ikonu
-    final circleFinder = find.byType(ResultCircle);
-    expect(circleFinder, findsOneWidget);
-    final circle = tester.widget<ResultCircle>(circleFinder);
-    expect(circle.variant, ResultCircleVariant.draw);
-    expect(circle.icon, AppIcons.equal);
+    // RoundResultIcon: draw varyantı, round_draw.svg
+    final iconFinder = find.byType(RoundResultIcon);
+    expect(iconFinder, findsOneWidget);
+    final icon = tester.widget<RoundResultIcon>(iconFinder);
+    expect(icon.variant, RoundResultVariant.draw);
+    expect(icon.assetPath, RoundResultIcon.drawAsset);
 
     // Başlık ve neden
     expect(find.text(AppStrings.roundDrawTitle), findsOneWidget);

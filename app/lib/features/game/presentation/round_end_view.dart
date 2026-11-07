@@ -2,21 +2,20 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/icons/app_icons.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_progress_bar.dart';
 import '../../../core/widgets/question_preview_card.dart';
-import '../../../core/widgets/result_circle.dart';
+import '../../../core/widgets/round_result_icon.dart';
 import '../application/match_providers.dart';
 import '../domain/match/match_events.dart';
 
 /// DESIGN.md Bölüm 7: 4) Tur Sonu Ekranı
 ///
 /// Üstte "Tur N" hapı.
-/// Ortada 104 px ResultCircle, başlık, neden ve skor kartı (Fredoka 52).
+/// Ortada 104 px RoundResultIcon, başlık, neden ve skor kartı (Fredoka 52).
 /// Altta "Tur N+1 birazdan başlıyor" (beraberlikte "Yeni tur birazdan başlıyor",
 /// son turda "Maç sonucu birazdan") ve geri sayım çubuğu.
 class RoundEndView extends ConsumerStatefulWidget {
@@ -76,31 +75,27 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
     final isLoser = lastRound?.winnerId != null && lastRound?.winnerId != 'me';
     final isDraw = lastRound?.winnerId == null;
 
-    final ResultCircleVariant circleVariant;
-    final AppIconData icon;
+    final RoundResultVariant resultVariant;
     final String title;
     final TextStyle titleStyle;
     final String reasonText;
 
     if (isWinner) {
-      circleVariant = ResultCircleVariant.win;
-      icon = AppIcons.check;
+      resultVariant = RoundResultVariant.win;
       title = AppStrings.roundWonTitle;
       titleStyle = AppTextStyles.roundResultTitle;
       reasonText = lastRound?.reason == RoundEndReason.timeout
           ? AppStrings.reasonOpponentTimeout
           : AppStrings.reasonExhausted;
     } else if (isLoser) {
-      circleVariant = ResultCircleVariant.lose;
-      icon = AppIcons.close;
+      resultVariant = RoundResultVariant.lose;
       title = AppStrings.roundLostTitle;
       titleStyle = AppTextStyles.roundResultTitleDanger;
       reasonText = lastRound?.reason == RoundEndReason.timeout
           ? AppStrings.reasonMyTimeout
           : AppStrings.reasonExhausted;
     } else {
-      circleVariant = ResultCircleVariant.draw;
-      icon = AppIcons.equal;
+      resultVariant = RoundResultVariant.draw;
       title = AppStrings.roundDrawTitle;
       titleStyle = AppTextStyles.roundResultTitle;
       reasonText = AppStrings.reasonExhausted;
@@ -168,10 +163,9 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
 
               const Spacer(flex: 3),
 
-              // 2. ResultCircle (104 px)
-              ResultCircle(
-                variant: circleVariant,
-                icon: icon,
+              // 2. Tur Sonu SVG İkonu (104 px)
+              RoundResultIcon(
+                variant: resultVariant,
               ),
 
               const SizedBox(height: AppDimens.space20),
