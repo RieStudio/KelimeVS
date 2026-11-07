@@ -5,6 +5,7 @@ import 'package:app/core/network/network_status_provider.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/global_offline_banner.dart';
 import 'package:app/core/widgets/offline_splash_screen.dart';
+import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
@@ -14,6 +15,7 @@ import 'package:app/features/leaderboard/data/leaderboard_api_client.dart';
 import 'package:app/features/leaderboard/domain/models/leaderboard_models.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/main.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,6 +90,23 @@ class FakeLeaderboardClient implements LeaderboardApiClient {
   }
 }
 
+class FakeAuthRepository implements AuthRepository {
+  @override
+  bool get isAuthenticated => true;
+  @override
+  bool get isGoogleLinked => false;
+  @override
+  String? get linkedEmail => null;
+  @override
+  User? get currentUser => null;
+  @override
+  Stream<User?> authStateChanges() => const Stream.empty();
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async => 'token';
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   group('App Startup & Lifecycle Network Tests', () {
     late ControllableNetworkService netService;
@@ -106,6 +125,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
             networkServiceProvider.overrideWithValue(netService),
             matchHistoryRepositoryProvider.overrideWithValue(FakeMatchHistoryRepository()),
             profileProvider.overrideWith(() => fakeProfile),
@@ -142,6 +162,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
             networkServiceProvider.overrideWithValue(netService),
             matchHistoryRepositoryProvider.overrideWithValue(FakeMatchHistoryRepository()),
             profileProvider.overrideWith(() => fakeProfile),
@@ -189,6 +210,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
             networkServiceProvider.overrideWithValue(netService),
             matchHistoryRepositoryProvider.overrideWithValue(FakeMatchHistoryRepository()),
             profileProvider.overrideWith(() => fakeProfile),

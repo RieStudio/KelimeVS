@@ -25,6 +25,9 @@ class FakeAuthRepository implements AuthRepository {
   bool isGoogleLinked;
 
   @override
+  bool isAuthenticated = true;
+
+  @override
   String? linkedEmail;
 
   AuthLinkResult linkResultToReturn;

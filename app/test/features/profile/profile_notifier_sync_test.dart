@@ -2,9 +2,24 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
+
+class _SyncTestAuthRepo implements AuthRepository {
+  @override
+  bool get isAuthenticated => true;
+
+  @override
+  bool get isGoogleLinked => false;
+
+  @override
+  String? get linkedEmail => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class FakeProfileRepository implements ProfileRepository {
   String? _nickname;
@@ -105,6 +120,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -131,6 +147,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -153,6 +170,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -180,6 +198,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -201,6 +220,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -225,6 +245,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],
@@ -256,6 +277,7 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          authRepositoryProvider.overrideWithValue(_SyncTestAuthRepo()),
           profileRepositoryProvider.overrideWithValue(fakeRepo),
           profileApiClientProvider.overrideWithValue(fakeApi),
         ],

@@ -24,6 +24,12 @@ void main() {
       );
       expect(() => provider.getIdToken(), throwsA(isA<Exception>()));
     });
+
+    test('FirebaseAuthTokenProvider oturum yokken (auth null / currentUser null) null döner ve anonim hesap açmaz', () async {
+      const provider = FirebaseAuthTokenProvider(auth: null);
+      final token = await provider.getIdToken();
+      expect(token, isNull);
+    });
   });
 }
 

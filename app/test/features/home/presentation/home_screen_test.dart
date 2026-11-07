@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import 'package:app/core/widgets/match_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/result_badge.dart';
 import 'package:app/core/widgets/secondary_button.dart';
+import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
@@ -65,12 +67,30 @@ Widget _buildTestApp(MatchHistoryRepository repo, {ProfileState? profileState}) 
   );
 }
 
+class _HomeTestAuthRepo implements AuthRepository {
+  @override
+  bool get isAuthenticated => true;
+  @override
+  bool get isGoogleLinked => false;
+  @override
+  String? get linkedEmail => null;
+  @override
+  User? get currentUser => null;
+  @override
+  Stream<User?> authStateChanges() => const Stream.empty();
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async => 'token';
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Widget _buildMainShellTestApp(
   MatchHistoryRepository repo, {
   ProfileState? profileState,
 }) {
   return ProviderScope(
     overrides: [
+      authRepositoryProvider.overrideWithValue(_HomeTestAuthRepo()),
       matchHistoryRepositoryProvider.overrideWithValue(repo),
       if (profileState != null)
         profileProvider.overrideWith(() => _MockProfileNotifier(profileState)),
@@ -657,6 +677,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            authRepositoryProvider.overrideWithValue(_HomeTestAuthRepo()),
             matchHistoryRepositoryProvider.overrideWithValue(repo),
             profileProvider.overrideWith(() => _MockProfileNotifier(profile)),
           ],

@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:app/core/config/app_config.dart';
+
 import 'package:app/core/network/network_status_provider.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
@@ -22,6 +24,9 @@ import 'package:app/features/profile/presentation/onboarding_nickname_screen.dar
 class FakeWelcomeAuthRepo implements AuthRepository {
   @override
   bool isGoogleLinked = false;
+
+  @override
+  bool isAuthenticated = false;
 
   @override
   String? linkedEmail;
@@ -49,6 +54,7 @@ class FakeWelcomeAuthRepo implements AuthRepository {
       throw errorToThrowOnSignInAnonymously!;
     }
     signInAnonymouslyCalled = true;
+    isAuthenticated = true;
     if (signInCompleter != null) {
       await signInCompleter!.future;
     }
@@ -350,6 +356,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.authServiceError), findsOneWidget);
+    });
+
+    testWidgets('11. Gizlilik Politikası bilgilendirmesi görünür ve tıklandığında URL açılır', (tester) async {
+      Uri? launchedUri;
+      await tester.pumpWidget(MaterialApp(
+        home: ProviderScope(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(FakeWelcomeAuthRepo()),
+            profileApiClientProvider.overrideWithValue(FakeWelcomeProfileApiClient()),
+            networkStatusProvider.overrideWith(() => _TestNetworkNotifier(true)),
+          ],
+          child: WelcomeScreen(
+            urlLauncher: (uri) async {
+              launchedUri = uri;
+              return true;
+            },
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('welcome_privacy_policy_consent_text')), findsOneWidget);
+      expect(find.textContaining(AppStrings.privacyPolicyConsentPrefix), findsOneWidget);
+      expect(find.textContaining(AppStrings.privacyPolicyConsentLink), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('welcome_privacy_policy_consent_text')));
+      await tester.pumpAndSettle();
+
+      expect(launchedUri, isNotNull);
+      expect(launchedUri.toString(), AppConfig.privacyPolicyUrl);
     });
   });
 }

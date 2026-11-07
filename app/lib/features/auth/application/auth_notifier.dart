@@ -16,12 +16,14 @@ import '../data/auth_repository.dart';
 import '../domain/auth_link_result.dart';
 
 class AuthUiState {
+  final bool isAuthenticated;
   final bool isGoogleLinked;
   final String? linkedEmail;
   final bool isLoading;
   final String? errorMessage;
 
   const AuthUiState({
+    this.isAuthenticated = false,
     required this.isGoogleLinked,
     this.linkedEmail,
     this.isLoading = false,
@@ -29,12 +31,14 @@ class AuthUiState {
   });
 
   AuthUiState copyWith({
+    bool? isAuthenticated,
     bool? isGoogleLinked,
     String? linkedEmail,
     bool? isLoading,
     String? errorMessage,
   }) {
     return AuthUiState(
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       isGoogleLinked: isGoogleLinked ?? this.isGoogleLinked,
       linkedEmail: linkedEmail ?? this.linkedEmail,
       isLoading: isLoading ?? this.isLoading,
@@ -60,6 +64,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
     });
 
     return AuthUiState(
+      isAuthenticated: repo.isAuthenticated,
       isGoogleLinked: repo.isGoogleLinked,
       linkedEmail: repo.linkedEmail,
     );
@@ -68,6 +73,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
   void _refresh() {
     final repo = ref.read(authRepositoryProvider);
     state = state.copyWith(
+      isAuthenticated: repo.isAuthenticated,
       isGoogleLinked: repo.isGoogleLinked,
       linkedEmail: repo.linkedEmail,
     );
@@ -160,8 +166,8 @@ class AuthNotifier extends Notifier<AuthUiState> {
 
   Future<void> signInAsGuest() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
+    final repo = ref.read(authRepositoryProvider);
     try {
-      final repo = ref.read(authRepositoryProvider);
       await repo.signInAnonymously();
       await repo.getIdToken(forceRefresh: true);
       final synced = await ref
@@ -172,6 +178,7 @@ class AuthNotifier extends Notifier<AuthUiState> {
       }
       _refresh();
       state = state.copyWith(
+        isAuthenticated: true,
         isLoading: false,
         isGoogleLinked: false,
         linkedEmail: null,
@@ -180,7 +187,12 @@ class AuthNotifier extends Notifier<AuthUiState> {
       if (kDebugMode) {
         debugPrint('[AuthNotifier] signInAsGuest failed: $e\n$st');
       }
+      try {
+        await repo.signOutAndResetToAnonymous();
+      } catch (_) {}
+      _refresh();
       state = state.copyWith(
+        isAuthenticated: false,
         isLoading: false,
         errorMessage: e.toString(),
       );
@@ -242,7 +254,12 @@ class AuthNotifier extends Notifier<AuthUiState> {
       await ref.read(profileProvider.notifier).clearNickname();
 
       _refresh();
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(
+        isAuthenticated: false,
+        isLoading: false,
+        isGoogleLinked: false,
+        linkedEmail: null,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -308,11 +325,16 @@ class AuthNotifier extends Notifier<AuthUiState> {
     await ref.read(objectionRepositoryProvider).clear();
     await ref.read(profileProvider.notifier).clearNickname();
 
-    // 5. Oturumları sıfırla ve yeni anonim hesaba geç
+    // 5. Oturumları sıfırla
     await repo.completeAccountDeletionAndReset();
 
     _refresh();
-    state = state.copyWith(isLoading: false);
+    state = state.copyWith(
+      isAuthenticated: false,
+      isLoading: false,
+      isGoogleLinked: false,
+      linkedEmail: null,
+    );
     return true;
   }
 

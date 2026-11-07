@@ -3,9 +3,12 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
@@ -28,8 +31,9 @@ import '../domain/auth_link_result.dart';
 /// Misafir kullanıcıların adı sunucu tarafından otomatik M-#### olarak atanır.
 class WelcomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onComplete;
+  final Future<bool> Function(Uri)? urlLauncher;
 
-  const WelcomeScreen({super.key, this.onComplete});
+  const WelcomeScreen({super.key, this.onComplete, this.urlLauncher});
 
   @override
   ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -135,6 +139,27 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     }
   }
 
+  Future<void> _handleOpenPrivacyPolicy() async {
+    if (!ensureNetworkConnected(context, ref)) return;
+    final uri = Uri.parse(AppConfig.privacyPolicyUrl);
+    try {
+      final ok = widget.urlLauncher != null
+          ? await widget.urlLauncher!(uri)
+          : await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.linkOpenError)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.linkOpenError)),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
@@ -209,6 +234,44 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     key: const Key('welcome_guest_sign_in_button'),
                     text: AppStrings.continueAsGuest,
                     onPressed: isBusy ? null : _handleGuestSignIn,
+                  ),
+                  const SizedBox(height: AppDimens.space24),
+
+                  // Gizlilik Politikası Bilgilendirmesi ve Bağlantısı
+                  Center(
+                    child: Text.rich(
+                      key: const Key('welcome_privacy_policy_consent_text'),
+                      TextSpan(
+                        text: AppStrings.privacyPolicyConsentPrefix,
+                        style: AppTextStyles.bodyText.copyWith(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: AppStrings.privacyPolicyConsentLink,
+                            style: AppTextStyles.bodyText.copyWith(
+                              fontSize: 12,
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                              decorationColor: AppColors.ink,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap =
+                                  isBusy ? null : _handleOpenPrivacyPolicy,
+                          ),
+                          TextSpan(
+                            text: AppStrings.privacyPolicyConsentSuffix,
+                            style: AppTextStyles.bodyText.copyWith(
+                              fontSize: 12,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ],
               ),

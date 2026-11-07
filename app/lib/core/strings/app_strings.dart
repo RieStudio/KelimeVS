@@ -585,6 +585,9 @@ abstract final class AppStrings {
   static const String settingsSectionSupport = 'Destek';
   static const String settingsSectionDeveloper = 'Geliştirici';
   static const String privacyPolicy = 'Gizlilik Politikası';
+  static const String privacyPolicyConsentPrefix = 'Devam ederek ';
+  static const String privacyPolicyConsentLink = 'Gizlilik Politikası';
+  static const String privacyPolicyConsentSuffix = "'nı kabul etmiş olursun.";
   static const String thirdPartyLicenses = 'Üçüncü Taraf Lisansları';
   static const String licensesTitle = 'Lisanslar';
   static String licenseCount(int count) => '$count lisans';

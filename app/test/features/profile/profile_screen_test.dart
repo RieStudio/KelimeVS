@@ -7,15 +7,27 @@ import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/application/auth_notifier.dart';
+import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
+
+class _ProfileTestAuthRepo implements AuthRepository {
+  @override
+  bool get isAuthenticated => true;
+  @override
+  bool get isGoogleLinked => true;
+  @override
+  String? get linkedEmail => 'test@google.com';
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _TestAuthNotifier extends AuthNotifier {
   final bool isGoogleLinked;
   _TestAuthNotifier({this.isGoogleLinked = true});
 
   @override
-  AuthUiState build() => AuthUiState(isGoogleLinked: isGoogleLinked);
+  AuthUiState build() => AuthUiState(isAuthenticated: true, isGoogleLinked: isGoogleLinked);
 }
 
 void main() {
@@ -30,6 +42,7 @@ void main() {
   Widget buildTestScreen({bool isGoogleLinked = true}) {
     return ProviderScope(
       overrides: [
+        authRepositoryProvider.overrideWithValue(_ProfileTestAuthRepo()),
         authNotifierProvider.overrideWith(() => _TestAuthNotifier(isGoogleLinked: isGoogleLinked)),
       ],
       child: const MaterialApp(

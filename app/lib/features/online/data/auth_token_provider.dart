@@ -34,10 +34,6 @@ class FirebaseAuthTokenProvider implements AuthTokenProvider {
       if (auth == null) return null;
       User? user = auth.currentUser;
       if (user == null) {
-        final userCredential = await auth.signInAnonymously();
-        user = userCredential.user;
-      }
-      if (user == null) {
         return null;
       }
       return await user.getIdToken(forceRefresh);

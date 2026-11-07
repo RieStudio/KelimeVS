@@ -28,6 +28,9 @@ class FakeAuthRepository implements AuthRepository {
   bool isGoogleLinked;
 
   @override
+  bool isAuthenticated = true;
+
+  @override
   String? linkedEmail;
 
   AuthLinkResult linkResultToReturn;
@@ -88,6 +91,7 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<void> signOutAndResetToAnonymous() async {
     signOutCalled = true;
+    isAuthenticated = false;
     isGoogleLinked = false;
     linkedEmail = null;
     _controller.add(null);
@@ -111,6 +115,7 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<void> completeAccountDeletionAndReset() async {
     completeAccountDeletionCalled = true;
+    isAuthenticated = false;
     isGoogleLinked = false;
     linkedEmail = null;
     _controller.add(null);

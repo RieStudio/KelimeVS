@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 abstract interface class AuthRepository {
   User? get currentUser;
+  bool get isAuthenticated;
   Stream<User?> authStateChanges();
   bool get isGoogleLinked;
   String? get linkedEmail;
@@ -48,6 +49,9 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   User? get currentUser => _auth?.currentUser;
+
+  @override
+  bool get isAuthenticated => currentUser != null;
 
   @override
   Stream<User?> authStateChanges() {
@@ -178,7 +182,6 @@ class FirebaseAuthRepository implements AuthRepository {
     if (a == null) throw StateError('Firebase henüz başlatılmadı.');
     await a.signOut();
     await _googleAuthService.signOut();
-    await a.signInAnonymously();
   }
 
   @override
@@ -258,7 +261,6 @@ class FirebaseAuthRepository implements AuthRepository {
       try {
         await a.signOut();
       } catch (_) {}
-      await a.signInAnonymously();
     }
   }
 }

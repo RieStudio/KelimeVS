@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
@@ -58,6 +60,23 @@ class FakeProfileNotifier extends ProfileNotifier {
   Future<bool> syncWithServer({bool force = false}) async => true;
 }
 
+class FakeAuthRepository implements AuthRepository {
+  @override
+  bool get isAuthenticated => true;
+  @override
+  bool get isGoogleLinked => false;
+  @override
+  String? get linkedEmail => null;
+  @override
+  User? get currentUser => null;
+  @override
+  Stream<User?> authStateChanges() => const Stream.empty();
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async => 'token';
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Widget _buildMainShellApp({
   required FakeLeaderboardApiClient leaderboardClient,
   String nickname = 'Muhammed',
@@ -65,6 +84,7 @@ Widget _buildMainShellApp({
 }) {
   return ProviderScope(
     overrides: [
+      authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
       matchHistoryRepositoryProvider.overrideWithValue(
         FakeMatchHistoryRepository(),
       ),

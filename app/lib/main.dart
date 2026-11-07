@@ -38,9 +38,6 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    if (FirebaseAuth.instance.currentUser == null) {
-      await FirebaseAuth.instance.signInAnonymously();
-    }
   } catch (e) {
     authError = e.toString();
   }
@@ -122,7 +119,6 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
-  String? _authError;
   StreamSubscription<User?>? _authSubscription;
   bool _hasVisitedLeaderboard = false;
   bool _hasInitialOnline = false;
@@ -131,7 +127,6 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authError = widget.initialAuthError;
     _initAuth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reconcilePendingMatches();
@@ -157,26 +152,16 @@ class _MainShellState extends ConsumerState<MainShell>
   Future<void> _initAuth() async {
     try {
       if (Firebase.apps.isNotEmpty) {
-        if (FirebaseAuth.instance.currentUser == null && _authError == null) {
-          await FirebaseAuth.instance.signInAnonymously();
-        }
         _authSubscription ??= FirebaseAuth.instance.authStateChanges().listen((
           _,
         ) {
           if (mounted) setState(() {});
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _authError = e.toString();
-        });
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _retryStartupSequence() async {
-    _authError = null;
     await _initAuth();
     if (mounted) {
       ref.read(profileProvider.notifier).syncWithServer(force: true);
@@ -233,6 +218,12 @@ class _MainShellState extends ConsumerState<MainShell>
         onRetry: () => ref.read(networkStatusProvider.notifier).refresh(),
       );
     }
+
+    final authState = ref.watch(authNotifierProvider);
+    if (!authState.isAuthenticated) {
+      return const WelcomeScreen();
+    }
+
     final profile = ref.watch(profileProvider);
     if (!profile.isLoaded) {
       return const Scaffold(

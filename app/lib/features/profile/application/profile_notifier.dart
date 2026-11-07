@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../data/profile_api_client.dart';
 import '../data/profile_repository.dart';
@@ -121,6 +122,10 @@ class ProfileNotifier extends Notifier<ProfileState> {
 
   @override
   ProfileState build() {
+    final authRepo = ref.watch(authRepositoryProvider);
+    if (!authRepo.isAuthenticated) {
+      return const ProfileState(isLoaded: true);
+    }
     _loadProfile();
     return const ProfileState(isLoaded: false);
   }
@@ -150,6 +155,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
   /// ardından güncel oturum bilgileriyle yeni bir senkronizasyon çalıştırır.
   /// Başarıyla takma ad güncellenmiş/mevcutsa true, aksi halde false döner.
   Future<bool> syncWithServer({bool force = false}) async {
+    final authRepo = ref.read(authRepositoryProvider);
+    if (!authRepo.isAuthenticated) {
+      return state.hasNickname;
+    }
+
     if (_isSyncing) {
       await _awaitCurrentSync();
       if (!force) {

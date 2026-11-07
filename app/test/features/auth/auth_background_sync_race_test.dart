@@ -17,6 +17,9 @@ class FakeRaceAuthRepo implements AuthRepository {
   bool isGoogleLinked;
 
   @override
+  bool isAuthenticated = true;
+
+  @override
   String? linkedEmail;
 
   AuthLinkResult linkResultToReturn = const AuthLinkSuccess(email: 'google@test.com');
