@@ -28,6 +28,10 @@ class FakeMatchController extends MatchController {
 
   FakeMatchController(this._initialState);
 
+  void updateUiState(MatchUiState newState) {
+    state = newState;
+  }
+
   @override
   MatchUiState build() => _initialState;
 
@@ -582,5 +586,160 @@ void main() {
       isFalse,
       reason: '360 dp ekranda ve textScale 1.3 iken M-9633 rakip kartında kırpılmamalıdır',
     );
+  });
+
+  testWidgets('13a. Peş peşe iki öğe eklenince son öğe görünür alanda kalır ve en alta kaydırılır', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final initialAttempts = List.generate(
+      8,
+      (i) => RoundAttemptUiModel(
+        playerId: i.isEven ? 'me' : 'bot',
+        text: 'Cevap_$i',
+        isCorrect: true,
+      ),
+    );
+
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: initialAttempts,
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    // Peş peşe iki yeni cevap eklenir (ben doğru, rakip yanlış)
+    final updatedAttempts1 = [
+      ...initialAttempts,
+      const RoundAttemptUiModel(playerId: 'me', text: 'BenimCevap', isCorrect: true),
+    ];
+    controller.updateUiState(state.copyWith(roundAttempts: updatedAttempts1));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final updatedAttempts2 = [
+      ...updatedAttempts1,
+      const RoundAttemptUiModel(playerId: 'bot', text: 'RakipCevap', isCorrect: false),
+    ];
+    controller.updateUiState(state.copyWith(roundAttempts: updatedAttempts2));
+    await tester.pumpAndSettle();
+
+    final lastBubbleFinder = find.byWidgetPredicate(
+      (w) => w is AnswerBubble && w.text == 'RakipCevap',
+    );
+    expect(lastBubbleFinder, findsOneWidget);
+    final listRect = tester.getRect(find.byType(ListView));
+    final bubbleRect = tester.getRect(lastBubbleFinder);
+    expect(bubbleRect.bottom, lessThanOrEqualTo(listRect.bottom + 1.0));
+    expect(bubbleRect.top, greaterThanOrEqualTo(listRect.top - 1.0));
+  });
+
+  testWidgets('13b. Küçük liste yüksekliği ve klavye insets simülasyonunda yeni öğe görünür alanda kalır', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final initialAttempts = List.generate(
+      6,
+      (i) => RoundAttemptUiModel(
+        playerId: i.isEven ? 'me' : 'bot',
+        text: 'Eski_$i',
+        isCorrect: true,
+      ),
+    );
+
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: initialAttempts,
+    );
+    final controller = FakeMatchController(state);
+
+    // Klavye açıkken viewInsets.bottom: 280
+    await tester.pumpWidget(_buildTestApp(
+      controller,
+      mediaQueryData: const MediaQueryData(
+        size: Size(360, 640),
+        viewInsets: EdgeInsets.only(bottom: 280),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Klavye açıkken yeni bir cevap eklenir
+    final updatedAttempts = [
+      ...initialAttempts,
+      const RoundAttemptUiModel(playerId: 'bot', text: 'KlavyeYeni', isCorrect: false),
+    ];
+    controller.updateUiState(state.copyWith(roundAttempts: updatedAttempts));
+    await tester.pumpAndSettle();
+
+    final newBubbleFinder = find.byWidgetPredicate(
+      (w) => w is AnswerBubble && w.text == 'KlavyeYeni',
+    );
+    expect(newBubbleFinder, findsOneWidget);
+    final listRect = tester.getRect(find.byType(ListView));
+    final bubbleRect = tester.getRect(newBubbleFinder);
+    expect(bubbleRect.bottom, lessThanOrEqualTo(listRect.bottom + 1.0));
+    expect(bubbleRect.bottom, greaterThan(listRect.top));
+  });
+
+  testWidgets('13c. Son öğenin içeriği değiştiğinde (aynı uzunluk) en alta kaydırma tetiklenir ve son öğe görünür kalır', (tester) async {
+    tester.view.physicalSize = const Size(400, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final initialAttempts = [
+      ...List.generate(
+        8,
+        (i) => RoundAttemptUiModel(
+          playerId: i.isEven ? 'me' : 'bot',
+          text: 'Baslangic_$i',
+          isCorrect: true,
+        ),
+      ),
+      const RoundAttemptUiModel(playerId: 'bot', text: 'Bekleyen', isCorrect: true),
+    ];
+
+    final state = MatchUiState(
+      matchState: testMatchState,
+      opponentName: 'Ahmet',
+      remainingMs: 10000,
+      roundAttempts: initialAttempts,
+    );
+    final controller = FakeMatchController(state);
+
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    // Uzunluk aynı kalır ama son öğenin metni ve doğruluğu güncellenir
+    final updatedAttempts = [
+      ...initialAttempts.sublist(0, initialAttempts.length - 1),
+      const RoundAttemptUiModel(playerId: 'bot', text: 'Reddedildi', isCorrect: false),
+    ];
+    controller.updateUiState(state.copyWith(roundAttempts: updatedAttempts));
+    await tester.pumpAndSettle();
+
+    final updatedBubbleFinder = find.byWidgetPredicate(
+      (w) => w is AnswerBubble && w.text == 'Reddedildi',
+    );
+    expect(updatedBubbleFinder, findsOneWidget);
+    final listRect = tester.getRect(find.byType(ListView));
+    final bubbleRect = tester.getRect(updatedBubbleFinder);
+    expect(bubbleRect.bottom, lessThanOrEqualTo(listRect.bottom + 1.0));
+    expect(bubbleRect.top, greaterThanOrEqualTo(listRect.top - 1.0));
   });
 }

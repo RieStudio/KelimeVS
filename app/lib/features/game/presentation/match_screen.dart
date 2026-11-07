@@ -28,6 +28,8 @@ class MatchScreen extends ConsumerStatefulWidget {
 class _MatchScreenState extends ConsumerState<MatchScreen> {
   final ScrollController _scrollController = ScrollController();
   late final BannerSuppressionNotifier _suppressionNotifier;
+  int _scrollGeneration = 0;
+  double _lastBottomInset = 0.0;
 
   @override
   void initState() {
@@ -56,15 +58,45 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool immediate = false}) {
+    final int currentGen = ++_scrollGeneration;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!mounted || currentGen != _scrollGeneration) return;
+      if (!_scrollController.hasClients) return;
+
+      final position = _scrollController.position;
+      final target1 = position.maxScrollExtent;
+
+      if (immediate) {
+        _scrollController.jumpTo(target1);
+      } else {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
+          target1,
+          duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
         );
       }
+
+      // 2. Aşama: Yeni eklenen öğe ve ayraç render edilip maxScrollExtent
+      // genişlemişse, bir sonraki frame'de güncel sınıra kaydır:
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || currentGen != _scrollGeneration) return;
+        if (!_scrollController.hasClients) return;
+
+        final updatedTarget = _scrollController.position.maxScrollExtent;
+        if (_scrollController.position.pixels < updatedTarget) {
+          if (immediate) {
+            _scrollController.jumpTo(updatedTarget);
+          } else {
+            _scrollController.animateTo(
+              updatedTarget,
+              duration: const Duration(milliseconds: 100),
+              curve: Curves.easeOut,
+            );
+          }
+        }
+      });
     });
   }
 
@@ -116,13 +148,24 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(
-      activeMatchUiStateProvider.select((s) => s.displayAttempts.length),
+      activeMatchUiStateProvider.select((s) {
+        final attempts = s.displayAttempts;
+        if (attempts.isEmpty) return '';
+        final last = attempts.last;
+        return '${attempts.length}_${last.playerId}_${last.text}_${last.isCorrect}';
+      }),
       (prev, next) {
-        if (next > (prev ?? 0)) {
+        if (next.isNotEmpty && next != prev) {
           _scrollToBottom();
         }
       },
     );
+
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset != _lastBottomInset) {
+      _lastBottomInset = bottomInset;
+      _scrollToBottom();
+    }
 
     ref.listen<bool>(
       activeMatchUiStateProvider.select((s) => s.isVoided),
