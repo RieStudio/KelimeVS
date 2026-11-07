@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -82,5 +83,235 @@ void main() {
       final textField = tester.widget<TextField>(find.byType(TextField));
       expect(textField.readOnly, isTrue);
     });
+
+    testWidgets(
+      '4. Odak hiç alınmamışken sıra değişince (isMyTurn true -> false -> true) klavye zorla açılmaz ve TextInput.show çağrılmaz',
+      (tester) async {
+        final List<MethodCall> textInputCalls = [];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.textInput, (call) async {
+          textInputCalls.add(call);
+          return null;
+        });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.textInput, null);
+        });
+
+        final focusNode = FocusNode();
+        addTearDown(focusNode.dispose);
+
+        bool isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, setState) {
+                  return AnswerInputBar(
+                    isMyTurn: isMyTurn,
+                    focusNode: focusNode,
+                    onSubmitted: (_) {},
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(focusNode.hasFocus, isFalse);
+        textInputCalls.clear();
+
+        // Sıra rakibe geçer
+        isMyTurn = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(focusNode.hasFocus, isFalse);
+
+        // Sıra tekrar bana geçer
+        isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Odak hiç alınmadığı için klavye zorla açılmamalı
+        expect(focusNode.hasFocus, isFalse);
+        final showCalls = textInputCalls.where((c) => c.method == 'TextInput.show');
+        expect(showCalls, isEmpty);
+      },
+    );
+
+    testWidgets(
+      '5. Odak daha önce alınmışken isMyTurn true -> false -> true geçişinde hasFocus korunur ve TextInput.show çağrılır',
+      (tester) async {
+        final List<MethodCall> textInputCalls = [];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.textInput, (call) async {
+          textInputCalls.add(call);
+          return null;
+        });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.textInput, null);
+        });
+
+        final focusNode = FocusNode();
+        addTearDown(focusNode.dispose);
+
+        bool isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Alana odaklanılır
+        focusNode.requestFocus();
+        await tester.pumpAndSettle();
+        expect(focusNode.hasFocus, isTrue);
+
+        textInputCalls.clear();
+
+        // Sıra rakibe geçer (true -> false)
+        isMyTurn = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        // focusNode unfocus yapılmadı, hasFocus hala true
+        expect(focusNode.hasFocus, isTrue);
+
+        // Sıra tekrar bana geçer (false -> true)
+        isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        // PostFrameCallback tetiklenmesi için pump
+        await tester.pump();
+
+        expect(focusNode.hasFocus, isTrue);
+        final showCalls = textInputCalls.where((c) => c.method == 'TextInput.show');
+        expect(showCalls, isNotEmpty);
+      },
+    );
+
+    testWidgets(
+      '6. Odak daha önce alınmış ancak sıra rakipteyken focus kaybedilmişse, false -> true geçişinde requestFocus çağrılarak odak geri alınır',
+      (tester) async {
+        final List<MethodCall> textInputCalls = [];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.textInput, (call) async {
+          textInputCalls.add(call);
+          return null;
+        });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.textInput, null);
+        });
+
+        final focusNode = FocusNode();
+        addTearDown(focusNode.dispose);
+
+        bool isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Alana odaklanılır
+        focusNode.requestFocus();
+        await tester.pumpAndSettle();
+        expect(focusNode.hasFocus, isTrue);
+
+        // Sıra rakibe geçer
+        isMyTurn = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Sistem veya kullanıcı tarafından odak kaybedildiğini simüle et
+        focusNode.unfocus();
+        await tester.pump();
+        expect(focusNode.hasFocus, isFalse);
+
+        // Sıra tekrar bana geçer (false -> true)
+        isMyTurn = true;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AnswerInputBar(
+                isMyTurn: isMyTurn,
+                focusNode: focusNode,
+                onSubmitted: (_) {},
+              ),
+            ),
+          ),
+        );
+        // Post-frame callback
+        await tester.pump();
+
+        // Odak yeniden kazanılmış olmalıdır
+        expect(focusNode.hasFocus, isTrue);
+      },
+    );
   });
 }

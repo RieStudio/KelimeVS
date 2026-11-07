@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../features/game/application/match_ui_state.dart';
 import '../icons/app_icons.dart';
@@ -54,6 +55,8 @@ class _AnswerInputBarState extends State<AnswerInputBar>
   MatchFeedbackType? _activeFeedback;
   Timer? _feedbackTimer;
   bool _showDangerBorder = false;
+  bool _hasEverFocused = false;
+  bool _isRestoreScheduled = false;
 
   bool get _isExternalController => widget.controller != null;
   bool get _isExternalFocusNode => widget.focusNode != null;
@@ -63,6 +66,10 @@ class _AnswerInputBarState extends State<AnswerInputBar>
     super.initState();
     _controller = widget.controller ?? TextEditingController();
     _focusNode = widget.focusNode ?? FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+    if (_focusNode.hasFocus) {
+      _hasEverFocused = true;
+    }
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -85,13 +92,55 @@ class _AnswerInputBarState extends State<AnswerInputBar>
     }
   }
 
+  void _handleFocusChange() {
+    if (_focusNode.hasFocus) {
+      _hasEverFocused = true;
+    }
+  }
+
   @override
   void didUpdateWidget(AnswerInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.focusNode != oldWidget.focusNode) {
+      oldWidget.focusNode?.removeListener(_handleFocusChange);
+      if (!_isExternalFocusNode && oldWidget.focusNode == null) {
+        _focusNode.removeListener(_handleFocusChange);
+        _focusNode.dispose();
+      }
+      _focusNode = widget.focusNode ?? FocusNode();
+      _focusNode.addListener(_handleFocusChange);
+      if (_focusNode.hasFocus) {
+        _hasEverFocused = true;
+      }
+    }
+
     if (widget.feedbackCounter != oldWidget.feedbackCounter &&
         widget.feedback != null) {
       _triggerFeedback(widget.feedback!);
     }
+
+    // Sıra bana geçtiğinde (false -> true) odak ve klavye güvencesi:
+    // Sadece kullanıcı daha önce alana odaklanmış/yazmışsa devreye girer.
+    if (!oldWidget.isMyTurn && widget.isMyTurn) {
+      if (_hasEverFocused) {
+        _scheduleKeyboardRestore();
+      }
+    }
+  }
+
+  void _scheduleKeyboardRestore() {
+    if (_isRestoreScheduled) return;
+    _isRestoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isRestoreScheduled = false;
+      if (!mounted || !widget.isMyTurn) return;
+
+      if (!_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      } else {
+        SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      }
+    });
   }
 
   void _triggerFeedback(MatchFeedbackType feedback) {
@@ -120,6 +169,7 @@ class _AnswerInputBarState extends State<AnswerInputBar>
 
   @override
   void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
     _feedbackTimer?.cancel();
     _shakeController.dispose();
     if (!_isExternalController) {
@@ -137,6 +187,7 @@ class _AnswerInputBarState extends State<AnswerInputBar>
 
     _controller.clear();
     widget.onSubmitted(text);
+    _hasEverFocused = true;
     _focusNode.requestFocus();
   }
 
