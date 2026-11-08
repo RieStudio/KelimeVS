@@ -298,6 +298,7 @@ server/
 │   ├── index.ts                # Worker giriş noktası ve yönlendirme (/health, /ws/...)
 │   ├── auth.ts                 # Dev mod token ayrıştırıcı (Adım 4.3b'de Firebase Auth)
 │   ├── protocol.ts             # İstemci-sunucu JSON protokol tipleri ve validatörler
+│   ├── powerup.ts              # Güçlendirici maliyet yapılandırması ve doğrulayıcılar
 │   ├── matchmaker.ts           # Matchmaker Durable Object (global kuyruk, FIFO, eşleştirme)
 │   ├── matchRoom.ts            # MatchRoom Durable Object (canlı oda, WebSocket Hibernation, SQLite)
 │   ├── scheduler.ts            # Tek alarmlı zamanlayıcı hesaplayıcı (pure functions)
@@ -325,4 +326,7 @@ server/
 ## 📖 Protokol Dokümantasyonu
 
 Tüm WebSocket mesaj formatları, JSON şemaları, gizlilik kuralları ve hata kodları için [docs/PROTOCOL.md](../docs/PROTOCOL.md) belgesine bakınız.
+
+### ⚡ Bot Maçı Joker Harcama Uç Noktası (`POST /powerups/spend`)
+Bot maçlarında oda (`MatchRoom`) sunucuda bulunmadığından, istemci tarafındaki joker harcamaları (`extra_time`: 30, `give_answer`: 50) bu uç nokta üzerinden `UserProfile` Durable Object'ine atomik ve idempotent olarak yansıtılır. Yalnızca `bot:` önekli maç kimlikleri kabul edilir. Detaylar için [docs/PROTOCOL.md](../docs/PROTOCOL.md) belgesine bakınız.
 

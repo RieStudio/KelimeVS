@@ -590,4 +590,55 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 - `POST /admin/leaderboard/seed` (Yalnızca Yerel Geliştirme): Güncel hafta için toplu test oyuncusu ekler (`{ "entries": [...] }`). Canlı ortamda 403 Forbidden ile engellenmiştir.
 - `POST /admin/leaderboard/clear` (Yalnızca Yerel Geliştirme): Tablodaki `seed_` ön ekli test oyuncularını temizler. Gerçek kullanıcılara dokunmaz. Canlı ortamda 403 Forbidden ile engellenmiştir.
 
+### Bot Maçı Güçlendirici Harcama (`POST /powerups/spend`)
+Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından ve sunucuda canlı bir maç odası (`MatchRoom`) bulunmadığından, bot maçlarında kullanılan jokerlerin ("Ek süre" ve "Cevap Ver") jeton bedeli bu HTTP endpoint'i üzerinden doğrudan `UserProfile` Durable Object'inden düşülür.
+
+- **Uç Nokta:** `POST /powerups/spend`
+- **Kimlik Doğrulama:** `Authorization: Bearer <token>` başlığı zorunludur. Geçersiz veya eksikse `401 Unauthorized` döner (`{ "ok": false, "error": "unauthorized" }`).
+- **İstek Başlıkları:**
+  - `Authorization: Bearer <token>`
+  - `Content-Type: application/json`
+  - `X-App-Build: <build>` (opsiyonel istemci derleme numarası)
+- **İstek Gövdesi:**
+  ```json
+  {
+    "matchId": "bot:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "powerup": "extra_time"
+  }
+  ```
+  - `matchId`: Zorunlu dize. `^bot:[A-Za-z0-9_-]{8,64}$` düzenli ifadesiyle eşleşmelidir. `'bot:'` öneki **ZORUNLUDUR**. Online oda kimlikleri veya öneksiz kimlikler `400 Bad Request` ile reddedilir (bu kısıtlama, istemcinin online bir maçın powerup kaydını önceden yakarak rakibi engellemesini önler).
+  - `powerup`: Zorunlu dize. `'extra_time'` veya `'give_answer'` olmalıdır.
+  - Gövdede gönderilen fazladan alanlar (özellikle `amount`) sunucu tarafından **YOK SAYILIR**.
+- **Fiyatlandırma (Sunucu Belirler):**
+  - `extra_time`: 30 jeton (`EXTRA_TIME_COST` ortam değişkeniyle ezilebilir).
+  - `give_answer`: 50 jeton (`GIVE_ANSWER_COST` ortam değişkeniyle ezilebilir).
+- **İdempotentlik (Mükerrer Harcama Koruması):**
+  - Sunucu veritabanında `powerup_purchases` tablosunda `(match_id, powerup)` birincil anahtardır (`PRIMARY KEY`).
+  - Aynı `matchId` ve `powerup` kombinasyonu için tekrar istek gönderildiğinde jeton **İKİNCİ KEZ DÜŞMEZ**; sunucu `200 OK` ve `alreadySpent: true` ile güncel bakiyeyi döner. Ağ kesintilerinde aynı `matchId` ile yeniden deneme tamamen güvenlidir.
+  - Aynı `matchId` ile farklı bir `powerup` (örn. önce `extra_time`, sonra `give_answer`) gönderildiğinde her biri bağımsız olarak düşülür.
+- **Yanıtlar ve Durum Kodları:**
+  - `200 OK`: Harcama başarılı veya zaten harcanmış.
+    ```json
+    { "ok": true, "coins": 70, "alreadySpent": false }
+    ```
+    *(Mükerrer çağrıda: `{ "ok": true, "coins": 70, "alreadySpent": true }`)*
+  - `400 Bad Request`: Geçersiz JSON gövdesi, eksik gövde, geçersiz `matchId` (örn. `bot:` öneki eksik, 8-64 karakter sınırları dışında, geçersiz karakterler) veya bilinmeyen `powerup`.
+    ```json
+    { "ok": false, "error": "bad_request", "message": "Geçersiz matchId: 'bot:' öneki zorunludur" }
+    ```
+  - `401 Unauthorized`: Kimliksiz veya geçersiz belirteçli istek.
+    ```json
+    { "ok": false, "error": "unauthorized" }
+    ```
+  - `402 Payment Required`: Jeton bakiyesi yetersiz. Bakiye değişmez.
+    ```json
+    { "ok": false, "error": "not_enough_coins", "coins": 15 }
+    ```
+  - `410 Gone`: Kullanıcı hesabı silinmiş (tombstone).
+    ```json
+    { "ok": false, "error": "account_deleted" }
+    ```
+- **İade (Refund):** Bu endpoint iade işlemi yapmaz; bot maçlarında iade endpoint'i bulunmaz.
+
+
 

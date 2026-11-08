@@ -26,6 +26,12 @@ import {
 } from './storage';
 import type { MatchRewardOutcome, SpendCoinsResult } from './userProfile';
 import type { Env } from './index';
+import {
+  getExtraTimeConfig,
+  getGiveAnswerConfig,
+  type ExtraTimeConfig,
+  type GiveAnswerConfig,
+} from './powerup';
 
 interface PlayerInfo {
   readonly uid: string;
@@ -1204,20 +1210,12 @@ export class MatchRoom extends DurableObject<Env> {
     }
   }
 
-  private get extraTimeConfig(): { cost: number; seconds: number } {
-    const costVal = parseInt(this.env.EXTRA_TIME_COST ?? '30', 10);
-    const secVal = parseInt(this.env.EXTRA_TIME_SECONDS ?? '5', 10);
-    return {
-      cost: Number.isFinite(costVal) && costVal >= 0 ? costVal : 30,
-      seconds: Number.isFinite(secVal) && secVal > 0 ? secVal : 5,
-    };
+  private get extraTimeConfig(): ExtraTimeConfig {
+    return getExtraTimeConfig(this.env);
   }
 
-  private get giveAnswerConfig(): { cost: number } {
-    const costVal = parseInt(this.env.GIVE_ANSWER_COST ?? '50', 10);
-    return {
-      cost: Number.isFinite(costVal) && costVal >= 0 ? costVal : 50,
-    };
+  private get giveAnswerConfig(): GiveAnswerConfig {
+    return getGiveAnswerConfig(this.env);
   }
 
   private async handleUseExtraTime(uid: string): Promise<void> {

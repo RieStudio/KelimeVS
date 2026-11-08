@@ -1,5 +1,12 @@
 import { authenticateRequest, authenticateAuth, type AuthEnv, type AuthContext } from './auth';
 import type { EnergyEnv } from './energy';
+import {
+  getExtraTimeConfig,
+  getGiveAnswerConfig,
+  isValidBotMatchId,
+  isSupportedPowerup,
+  type PowerupEnv,
+} from './powerup';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild } from './userProfile';
@@ -14,7 +21,7 @@ export {
   ReportStore,
 };
 
-export interface Env extends AuthEnv, EnergyEnv {
+export interface Env extends AuthEnv, EnergyEnv, PowerupEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly USER_PROFILE: DurableObjectNamespace<UserProfile>;
@@ -611,6 +618,107 @@ export default {
           status: 500,
           headers: jsonHeaders,
         });
+      }
+    }
+
+    // Güçlendirici harcama rotası: POST /powerups/spend
+    if (request.method === 'POST' && pathname === '/powerups/spend') {
+      const auth = await authenticateAuth(request, env);
+      if (!auth) {
+        return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+      const uid = auth.uid;
+
+      // X-App-Build başlığı ayrıştırılır (kimlikli endpoint desen uyumu)
+      parseClientBuild(request);
+
+      let body: { matchId?: unknown; powerup?: unknown };
+      try {
+        body = (await request.json()) as { matchId?: unknown; powerup?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!body || typeof body !== 'object') {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Geçersiz istek gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!isValidBotMatchId(body.matchId)) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: "Geçersiz matchId: 'bot:' öneki zorunludur" }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!isSupportedPowerup(body.powerup)) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Geçersiz veya bilinmeyen powerup' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      // Fiyatı SUNUCU belirler (istemcinin gönderdiği fazladan alanlar yok sayılır)
+      const cost = body.powerup === 'extra_time'
+        ? getExtraTimeConfig(env).cost
+        : getGiveAnswerConfig(env).cost;
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        const res = await profileStub.spendCoins({
+          matchId: body.matchId,
+          powerup: body.powerup,
+          amount: cost,
+          uid,
+        });
+
+        if (!res.success) {
+          if (res.error === 'not_enough_coins') {
+            return new Response(
+              JSON.stringify({ ok: false, error: 'not_enough_coins', coins: res.coins }),
+              { status: 402, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'account_deleted') {
+            return new Response(
+              JSON.stringify({ ok: false, error: 'account_deleted' }),
+              { status: 410, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ ok: false, error: 'internal_error' }),
+            { status: 500, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            coins: res.coins,
+            alreadySpent: !!res.alreadySpent,
+          }),
+          { status: 200, headers: jsonHeaders }
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'account_deleted' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(
+          JSON.stringify({ ok: false, error: 'internal_error', message: msg }),
+          { status: 500, headers: jsonHeaders }
+        );
       }
     }
 
