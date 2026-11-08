@@ -139,10 +139,17 @@ class MatchUiState {
       boardScores ?? matchState?.scores ?? const {'me': 0, 'bot': 0};
 
   /// Güçlendirici ve tur süresinden türetilen dinamik tavan saniye (varsayılan: 20).
+  ///
+  /// Turun standart tavanı [base] süresidir (örn. 20 sn). Kullanıcı henüz ek süre
+  /// kullanmamışken (veya sıra rakipteyken) tavan yapay olarak [extraTimeSeconds] kadar artırılmaz;
+  /// aksi takdirde henüz ek süre basılmamış tur başında süre çubuğu %100 yerine
+  /// base / (base + extra) oranından (örn. 20 / 25 = %80) başlar.
+  /// Yalnızca kalan süre tur temel süresini aştığında (örn. tur başında ek süre basıldığında)
+  /// tavan süre kalan saniyeye dinamik genişler.
   int get maxAllowedSeconds {
     final base = matchState?.config.answerSeconds ?? 20;
-    final extra = extraTimeSeconds ?? 0;
-    return base + extra;
+    final remainingSec = (remainingMs / 1000).ceil();
+    return remainingSec > base ? remainingSec : base;
   }
 
   bool get isMyTurn =>

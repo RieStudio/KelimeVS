@@ -146,7 +146,7 @@ void main() {
     expect(ui.extraTimeCost, equals(30));
     expect(ui.extraTimeSeconds, equals(5));
     expect(ui.extraTimeRemainingUses, equals(1));
-    expect(ui.maxAllowedSeconds, equals(20)); // 15 + 5
+    expect(ui.maxAllowedSeconds, equals(15)); // Ek süre henüz kullanılmadığı için turun temel süresi geçerlidir
     expect(ui.isMyTurn, isTrue);
   });
 
