@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -125,7 +126,7 @@ void main() {
 
     // Skor kartı
     expect(find.text(AppStrings.you), findsOneWidget);
-    expect(find.text(AppStrings.opponent), findsOneWidget);
+    expect(find.text('Ahmet'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(find.text('0'), findsOneWidget);
     expect(find.text('–'), findsOneWidget);
@@ -451,5 +452,136 @@ void main() {
 
     expect(find.byKey(const ValueKey('round_end_next_question_card')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('11. Skor kartında bot adı (M-1234) başlık olarak görünür', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 0},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'M-1234',
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('M-1234'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
+  });
+
+  testWidgets('12. Skor kartında uzun ad (20 karakter) FittedBox ile sütuna sığar', (tester) async {
+    const longName = 'MustafaKemalettin123'; // 20 karakter
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: longName,
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(longName), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('13. Rakip adı boş veya sadece boşluklardan oluştuğunda "Rakip" fallback başlığı kullanılır', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 0, 'bot': 1},
+      winnerId: 'bot',
+      reason: RoundEndReason.timeout,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: '   ',
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text(AppStrings.opponent), findsOneWidget);
+  });
+
+  testWidgets('14. 360 dp küçük ekranda ve 1.3 yazı ölçeğinde uzun adla sıfır taşma oluşur', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    const longName = 'MustafaKemalettin123';
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: longName,
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(
+      controller,
+      textScaler: const TextScaler.linear(1.3),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(longName), findsOneWidget);
+  });
+
+  testWidgets('15. Uzun ad varken iki skor rakamının dikey hizası (dy) tamamen eşittir ve konum sabit kalır', (tester) async {
+    const longName = 'MustafaKemalettin123'; // 20 karakter
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+      reason: RoundEndReason.timeout,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: longName,
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    final myScoreTop = tester.getTopLeft(find.text('2'));
+    final oppScoreTop = tester.getTopLeft(find.text('1'));
+
+    // Her iki skor rakamı da tam olarak aynı dikey (y) hizadadır
+    expect(myScoreTop.dy, equals(oppScoreTop.dy));
+  });
+
+  testWidgets('16. M-9999 adı sütunda küçülmeden görünür (didExceedMaxLines false)', (tester) async {
+    final matchState = createMatchState(
+      decisiveRounds: 1,
+      scores: {'me': 1, 'bot': 1},
+      winnerId: null,
+      reason: RoundEndReason.exhausted,
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'M-9999',
+    );
+    final controller = FakeMatchController(uiState);
+    await tester.pumpWidget(_buildTestApp(controller));
+    await tester.pumpAndSettle();
+
+    final mFinder = find.text('M-9999');
+    expect(mFinder, findsOneWidget);
+    final renderParagraph = tester.renderObject<RenderParagraph>(mFinder);
+    expect(renderParagraph.didExceedMaxLines, isFalse);
   });
 }

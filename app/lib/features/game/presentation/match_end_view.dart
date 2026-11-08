@@ -7,6 +7,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/opponent_name_sanitizer.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/player_avatar.dart';
@@ -46,16 +47,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   bool _isSubmittingReport = false;
   bool _isSubmittingBlock = false;
 
-  /// Rakip adını sanitize eder: kontrol karakterlerini temizler, ardışık boşlukları
-  /// tek boşluğa indirir, aşırı uzun metinleri sınırlar. Boşsa [AppStrings.opponent] döner.
-  static String _sanitizeOpponentName(String? raw) {
-    if (raw == null) return AppStrings.opponent;
-    final noControlChars = raw.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
-    final trimmed = noControlChars.trim().replaceAll(RegExp(r'\s+'), ' ');
-    if (trimmed.isEmpty) return AppStrings.opponent;
-    const maxLength = 24;
-    return trimmed.length <= maxLength ? trimmed : trimmed.substring(0, maxLength);
-  }
+  /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
+  static String _sanitizeOpponentName(String? raw) => OpponentNameSanitizer.sanitize(raw);
 
   void _showSnackBar(String message) {
     if (!mounted) return;

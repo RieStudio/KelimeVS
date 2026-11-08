@@ -6,6 +6,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/opponent_name_sanitizer.dart';
 import '../../../core/widgets/app_progress_bar.dart';
 import '../../../core/widgets/question_preview_card.dart';
 import '../../../core/widgets/round_result_icon.dart';
@@ -125,6 +126,11 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
     final myScore = matchState?.scores['me'] ?? 0;
     final opponentScore = matchState?.scores['bot'] ?? 0;
 
+    final rawOpponentName = (uiState.lastSavedMatch?.opponentName.trim().isNotEmpty ?? false)
+        ? uiState.lastSavedMatch!.opponentName
+        : uiState.opponentName;
+    final opponentDisplayName = OpponentNameSanitizer.sanitize(rawOpponentName);
+
     final Widget content = Container(
       color: AppColors.surface,
       width: double.infinity,
@@ -194,9 +200,9 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
 
               const SizedBox(height: AppDimens.space24),
 
-              // 5. Skor Kartı ("Sen  –  Rakip", Fredoka 52)
+              // 5. Skor Kartı ("Sen  –  Rakip" / "Sen  –  <RakipAdı>", Fredoka 52)
               Semantics(
-                label: 'Skor: Sen $myScore, Rakip $opponentScore',
+                label: 'Skor: Sen $myScore, $opponentDisplayName $opponentScore',
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -255,12 +261,33 @@ class _RoundEndViewState extends ConsumerState<RoundEndView>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              AppStrings.opponent,
-                              style: AppTextStyles.playerName.copyWith(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Visibility(
+                                  visible: false,
+                                  maintainSize: true,
+                                  maintainAnimation: true,
+                                  maintainState: true,
+                                  child: Text(
+                                    ' ',
+                                    style: AppTextStyles.playerName.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    opponentDisplayName,
+                                    maxLines: 1,
+                                    style: AppTextStyles.playerName.copyWith(
+                                      color: AppColors.ink,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: AppDimens.space4),
                             ScaleTransition(
