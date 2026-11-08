@@ -20,6 +20,7 @@ export interface TurnAttempt {
   readonly nowMs: number;
   readonly isClose: boolean;
   readonly hintShown: boolean;
+  readonly viaPowerup?: boolean;
 }
 
 export interface RoundRecord {

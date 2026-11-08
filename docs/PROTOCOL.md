@@ -224,11 +224,12 @@ Arkadaş düellosu da `/ws/matchmaking` WebSocket uç noktası üzerinden yönet
 ```json
 {
   "t": "use_powerup",
-  "type": "extra_time"
+  "type": "extra_time" | "give_answer"
 }
 ```
-- Yalnızca online hızlı maçta (ranked), tur aktifken ve sıra oyuncudayken kullanılabilir.
-- Maç başına oyuncu başına 1 kullanım ile sınırlıdır (30 jeton).
+- Yalnızca online hızlı maçta (ranked), tur aktifken (`roundActive`) ve sıra oyuncudayken kullanılabilir.
+- `extra_time`: Maç başına 1 kullanım, 30 jeton (+5 sn ek süre).
+- `give_answer`: Maç başına 1 kullanım, 50 jeton (soruya ait henüz kullanılmamış doğru cevaplardan birini otomatik oynar).
 - Arkadaş maçında veya bakiye yetersizliğinde reddedilir.
 
 ---
@@ -266,8 +267,25 @@ Her hamle, tur geçişi veya durum değişikliğinde (veya `sync` istendiğinde)
       "text": "ankra",
       "result": "nearMiss",
       "hintShown": true
+    },
+    {
+      "mine": false,
+      "text": "Ankara",
+      "result": "correct",
+      "viaPowerup": true
     }
   ],
+  "powerups": {
+    "extraTime": {
+      "cost": 30,
+      "seconds": 5,
+      "remainingUses": 1
+    },
+    "giveAnswer": {
+      "cost": 50,
+      "remainingUses": 1
+    }
+  },
   "opponentName": "Mehmet",
   "opponentFrame": "classic",
   "opponentConnected": true,
@@ -288,7 +306,8 @@ Her hamle, tur geçişi veya durum değişikliğinde (veya `sync` istendiğinde)
 - `turnIsMine`: Sıranın bu istemcide olup olmadığı.
 - `deadlineMs`: Sıradaki oyuncunun hamle yapması gereken son zaman (Unix ms).
 - `myHintsLeft`: Oyuncunun bu tur kalan "çok yakın" ipucu hakkı (başlangıçta 1).
-- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik ve görünürlük kurallarına göre filtrelenmiş; aktif turda tekrarlanan cevaplar dahil edilmez). Doğru (`correct`) kabul edilen denemelerde `text` alanı eşleşen ana cevabı (`answer.display`) taşır; böylece kullanıcı alias (ör. `"bjk"`) yazsa bile chat balonunda ana cevap (ör. `"Beşiktaş"`) görünür. Yanlış (`wrong`) denemelerde `text` kullanıcının girdiği ham metni korur.
+- `attempts`: Turdaki balonlar / denemeler listesi (gizlilik ve görünürlük kurallarına göre filtrelenmiş; aktif turda tekrarlanan cevaplar dahil edilmez). Doğru (`correct`) kabul edilen denemelerde `text` alanı eşleşen ana cevabı (`answer.display`) taşır; böylece kullanıcı alias (ör. `"bjk"`) yazsa bile chat balonunda ana cevap (ör. `"Beşiktaş"`) görünür. Yanlış (`wrong`) denemelerde `text` kullanıcının girdiği ham metni korur. "Cevap Ver" güçlendiricisi ile otomatik oynanan cevaplarda `viaPowerup: true` alanı yer alır (balonda rozet/ikon gösterimi için).
+- `powerups`: Online dereceli maçlarda mevcut güçlendiricilerin durumunu (`extraTime`, `giveAnswer`) taşır (maliyet ve kalan kullanım sayısı). Arkadaş maçında `undefined` döner.
 - `opponentConnected`: Rakibin bağlantısının aktif olup olmadığı (`false` ise bağlantı koptu ve geri dönüş sayacı çalışıyor).
 - `nextRoundAtMs`: Tur arası geçişte bir sonraki turun başlama zamanı.
 
@@ -383,7 +402,7 @@ Yalnızca güçlendiriciyi kullanmak isteyen oyuncuya gönderilir:
 ```json
 {
   "t": "powerup_ack",
-  "powerupType": "extra_time",
+  "powerupType": "extra_time" | "give_answer",
   "success": true,
   "deadlineMs": 1728518420000,
   "coins": 70,
@@ -394,21 +413,23 @@ Başarısızlık durumunda:
 ```json
 {
   "t": "powerup_ack",
-  "powerupType": "extra_time",
+  "powerupType": "extra_time" | "give_answer",
   "success": false,
-  "code": "not_enough_coins" | "already_used" | "not_your_turn" | "round_not_active" | "not_allowed_in_match_type" | "account_deleted",
+  "code": "not_enough_coins" | "already_used" | "not_your_turn" | "round_not_active" | "not_allowed_in_match_type" | "account_deleted" | "no_answers_left",
   "message": "Açıklayıcı Türkçe hata mesajı"
 }
 ```
 
 #### Rakip Güçlendirici Bildirimi (`opponent_powerup`)
-Rakip oyuncu bir güçlendirici kullandığında bilgi amaçlı iletilir:
+Rakip oyuncu `extra_time` güçlendiricisini kullandığında bilgi amaçlı iletilir:
 ```json
 {
   "t": "opponent_powerup",
   "powerupType": "extra_time",
   "seconds": 5
 }
+```
+*(Not: `give_answer` güçlendiricisi kullanıldığında `opponent_powerup` mesajı GÖNDERİLMEZ; eski istemcilerin bunu "+5 sn ek süre" olarak algılamasını önlemek için cevap doğrudan `state.attempts` listesine eklenir ve sıra rakibe geçer).*
 ```
 
 ---

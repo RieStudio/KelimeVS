@@ -40,6 +40,9 @@ FIREBASE_SERVICE_ACCOUNT_B64=<base64-encoded-service-account-json>
 - **`CONTENT_TTL_SECONDS`**: Bellek içi soru havuzu önbellek süresi (saniye cinsinden, varsayılan 3600).
 - **`FIREBASE_SERVICE_ACCOUNT_B64`**: Sunucunun Realtime Database REST API'sine erişmek için kullandığı Google servis hesabı JSON dosyasının Base64 hali.
 - **`LEADERBOARD_PAIR_WIN_CAP`**: Sıralama tablosunda aynı rakibe karşı haftada en fazla kaç galibiyetin sayılabileceğini (anti-farming) belirler. Belirtilmezse veya geçersizse varsayılan **20**'dir. Değer olarak **0** veya negatif bir sayı verildiğinde sınır kaldırılır (sınırsız, yerel testler için uygundur). Yerelde test ederken `server/.dev.vars` içine `LEADERBOARD_PAIR_WIN_CAP=0` veya istenen sınır yazılarak ayarlanabilir.
+- **`EXTRA_TIME_COST`**: Ek süre (+5 sn) güçlendiricisinin jeton maliyeti (varsayılan: **30**).
+- **`EXTRA_TIME_SECONDS`**: Ek süre güçlendiricisinin sağladığı süre (saniye cinsinden, varsayılan: **5**).
+- **`GIVE_ANSWER_COST`**: "Cevap Ver" güçlendiricisinin jeton maliyeti (varsayılan: **50**). Maç başına 1 kullanım sınırı bulunur ve sorunun henüz kullanılmamış doğru cevaplarından birini otomatik oynar.
 
 ### 🔐 Canlı Ortam Gizli Değişkenleri (Cloudflare Secrets)
 

@@ -216,6 +216,26 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
   - Build >= 11 istemciler sunucuya bağlandığında (`GET /me` veya `GET /store` çağrıldığında) sahip oldukları emekli çerçeveler envanterden kaldırılır ve ödedikleri tüm jetonlar bakiyelerine iade edilir. Kuşanılmış emekli çerçeve `'classic'`e çekilir.
   - İadeli geçiş işlemi tek seferlik ve idempotenttir; `daily_coins` (günlük maç kazanç üst sınırı) sayacını etkilemez.
 
+### 8.2 Maç İçi Güçlendiriciler (Power-ups)
+
+Maç içi güçlendiriciler oyuncunun zor anlarda taktiksel avantaj elde etmesini sağlayan, yalnızca **Online Dereceli (Ranked)** maçlarda geçerli jeton harcamalarıdır. Dostluk maçlarında rekabet adaletini korumak için kapalıdır (`not_allowed_in_match_type`), internetsiz yerel bot maçlarında yer almaz.
+
+- **Ek Süre (`extra_time`):**
+  - **Maliyet:** 30 jeton (`EXTRA_TIME_COST` env değişkeni ile yapılandırılabilir).
+  - **Süre:** +5 saniye (`EXTRA_TIME_SECONDS`).
+  - **Kullanım Limiti:** Maç başına oyuncu başına 1 kullanım.
+  - **Koşul:** Yalnızca aktif turda (`roundActive`) ve sıra oyuncunun kendisindeyken.
+  - **İşleyiş:** `deadlineMs` 5 sn uzatılır, alarm ötelenir, rakibe `opponent_powerup` bildirimi gönderilir.
+
+- **Cevap Ver (`give_answer`):**
+  - **Maliyet:** 50 jeton (`GIVE_ANSWER_COST` env değişkeni ile yapılandırılabilir).
+  - **Kullanım Limiti:** Maç başına oyuncu başına 1 kullanım.
+  - **Koşul:** Yalnızca aktif turda (`roundActive`), sıra oyuncunun kendisindeyken ve soruda henüz kullanılmamış cevap varken.
+  - **Seçim Stratejisi:** Sorunun o turda henüz iki oyuncu tarafından da söylenmemiş cevapları arasından eşit olasılıklı rastgele biri seçilir.
+  - **İşleyiş:** Seçilen cevap standart `MatchEngine.submit` akışından geçirilir (skor, tur bitişi, exhausted, süre sıfırlama aynen çalışır). 600 ms submit aralığı bu çağrı için atlanır. Deneme kaydında `viaPowerup: true` bayrağı ile işaretlenir ve istemciye rozet gösterimi için iletilir.
+  - **Eski İstemci Uyumluluğu:** `opponent_powerup` mesajı gönderilmez (eski istemcilerin +5 sn sanmasını önlemek için); rakip cevabı normal doğru cevap balonu olarak görür.
+  - **Ekonomi Dengesi:** Galibiyet ödülü +30 jetondur. Güçlendiriciyi kullanan oyuncu maçı kazansa bile net -20 jeton zarardadır (+30 - 50 = -20). Dolayısıyla istismar edilemez, ekonomideki fazla jetonları eriten deflasyonist bir mekanizmadır.
+
 ## 9. Güvenlik ilkeleri
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.

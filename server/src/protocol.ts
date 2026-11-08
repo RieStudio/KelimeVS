@@ -68,13 +68,14 @@ export type MatchRoomClientMessage =
   | { readonly t: 'submit'; readonly text: string }
   | { readonly t: 'leave' }
   | { readonly t: 'sync' }
-  | { readonly t: 'use_powerup'; readonly type: 'extra_time' };
+  | { readonly t: 'use_powerup'; readonly type: 'extra_time' | 'give_answer' };
 
 export interface ClientAttempt {
   readonly mine: boolean;
   readonly text: string;
   readonly result: 'correct' | 'repeated' | 'wrong' | 'nearMiss' | 'timeout';
   readonly hintShown?: boolean;
+  readonly viaPowerup?: boolean;
 }
 
 export interface ClientStateMessage {
@@ -105,6 +106,10 @@ export interface ClientStateMessage {
     readonly extraTime?: {
       readonly cost: number;
       readonly seconds: number;
+      readonly remainingUses: number;
+    };
+    readonly giveAnswer?: {
+      readonly cost: number;
       readonly remainingUses: number;
     };
   };
@@ -142,7 +147,7 @@ export interface ClientVoidedMessage {
 
 export interface ClientPowerupAckMessage {
   readonly t: 'powerup_ack';
-  readonly powerupType: 'extra_time';
+  readonly powerupType: 'extra_time' | 'give_answer';
   readonly success: boolean;
   readonly deadlineMs?: number;
   readonly coins?: number;
@@ -254,6 +259,9 @@ export function parseMatchRoomMessage(
     if (data.t === 'use_powerup') {
       if (data.type === 'extra_time') {
         return { t: 'use_powerup', type: 'extra_time' };
+      }
+      if (data.type === 'give_answer') {
+        return { t: 'use_powerup', type: 'give_answer' };
       }
       return null;
     }

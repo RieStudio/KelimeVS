@@ -86,7 +86,7 @@ interface StoredRoomData {
   readonly leaderboardLoserUid?: string;
   readonly leaderboardLoserNickname?: string | null;
   readonly finishedAtMs?: number;
-  readonly powerupsUsed?: Record<string, { extraTime?: boolean }>;
+  readonly powerupsUsed?: Record<string, { extraTime?: boolean; giveAnswer?: boolean }>;
   readonly pendingRefunds?: readonly PendingRefund[];
   readonly refundRetryCount?: number;
   readonly energyChargedUids?: readonly string[];
@@ -152,6 +152,11 @@ function countPlayerCorrectAnswers(state: MatchState, playerId: string): number 
 
 export class MatchRoom extends DurableObject<Env> {
   private data: StoredRoomData | null = null;
+  private rng: () => number = Math.random;
+
+  public setRngForTest(rng: () => number): void {
+    this.rng = rng;
+  }
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -343,6 +348,8 @@ export class MatchRoom extends DurableObject<Env> {
     if (parsed.t === 'use_powerup') {
       if (parsed.type === 'extra_time') {
         await this.handleUseExtraTime(uid);
+      } else if (parsed.type === 'give_answer') {
+        await this.handleUseGiveAnswer(uid);
       }
       return;
     }
@@ -1206,6 +1213,13 @@ export class MatchRoom extends DurableObject<Env> {
     };
   }
 
+  private get giveAnswerConfig(): { cost: number } {
+    const costVal = parseInt(this.env.GIVE_ANSWER_COST ?? '50', 10);
+    return {
+      cost: Number.isFinite(costVal) && costVal >= 0 ? costVal : 50,
+    };
+  }
+
   private async handleUseExtraTime(uid: string): Promise<void> {
     if (!this.data) return;
 
@@ -1381,7 +1395,10 @@ export class MatchRoom extends DurableObject<Env> {
       },
       powerupsUsed: {
         ...this.data.powerupsUsed,
-        [uid]: { extraTime: true },
+        [uid]: {
+          ...(this.data.powerupsUsed?.[uid] ?? {}),
+          extraTime: true,
+        },
       },
     };
 
@@ -1408,6 +1425,271 @@ export class MatchRoom extends DurableObject<Env> {
 
     // Her iki oyuncuya güncel durumu yayınla
     this.broadcastState();
+  }
+
+  private async handleUseGiveAnswer(uid: string): Promise<void> {
+    if (!this.data) return;
+
+    if (this.data.matchType === 'friendly') {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'not_allowed_in_match_type',
+        message: 'Arkadaş maçında güçlendirici kullanılamaz.',
+      }));
+      return;
+    }
+
+    if (this.data.status !== 'active' || !this.data.engineState) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Aktif bir tur bulunmuyor.',
+      }));
+      return;
+    }
+
+    const state = deserializeMatchState(this.data.engineState);
+
+    if (state.phase !== 'roundActive') {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Aktif bir tur bulunmuyor.',
+      }));
+      return;
+    }
+
+    if (state.turnPlayerId !== uid) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'not_your_turn',
+        message: 'Sıra sende değil.',
+      }));
+      return;
+    }
+
+    if (this.data.powerupsUsed?.[uid]?.giveAnswer) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'already_used',
+        message: 'Bu maçta zaten cevap ver hakkını kullandın.',
+      }));
+      return;
+    }
+
+    const nowMs = Date.now();
+    if (nowMs >= state.deadlineMs) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Süre doldu.',
+      }));
+      return;
+    }
+
+    // Kullanılmamış cevap kontrolü (Harcama öncesi)
+    const currentQuestion = state.currentQuestion;
+    const unusedAnswers = currentQuestion?.answers.filter(
+      (a) => !state.usedAnswerIds.has(a.id)
+    ) ?? [];
+
+    if (unusedAnswers.length === 0) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'no_answers_left',
+        message: 'Bu soru için kullanılabilecek cevap kalmadı.',
+      }));
+      return;
+    }
+
+    const config = this.giveAnswerConfig;
+    const userProfileStub = this.env.USER_PROFILE.get(
+      this.env.USER_PROFILE.idFromName(uid)
+    );
+
+    let spendRes: SpendCoinsResult;
+    try {
+      spendRes = await userProfileStub.spendCoins({
+        matchId: this.data.matchId,
+        powerup: 'give_answer',
+        amount: config.cost,
+        uid,
+      });
+    } catch (err) {
+      const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+      console.error(`spendCoins failed for uid ${uid}:`, errMsg);
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'temporary_error',
+        message: 'İşlem sırasında bir hata oluştu.',
+      }));
+      return;
+    }
+
+    if (!spendRes.success) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: spendRes.error ?? 'not_enough_coins',
+        message: spendRes.error === 'account_deleted'
+          ? 'Hesap silinmiş.'
+          : 'Yetersiz jeton bakiyesi.',
+      }));
+      return;
+    }
+
+    // Post-check (Yarış durumu kontrolü):
+    // Ağ çağrısı sırasında tur bitti mi veya sıra değişti mi?
+    if (
+      !this.data ||
+      this.data.status !== 'active' ||
+      !this.data.engineState
+    ) {
+      await this.enqueueAndRefund(uid, config.cost, 'give_answer');
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Tur sona erdiği için harcama iade edildi.',
+      }));
+      return;
+    }
+
+    const currentState = deserializeMatchState(this.data.engineState);
+    const currentNowMs = Date.now();
+
+    if (
+      currentState.phase !== 'roundActive' ||
+      currentState.turnPlayerId !== uid ||
+      currentNowMs >= currentState.deadlineMs
+    ) {
+      await this.enqueueAndRefund(uid, config.cost, 'give_answer');
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Tur sona erdiği için harcama iade edildi.',
+      }));
+      return;
+    }
+
+    const currentUnusedAnswers = currentState.currentQuestion?.answers.filter(
+      (a) => !currentState.usedAnswerIds.has(a.id)
+    ) ?? [];
+
+    if (currentUnusedAnswers.length === 0) {
+      await this.enqueueAndRefund(uid, config.cost, 'give_answer');
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'round_not_active',
+        message: 'Kullanılabilir cevap kalmadığı için harcama iade edildi.',
+      }));
+      return;
+    }
+
+    if (spendRes.alreadySpent && this.data.powerupsUsed?.[uid]?.giveAnswer) {
+      this.sendToUid(uid, JSON.stringify({
+        t: 'powerup_ack',
+        powerupType: 'give_answer',
+        success: false,
+        code: 'already_used',
+        message: 'Bu maçta zaten cevap ver hakkını kullandın.',
+      }));
+      return;
+    }
+
+    // Eşit olasılıklı rastgele cevap seçimi (testlerde rng enjekte edilebilir)
+    const selectedIndex = Math.floor(this.rng() * currentUnusedAnswers.length);
+    const selectedAnswer = currentUnusedAnswers[selectedIndex];
+
+    // Seçilen cevabı MEVCUT MatchEngine.submit yolundan geçir (isSystemPowerup: true)
+    const questions = this.data.questions;
+    const res = MatchEngine.submit({
+      state: currentState,
+      playerId: uid,
+      rawInput: selectedAnswer.display,
+      nowMs: currentNowMs,
+      questionsPool: questions,
+      isSystemPowerup: true,
+    });
+
+    const userPowerups = this.data.powerupsUsed?.[uid] ?? {};
+    this.data = {
+      ...this.data,
+      engineState: serializeMatchState(res.state),
+      powerupsUsed: {
+        ...this.data.powerupsUsed,
+        [uid]: {
+          ...userPowerups,
+          giveAnswer: true,
+        },
+      },
+    };
+
+    // Kullanan oyuncuya onay gönder
+    this.sendToUid(uid, JSON.stringify({
+      t: 'powerup_ack',
+      powerupType: 'give_answer',
+      success: true,
+      coins: spendRes.coins,
+      remainingUses: 0,
+    }));
+
+    // ÖNEMLİ: opponent_powerup mesajı GÖNDERİLMEZ (eski istemciler +5 sn zanneder).
+
+    if (res.state.phase === 'matchFinished') {
+      if (res.state.endedBy === 'draw_limit_reached') {
+        await this.handleDrawLimitVoided(res.state.totalRoundsPlayed);
+      } else {
+        await this.handleMatchFinished();
+      }
+    } else if (res.state.phase === 'roundEnded') {
+      if (this.data.schedule.nextRoundAtMs === undefined) {
+        this.data = {
+          ...this.data,
+          schedule: {
+            ...this.data.schedule,
+            turnDeadlineMs: undefined,
+            nextRoundAtMs: currentNowMs + this.durations.roundTransitionMs,
+          },
+        };
+        await this.persist();
+        await this.updateAlarm();
+        this.broadcastState();
+      }
+    } else {
+      this.data = {
+        ...this.data,
+        schedule: {
+          ...this.data.schedule,
+          turnDeadlineMs: res.state.deadlineMs + this.turnGraceMs,
+        },
+      };
+      await this.persist();
+      await this.updateAlarm();
+      this.broadcastState();
+    }
   }
 
   private async enqueueAndRefund(
@@ -1595,14 +1877,20 @@ export class MatchRoom extends DurableObject<Env> {
     const state = deserializeMatchState(this.data.engineState);
     const isFriendly = this.data.matchType === 'friendly';
     const extraTimeCfg = this.extraTimeConfig;
-    const isUsed = this.data.powerupsUsed?.[uid]?.extraTime ?? false;
+    const giveAnswerCfg = this.giveAnswerConfig;
+    const isExtraTimeUsed = this.data.powerupsUsed?.[uid]?.extraTime ?? false;
+    const isGiveAnswerUsed = this.data.powerupsUsed?.[uid]?.giveAnswer ?? false;
     const powerups = isFriendly
       ? undefined
       : {
           extraTime: {
             cost: extraTimeCfg.cost,
             seconds: extraTimeCfg.seconds,
-            remainingUses: isUsed ? 0 : 1,
+            remainingUses: isExtraTimeUsed ? 0 : 1,
+          },
+          giveAnswer: {
+            cost: giveAnswerCfg.cost,
+            remainingUses: isGiveAnswerUsed ? 0 : 1,
           },
         };
 

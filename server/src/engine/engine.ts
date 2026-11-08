@@ -238,6 +238,7 @@ export abstract class MatchEngine {
     readonly rawInput: string;
     readonly nowMs: number;
     readonly questionsPool?: readonly Question[];
+    readonly isSystemPowerup?: boolean;
   }): EngineResult {
     const { state, playerId, rawInput, nowMs } = params;
 
@@ -261,14 +262,14 @@ export abstract class MatchEngine {
       });
     }
 
-    // 3. Kötüye kullanım: minSubmitIntervalMs (600 ms) kontrolü
+    // 3. Kötüye kullanım: minSubmitIntervalMs (600 ms) kontrolü (sistem güçlendiricisi çağrısında atlanır)
     const lastSubmit = state.lastSubmitTimes[playerId];
-    if (lastSubmit !== undefined && nowMs - lastSubmit < state.config.minSubmitIntervalMs) {
+    if (!params.isSystemPowerup && lastSubmit !== undefined && nowMs - lastSubmit < state.config.minSubmitIntervalMs) {
       return { state, events: [{ type: 'Ignored', reason: 'tooFast' }] };
     }
 
-    // 4. Kötüye kullanım: maxAttemptsPerTurn (25 deneme) kontrolü
-    if (state.currentTurnAttempts >= state.config.maxAttemptsPerTurn) {
+    // 4. Kötüye kullanım: maxAttemptsPerTurn (25 deneme) kontrolü (sistem güçlendiricisi çağrısında atlanır)
+    if (!params.isSystemPowerup && state.currentTurnAttempts >= state.config.maxAttemptsPerTurn) {
       return { state, events: [{ type: 'Ignored', reason: 'tooManyAttempts' }] };
     }
 
@@ -304,6 +305,7 @@ export abstract class MatchEngine {
           nowMs,
           isClose: false,
           hintShown: false,
+          ...(params.isSystemPowerup ? { viaPowerup: true } : {}),
         };
 
         const updatedUsedAnswerIds = new Set([...state.usedAnswerIds, matchResult.answer.id]);

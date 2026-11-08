@@ -102,6 +102,10 @@ export function filterStateForPlayer(params: {
       readonly seconds: number;
       readonly remainingUses: number;
     };
+    readonly giveAnswer?: {
+      readonly cost: number;
+      readonly remainingUses: number;
+    };
   };
 }): ClientStateMessage {
   const {
@@ -136,6 +140,7 @@ export function filterStateForPlayer(params: {
     text: a.displayText ?? a.rawInput,
     result: a.resultType,
     ...(a.hintShown ? { hintShown: true } : {}),
+    ...(a.viaPowerup ? { viaPowerup: true } : {}),
   }));
 
   let lastRound:
@@ -211,6 +216,7 @@ export function buildFinalMessage(params: {
       text: a.displayText ?? a.rawInput,
       result: a.resultType,
       ...(a.hintShown ? { hintShown: true } : {}),
+      ...(a.viaPowerup ? { viaPowerup: true } : {}),
     })),
     winnerIsMe: r.winnerId === null ? null : r.winnerId === playerUid,
     reason: r.reason,
