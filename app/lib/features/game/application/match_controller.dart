@@ -472,6 +472,11 @@ class MatchController extends Notifier<MatchUiState>
     // Bot maçlarında ek süre güçlendiricisi kullanılamaz.
   }
 
+  @override
+  void useGiveAnswer() {
+    // Bot maçlarında cevap ver güçlendiricisi kullanılamaz.
+  }
+
   /// Kullanıcının maçı terk etmesini sağlar.
   @override
   void leaveMatch() {

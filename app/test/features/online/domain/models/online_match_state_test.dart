@@ -157,4 +157,73 @@ void main() {
       expect(state.nextQuestion, isNull);
     });
   });
+
+  group('Cevap Ver (give_answer) ve viaPowerup Ayrıştırma Testleri', () {
+    test('giveAnswer yapılandırması varsa doğru ayrıştırılır', () {
+      final json = {
+        'serverNowMs': 10000,
+        'phase': 'roundActive',
+        'roundNumber': 1,
+        'scores': {'me': 0, 'opponent': 0},
+        'powerups': {
+          'extraTime': {'cost': 30, 'seconds': 5, 'remainingUses': 1},
+          'giveAnswer': {'cost': 50, 'remainingUses': 1},
+        },
+      };
+
+      final state = OnlineMatchState.fromJson(json);
+      expect(state.giveAnswerPowerup, isNotNull);
+      expect(state.giveAnswerPowerup!.cost, equals(50));
+      expect(state.giveAnswerPowerup!.remainingUses, equals(1));
+    });
+
+    test('giveAnswer alanı yoksa (eski sunucu / dostluk maçı) giveAnswerPowerup null olur', () {
+      final json = {
+        'serverNowMs': 10000,
+        'phase': 'roundActive',
+        'roundNumber': 1,
+        'scores': {'me': 0, 'opponent': 0},
+        'powerups': {
+          'extraTime': {'cost': 30, 'seconds': 5, 'remainingUses': 1},
+        },
+      };
+
+      final state = OnlineMatchState.fromJson(json);
+      expect(state.extraTimePowerup, isNotNull);
+      expect(state.giveAnswerPowerup, isNull);
+    });
+
+    test('powerups alanı tamamen yoksa (dostluk maçı) güçlendiriciler null olur', () {
+      final json = {
+        'serverNowMs': 10000,
+        'phase': 'roundActive',
+        'roundNumber': 1,
+        'scores': {'me': 0, 'opponent': 0},
+      };
+
+      final state = OnlineMatchState.fromJson(json);
+      expect(state.extraTimePowerup, isNull);
+      expect(state.giveAnswerPowerup, isNull);
+    });
+
+    test('attempt nesnesinde viaPowerup alanı doğru ayrıştırılır ve serialize edilir', () {
+      final attemptWithPowerup = OnlineAttempt.fromJson({
+        'mine': true,
+        'text': 'Ankara',
+        'result': 'correct',
+        'displayText': 'Ankara',
+        'viaPowerup': true,
+      });
+      expect(attemptWithPowerup.viaPowerup, isTrue);
+      expect(attemptWithPowerup.toJson()['viaPowerup'], isTrue);
+
+      final attemptWithoutPowerup = OnlineAttempt.fromJson({
+        'mine': false,
+        'text': 'İstanbul',
+        'result': 'correct',
+      });
+      expect(attemptWithoutPowerup.viaPowerup, isFalse);
+      expect(attemptWithoutPowerup.toJson().containsKey('viaPowerup'), isFalse);
+    });
+  });
 }

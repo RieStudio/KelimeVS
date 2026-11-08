@@ -21,6 +21,7 @@ class FakeGameClock implements GameClock {
 class FakeOnlineMatchClient extends OnlineMatchClient {
   final _eventController = StreamController<OnlineMatchEvent>.broadcast(sync: true);
   bool usePowerupCalled = false;
+  int usePowerupCallCount = 0;
   String? lastPowerupType;
 
   @override
@@ -40,6 +41,7 @@ class FakeOnlineMatchClient extends OnlineMatchClient {
   @override
   bool usePowerup(String type) {
     usePowerupCalled = true;
+    usePowerupCallCount++;
     lastPowerupType = type;
     return true;
   }
@@ -335,5 +337,151 @@ void main() {
     expect(ui.isUsingPowerup, isFalse);
     expect(ui.powerupErrorNotice, equals(AppStrings.powerupTemporaryError));
     expect(ui.powerupErrorCounter, equals(1));
+  });
+
+  group('Cevap Ver (give_answer) Session Tests', () {
+    const baseGiveAnswerOnlineState = OnlineMatchState(
+      serverNowMs: 10000,
+      receivedLocalMs: 10000,
+      phase: OnlineMatchPhase.roundActive,
+      roundNumber: 1,
+      myScore: 0,
+      opponentScore: 0,
+      turnIsMine: true,
+      deadlineMs: 25000,
+      myHintsLeft: 1,
+      answerSeconds: 15,
+      attempts: [],
+      opponentConnected: true,
+      opponentName: 'Rakip',
+      giveAnswerPowerup: OnlineGiveAnswerPowerupConfig(
+        cost: 50,
+        remainingUses: 1,
+      ),
+    );
+
+    test('7. OnlineMatchStateUpdate ile giveAnswer konfigürasyonu aktarılır', () async {
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_give_answer',
+        opponentName: 'Rakip',
+        client: fakeClient,
+      );
+
+      fakeClient.emit(const OnlineMatchStateUpdate(baseGiveAnswerOnlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      final ui = container.read(onlineMatchSessionProvider);
+      expect(ui.giveAnswerCost, equals(50));
+      expect(ui.giveAnswerRemainingUses, equals(1));
+    });
+
+    test('8. useGiveAnswer çağrıldığında client.usePowerup("give_answer") çağrılır ve isUsingPowerup set edilir', () async {
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_give_answer',
+        opponentName: 'Rakip',
+        client: fakeClient,
+      );
+
+      fakeClient.emit(const OnlineMatchStateUpdate(baseGiveAnswerOnlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      session.useGiveAnswer();
+
+      expect(fakeClient.usePowerupCalled, isTrue);
+      expect(fakeClient.lastPowerupType, equals('give_answer'));
+      expect(container.read(onlineMatchSessionProvider).isUsingPowerup, isTrue);
+    });
+
+    test('9. Çift tıklama: isUsingPowerup açıkken ikinci useGiveAnswer() çağrısı mükerrer mesaj göndermez', () async {
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_give_answer',
+        opponentName: 'Rakip',
+        client: fakeClient,
+      );
+
+      fakeClient.emit(const OnlineMatchStateUpdate(baseGiveAnswerOnlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      session.useGiveAnswer();
+      expect(fakeClient.usePowerupCallCount, equals(1));
+
+      // İkinci kez çağrılıyor
+      session.useGiveAnswer();
+      expect(fakeClient.usePowerupCallCount, equals(1)); // Artmaz
+    });
+
+    test('10. Başarılı give_answer ack: profil jetonu güncellenir, remainingUses 0 olur, isUsingPowerup sıfırlanır', () async {
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_give_answer',
+        opponentName: 'Rakip',
+        client: fakeClient,
+      );
+
+      fakeClient.emit(const OnlineMatchStateUpdate(baseGiveAnswerOnlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      session.useGiveAnswer();
+
+      const ack = PowerupAckServerMessage(
+        powerupType: 'give_answer',
+        success: true,
+        coins: 50, // 100 - 50
+        remainingUses: 0,
+      );
+      fakeClient.emit(const OnlineMatchPowerupAck(ack));
+      await Future<void>.delayed(Duration.zero);
+
+      final ui = container.read(onlineMatchSessionProvider);
+      expect(ui.isUsingPowerup, isFalse);
+      expect(ui.giveAnswerRemainingUses, equals(0));
+      expect(container.read(profileProvider).coins, equals(50));
+    });
+
+    test('11. give_answer hata kodları için doğru Türkçe hata mesajları üretilir', () async {
+      final session = container.read(onlineMatchSessionProvider.notifier);
+      await session.startOnlineMatch(
+        matchId: 'm_give_answer',
+        opponentName: 'Rakip',
+        client: fakeClient,
+      );
+
+      fakeClient.emit(const OnlineMatchStateUpdate(baseGiveAnswerOnlineState));
+      await Future<void>.delayed(Duration.zero);
+
+      final scenarios = <String, String>{
+        'no_answers_left': AppStrings.noAnswersLeft,
+        'not_enough_coins': AppStrings.notEnoughCoinsForGiveAnswer(50),
+        'already_used': AppStrings.giveAnswerAlreadyUsed,
+        'not_your_turn': AppStrings.notYourTurnGiveAnswer,
+        'round_not_active': AppStrings.giveAnswerGenericError,
+        'not_allowed_in_match_type': AppStrings.giveAnswerGenericError,
+        'temporary_error': AppStrings.powerupTemporaryError,
+        'unknown_code': AppStrings.giveAnswerGenericError,
+      };
+
+      var counter = 0;
+      for (final entry in scenarios.entries) {
+        session.useGiveAnswer();
+        expect(container.read(onlineMatchSessionProvider).isUsingPowerup, isTrue);
+
+        fakeClient.emit(OnlineMatchPowerupAck(PowerupAckServerMessage(
+          powerupType: 'give_answer',
+          success: false,
+          code: entry.key,
+          message: 'Server text that should be ignored',
+        )));
+        await Future<void>.delayed(Duration.zero);
+
+        counter++;
+        final ui = container.read(onlineMatchSessionProvider);
+        expect(ui.isUsingPowerup, isFalse);
+        expect(ui.powerupErrorNotice, equals(entry.value));
+        expect(ui.powerupErrorCounter, equals(counter));
+      }
+    });
   });
 }

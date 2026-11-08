@@ -28,6 +28,7 @@ class OnlineAttempt {
   final String result; // 'correct', 'repeated', 'wrong', 'nearMiss', 'timeout'
   final bool hintShown;
   final String? displayText;
+  final bool viaPowerup;
 
   const OnlineAttempt({
     required this.mine,
@@ -35,6 +36,7 @@ class OnlineAttempt {
     required this.result,
     this.hintShown = false,
     this.displayText,
+    this.viaPowerup = false,
   });
 
   factory OnlineAttempt.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class OnlineAttempt {
       result: json['result'] as String? ?? 'wrong',
       hintShown: json['hintShown'] as bool? ?? false,
       displayText: json['displayText'] as String?,
+      viaPowerup: json['viaPowerup'] as bool? ?? false,
     );
   }
 
@@ -53,6 +56,7 @@ class OnlineAttempt {
     'result': result,
     if (hintShown) 'hintShown': true,
     if (displayText != null) 'displayText': displayText,
+    if (viaPowerup) 'viaPowerup': true,
   };
 }
 
@@ -121,6 +125,24 @@ class OnlinePowerupConfig {
   }
 }
 
+/// Cevap Ver (give_answer) güçlendirici konfigürasyon ve kullanım bilgisi.
+class OnlineGiveAnswerPowerupConfig {
+  final int cost;
+  final int remainingUses;
+
+  const OnlineGiveAnswerPowerupConfig({
+    required this.cost,
+    required this.remainingUses,
+  });
+
+  factory OnlineGiveAnswerPowerupConfig.fromJson(Map<String, dynamic> json) {
+    return OnlineGiveAnswerPowerupConfig(
+      cost: (json['cost'] as num?)?.toInt() ?? 50,
+      remainingUses: (json['remainingUses'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
 /// Sunucu durum mesajının (`state`) güçlü tipli modeli.
 class OnlineMatchState {
   final int serverNowMs;
@@ -144,6 +166,7 @@ class OnlineMatchState {
   final int? nextRoundAtMs;
   final int answerSeconds;
   final OnlinePowerupConfig? extraTimePowerup;
+  final OnlineGiveAnswerPowerupConfig? giveAnswerPowerup;
 
   const OnlineMatchState({
     required this.serverNowMs,
@@ -167,6 +190,7 @@ class OnlineMatchState {
     this.nextRoundAtMs,
     this.answerSeconds = 20,
     this.extraTimePowerup,
+    this.giveAnswerPowerup,
   });
 
   /// Sunucu saati ile istemcinin yerel saati arasındaki fark:
@@ -227,6 +251,10 @@ class OnlineMatchState {
     final extraTimePowerup = extraTimeMap != null
         ? OnlinePowerupConfig.fromJson(extraTimeMap)
         : null;
+    final giveAnswerMap = powerupsMap?['giveAnswer'] as Map<String, dynamic>?;
+    final giveAnswerPowerup = giveAnswerMap != null
+        ? OnlineGiveAnswerPowerupConfig.fromJson(giveAnswerMap)
+        : null;
 
     return OnlineMatchState(
       serverNowMs: serverNow,
@@ -250,6 +278,7 @@ class OnlineMatchState {
       nextRoundAtMs: (json['nextRoundAtMs'] as num?)?.toInt(),
       answerSeconds: ansSec,
       extraTimePowerup: extraTimePowerup,
+      giveAnswerPowerup: giveAnswerPowerup,
     );
   }
 }

@@ -18,6 +18,9 @@ abstract interface class MatchSession {
   /// Ek süre güçlendiricisini (+5 sn) aktifleştirir.
   void useExtraTime();
 
+  /// Cevap Ver güçlendiricisini aktifleştirir.
+  void useGiveAnswer();
+
   /// Kullanıcının maçı terk etmesini sağlar.
   void leaveMatch();
 

@@ -22,6 +22,9 @@ class FakeMatchSession implements MatchSession {
   void useExtraTime() {}
 
   @override
+  void useGiveAnswer() {}
+
+  @override
   void leaveMatch() {}
 
   @override

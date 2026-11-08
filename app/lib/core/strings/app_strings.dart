@@ -455,6 +455,20 @@ abstract final class AppStrings {
   static const String powerupTemporaryError =
       'Şu anda kullanılamıyor, tekrar dene.';
 
+  // Cevap Ver (give_answer) Güçlendiricisi
+  static const String giveAnswerPowerup = 'Cevap Ver';
+  static const String giveAnswerUsed = 'Kullanıldı';
+  static String notEnoughCoinsForGiveAnswer(int cost) =>
+      'Yetersiz jeton ($cost gerekli)';
+  static const String notYourTurnGiveAnswer =
+      'Cevap Ver sadece kendi sıranda kullanılabilir.';
+  static const String noAnswersLeft =
+      'Bu soru için kullanılabilecek cevap kalmadı.';
+  static const String giveAnswerGenericError =
+      'Cevap Ver şu an kullanılamıyor.';
+  static const String giveAnswerAlreadyUsed =
+      'Bu maçta Cevap Ver hakkını zaten kullandın.';
+
   // İleride Play Store linki açıldığında buraya URL yazılacak:
   static const String storeShareUrl = '';
 

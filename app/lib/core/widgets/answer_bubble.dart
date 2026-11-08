@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
@@ -25,6 +26,7 @@ class AnswerBubble extends StatelessWidget {
   final bool isSelected;
   final bool showTail;
   final VoidCallback? onTap;
+  final bool viaPowerup;
 
   const AnswerBubble({
     super.key,
@@ -34,6 +36,7 @@ class AnswerBubble extends StatelessWidget {
     this.isSelected = false,
     this.showTail = true,
     this.onTap,
+    this.viaPowerup = false,
   });
 
   const AnswerBubble.rejected({
@@ -43,6 +46,7 @@ class AnswerBubble extends StatelessWidget {
     this.isSelected = false,
     this.showTail = true,
     this.onTap,
+    this.viaPowerup = false,
   }) : isRejected = true;
 
   @override
@@ -111,11 +115,36 @@ class AnswerBubble extends StatelessWidget {
       ),
       child: Padding(
         padding: innerPadding,
-        child: Text(
-          wrapSafeText,
-          style: textStyle,
-          softWrap: true,
-        ),
+        child: viaPowerup && !isRejected
+            ? Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: wrapSafeText),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4.0),
+                        child: SvgPicture.asset(
+                          'assets/icons/powerup_auto_answer.svg',
+                          width: 12,
+                          height: 12,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.ink,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                style: textStyle,
+                softWrap: true,
+              )
+            : Text(
+                wrapSafeText,
+                style: textStyle,
+                softWrap: true,
+              ),
       ),
     );
 

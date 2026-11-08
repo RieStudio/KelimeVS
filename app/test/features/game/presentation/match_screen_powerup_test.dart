@@ -14,6 +14,7 @@ import 'package:app/features/profile/application/profile_notifier.dart';
 
 class MockPowerupSession implements MatchSession {
   bool extraTimeCalled = false;
+  bool giveAnswerCalled = false;
 
   @override
   MatchUiState get state => const MatchUiState();
@@ -24,6 +25,11 @@ class MockPowerupSession implements MatchSession {
   @override
   void useExtraTime() {
     extraTimeCalled = true;
+  }
+
+  @override
+  void useGiveAnswer() {
+    giveAnswerCalled = true;
   }
 
   @override
@@ -298,5 +304,244 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text(AppStrings.powerupTemporaryError), findsOneWidget);
+  });
+
+  group('Cevap Ver (give_answer) Widget & Yerleşim Testleri', () {
+    testWidgets('8. Bot ve arkadaş maçında Cevap Ver güçlendirici butonu gösterilmez', (tester) async {
+      final session = MockPowerupSession();
+      // Bot maçı
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.bot,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Bot Ahmet',
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+      ));
+      await tester.pump();
+      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
+
+      // Arkadaş maçı
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Arkadaş Ali',
+          isFriendly: true,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+      ));
+      await tester.pump();
+      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
+    });
+
+    testWidgets('9. Çevrimiçi ranked maçta iki çip yan yana ("+5 sn · 30" ve "Cevap Ver · 50") yerleşir', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 1,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      expect(find.text('+5 sn'), findsOneWidget);
+      expect(find.text('30'), findsOneWidget);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
+      expect(find.text('50'), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.giveAnswerPowerup));
+      await tester.pump();
+
+      expect(session.giveAnswerCalled, isTrue);
+    });
+
+    testWidgets('10. 360x640 ekranda, klavye açıkken (viewInsets) ve uzun metinlerle iki çip overflow yapmaz', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final session = MockPowerupSession();
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            viewInsets: EdgeInsets.only(bottom: 260), // Klavye açık
+          ),
+          child: createWidget(
+            mode: MatchSessionMode.online,
+            uiState: MatchUiState(
+              matchState: testMatchState,
+              opponentName: 'Rakip Zeynep',
+              isFriendly: false,
+              extraTimeCost: 30,
+              extraTimeSeconds: 5,
+              extraTimeRemainingUses: 1,
+              giveAnswerCost: 50,
+              giveAnswerRemainingUses: 1,
+              roundAttempts: const [
+                RoundAttemptUiModel(
+                  playerId: 'me',
+                  text: 'ÇokUzunBirCevapKelimesiDenemesiTaşmaTesti',
+                  isCorrect: true,
+                  viaPowerup: true,
+                ),
+              ],
+            ),
+            session: session,
+            coins: 100,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final err = tester.takeException();
+      expect(err, isNull);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
+      expect(find.text('+5 sn'), findsOneWidget);
+    });
+
+    testWidgets('11. Cevap Ver yetersiz jeton durumunda (%50 opaklık) tıklanınca SnackBar gösterir', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+        coins: 20, // < 50
+      ));
+      await tester.pump();
+
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.giveAnswerPowerup));
+      await tester.pump();
+
+      expect(session.giveAnswerCalled, isFalse);
+      expect(find.text(AppStrings.notEnoughCoinsForGiveAnswer(50)), findsOneWidget);
+    });
+
+    testWidgets('12. Cevap Ver kullanıldıktan sonra (remainingUses = 0) "Kullanıldı" rozetine dönüşür', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 0, // kullanıldı
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      expect(find.text(AppStrings.giveAnswerUsed), findsOneWidget);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
+
+      await tester.tap(find.text(AppStrings.giveAnswerUsed));
+      await tester.pump();
+
+      expect(session.giveAnswerCalled, isFalse);
+    });
+
+    testWidgets('13. Sıra bende değilken Cevap Ver tıklandığında sıra uyarısı verir', (tester) async {
+      final botTurnMatchState = testMatchState.copyWith(
+        turnPlayerId: 'bot',
+      );
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: botTurnMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      await tester.tap(find.text(AppStrings.giveAnswerPowerup));
+      await tester.pump();
+
+      expect(session.giveAnswerCalled, isFalse);
+      expect(find.text(AppStrings.notYourTurnGiveAnswer), findsOneWidget);
+    });
+
+    testWidgets('14. isUsingPowerup aktifken Cevap Ver içinde yükleniyor çemberi görünür', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+          isUsingPowerup: true,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('15. viaPowerup=true olan doğru cevap balonunda güçlendirici SVG ikonu çizilir', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          roundAttempts: const [
+            RoundAttemptUiModel(
+              playerId: 'me',
+              text: 'Ankara',
+              isCorrect: true,
+              viaPowerup: true,
+            ),
+          ],
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Ankara'), findsOneWidget);
+      // AnswerBubble içinde WidgetSpan ile powerup_auto_answer.svg çizildiğini doğrula
+      expect(find.byWidgetPredicate((w) =>
+          w is Text &&
+          w.textSpan != null &&
+          w.textSpan!.toPlainText().contains('Ankara')),
+          findsOneWidget);
+    });
   });
 }

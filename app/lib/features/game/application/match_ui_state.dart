@@ -30,6 +30,7 @@ class RoundAttemptUiModel {
   final bool isCorrect;
   final bool isClose;
   final bool isRepeated;
+  final bool viaPowerup;
 
   const RoundAttemptUiModel({
     required this.playerId,
@@ -37,6 +38,7 @@ class RoundAttemptUiModel {
     required this.isCorrect,
     this.isClose = false,
     this.isRepeated = false,
+    this.viaPowerup = false,
   });
 }
 
@@ -83,6 +85,8 @@ class MatchUiState {
   final int? extraTimeCost;
   final int? extraTimeSeconds;
   final int? extraTimeRemainingUses;
+  final int? giveAnswerCost;
+  final int? giveAnswerRemainingUses;
   final String? opponentExtraTimeBanner;
   final bool isUsingPowerup;
   final String? powerupErrorNotice;
@@ -121,6 +125,8 @@ class MatchUiState {
     this.extraTimeCost,
     this.extraTimeSeconds,
     this.extraTimeRemainingUses,
+    this.giveAnswerCost,
+    this.giveAnswerRemainingUses,
     this.opponentExtraTimeBanner,
     this.isUsingPowerup = false,
     this.powerupErrorNotice,
@@ -210,6 +216,8 @@ class MatchUiState {
     int? extraTimeCost,
     int? extraTimeSeconds,
     int? extraTimeRemainingUses,
+    int? giveAnswerCost,
+    int? giveAnswerRemainingUses,
     String? opponentExtraTimeBanner,
     bool clearOpponentExtraTimeBanner = false,
     bool? isUsingPowerup,
@@ -259,6 +267,9 @@ class MatchUiState {
       extraTimeSeconds: extraTimeSeconds ?? this.extraTimeSeconds,
       extraTimeRemainingUses:
           extraTimeRemainingUses ?? this.extraTimeRemainingUses,
+      giveAnswerCost: giveAnswerCost ?? this.giveAnswerCost,
+      giveAnswerRemainingUses:
+          giveAnswerRemainingUses ?? this.giveAnswerRemainingUses,
       opponentExtraTimeBanner: clearOpponentExtraTimeBanner
           ? null
           : (opponentExtraTimeBanner ?? this.opponentExtraTimeBanner),

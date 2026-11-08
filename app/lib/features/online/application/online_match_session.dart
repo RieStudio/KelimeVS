@@ -378,6 +378,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         isCorrect: a.result == 'correct',
         isClose: a.result == 'nearMiss' || a.hintShown,
         isRepeated: a.result == 'repeated',
+        viaPowerup: a.viaPowerup,
       );
     }).toList();
 
@@ -432,6 +433,11 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final extraTimeSeconds = extraTimeCfg?.seconds ?? state.extraTimeSeconds;
     final extraTimeRemainingUses =
         extraTimeCfg?.remainingUses ?? state.extraTimeRemainingUses;
+
+    final giveAnswerCfg = onlineState.giveAnswerPowerup;
+    final giveAnswerCost = giveAnswerCfg?.cost ?? state.giveAnswerCost;
+    final giveAnswerRemainingUses =
+        giveAnswerCfg?.remainingUses ?? state.giveAnswerRemainingUses;
 
     final mappedMatchState = MatchState(
       config: MatchConfig(answerSeconds: onlineState.answerSeconds),
@@ -543,6 +549,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       extraTimeCost: extraTimeCost,
       extraTimeSeconds: extraTimeSeconds,
       extraTimeRemainingUses: extraTimeRemainingUses,
+      giveAnswerCost: giveAnswerCost,
+      giveAnswerRemainingUses: giveAnswerRemainingUses,
     );
   }
 
@@ -829,36 +837,64 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       if (ack.coins != null) {
         unawaited(ref.read(profileProvider.notifier).updateCoins(ack.coins!));
       }
-      int? newRemainingMs;
-      if (ack.deadlineMs != null && _lastOnlineState != null) {
-        final estimatedServerNow =
-            _clock.nowMs() + _lastOnlineState!.clockOffsetMs;
-        newRemainingMs = math.max(0, ack.deadlineMs! - estimatedServerNow);
+      if (ack.powerupType == 'give_answer') {
+        state = state.copyWith(
+          isUsingPowerup: false,
+          giveAnswerRemainingUses: ack.remainingUses ?? 0,
+        );
+      } else {
+        int? newRemainingMs;
+        if (ack.deadlineMs != null && _lastOnlineState != null) {
+          final estimatedServerNow =
+              _clock.nowMs() + _lastOnlineState!.clockOffsetMs;
+          newRemainingMs = math.max(0, ack.deadlineMs! - estimatedServerNow);
+        }
+        state = state.copyWith(
+          isUsingPowerup: false,
+          extraTimeRemainingUses: ack.remainingUses ?? 0,
+          remainingMs: newRemainingMs ?? state.remainingMs,
+        );
       }
-      state = state.copyWith(
-        isUsingPowerup: false,
-        extraTimeRemainingUses: ack.remainingUses ?? 0,
-        remainingMs: newRemainingMs ?? state.remainingMs,
-      );
     } else {
       final String errorMsg;
-      switch (ack.code) {
-        case 'temporary_error':
-          errorMsg = AppStrings.powerupTemporaryError;
-        case 'not_enough_coins':
-          errorMsg = AppStrings.notEnoughCoinsForExtraTime(
-            state.extraTimeCost ?? 30,
-          );
-        case 'already_used':
-          errorMsg = AppStrings.extraTimeAlreadyUsed;
-        case 'not_your_turn':
-          errorMsg = AppStrings.notYourTurnPowerup;
-        case 'round_not_active':
-          errorMsg = AppStrings.powerupGenericError;
-        default:
-          errorMsg = ack.message?.isNotEmpty == true
-              ? ack.message!
-              : AppStrings.powerupGenericError;
+      if (ack.powerupType == 'give_answer') {
+        switch (ack.code) {
+          case 'temporary_error':
+            errorMsg = AppStrings.powerupTemporaryError;
+          case 'not_enough_coins':
+            errorMsg = AppStrings.notEnoughCoinsForGiveAnswer(
+              state.giveAnswerCost ?? 50,
+            );
+          case 'already_used':
+            errorMsg = AppStrings.giveAnswerAlreadyUsed;
+          case 'not_your_turn':
+            errorMsg = AppStrings.notYourTurnGiveAnswer;
+          case 'no_answers_left':
+            errorMsg = AppStrings.noAnswersLeft;
+          case 'round_not_active':
+          case 'not_allowed_in_match_type':
+          default:
+            errorMsg = AppStrings.giveAnswerGenericError;
+        }
+      } else {
+        switch (ack.code) {
+          case 'temporary_error':
+            errorMsg = AppStrings.powerupTemporaryError;
+          case 'not_enough_coins':
+            errorMsg = AppStrings.notEnoughCoinsForExtraTime(
+              state.extraTimeCost ?? 30,
+            );
+          case 'already_used':
+            errorMsg = AppStrings.extraTimeAlreadyUsed;
+          case 'not_your_turn':
+            errorMsg = AppStrings.notYourTurnPowerup;
+          case 'round_not_active':
+            errorMsg = AppStrings.powerupGenericError;
+          default:
+            errorMsg = ack.message?.isNotEmpty == true
+                ? ack.message!
+                : AppStrings.powerupGenericError;
+        }
       }
       state = state.copyWith(
         isUsingPowerup: false,
@@ -890,6 +926,23 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
     state = state.copyWith(isUsingPowerup: true);
     final sent = _client?.usePowerup('extra_time') ?? false;
+    if (!sent) {
+      state = state.copyWith(
+        isUsingPowerup: false,
+        powerupErrorNotice: AppStrings.powerupTemporaryError,
+        powerupErrorCounter: state.powerupErrorCounter + 1,
+      );
+    }
+  }
+
+  @override
+  void useGiveAnswer() {
+    if (state.isUsingPowerup) return;
+    if ((state.giveAnswerRemainingUses ?? 0) <= 0) return;
+    if (!state.isMyTurn) return;
+
+    state = state.copyWith(isUsingPowerup: true);
+    final sent = _client?.usePowerup('give_answer') ?? false;
     if (!sent) {
       state = state.copyWith(
         isUsingPowerup: false,

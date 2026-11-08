@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
@@ -27,6 +28,7 @@ class MatchScreen extends ConsumerStatefulWidget {
 
 class _MatchScreenState extends ConsumerState<MatchScreen> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _inputController = TextEditingController();
   late final BannerSuppressionNotifier _suppressionNotifier;
   int _scrollGeneration = 0;
   double _lastBottomInset = 0.0;
@@ -55,6 +57,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   void dispose() {
     _suppressionNotifier.unsuppress();
     _scrollController.dispose();
+    _inputController.dispose();
     super.dispose();
   }
 
@@ -233,6 +236,9 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     final mode = ref.watch(activeMatchSessionModeProvider);
     final isOnlineRanked =
         mode == MatchSessionMode.online && !uiState.isFriendly;
+    final hasExtraTime = uiState.extraTimeCost != null;
+    final hasGiveAnswer = uiState.giveAnswerCost != null;
+    final showPowerups = isOnlineRanked && (hasExtraTime || hasGiveAnswer);
 
     final isMyTurn = uiState.isMyTurn;
     final isBotTurn = matchState?.phase == MatchPhase.roundActive &&
@@ -312,83 +318,112 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            PlayerCard(
-                              name: AppStrings.you,
-                              score: uiState.displayedScores['me'] ?? 0,
-                              avatar: PlayerAvatar.selfMatch(
-                                name: (myNickname != null && myNickname.isNotEmpty)
-                                    ? myNickname
-                                    : AppStrings.you,
-                                frame: profile.equippedFrame,
-                              ),
-                              isActive: isMyTurn,
-                              remainingSeconds: isMyTurn ? remainingSec : null,
-                              timeProgress: isMyTurn ? timeProgress : null,
-                              maxSeconds: maxSec,
-                              isPaused: uiState.isPaused,
-                            ),
-                            if (isOnlineRanked) ...[
-                              const SizedBox(height: AppDimens.space6),
-                              _ExtraTimePowerupButton(
-                                isMyTurn: isMyTurn,
-                                remainingUses:
-                                    uiState.extraTimeRemainingUses ?? 1,
-                                cost: uiState.extraTimeCost ?? 30,
-                                seconds: uiState.extraTimeSeconds ?? 5,
-                                isLoading: uiState.isUsingPowerup,
-                                userCoins: profile.coins,
-                                onTap: () {
-                                  ref
-                                      .read(activeMatchSessionProvider)
-                                      .useExtraTime();
-                                },
-                                onInsufficientCoins: (cost) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppStrings.notEnoughCoinsForExtraTime(
-                                            cost),
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ],
+                        child: PlayerCard(
+                          name: AppStrings.you,
+                          score: uiState.displayedScores['me'] ?? 0,
+                          avatar: PlayerAvatar.selfMatch(
+                            name: (myNickname != null && myNickname.isNotEmpty)
+                                ? myNickname
+                                : AppStrings.you,
+                            frame: profile.equippedFrame,
+                          ),
+                          isActive: isMyTurn,
+                          remainingSeconds: isMyTurn ? remainingSec : null,
+                          timeProgress: isMyTurn ? timeProgress : null,
+                          maxSeconds: maxSec,
+                          isPaused: uiState.isPaused,
                         ),
                       ),
                       const SizedBox(width: AppDimens.space8),
                       Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            PlayerCard(
-                              name: uiState.opponentName.isNotEmpty
-                                  ? uiState.opponentName
-                                  : AppStrings.opponent,
-                              score: uiState.displayedScores['bot'] ?? 0,
-                              avatar: PlayerAvatar.opponent(
-                                name: uiState.opponentName,
-                                frame: uiState.opponentFrame,
-                                size: AppDimens.avatarMatch,
-                              ),
-                              isActive: isBotTurn,
-                              remainingSeconds: isBotTurn ? remainingSec : null,
-                              timeProgress: isBotTurn ? timeProgress : null,
-                              maxSeconds: maxSec,
-                              isPaused: uiState.isPaused,
-                            ),
-                          ],
+                        child: PlayerCard(
+                          name: uiState.opponentName.isNotEmpty
+                              ? uiState.opponentName
+                              : AppStrings.opponent,
+                          score: uiState.displayedScores['bot'] ?? 0,
+                          avatar: PlayerAvatar.opponent(
+                            name: uiState.opponentName,
+                            frame: uiState.opponentFrame,
+                            size: AppDimens.avatarMatch,
+                          ),
+                          isActive: isBotTurn,
+                          remainingSeconds: isBotTurn ? remainingSec : null,
+                          timeProgress: isBotTurn ? timeProgress : null,
+                          maxSeconds: maxSec,
+                          isPaused: uiState.isPaused,
                         ),
                       ),
                     ],
                   ),
+                  if (showPowerups) ...[
+                    const SizedBox(height: AppDimens.space8),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                        if (hasExtraTime) ...[
+                          _ExtraTimePowerupButton(
+                            isMyTurn: isMyTurn,
+                            remainingUses:
+                                uiState.extraTimeRemainingUses ?? 1,
+                            cost: uiState.extraTimeCost ?? 30,
+                            seconds: uiState.extraTimeSeconds ?? 5,
+                            isLoading: uiState.isUsingPowerup,
+                            userCoins: profile.coins,
+                            onTap: () {
+                              ref
+                                  .read(activeMatchSessionProvider)
+                                  .useExtraTime();
+                            },
+                            onInsufficientCoins: (cost) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    AppStrings.notEnoughCoinsForExtraTime(
+                                        cost),
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                        if (hasExtraTime && hasGiveAnswer)
+                          const SizedBox(width: AppDimens.space8),
+                        if (hasGiveAnswer) ...[
+                          _GiveAnswerPowerupButton(
+                            isMyTurn: isMyTurn,
+                            remainingUses:
+                                uiState.giveAnswerRemainingUses ?? 1,
+                            cost: uiState.giveAnswerCost ?? 50,
+                            isLoading: uiState.isUsingPowerup,
+                            userCoins: profile.coins,
+                            onTap: () {
+                              _inputController.clear();
+                              ref
+                                  .read(activeMatchSessionProvider)
+                                  .useGiveAnswer();
+                            },
+                            onInsufficientCoins: (cost) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    AppStrings.notEnoughCoinsForGiveAnswer(
+                                        cost),
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
                   const SizedBox(height: AppDimens.space12),
 
                   // 3. Soru Kartı
@@ -418,6 +453,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                           isMe: item.playerId == uiState.myPlayerId,
                           isRejected: !item.isCorrect,
                           showTail: showTail,
+                          viaPowerup: item.viaPowerup,
                         );
                       },
                     ),
@@ -429,6 +465,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                     isMyTurn: isMyTurn,
                     feedback: uiState.lastFeedback,
                     feedbackCounter: uiState.feedbackCounter,
+                    controller: _inputController,
                     onSubmitted: (text) {
                       ref.read(activeMatchSessionProvider).submit(text);
                     },
@@ -524,6 +561,7 @@ class _AnimatedBubble extends StatefulWidget {
   final bool isMe;
   final bool isRejected;
   final bool showTail;
+  final bool viaPowerup;
 
   const _AnimatedBubble({
     super.key,
@@ -531,6 +569,7 @@ class _AnimatedBubble extends StatefulWidget {
     required this.isMe,
     this.isRejected = false,
     this.showTail = true,
+    this.viaPowerup = false,
   });
 
   @override
@@ -574,6 +613,7 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
         isMe: widget.isMe,
         isRejected: widget.isRejected,
         showTail: widget.showTail,
+        viaPowerup: widget.viaPowerup,
       ),
     );
   }
@@ -801,6 +841,246 @@ class _ExtraTimePowerupButton extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(AppStrings.notYourTurnPowerup),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      },
+      child: Opacity(
+        opacity: 0.5,
+        child: buttonContent,
+      ),
+    );
+  }
+}
+
+/// Cevap Ver (give_answer) güçlendiricisi butonu
+class _GiveAnswerPowerupButton extends StatelessWidget {
+  final bool isMyTurn;
+  final int remainingUses;
+  final int cost;
+  final bool isLoading;
+  final int userCoins;
+  final VoidCallback onTap;
+  final void Function(int cost) onInsufficientCoins;
+
+  const _GiveAnswerPowerupButton({
+    required this.isMyTurn,
+    required this.remainingUses,
+    required this.cost,
+    required this.isLoading,
+    required this.userCoins,
+    required this.onTap,
+    required this.onInsufficientCoins,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUsed = remainingUses <= 0;
+    final hasEnoughCoins = userCoins >= cost;
+    final isInteractive = !isUsed && isMyTurn && !isLoading;
+
+    // Durum 1: Kullanıldı (soluk gri, tıklanamaz)
+    if (isUsed) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space10,
+          vertical: AppDimens.space4,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppDimens.borderRadiusFull,
+          border: Border.all(
+            color: AppColors.ink.withValues(alpha: 0.3),
+            width: AppDimens.borderThin,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: AppColors.muted.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: AppDimens.space4),
+            Text(
+              AppStrings.giveAnswerUsed,
+              style: AppTextStyles.secondaryText.copyWith(
+                fontSize: 11,
+                color: AppColors.muted.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Durum 2: Yetersiz Jeton (Soluk, tıklandığında SnackBar gösterir)
+    if (!hasEnoughCoins) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onInsufficientCoins(cost),
+        child: Opacity(
+          opacity: 0.5,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.space10,
+              vertical: AppDimens.space4,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppDimens.borderRadiusFull,
+              border: Border.all(
+                color: AppColors.ink,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/powerup_auto_answer.svg',
+                  width: 14,
+                  height: 14,
+                  colorFilter: const ColorFilter.mode(
+                    AppColors.ink,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  AppStrings.giveAnswerPowerup,
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  '·',
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    color: AppColors.muted,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                const CoinIcon(size: 14, opacity: 0.5),
+                const SizedBox(width: 2),
+                Text(
+                  '$cost',
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Durum 3: Yeterli Jeton ve Kullanılabilir / Sıra Bende Değil / Yükleniyor
+    final buttonContent = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space10,
+        vertical: AppDimens.space4,
+      ),
+      decoration: BoxDecoration(
+        color: isInteractive ? AppColors.coin : AppColors.card,
+        borderRadius: AppDimens.borderRadiusFull,
+        border: Border.all(
+          color: AppColors.ink,
+          width: AppDimens.borderThin,
+        ),
+        boxShadow: isInteractive
+            ? const [
+                BoxShadow(
+                  color: AppColors.ink,
+                  offset: Offset(0, 2),
+                  blurRadius: 0,
+                ),
+              ]
+            : null,
+      ),
+      child: isLoading
+          ? const Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.ink,
+                ),
+              ),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SvgPicture.asset(
+                  'assets/icons/powerup_auto_answer.svg',
+                  width: 14,
+                  height: 14,
+                  colorFilter: const ColorFilter.mode(
+                    AppColors.ink,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  AppStrings.giveAnswerPowerup,
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                Text(
+                  '·',
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    color: AppColors.muted,
+                  ),
+                ),
+                const SizedBox(width: AppDimens.space4),
+                const CoinIcon(size: 14),
+                const SizedBox(width: 2),
+                Text(
+                  '$cost',
+                  style: AppTextStyles.cardTitle.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+    );
+
+    if (isInteractive) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: buttonContent,
+      );
+    }
+
+    if (isLoading) {
+      return Opacity(
+        opacity: 0.7,
+        child: buttonContent,
+      );
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppStrings.notYourTurnGiveAnswer),
             duration: Duration(seconds: 1),
           ),
         );
