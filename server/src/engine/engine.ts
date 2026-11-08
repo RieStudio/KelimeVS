@@ -492,21 +492,32 @@ export abstract class MatchEngine {
 
     const opponentId = opponentOf(state, playerId);
 
-    const starterIndex = state.totalRoundsPlayed % 2;
-    const starterPlayerId = state.playerIds[starterIndex];
+    let updatedRoundHistory = state.roundHistory;
 
-    const currentRoundRecord: RoundRecord = {
-      questionId: state.currentQuestion?.id ?? '',
-      starterPlayerId,
-      attempts: state.currentRoundAttempts,
-      winnerId: opponentId,
-      reason: 'forfeit',
+    if (state.phase === 'roundActive') {
+      const starterIndex = state.totalRoundsPlayed % 2;
+      const starterPlayerId = state.playerIds[starterIndex];
+
+      const currentRoundRecord: RoundRecord = {
+        questionId: state.currentQuestion?.id ?? '',
+        starterPlayerId,
+        attempts: state.currentRoundAttempts,
+        winnerId: opponentId,
+        reason: 'forfeit',
+      };
+
+      updatedRoundHistory = [...state.roundHistory, currentRoundRecord];
+    }
+
+    const roundsToWin = state.config.roundsToWin;
+    const updatedScores: Record<string, number> = {
+      [opponentId]: roundsToWin,
+      [playerId]: 0,
     };
-
-    const updatedRoundHistory = [...state.roundHistory, currentRoundRecord];
 
     const finishedState: MatchState = {
       ...state,
+      scores: updatedScores,
       phase: 'matchFinished',
       roundHistory: updatedRoundHistory,
       winnerId: opponentId,

@@ -172,6 +172,8 @@ void main() {
       expect(entry.endType, MatchEndType.forfeit);
       expect(entry.forfeitedPlayerId, 'me');
       expect(entry.botlaOynandi, isTrue);
+      expect(entry.myScore, 0);
+      expect(entry.opponentScore, 2);
 
       // Ekstra beklemede ikinci kayıt atılmaz
       async.elapse(const Duration(milliseconds: 5000));

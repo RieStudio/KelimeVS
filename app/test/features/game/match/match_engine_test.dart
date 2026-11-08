@@ -505,6 +505,131 @@ void main() {
       expect(state.roundHistory.length, equals(1));
       expect(state.roundHistory.first.reason, equals(RoundEndReason.forfeit));
       expect(state.roundHistory.first.winnerId, equals('p2'));
+      // Hükmen sonuç kuralı: kazanan roundsToWin (2), terk eden 0
+      expect(state.scores['p2'], equals(2));
+      expect(state.scores['p1'], equals(0));
+    });
+
+    test('6b. forfeit() terk eden öndeyken (1 - 0) terk edenin skoru 0, kazanan 2 olur', () {
+      final config = const MatchConfig();
+      final random = math.Random(1);
+
+      final startRes = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2'],
+        nowMs: 1000,
+      );
+
+      // p1 cevap verir ve tur 1'i kazanır (1 - 0)
+      final subRes = MatchEngine.submit(
+        state: startRes.state,
+        playerId: 'p1',
+        rawInput: 'audi',
+        nowMs: 2000,
+      );
+      final timeoutRes = MatchEngine.checkTimeout(state: subRes.state, nowMs: 23000);
+      expect(timeoutRes.state.scores['p1'], equals(1));
+      expect(timeoutRes.state.scores['p2'], equals(0));
+
+      final round2 = MatchEngine.startNextRound(
+        state: timeoutRes.state,
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2'],
+        nowMs: 24000,
+      );
+
+      // p1 öndeyken terk eder
+      final forfeitRes = MatchEngine.forfeit(
+        state: round2.state,
+        playerId: 'p1',
+        nowMs: 26000,
+      );
+
+      expect(forfeitRes.state.winnerId, equals('p2'));
+      expect(forfeitRes.state.endedBy, equals('forfeit'));
+      expect(forfeitRes.state.scores['p2'], equals(2));
+      expect(forfeitRes.state.scores['p1'], equals(0));
+      expect(forfeitRes.state.roundHistory.length, equals(2));
+    });
+
+    test('6c. forfeit() 1 - 1 berabere iken terk edenin skoru 0, kazanan 2 olur', () {
+      final config = const MatchConfig();
+      final random = math.Random(1);
+
+      final startRes = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2', 'q3'],
+        nowMs: 1000,
+      );
+
+      // R1: p1 kazanır
+      final sub1 = MatchEngine.submit(state: startRes.state, playerId: 'p1', rawInput: 'audi', nowMs: 2000);
+      final to1 = MatchEngine.checkTimeout(state: sub1.state, nowMs: 23000);
+      expect(to1.state.scores['p1'], equals(1));
+      expect(to1.state.scores['p2'], equals(0));
+
+      // R2: p2 kazanır
+      final r2 = MatchEngine.startNextRound(
+        state: to1.state,
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2', 'q3'],
+        nowMs: 24000,
+      );
+      final sub2 = MatchEngine.submit(state: r2.state, playerId: 'p2', rawInput: 'paris', nowMs: 25000);
+      final to2 = MatchEngine.checkTimeout(state: sub2.state, nowMs: 46000);
+      expect(to2.state.scores['p1'], equals(1));
+      expect(to2.state.scores['p2'], equals(1));
+
+      // R3: p1 terk eder
+      final r3 = MatchEngine.startNextRound(
+        state: to2.state,
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2', 'q3'],
+        nowMs: 47000,
+      );
+      final forfeitRes = MatchEngine.forfeit(state: r3.state, playerId: 'p1', nowMs: 49000);
+
+      expect(forfeitRes.state.winnerId, equals('p2'));
+      expect(forfeitRes.state.scores['p2'], equals(2));
+      expect(forfeitRes.state.scores['p1'], equals(0));
+      expect(forfeitRes.state.roundHistory.length, equals(3));
+    });
+
+    test('6d. forfeit() roundEnded fazında mükerrer tur kaydı oluşturmaz', () {
+      final config = const MatchConfig();
+      final random = math.Random(1);
+
+      final startRes = MatchEngine.start(
+        config: config,
+        playerIds: ['p1', 'p2'],
+        questions: sampleQuestions,
+        random: random,
+        questionOrder: ['q1', 'q2'],
+        nowMs: 1000,
+      );
+
+      final sub1 = MatchEngine.submit(state: startRes.state, playerId: 'p1', rawInput: 'audi', nowMs: 2000);
+      final to1 = MatchEngine.checkTimeout(state: sub1.state, nowMs: 23000);
+      expect(to1.state.phase, equals(MatchPhase.roundEnded));
+      expect(to1.state.roundHistory.length, equals(1));
+
+      // roundEnded fazında terk
+      final forfeitRes = MatchEngine.forfeit(state: to1.state, playerId: 'p2', nowMs: 23500);
+      expect(forfeitRes.state.phase, equals(MatchPhase.matchFinished));
+      expect(forfeitRes.state.winnerId, equals('p1'));
+      expect(forfeitRes.state.scores['p1'], equals(2));
+      expect(forfeitRes.state.scores['p2'], equals(0));
+      // Mükerrer tur eklenmemiş olmalı
+      expect(forfeitRes.state.roundHistory.length, equals(1));
     });
 
     test('7. Grace period sınır testleri (1ms öncesinde geçerli, tam sınırda ve sonrasında timeout)', () {

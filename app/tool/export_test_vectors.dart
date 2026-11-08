@@ -1211,11 +1211,11 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
     ],
   ));
 
-  // 13. Forfeit Freezes Score
+  // 13. Forfeit Overrides Score (Terk Eden Öndeyken Terk)
   scenarios.add(runScenario(
     id: 'scen_13_forfeit_freezes_score',
-    name: 'Forfeit Freezes Score',
-    description: 'P1 led 1-0 in round 1, then P1 forfeits in round 2; score freezes at 1-0, P2 wins.',
+    name: 'Forfeit Overrides Score',
+    description: 'P1 led 1-0 in round 1, then P1 forfeits in round 2; forfeit overrides score to 0-2 (roundsToWin for opponent, 0 for forfeiter), P2 wins.',
     config: stdConfig,
     playerIds: ['p1', 'p2'],
     questionOrder: ['q1', 'q2'],
@@ -1224,7 +1224,27 @@ List<Map<String, dynamic>> _buildEngineScenarios() {
       ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
       ('tick', {'nowMs': 22001}), // p1 wins round 1 (1-0)
       ('startNextRound', {'nowMs': 24000}),
-      ('forfeit', {'playerId': 'p1', 'nowMs': 26000}), // p1 forfeits -> p2 wins match, scores stay 1-0
+      ('forfeit', {'playerId': 'p1', 'nowMs': 26000}), // p1 forfeits -> p2 wins match, scores become p1: 0, p2: 2
+    ],
+  ));
+
+  // 13b. Forfeit When Tied (1-1 İken Terk)
+  scenarios.add(runScenario(
+    id: 'scen_13b_forfeit_when_tied',
+    name: 'Forfeit When Tied',
+    description: '1-1 tie after 2 rounds; P1 forfeits in round 3; P2 wins 2-0, P1 score becomes 0.',
+    config: stdConfig,
+    playerIds: ['p1', 'p2'],
+    questionOrder: ['q1', 'q2', 'q3'],
+    initialNowMs: 1000,
+    stepPlan: [
+      ('submit', {'playerId': 'p1', 'rawInput': 'audi', 'nowMs': 2000}),
+      ('tick', {'nowMs': 22001}), // p1 wins round 1 (1-0)
+      ('startNextRound', {'nowMs': 24000}),
+      ('submit', {'playerId': 'p2', 'rawInput': 'elma', 'nowMs': 25000}),
+      ('tick', {'nowMs': 45001}), // p2 wins round 2 (1-1)
+      ('startNextRound', {'nowMs': 47000}),
+      ('forfeit', {'playerId': 'p1', 'nowMs': 49000}), // p1 forfeits in round 3 -> p2 wins 2-0, p1 score becomes 0
     ],
   ));
 

@@ -310,20 +310,31 @@ abstract final class MatchEngine {
 
     final opponentId = state.opponentOf(playerId);
 
-    final starterIndex = state.totalRoundsPlayed % 2;
-    final starterPlayerId = state.playerIds[starterIndex];
+    var updatedRoundHistory = state.roundHistory;
 
-    final currentRoundRecord = RoundRecord(
-      questionId: state.currentQuestion?.id ?? '',
-      starterPlayerId: starterPlayerId,
-      attempts: state.currentRoundAttempts,
-      winnerId: opponentId,
-      reason: RoundEndReason.forfeit,
-    );
+    if (state.phase == MatchPhase.roundActive) {
+      final starterIndex = state.totalRoundsPlayed % 2;
+      final starterPlayerId = state.playerIds[starterIndex];
 
-    final updatedRoundHistory = [...state.roundHistory, currentRoundRecord];
+      final currentRoundRecord = RoundRecord(
+        questionId: state.currentQuestion?.id ?? '',
+        starterPlayerId: starterPlayerId,
+        attempts: state.currentRoundAttempts,
+        winnerId: opponentId,
+        reason: RoundEndReason.forfeit,
+      );
+
+      updatedRoundHistory = [...state.roundHistory, currentRoundRecord];
+    }
+
+    final roundsToWin = state.config.roundsToWin;
+    final updatedScores = {
+      opponentId: roundsToWin,
+      playerId: 0,
+    };
 
     final finishedState = state.copyWith(
+      scores: updatedScores,
       phase: MatchPhase.matchFinished,
       roundHistory: updatedRoundHistory,
       winnerId: opponentId,

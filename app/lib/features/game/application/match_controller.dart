@@ -532,6 +532,8 @@ class MatchController extends Notifier<MatchUiState>
       } else {
         updatedBoardScores = state.boardScores!;
       }
+    } else if (nextState.endedBy == 'forfeit') {
+      updatedBoardScores = Map<String, int>.from(nextState.scores);
     } else {
       updatedBoardScores =
           state.boardScores ?? prevState?.scores ?? nextState.scores;

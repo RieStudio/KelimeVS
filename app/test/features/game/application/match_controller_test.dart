@@ -509,6 +509,9 @@ void main() {
         expect(state.summary, isNotNull);
         expect(state.summary!.winnerId, 'bot');
         expect(state.matchState!.endedBy, 'forfeit');
+        expect(state.matchState!.scores['me'], 0);
+        expect(state.matchState!.scores['bot'], 2);
+        expect(state.boardScores, {'me': 0, 'bot': 2});
 
         container.dispose();
       });

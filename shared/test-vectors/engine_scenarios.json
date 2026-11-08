@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "MatchEngine complete step-by-step match scenarios for state and event verification",
-  "totalScenarios": 26,
+  "totalScenarios": 27,
   "scenarios": [
     {
       "id": "scen_01_clean_win_p1",
@@ -2086,8 +2086,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p1",
             "scores": {
-              "p1": 0,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 0,
             "totalRoundsPlayed": 0,
@@ -2240,7 +2240,7 @@
             "phase": "matchFinished",
             "turnPlayerId": "p2",
             "scores": {
-              "p1": 1,
+              "p1": 2,
               "p2": 0
             },
             "decisiveRounds": 1,
@@ -2321,8 +2321,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p1",
             "scores": {
-              "p1": 0,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 0,
             "totalRoundsPlayed": 0,
@@ -2355,8 +2355,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p1",
             "scores": {
-              "p1": 0,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 0,
             "totalRoundsPlayed": 0,
@@ -2376,8 +2376,8 @@
     },
     {
       "id": "scen_13_forfeit_freezes_score",
-      "name": "Forfeit Freezes Score",
-      "description": "P1 led 1-0 in round 1, then P1 forfeits in round 2; score freezes at 1-0, P2 wins.",
+      "name": "Forfeit Overrides Score",
+      "description": "P1 led 1-0 in round 1, then P1 forfeits in round 2; forfeit overrides score to 0-2 (roundsToWin for opponent, 0 for forfeiter), P2 wins.",
       "config": {
         "roundsToWin": 2,
         "answerSeconds": 20,
@@ -2537,8 +2537,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p2",
             "scores": {
-              "p1": 1,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 1,
             "totalRoundsPlayed": 1,
@@ -2552,6 +2552,291 @@
             },
             "attemptsCount": 0,
             "deadlineMs": 44000
+          }
+        }
+      ]
+    },
+    {
+      "id": "scen_13b_forfeit_when_tied",
+      "name": "Forfeit When Tied",
+      "description": "1-1 tie after 2 rounds; P1 forfeits in round 3; P2 wins 2-0, P1 score becomes 0.",
+      "config": {
+        "roundsToWin": 2,
+        "answerSeconds": 20,
+        "graceMs": 0,
+        "nearMissPerRound": 1,
+        "minAnswersPerQuestion": 0,
+        "minSubmitIntervalMs": 600,
+        "maxAttemptsPerTurn": 25
+      },
+      "playerIds": [
+        "p1",
+        "p2"
+      ],
+      "questionOrder": [
+        "q1",
+        "q2",
+        "q3"
+      ],
+      "initialNowMs": 1000,
+      "initialStateSnapshot": {
+        "phase": "roundActive",
+        "turnPlayerId": "p1",
+        "scores": {
+          "p1": 0,
+          "p2": 0
+        },
+        "decisiveRounds": 0,
+        "totalRoundsPlayed": 0,
+        "currentQuestionId": "q1",
+        "winnerId": null,
+        "endedBy": null,
+        "usedAnswerIds": [],
+        "remainingNearMisses": {
+          "p1": 1,
+          "p2": 1
+        },
+        "attemptsCount": 0,
+        "deadlineMs": 21000
+      },
+      "steps": [
+        {
+          "stepIndex": 0,
+          "action": "submit",
+          "payload": {
+            "playerId": "p1",
+            "rawInput": "audi",
+            "nowMs": 2000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p1",
+              "answerDisplay": "Audi"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 0,
+              "p2": 0
+            },
+            "decisiveRounds": 0,
+            "totalRoundsPlayed": 0,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 22000
+          }
+        },
+        {
+          "stepIndex": 1,
+          "action": "tick",
+          "payload": {
+            "nowMs": 22001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p1",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q1",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "audi"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 22000
+          }
+        },
+        {
+          "stepIndex": 2,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 24000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p2",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 44000
+          }
+        },
+        {
+          "stepIndex": 3,
+          "action": "submit",
+          "payload": {
+            "playerId": "p2",
+            "rawInput": "elma",
+            "nowMs": 25000
+          },
+          "expectedEvents": [
+            {
+              "type": "AnswerAccepted",
+              "playerId": "p2",
+              "answerDisplay": "Elma"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 0
+            },
+            "decisiveRounds": 1,
+            "totalRoundsPlayed": 1,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 45000
+          }
+        },
+        {
+          "stepIndex": 4,
+          "action": "tick",
+          "payload": {
+            "nowMs": 45001
+          },
+          "expectedEvents": [
+            {
+              "type": "RoundWon",
+              "winnerId": "p2",
+              "reason": "timeout"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "roundEnded",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q2",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [
+              "elma"
+            ],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 1,
+            "deadlineMs": 45000
+          }
+        },
+        {
+          "stepIndex": 5,
+          "action": "startNextRound",
+          "payload": {
+            "nowMs": 47000
+          },
+          "expectedEvents": [],
+          "expectedStateSnapshot": {
+            "phase": "roundActive",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p1": 1,
+              "p2": 1
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q3",
+            "winnerId": null,
+            "endedBy": null,
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 67000
+          }
+        },
+        {
+          "stepIndex": 6,
+          "action": "forfeit",
+          "payload": {
+            "playerId": "p1",
+            "nowMs": 49000
+          },
+          "expectedEvents": [
+            {
+              "type": "MatchFinished",
+              "winnerId": "p2",
+              "reason": "forfeit"
+            }
+          ],
+          "expectedStateSnapshot": {
+            "phase": "matchFinished",
+            "turnPlayerId": "p1",
+            "scores": {
+              "p2": 2,
+              "p1": 0
+            },
+            "decisiveRounds": 2,
+            "totalRoundsPlayed": 2,
+            "currentQuestionId": "q3",
+            "winnerId": "p2",
+            "endedBy": "forfeit",
+            "usedAnswerIds": [],
+            "remainingNearMisses": {
+              "p1": 1,
+              "p2": 1
+            },
+            "attemptsCount": 0,
+            "deadlineMs": 67000
           }
         }
       ]
@@ -2616,8 +2901,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p1",
             "scores": {
-              "p1": 0,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 0,
             "totalRoundsPlayed": 0,
@@ -2650,8 +2935,8 @@
             "phase": "matchFinished",
             "turnPlayerId": "p1",
             "scores": {
-              "p1": 0,
-              "p2": 0
+              "p2": 2,
+              "p1": 0
             },
             "decisiveRounds": 0,
             "totalRoundsPlayed": 0,
