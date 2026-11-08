@@ -41,6 +41,7 @@ export interface Env extends AuthEnv, EnergyEnv {
   readonly VISUAL_FRAMES_MIN_BUILD?: string;
   readonly RETIRED_FRAMES_BUILD?: string;
   readonly GUEST_NICKNAME_LOCK_MIN_BUILD?: string;
+  readonly LEADERBOARD_PAIR_WIN_CAP?: string;
 }
 
 function parseClientBuild(request: Request): number {

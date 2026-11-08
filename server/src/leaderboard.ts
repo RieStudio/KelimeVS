@@ -5,6 +5,7 @@ import { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry }
 export { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry };
 
 export const LEADERBOARD_TOP_LIMIT = 100;
+export const DEFAULT_PAIR_WIN_CAP = 20;
 
 export interface LeaderboardEntry {
   readonly rank: number;
@@ -49,6 +50,18 @@ export class Leaderboard extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+  }
+
+  private get pairWinCap(): number {
+    const raw = this.env?.LEADERBOARD_PAIR_WIN_CAP;
+    if (raw === undefined || raw === null || raw.trim() === '') {
+      return DEFAULT_PAIR_WIN_CAP;
+    }
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      return DEFAULT_PAIR_WIN_CAP;
+    }
+    return parsed;
   }
 
   private ensureSchema(): void {
@@ -122,7 +135,7 @@ export class Leaderboard extends DurableObject<Env> {
   /**
    * Maç sonucunu liderlik tablosuna kaydeder.
    * - matchId idempotenttir.
-   * - Aynı rakibe karşı haftada en fazla 3 galibiyet sayılır.
+   * - Aynı rakibe karşı haftada en fazla varsayılan 20 galibiyet sayılır (LEADERBOARD_PAIR_WIN_CAP ile ayarlanabilir).
    * - Takma adı olmayan oyuncu tabloya yazılmaz.
    */
   async recordMatchResult(params: RecordMatchResultParams): Promise<RecordMatchResultResult> {
@@ -142,7 +155,7 @@ export class Leaderboard extends DurableObject<Env> {
     const weekInfo = getIstanbulWeekInfo(new Date(nowMs));
     const weekKey = weekInfo.weekKey;
 
-    // 2. Anti-farming / Pair win sınırı kontrolü (aynı rakibe en fazla 3 galibiyet)
+    // 2. Anti-farming / Pair win sınırı kontrolü (aynı rakibe haftada en fazla varsayılan 20 galibiyet)
     // Silinmiş kullanıcı varsa pair_wins'e yazılmaz.
     const isWinnerDeleted = params.deletedUids?.includes(params.winnerUid) ?? false;
     const isLoserDeleted = params.deletedUids?.includes(params.loserUid) ?? false;
@@ -150,6 +163,7 @@ export class Leaderboard extends DurableObject<Env> {
 
     let isCapped = false;
     if (!shouldSkipPairWins) {
+      const cap = this.pairWinCap;
       const pairRows = this.ctx.storage.sql.exec<{ count: number }>(
         'SELECT count FROM pair_wins WHERE week_key = ? AND winner_uid = ? AND loser_uid = ? LIMIT 1',
         weekKey,
@@ -158,7 +172,7 @@ export class Leaderboard extends DurableObject<Env> {
       ).toArray();
 
       const currentPairCount = pairRows.length > 0 ? pairRows[0].count : 0;
-      isCapped = currentPairCount >= 3;
+      isCapped = cap > 0 && currentPairCount >= cap;
 
       // İkili galibiyet sayısını güncelle
       this.ctx.storage.sql.exec(

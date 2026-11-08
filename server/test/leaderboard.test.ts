@@ -60,12 +60,13 @@ function createMockCtx() {
   return { storage } as unknown as DurableObjectState;
 }
 
-function createEnv(): Env {
+function createEnv(overrides?: Partial<Env>): Env {
   return {
     MATCHMAKER: {} as any,
     MATCH_ROOM: {} as any,
     USER_PROFILE: {} as any,
     LEADERBOARD: {} as any,
+    ...overrides,
   };
 }
 
@@ -254,14 +255,14 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
     expect(res.me).toEqual({ rank: 2, wins: 2 });
   });
 
-  it('4. Anti-farming kuralı: Aynı rakibe karşı haftada en fazla 3 galibiyet yazılır', async () => {
+  it('4. Anti-farming kuralı: Aynı rakibe karşı haftada en fazla varsayılan 20 galibiyet yazılır', async () => {
     const ctx = createMockCtx();
     const env = createEnv();
     const lb = new Leaderboard(ctx, env);
     const baseTime = new Date('2026-10-14T12:00:00Z').getTime();
 
-    // A, B'yi 1., 2. ve 3. kez yeniyor
-    for (let i = 1; i <= 3; i++) {
+    // A, B'yi 1'den 20'ye kadar yeniyor
+    for (let i = 1; i <= 20; i++) {
       const res = await lb.recordMatchResult({
         matchId: `farm_${i}`,
         winnerUid: 'uid_farmer',
@@ -273,22 +274,22 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       expect(res.capped).toBe(false);
     }
 
-    let check = await lb.getLeaderboard('uid_farmer', baseTime + 4000);
-    expect(check.me?.wins).toBe(3);
+    let check = await lb.getLeaderboard('uid_farmer', baseTime + 21000);
+    expect(check.me?.wins).toBe(20);
 
-    // 4. galibiyet aynı rakibe karşı -> capped
-    const res4 = await lb.recordMatchResult({
-      matchId: 'farm_4',
+    // 21. galibiyet aynı rakibe karşı -> capped
+    const res21 = await lb.recordMatchResult({
+      matchId: 'farm_21',
       winnerUid: 'uid_farmer',
       winnerNickname: 'Farmer',
       loserUid: 'uid_alt',
       loserNickname: 'AltAcc',
-      finishedAtMs: baseTime + 5000,
+      finishedAtMs: baseTime + 22000,
     });
-    expect(res4.capped).toBe(true);
+    expect(res21.capped).toBe(true);
 
-    check = await lb.getLeaderboard('uid_farmer', baseTime + 6000);
-    expect(check.me?.wins).toBe(3); // Galibiyet 3'te kalır!
+    check = await lb.getLeaderboard('uid_farmer', baseTime + 23000);
+    expect(check.me?.wins).toBe(20); // Galibiyet 20'de kalır!
 
     // Farklı bir rakibe karşı galibiyet -> artar
     const resDifferent = await lb.recordMatchResult({
@@ -297,12 +298,142 @@ describe('Leaderboard Durable Object - SQLite, Eşitlik Sıralaması, Anti-Farmi
       winnerNickname: 'Farmer',
       loserUid: 'uid_other',
       loserNickname: 'OtherPlayer',
-      finishedAtMs: baseTime + 7000,
+      finishedAtMs: baseTime + 24000,
     });
     expect(resDifferent.capped).toBe(false);
 
+    check = await lb.getLeaderboard('uid_farmer', baseTime + 25000);
+    expect(check.me?.wins).toBe(21);
+  });
+
+  it('4b. Anti-farming kuralı: LEADERBOARD_PAIR_WIN_CAP=5 iken 5 galibiyet sayılır, 6. galibiyet sınırlandırılır', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv({ LEADERBOARD_PAIR_WIN_CAP: '5' });
+    const lb = new Leaderboard(ctx, env);
+    const baseTime = new Date('2026-10-14T12:00:00Z').getTime();
+
+    for (let i = 1; i <= 5; i++) {
+      const res = await lb.recordMatchResult({
+        matchId: `cap5_${i}`,
+        winnerUid: 'uid_farmer',
+        winnerNickname: 'Farmer',
+        loserUid: 'uid_alt',
+        loserNickname: 'AltAcc',
+        finishedAtMs: baseTime + i * 1000,
+      });
+      expect(res.capped).toBe(false);
+    }
+
+    let check = await lb.getLeaderboard('uid_farmer', baseTime + 6000);
+    expect(check.me?.wins).toBe(5);
+
+    const res6 = await lb.recordMatchResult({
+      matchId: 'cap5_6',
+      winnerUid: 'uid_farmer',
+      winnerNickname: 'Farmer',
+      loserUid: 'uid_alt',
+      loserNickname: 'AltAcc',
+      finishedAtMs: baseTime + 7000,
+    });
+    expect(res6.capped).toBe(true);
+
     check = await lb.getLeaderboard('uid_farmer', baseTime + 8000);
-    expect(check.me?.wins).toBe(4);
+    expect(check.me?.wins).toBe(5);
+  });
+
+  it('4c. Anti-farming kuralı: LEADERBOARD_PAIR_WIN_CAP=0 veya negatif iken sınır uygulanmaz (sınırsız)', async () => {
+    const ctx = createMockCtx();
+    const env = createEnv({ LEADERBOARD_PAIR_WIN_CAP: '0' });
+    const lb = new Leaderboard(ctx, env);
+    const baseTime = new Date('2026-10-14T12:00:00Z').getTime();
+
+    for (let i = 1; i <= 25; i++) {
+      const res = await lb.recordMatchResult({
+        matchId: `unlimited_${i}`,
+        winnerUid: 'uid_farmer',
+        winnerNickname: 'Farmer',
+        loserUid: 'uid_alt',
+        loserNickname: 'AltAcc',
+        finishedAtMs: baseTime + i * 1000,
+      });
+      expect(res.capped).toBe(false);
+    }
+
+    const check = await lb.getLeaderboard('uid_farmer', baseTime + 30000);
+    expect(check.me?.wins).toBe(25);
+
+    // Negatif değer testi (-1)
+    const ctxNeg = createMockCtx();
+    const envNeg = createEnv({ LEADERBOARD_PAIR_WIN_CAP: '-1' });
+    const lbNeg = new Leaderboard(ctxNeg, envNeg);
+    for (let i = 1; i <= 25; i++) {
+      const res = await lbNeg.recordMatchResult({
+        matchId: `unlimited_neg_${i}`,
+        winnerUid: 'uid_farmer_neg',
+        winnerNickname: 'FarmerNeg',
+        loserUid: 'uid_alt_neg',
+        loserNickname: 'AltAccNeg',
+        finishedAtMs: baseTime + i * 1000,
+      });
+      expect(res.capped).toBe(false);
+    }
+    const checkNeg = await lbNeg.getLeaderboard('uid_farmer_neg', baseTime + 30000);
+    expect(checkNeg.me?.wins).toBe(25);
+  });
+
+  it('4d. Anti-farming kuralı: LEADERBOARD_PAIR_WIN_CAP geçersiz ("abc", "") iken varsayılan 20 geçerlidir', async () => {
+    // "abc" geçersiz string testi
+    const ctxAbc = createMockCtx();
+    const envAbc = createEnv({ LEADERBOARD_PAIR_WIN_CAP: 'abc' });
+    const lbAbc = new Leaderboard(ctxAbc, envAbc);
+    const baseTime = new Date('2026-10-14T12:00:00Z').getTime();
+
+    for (let i = 1; i <= 20; i++) {
+      const res = await lbAbc.recordMatchResult({
+        matchId: `invalid_abc_${i}`,
+        winnerUid: 'uid_abc',
+        winnerNickname: 'AbcWinner',
+        loserUid: 'uid_loser',
+        loserNickname: 'Loser',
+        finishedAtMs: baseTime + i * 1000,
+      });
+      expect(res.capped).toBe(false);
+    }
+    const res21Abc = await lbAbc.recordMatchResult({
+      matchId: 'invalid_abc_21',
+      winnerUid: 'uid_abc',
+      winnerNickname: 'AbcWinner',
+      loserUid: 'uid_loser',
+      loserNickname: 'Loser',
+      finishedAtMs: baseTime + 21000,
+    });
+    expect(res21Abc.capped).toBe(true);
+
+    // "" boş string testi
+    const ctxEmpty = createMockCtx();
+    const envEmpty = createEnv({ LEADERBOARD_PAIR_WIN_CAP: '' });
+    const lbEmpty = new Leaderboard(ctxEmpty, envEmpty);
+
+    for (let i = 1; i <= 20; i++) {
+      const res = await lbEmpty.recordMatchResult({
+        matchId: `empty_${i}`,
+        winnerUid: 'uid_empty',
+        winnerNickname: 'EmptyWinner',
+        loserUid: 'uid_loser',
+        loserNickname: 'Loser',
+        finishedAtMs: baseTime + i * 1000,
+      });
+      expect(res.capped).toBe(false);
+    }
+    const res21Empty = await lbEmpty.recordMatchResult({
+      matchId: 'empty_21',
+      winnerUid: 'uid_empty',
+      winnerNickname: 'EmptyWinner',
+      loserUid: 'uid_loser',
+      loserNickname: 'Loser',
+      finishedAtMs: baseTime + 21000,
+    });
+    expect(res21Empty.capped).toBe(true);
   });
 
   it('5. İdempotentlik: Aynı matchId ikinci kez sayılmaz', async () => {

@@ -163,7 +163,7 @@ Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad
 - **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
 - Tabloda ilk 100 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
 - Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
-- Aynı rakibe karşı bir haftada en fazla **3 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
+- Aynı rakibe karşı bir haftada en fazla **20 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için; `LEADERBOARD_PAIR_WIN_CAP` ortam değişkeniyle ayarlanabilir, varsayılan 20). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
 - Takma adı henüz olmayan oyuncu tabloda görünmez.
 - Veri tek bir `Leaderboard` Durable Object içinde tutulur; yalnızca sunucu yazar. Maç bitince `UserProfile` güncellemesiyle birlikte tabloya galibiyet bildirilir. Bildirim hata verirse maç sonu etkilenmez, sonra tekrar denenir.
 - Geçmiş haftaların tablosu ve haftalık ödüller şimdilik yoktur (sonraki aşama).
