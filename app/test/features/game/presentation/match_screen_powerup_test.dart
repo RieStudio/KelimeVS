@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/theme/app_dimens.dart';
 import 'package:app/core/widgets/app_widgets.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_session.dart';
@@ -74,6 +77,18 @@ class TestUiStateNotifier extends Notifier<MatchUiState> {
   void updateState(MatchUiState next) {
     state = next;
   }
+}
+
+Finder findSvgAsset(String assetName) {
+  return find.byWidgetPredicate((widget) {
+    if (widget is SvgPicture) {
+      final loader = widget.bytesLoader;
+      if (loader is SvgAssetLoader) {
+        return loader.assetName == assetName;
+      }
+    }
+    return false;
+  });
 }
 
 void main() {
@@ -147,6 +162,7 @@ void main() {
     expect(find.bySemanticsLabel('Jokerler'), findsOneWidget);
     expect(find.byType(BackdropFilter), findsNothing);
     expect(find.byIcon(Icons.timer), findsNothing);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
 
     // Butona bas -> radial menü ve bulanıklık açılır
     await tester.tap(find.bySemanticsLabel('Jokerler'));
@@ -157,15 +173,35 @@ void main() {
     expect(find.text('Süre'), findsNothing);
     expect(find.text('+5 sn'), findsNothing);
     expect(find.text('30'), findsNothing);
-    expect(find.byIcon(Icons.timer), findsOneWidget);
-    expect(find.bySemanticsLabel('Süre jokeri, 30 jeton'), findsOneWidget);
+    // Radial menüde Icons.timer artık KULLANILMAZ
+    expect(find.byIcon(Icons.timer), findsNothing);
+    final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+    expect(sureFinder, findsOneWidget);
+    final timeSvgFinder = findSvgAsset('assets/icons/powerup_time.svg');
+    expect(timeSvgFinder, findsOneWidget);
+
+    // Renk filtresi YOK, SVG kendi renkleriyle çizilir
+    final timeSvg = tester.widget<SvgPicture>(timeSvgFinder);
+    expect(timeSvg.colorFilter, isNull);
+    expect(timeSvg.width, 28);
+    expect(timeSvg.height, 28);
+
+    // Kullanılabilir durumda buton zemini BEYAZ/krem (AppColors.card)
+    final container = tester.widget<Container>(
+      find.descendant(of: sureFinder, matching: find.byType(Container)).first,
+    );
+    final decoration = container.decoration as BoxDecoration;
+    expect(decoration.color, AppColors.card);
+    expect(decoration.shape, BoxShape.circle);
+    expect(decoration.border?.top.color, AppColors.ink);
+    expect(decoration.boxShadow, isNotNull);
 
     // Süre butonuna bas -> useExtraTime çağrılır ve menü anında kapanır
-    await tester.tap(find.byIcon(Icons.timer));
+    await tester.tap(sureFinder);
     await tester.pumpAndSettle();
 
     expect(session.extraTimeCalled, isTrue);
-    expect(find.byIcon(Icons.timer), findsNothing);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 
@@ -187,6 +223,7 @@ void main() {
 
     expect(find.bySemanticsLabel('Jokerler'), findsNothing);
     expect(find.byIcon(Icons.timer), findsNothing);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 
@@ -215,19 +252,21 @@ void main() {
     // Menü üzerinde metin etiketi ve fiyat yazısı YOK
     expect(find.text('Süre'), findsNothing);
     expect(find.text('30'), findsNothing);
-    expect(find.byIcon(Icons.timer), findsOneWidget);
-    expect(find.bySemanticsLabel('Süre jokeri, 30 jeton'), findsOneWidget);
+    expect(find.byIcon(Icons.timer), findsNothing);
+    final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+    expect(sureFinder, findsOneWidget);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
     // Uzun basınca Tooltip ipucu ("Süre · 30 jeton") çıkar
-    await tester.longPress(find.byIcon(Icons.timer));
+    await tester.longPress(sureFinder);
     await tester.pumpAndSettle();
     expect(find.text('Süre · 30 jeton'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.timer));
+    await tester.tap(sureFinder);
     await tester.pumpAndSettle();
 
     expect(session.extraTimeCalled, isTrue);
-    expect(find.byIcon(Icons.timer), findsNothing);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
     expect(find.byType(BackdropFilter), findsNothing);
   });
 
@@ -251,15 +290,27 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Jokerler'));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.timer), findsOneWidget);
+    final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+    expect(sureFinder, findsOneWidget);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.timer));
+    // Pasif durumda %50 opaklık doğrula
+    final opacityWidget = tester.widget<Opacity>(
+      find.ancestor(
+        of: findSvgAsset('assets/icons/powerup_time.svg'),
+        matching: find.byType(Opacity),
+      ).first,
+    );
+    expect(opacityWidget.opacity, 0.5);
+
+    await tester.tap(sureFinder);
     await tester.pumpAndSettle();
 
     expect(session.extraTimeCalled, isFalse);
     expect(find.text(AppStrings.notEnoughCoinsForExtraTime(30)), findsOneWidget);
     // Pasif duruma basıldığında menü AÇIK kalır
-    expect(find.byIcon(Icons.timer), findsOneWidget);
+    expect(sureFinder, findsOneWidget);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
     expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
   });
 
@@ -283,9 +334,19 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Jokerler'));
     await tester.pumpAndSettle();
 
-    // Metin etiketi kalktı, küçük onay (check) ikonu var
+    // Metin etiketi kalktı, renkli ikon GÖSTERİLMEZ, küçük onay (check) ikonu var
     expect(find.text(AppStrings.extraTimeUsed), findsNothing);
+    expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
     expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+
+    // Kullanıldı durumunda soluk gri zemin (AppColors.surface)
+    final usedFinder = find.bySemanticsLabel('Süre jokeri, ${AppStrings.extraTimeUsed}');
+    expect(usedFinder, findsOneWidget);
+    final container = tester.widget<Container>(
+      find.descendant(of: usedFinder, matching: find.byType(Container)).first,
+    );
+    final decoration = container.decoration as BoxDecoration;
+    expect(decoration.color, AppColors.surface);
 
     await tester.tap(find.byIcon(Icons.check_circle_outline));
     await tester.pumpAndSettle();
@@ -384,6 +445,13 @@ void main() {
       expect(cevapVerFinder, findsOneWidget);
       expect(find.text(AppStrings.giveAnswerPowerup), findsNothing); // Metin etiketi yok
 
+      final answerSvgFinder = findSvgAsset('assets/icons/powerup_auto_answer.svg');
+      expect(answerSvgFinder, findsOneWidget);
+      final answerSvg = tester.widget<SvgPicture>(answerSvgFinder);
+      expect(answerSvg.colorFilter, isNull);
+      expect(answerSvg.width, 28);
+      expect(answerSvg.height, 28);
+
       await tester.tap(cevapVerFinder);
       await tester.pumpAndSettle();
 
@@ -436,11 +504,37 @@ void main() {
       expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
       expect(find.text('50'), findsNothing);
 
-      // İkonlar ve semantics var
-      expect(find.byIcon(Icons.timer), findsOneWidget);
-      expect(find.bySemanticsLabel('Süre jokeri, 30 jeton'), findsOneWidget);
+      // Radial menüde Icons.timer artık KULLANILMAZ
+      expect(find.byIcon(Icons.timer), findsNothing);
+
+      // İkonlar SVG olarak çizilir ve semantics var
+      final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+      expect(sureFinder, findsOneWidget);
       final cevapVerFinder = find.bySemanticsLabel('Cevap Ver jokeri, 50 jeton');
       expect(cevapVerFinder, findsOneWidget);
+
+      final timeSvgFinder = findSvgAsset('assets/icons/powerup_time.svg');
+      final answerSvgFinder = findSvgAsset('assets/icons/powerup_auto_answer.svg');
+      expect(timeSvgFinder, findsOneWidget);
+      expect(answerSvgFinder, findsOneWidget);
+
+      // Renk boyaması (colorFilter) KALDIRILDI
+      final timeSvg = tester.widget<SvgPicture>(timeSvgFinder);
+      final answerSvg = tester.widget<SvgPicture>(answerSvgFinder);
+      expect(timeSvg.colorFilter, isNull);
+      expect(answerSvg.colorFilter, isNull);
+      expect(timeSvg.width, 28);
+      expect(answerSvg.width, 28);
+
+      // Kullanılabilir durumda buton zeminleri BEYAZ (AppColors.card)
+      final sureContainer = tester.widget<Container>(
+        find.descendant(of: sureFinder, matching: find.byType(Container)).first,
+      );
+      final answerContainer = tester.widget<Container>(
+        find.descendant(of: cevapVerFinder, matching: find.byType(Container)).first,
+      );
+      expect((sureContainer.decoration as BoxDecoration).color, AppColors.card);
+      expect((answerContainer.decoration as BoxDecoration).color, AppColors.card);
 
       // Uzun basınca Cevap Ver ipucu ("Cevap Ver · 50 jeton") çıkar
       await tester.longPress(cevapVerFinder);
@@ -615,6 +709,17 @@ void main() {
 
       final cevapVerFinder = find.bySemanticsLabel('Cevap Ver jokeri, 50 jeton');
       expect(cevapVerFinder, findsOneWidget);
+      final answerSvgFinder = findSvgAsset('assets/icons/powerup_auto_answer.svg');
+      expect(answerSvgFinder, findsOneWidget);
+
+      // Pasif durumda %50 opaklık doğrula
+      final opacityWidget = tester.widget<Opacity>(
+        find.ancestor(
+          of: answerSvgFinder,
+          matching: find.byType(Opacity),
+        ).first,
+      );
+      expect(opacityWidget.opacity, 0.5);
 
       await tester.tap(cevapVerFinder);
       await tester.pumpAndSettle();
@@ -645,8 +750,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.giveAnswerUsed), findsNothing);
+      // Kullanıldı durumunda renkli ikon GÖSTERİLMEZ
+      expect(findSvgAsset('assets/icons/powerup_auto_answer.svg'), findsNothing);
       final checkFinder = find.byIcon(Icons.check_circle_outline);
       expect(checkFinder, findsOneWidget);
+
+      // Kullanıldı durumunda soluk gri zemin (AppColors.surface)
+      final usedFinder = find.bySemanticsLabel('Cevap Ver jokeri, ${AppStrings.giveAnswerUsed}');
+      expect(usedFinder, findsOneWidget);
+      final container = tester.widget<Container>(
+        find.descendant(of: usedFinder, matching: find.byType(Container)).first,
+      );
+      expect((container.decoration as BoxDecoration).color, AppColors.surface);
 
       await tester.tap(checkFinder);
       await tester.pumpAndSettle();
@@ -679,6 +794,17 @@ void main() {
 
       final cevapVerFinder = find.bySemanticsLabel('Cevap Ver jokeri, 50 jeton');
       expect(cevapVerFinder, findsOneWidget);
+      final answerSvgFinder = findSvgAsset('assets/icons/powerup_auto_answer.svg');
+      expect(answerSvgFinder, findsOneWidget);
+
+      // Pasif durumda %50 opaklık doğrula
+      final opacityWidget = tester.widget<Opacity>(
+        find.ancestor(
+          of: answerSvgFinder,
+          matching: find.byType(Opacity),
+        ).first,
+      );
+      expect(opacityWidget.opacity, 0.5);
 
       await tester.tap(cevapVerFinder);
       await tester.pumpAndSettle();
@@ -761,40 +887,44 @@ void main() {
       // Başlangıçta kapalı
       expect(find.byType(BackdropFilter), findsNothing);
       expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
 
       // 1. Butona tıkla -> açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
-      expect(find.byIcon(Icons.timer), findsOneWidget);
+      expect(find.byIcon(Icons.timer), findsNothing); // Radial menüde Icons.timer KULLANILMAZ
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
       // 2. Butona tekrar tıkla -> kapanır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNothing);
-      expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
 
       // 3. Butona tıkla -> tekrar açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
-      expect(find.byIcon(Icons.timer), findsOneWidget);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
       // 4. Panel dışına (ekranın sol ortasına) tıkla -> kapanır
       await tester.tapAt(const Offset(30, 300));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNothing);
-      expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
 
       // 5. Butona tıkla -> tekrar açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
       // 6. Bulanık bölgenin butonlar harici boş bir noktasına dokun -> kapanır
       await tester.tapAt(const Offset(220, 25));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
       expect(find.byIcon(Icons.timer), findsNothing);
     });
 
@@ -825,13 +955,16 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
-      expect(find.byIcon(Icons.timer), findsOneWidget);
+      expect(find.byIcon(Icons.timer), findsNothing); // Radial menüde Icons.timer YOK
+
+      final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+      expect(sureFinder, findsOneWidget);
 
       // Odak hâlâ cevap kutusundadır!
       expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
 
       // Uzun bas -> Tooltip ipucu çıkar ("Süre · 30 jeton")
-      await tester.longPress(find.byIcon(Icons.timer));
+      await tester.longPress(sureFinder);
       await tester.pumpAndSettle();
       expect(find.text('Süre · 30 jeton'), findsOneWidget);
 
@@ -843,6 +976,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNothing);
       expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
 
       // Odak hâlâ cevap kutusundadır!
       expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
@@ -887,7 +1021,8 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
-      expect(find.byIcon(Icons.timer), findsOneWidget);
+      expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsOneWidget);
 
       // Sıra bota geçer (tur değişimi)
       stateNotifier.updateState(
@@ -900,6 +1035,7 @@ void main() {
       // Panel ve blur kendiliğinden kapanmıştır
       expect(find.byType(BackdropFilter), findsNothing);
       expect(find.byIcon(Icons.timer), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
     });
 
     testWidgets('19. İki joker de kullanıldıysa Jokerler butonu soluk görünür ama panel yine açılabilir ve check ikonları görünür', (tester) async {
@@ -933,9 +1069,83 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
 
-      // Menüde "Kullanıldı" metin etiketi YOK, iki adet onay (check) ikonu var
+      // Menüde "Kullanıldı" metin etiketi YOK, renkli SVG ikonları YOK, iki adet onay (check) ikonu var
       expect(find.text('Kullanıldı'), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_time.svg'), findsNothing);
+      expect(findSvgAsset('assets/icons/powerup_auto_answer.svg'), findsNothing);
       expect(find.byIcon(Icons.check_circle_outline), findsNWidgets(2));
+    });
+
+    testWidgets('20. Renkli SVG ikonlar, zemin renkleri ve kontur/gölge detayları: Icons.timer menüde yoktur, colorFilter boştur, beyaz zemin ve sert gölge korunur', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 1,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pumpAndSettle();
+
+      // Paneli aç
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pumpAndSettle();
+
+      // 1. Icons.timer menü butonunda KESİNLİKLE kullanılmaz
+      expect(find.byIcon(Icons.timer), findsNothing);
+
+      // 2. İki buton da SVG ikon kullanır
+      final timeSvgFinder = findSvgAsset('assets/icons/powerup_time.svg');
+      final answerSvgFinder = findSvgAsset('assets/icons/powerup_auto_answer.svg');
+      expect(timeSvgFinder, findsOneWidget);
+      expect(answerSvgFinder, findsOneWidget);
+
+      final timeSvg = tester.widget<SvgPicture>(timeSvgFinder);
+      final answerSvg = tester.widget<SvgPicture>(answerSvgFinder);
+
+      // 3. Renk boyaması (colorFilter / color) KALDIRILMIŞTIR (null)
+      expect(timeSvg.colorFilter, isNull);
+      expect(answerSvg.colorFilter, isNull);
+      expect(timeSvg.width, 28);
+      expect(timeSvg.height, 28);
+      expect(answerSvg.width, 28);
+      expect(answerSvg.height, 28);
+
+      // 4. KULLANILABİLİR durumdaki buton zeminleri sarı yerine BEYAZ (AppColors.card)
+      final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
+      final cevapVerFinder = find.bySemanticsLabel('Cevap Ver jokeri, 50 jeton');
+
+      final sureContainer = tester.widget<Container>(
+        find.descendant(of: sureFinder, matching: find.byType(Container)).first,
+      );
+      final answerContainer = tester.widget<Container>(
+        find.descendant(of: cevapVerFinder, matching: find.byType(Container)).first,
+      );
+
+      final sureDecor = sureContainer.decoration as BoxDecoration;
+      final answerDecor = answerContainer.decoration as BoxDecoration;
+
+      expect(sureDecor.color, AppColors.card);
+      expect(answerDecor.color, AppColors.card);
+
+      // 5. Koyu yeşil çerçeve ve sert gölge korunmuştur
+      expect(sureDecor.border?.top.color, AppColors.ink);
+      expect(sureDecor.border?.top.width, AppDimens.borderThin);
+      expect(sureDecor.boxShadow?.first.color, AppColors.ink);
+      expect(sureDecor.boxShadow?.first.offset, const Offset(0, 2));
+
+      expect(answerDecor.border?.top.color, AppColors.ink);
+      expect(answerDecor.border?.top.width, AppDimens.borderThin);
+      expect(answerDecor.boxShadow?.first.color, AppColors.ink);
+      expect(answerDecor.boxShadow?.first.offset, const Offset(0, 2));
     });
   });
 }

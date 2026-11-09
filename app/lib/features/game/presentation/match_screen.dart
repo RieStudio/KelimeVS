@@ -717,10 +717,10 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                     child: _RadialPowerupItem(
                       title: AppStrings.extraTimePowerup,
                       cost: extraTimeCost,
-                      icon: const Icon(
-                        Icons.timer,
-                        size: 26,
-                        color: AppColors.ink,
+                      icon: SvgPicture.asset(
+                        'assets/icons/powerup_time.svg',
+                        width: 28,
+                        height: 28,
                       ),
                       isUsed: extraTimeRemainingUses <= 0,
                       isInteractive: extraTimeRemainingUses > 0 &&
@@ -776,12 +776,8 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                       cost: giveAnswerCost,
                       icon: SvgPicture.asset(
                         'assets/icons/powerup_auto_answer.svg',
-                        width: 26,
-                        height: 26,
-                        colorFilter: const ColorFilter.mode(
-                          AppColors.ink,
-                          BlendMode.srcIn,
-                        ),
+                        width: 28,
+                        height: 28,
                       ),
                       isUsed: giveAnswerRemainingUses <= 0,
                       isInteractive: giveAnswerRemainingUses > 0 &&
@@ -1018,7 +1014,7 @@ class _RadialPowerupItem extends StatelessWidget {
         shape: BoxShape.circle,
         color: isUsed
             ? AppColors.surface
-            : (isInteractive ? AppColors.coin : AppColors.card),
+            : AppColors.card,
         border: Border.all(
           color: isUsed
               ? AppColors.ink.withValues(alpha: 0.3)
