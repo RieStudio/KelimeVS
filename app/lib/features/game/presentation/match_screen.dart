@@ -880,8 +880,20 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
   }
 }
 
-/// Joker butonu ikonu. İleride SVG ile değiştirilebilir.
-const IconData kPowerupMenuIcon = Icons.auto_awesome;
+/// Joker ana butonu SVG ikonu yolu ve boyutu (~26 dp)
+const String kPowerupMenuSvgPath = 'assets/icons/powerup_menu.svg';
+const double kPowerupMenuIconSize = 26.0;
+
+/// Joker menüsü açılırken ana buton ikonunun hafif yana yatma açısı (~14° sağa)
+const double kPowerupMenuTiltAngle = 14.0 * (math.pi / 180.0);
+
+/// Kullanılmış joker ikonunu siyah-beyaz (gri tonlamalı) çizmek için ITU-R BT.709 matrisi
+const List<double> kGrayscaleMatrix = <double>[
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0,      0,      0,      1, 0,
+];
 
 /// Joker menüsü açıldığında sağ üst köşedeki kademeli dairesel bulanıklık halkaları yarıçapları (dp)
 /// En iç halka (112 dp) butonları ve dokunma hedeflerini tamamen içine alır.
@@ -928,44 +940,47 @@ class _PowerupMenuButton extends StatelessWidget {
                 animation: animation,
                 builder: (context, _) {
                   final t = animation.value;
-                  return Container(
-                    width: AppDimens.iconButtonSize,
-                    height: AppDimens.iconButtonSize,
-                    decoration: BoxDecoration(
-                      color: Color.lerp(AppColors.card, AppColors.coin, t),
-                      borderRadius: AppDimens.borderRadiusIconBtn,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: AppDimens.borderThin,
+                  return Transform.translate(
+                    offset: Offset(0, 2.0 * t),
+                    child: Container(
+                      width: AppDimens.iconButtonSize,
+                      height: AppDimens.iconButtonSize,
+                      decoration: BoxDecoration(
+                        color: Color.lerp(AppColors.card, AppColors.coin, t),
+                        borderRadius: AppDimens.borderRadiusIconBtn,
+                        border: Border.all(
+                          color: AppColors.ink,
+                          width: AppDimens.borderThin,
+                        ),
+                        boxShadow: t > 0.5
+                            ? null
+                            : const [
+                                BoxShadow(
+                                  color: AppColors.ink,
+                                  offset: Offset(0, 2),
+                                  blurRadius: 0,
+                                ),
+                              ],
                       ),
-                      boxShadow: t > 0.5
-                          ? null
-                          : const [
-                              BoxShadow(
+                      alignment: Alignment.center,
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
                                 color: AppColors.ink,
-                                offset: Offset(0, 2),
-                                blurRadius: 0,
                               ),
-                            ],
+                            )
+                          : Transform.rotate(
+                              angle: t * kPowerupMenuTiltAngle,
+                              child: SvgPicture.asset(
+                                kPowerupMenuSvgPath,
+                                width: kPowerupMenuIconSize,
+                                height: kPowerupMenuIconSize,
+                              ),
+                            ),
                     ),
-                    alignment: Alignment.center,
-                    child: isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.ink,
-                            ),
-                          )
-                        : Transform.rotate(
-                            angle: t * (math.pi / 4), // 45° dönüş
-                            child: const Icon(
-                              kPowerupMenuIcon,
-                              size: 20,
-                              color: AppColors.ink,
-                            ),
-                          ),
                   );
                 },
               ),
@@ -1042,25 +1057,31 @@ class _RadialPowerupItem extends StatelessWidget {
               ),
             )
           : (isUsed
-              ? Icon(
-                  Icons.check_circle_outline,
-                  size: 26,
-                  color: AppColors.muted.withValues(alpha: 0.6),
+              ? ColorFiltered(
+                  colorFilter: const ColorFilter.matrix(kGrayscaleMatrix),
+                  child: icon,
                 )
               : icon),
     );
+
+    final positionedCircle = isUsed
+        ? Transform.translate(
+            offset: const Offset(0, 2),
+            child: circle,
+          )
+        : circle;
 
     Widget wrappedContent;
     if (isInteractive) {
       wrappedContent = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: circle,
+        child: positionedCircle,
       );
     } else if (isUsed || isLoading) {
       wrappedContent = Opacity(
         opacity: isUsed ? 0.85 : 0.7,
-        child: circle,
+        child: positionedCircle,
       );
     } else if (!hasEnoughCoins) {
       wrappedContent = GestureDetector(
@@ -1068,7 +1089,7 @@ class _RadialPowerupItem extends StatelessWidget {
         onTap: () => onInsufficientCoins(cost),
         child: Opacity(
           opacity: 0.5,
-          child: circle,
+          child: positionedCircle,
         ),
       );
     } else {
@@ -1084,7 +1105,7 @@ class _RadialPowerupItem extends StatelessWidget {
         },
         child: Opacity(
           opacity: 0.5,
-          child: circle,
+          child: positionedCircle,
         ),
       );
     }
