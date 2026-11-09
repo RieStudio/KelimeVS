@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -539,16 +540,37 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
             // 1.7 Joker Butonu ve Çeyrek Radial Menü
             if (showPowerups) ...[
               if (_isPowerupPanelOpen) ...[
-                // Dışarı dokunma bariyeri (ExcludeFocus ile klavye odağını çalmaz)
+                // Dışarı dokunma bariyeri ve Arka Plan Bulanıklığı
+                // ExcludeFocus ile klavye odağını çalmaz
                 Positioned.fill(
                   child: ExcludeFocus(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => _closePowerupMenu(),
+                      child: AnimatedBuilder(
+                        animation: _radialAnim,
+                        builder: (context, _) {
+                          final t = _radialAnim.value;
+                          return Opacity(
+                            opacity: t.clamp(0.0, 1.0),
+                            child: ClipRect(
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 5.0,
+                                  sigmaY: 5.0,
+                                ),
+                                child: Container(
+                                  color: AppColors.ink.withValues(alpha: 0.24),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-                // Radial Menü Öğeleri
+                // Radial Menü Öğeleri (Bulanıklığın üstünde)
                 ..._buildRadialMenuItems(
                   context: context,
                   hasExtraTime: hasExtraTime,
@@ -565,7 +587,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                   userCoins: profile.coins,
                 ),
               ],
-              // Jokerler Ana Butonu (Bariyerin üstünde, sağ üstte 40x40)
+              // Jokerler Ana Butonu (Bariyerin ve bulanıklığın üstünde, sağ üstte 40x40)
               Positioned(
                 top: AppDimens.space8,
                 right: AppDimens.screenPaddingHorizontal,
@@ -617,15 +639,15 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
         (AppDimens.screenPaddingHorizontal + AppDimens.iconButtonSize / 2);
     const cy = AppDimens.space8 + AppDimens.iconButtonSize / 2;
 
-    const radius = 82.0;
+    const radius = 74.0;
 
     // Buton 1 (Süre): Doğrudan aşağı (90°)
     const angleSure = 90.0 * (math.pi / 180.0);
     final targetX1 = cx + radius * math.cos(angleSure);
     final targetY1 = cy + radius * math.sin(angleSure);
 
-    // Buton 2 (Cevap Ver): Sol-aşağı (141°)
-    const angleCevapVer = 141.0 * (math.pi / 180.0);
+    // Buton 2 (Cevap Ver): Sol-aşağı (142°)
+    const angleCevapVer = 142.0 * (math.pi / 180.0);
     final targetX2 = cx + radius * math.cos(angleCevapVer);
     final targetY2 = cy + radius * math.sin(angleCevapVer);
 
@@ -652,7 +674,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                       cost: extraTimeCost,
                       icon: const Icon(
                         Icons.timer,
-                        size: 24,
+                        size: 26,
                         color: AppColors.ink,
                       ),
                       isUsed: extraTimeRemainingUses <= 0,
@@ -697,7 +719,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
             final rightOffset = screenWidth - currentX;
 
             return Positioned(
-              right: rightOffset - 28.0,
+              right: rightOffset - 26.0,
               top: currentY - 26.0,
               child: Transform.scale(
                 scale: t,
@@ -709,8 +731,8 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                       cost: giveAnswerCost,
                       icon: SvgPicture.asset(
                         'assets/icons/powerup_auto_answer.svg',
-                        width: 24,
-                        height: 24,
+                        width: 26,
+                        height: 26,
                         colorFilter: const ColorFilter.mode(
                           AppColors.ink,
                           BlendMode.srcIn,
@@ -905,7 +927,7 @@ class _PowerupMenuButton extends StatelessWidget {
   }
 }
 
-/// Çeyrek radial menü üzerindeki yuvarlak joker butonu ve etiketi
+/// Çeyrek radial menü üzerindeki yuvarlak joker butonu (sadece ikon + uzun basış ipucu)
 class _RadialPowerupItem extends StatelessWidget {
   final String title;
   final int cost;
@@ -935,9 +957,6 @@ class _RadialPowerupItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double itemWidth =
-        title == AppStrings.giveAnswerPowerup ? 56.0 : 52.0;
-
     final circle = Container(
       width: 52,
       height: 52,
@@ -975,73 +994,10 @@ class _RadialPowerupItem extends StatelessWidget {
           : (isUsed
               ? Icon(
                   Icons.check_circle_outline,
-                  size: 24,
+                  size: 26,
                   color: AppColors.muted.withValues(alpha: 0.6),
                 )
               : icon),
-    );
-
-    final content = SizedBox(
-      width: itemWidth,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          circle,
-          const SizedBox(height: 3),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              style: AppTextStyles.cardTitle.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isUsed
-                    ? AppColors.muted.withValues(alpha: 0.7)
-                    : AppColors.ink,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-            ),
-          ),
-          const SizedBox(height: 1),
-          if (isUsed)
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                AppStrings.extraTimeUsed, // "Kullanıldı"
-                style: AppTextStyles.secondaryText.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted.withValues(alpha: 0.7),
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-              ),
-            )
-          else
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CoinIcon(size: 11, opacity: hasEnoughCoins ? 1.0 : 0.5),
-                  const SizedBox(width: 2),
-                  Text(
-                    '$cost',
-                    style: AppTextStyles.cardTitle.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color:
-                          hasEnoughCoins ? AppColors.ink : AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
     );
 
     Widget wrappedContent;
@@ -1049,12 +1005,12 @@ class _RadialPowerupItem extends StatelessWidget {
       wrappedContent = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: content,
+        child: circle,
       );
     } else if (isUsed || isLoading) {
       wrappedContent = Opacity(
         opacity: isUsed ? 0.85 : 0.7,
-        child: content,
+        child: circle,
       );
     } else if (!hasEnoughCoins) {
       wrappedContent = GestureDetector(
@@ -1062,7 +1018,7 @@ class _RadialPowerupItem extends StatelessWidget {
         onTap: () => onInsufficientCoins(cost),
         child: Opacity(
           opacity: 0.5,
-          child: content,
+          child: circle,
         ),
       );
     } else {
@@ -1078,21 +1034,31 @@ class _RadialPowerupItem extends StatelessWidget {
         },
         child: Opacity(
           opacity: 0.5,
-          child: content,
+          child: circle,
         ),
       );
     }
+
+    final tooltipMessage = '$title · $cost${AppStrings.coinSuffix}';
 
     return Semantics(
       button: true,
       label: semanticLabel,
       excludeSemantics: true,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 48,
-          minHeight: 48,
+      child: ExcludeFocus(
+        child: Tooltip(
+          message: tooltipMessage,
+          triggerMode: TooltipTriggerMode.longPress,
+          waitDuration: Duration.zero,
+          showDuration: const Duration(seconds: 2),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 48,
+              minHeight: 48,
+            ),
+            child: wrappedContent,
+          ),
         ),
-        child: wrappedContent,
       ),
     );
   }
