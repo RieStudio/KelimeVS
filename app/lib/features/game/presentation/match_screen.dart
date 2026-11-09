@@ -321,9 +321,11 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
     final canLeaveWithoutPenalty = uiState.isMatchFinished;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
+    final topPadding = MediaQuery.paddingOf(context).top;
     final menuCenterX = screenWidth -
         (AppDimens.screenPaddingHorizontal + AppDimens.iconButtonSize / 2);
-    const menuCenterY = AppDimens.space8 + AppDimens.iconButtonSize / 2;
+    final menuCenterY =
+        topPadding + AppDimens.space8 + AppDimens.iconButtonSize / 2;
 
     return PopScope(
       canPop: canLeaveWithoutPenalty,
@@ -337,16 +339,16 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
       },
       child: Scaffold(
         backgroundColor: AppColors.surface,
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: Stack(
+        resizeToAvoidBottomInset: true,
+        body: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.screenPaddingHorizontal,
-                vertical: AppDimens.space8,
-              ),
-              child: Column(
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.screenPaddingHorizontal,
+                  vertical: AppDimens.space8,
+                ),
+                child: Column(
                 children: [
                   // 1. Üst Çubuk (Kapat İkon Butonu + "Tur N" Hapı)
                   Row(
@@ -479,11 +481,12 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                 ],
               ),
             ),
+          ),
 
             // 1.5 Bağlantı Uyarısı Şeridi (üst çubuğun hemen altında, içeriğin üstüne biner)
             if (!uiState.isMatchFinished && matchState != null)
               Positioned(
-                top: AppDimens.space8 + AppDimens.iconButtonSize + 2,
+                top: topPadding + AppDimens.space8 + AppDimens.iconButtonSize + 2,
                 left: 0,
                 right: 0,
                 child: ConnectionBanner(
@@ -495,7 +498,10 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
             // 1.6 Rakip Ek Süre Bildirimi (üst çubuk altında 2 sn gösterilen hap)
             if (uiState.opponentExtraTimeBanner != null)
               Positioned(
-                top: AppDimens.space8 + AppDimens.iconButtonSize + 4,
+                top: topPadding +
+                    AppDimens.space8 +
+                    AppDimens.iconButtonSize +
+                    4,
                 left: AppDimens.screenPaddingHorizontal,
                 right: AppDimens.screenPaddingHorizontal,
                 child: Center(
@@ -554,12 +560,12 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                     ),
                   ),
                 ),
-                // 2. Sağ üst köşeyle sınırlı dairesel arka plan bulanıklığı ve karartması
+                // 2. Sağ üst köşeyle sınırlı kademeli dairesel arka plan bulanıklığı ve karartması
                 Positioned(
-                  left: menuCenterX - _kPowerupBlurRadius,
-                  top: menuCenterY - _kPowerupBlurRadius,
-                  width: _kPowerupBlurRadius * 2,
-                  height: _kPowerupBlurRadius * 2,
+                  left: menuCenterX - kPowerupBlurRadii.first,
+                  top: menuCenterY - kPowerupBlurRadii.first,
+                  width: kPowerupBlurRadii.first * 2,
+                  height: kPowerupBlurRadii.first * 2,
                   child: ExcludeFocus(
                     child: IgnorePointer(
                       child: AnimatedBuilder(
@@ -568,26 +574,40 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                           final t = _radialAnim.value;
                           return Opacity(
                             opacity: t.clamp(0.0, 1.0),
-                            child: ClipOval(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 5.0,
-                                  sigmaY: 5.0,
-                                ),
-                                child: Container(
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                for (final r in kPowerupBlurRadii)
+                                  SizedBox(
+                                    width: r * 2,
+                                    height: r * 2,
+                                    child: ClipOval(
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(
+                                          sigmaX: kPowerupBlurRingSigma,
+                                          sigmaY: kPowerupBlurRingSigma,
+                                        ),
+                                        child: const SizedBox.expand(),
+                                      ),
+                                    ),
+                                  ),
+                                Container(
+                                  width: kPowerupBlurRadii.first * 2,
+                                  height: kPowerupBlurRadii.first * 2,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     gradient: RadialGradient(
                                       colors: [
                                         AppColors.ink.withValues(alpha: 0.24),
-                                        AppColors.ink.withValues(alpha: 0.14),
+                                        AppColors.ink.withValues(alpha: 0.16),
+                                        AppColors.ink.withValues(alpha: 0.05),
                                         AppColors.ink.withValues(alpha: 0.0),
                                       ],
-                                      stops: const [0.0, 0.7, 1.0],
+                                      stops: const [0.0, 0.55, 0.85, 1.0],
                                     ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
                           );
                         },
@@ -598,6 +618,8 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                 // 3. Radial Menü Öğeleri (Bulanıklığın üstünde)
                 ..._buildRadialMenuItems(
                   context: context,
+                  cx: menuCenterX,
+                  cy: menuCenterY,
                   hasExtraTime: hasExtraTime,
                   hasGiveAnswer: hasGiveAnswer,
                   isMyTurn: isMyTurn,
@@ -614,7 +636,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
               ],
               // Jokerler Ana Butonu (Bariyerin ve bulanıklığın üstünde, sağ üstte 40x40)
               Positioned(
-                top: AppDimens.space8,
+                top: topPadding + AppDimens.space8,
                 right: AppDimens.screenPaddingHorizontal,
                 child: ExcludeFocus(
                   child: _PowerupMenuButton(
@@ -642,12 +664,13 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
           ],
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   List<Widget> _buildRadialMenuItems({
     required BuildContext context,
+    required double cx,
+    required double cy,
     required bool hasExtraTime,
     required bool hasGiveAnswer,
     required bool isMyTurn,
@@ -660,9 +683,6 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
     required int userCoins,
   }) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final cx = screenWidth -
-        (AppDimens.screenPaddingHorizontal + AppDimens.iconButtonSize / 2);
-    const cy = AppDimens.space8 + AppDimens.iconButtonSize / 2;
 
     const radius = 74.0;
 
@@ -865,10 +885,16 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
 }
 
 /// Joker butonu ikonu. İleride SVG ile değiştirilebilir.
-const IconData _kPowerupMenuIcon = Icons.auto_awesome;
+const IconData kPowerupMenuIcon = Icons.auto_awesome;
 
-/// Sağ üst köşedeki dairesel arka plan bulanıklık/karartma bölgesi yarıçapı (~124 dp)
-const double _kPowerupBlurRadius = 124.0;
+/// Joker menüsü açıldığında sağ üst köşedeki kademeli dairesel bulanıklık halkaları yarıçapları (dp)
+/// En iç halka (112 dp) butonları ve dokunma hedeflerini tamamen içine alır.
+/// Dış halkalar (120, 128, 136 dp) yumuşak geçiş bandını oluşturur.
+const List<double> kPowerupBlurRadii = [136.0, 128.0, 120.0, 112.0];
+
+/// Her bir halkanın blur sigma değeri. 4 halkanın merkezde üst üste binmesiyle
+/// sqrt(4 * 2.0^2) = 4.0 sigma eşdeğeri toplam bulanıklık elde edilir.
+const double kPowerupBlurRingSigma = 2.0;
 
 /// Sağ üstteki küçük Jokerler menü butonu (~40 dp)
 class _PowerupMenuButton extends StatelessWidget {
@@ -939,7 +965,7 @@ class _PowerupMenuButton extends StatelessWidget {
                         : Transform.rotate(
                             angle: t * (math.pi / 4), // 45° dönüş
                             child: const Icon(
-                              _kPowerupMenuIcon,
+                              kPowerupMenuIcon,
                               size: 20,
                               color: AppColors.ink,
                             ),

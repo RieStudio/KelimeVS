@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -151,7 +152,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Jokerler'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
     // Menü üzerinde metin etiketi YOK, sadece ikon ve semantics var
     expect(find.text('Süre'), findsNothing);
     expect(find.text('+5 sn'), findsNothing);
@@ -210,7 +211,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Jokerler'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
     // Menü üzerinde metin etiketi ve fiyat yazısı YOK
     expect(find.text('Süre'), findsNothing);
     expect(find.text('30'), findsNothing);
@@ -259,7 +260,7 @@ void main() {
     expect(find.text(AppStrings.notEnoughCoinsForExtraTime(30)), findsOneWidget);
     // Pasif duruma basıldığında menü AÇIK kalır
     expect(find.byIcon(Icons.timer), findsOneWidget);
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
   });
 
   testWidgets('5. Güçlendirici maçta kullanıldıktan sonra onay (check) ikonuna dönüşür ve tıklanınca panel açık kalır', (tester) async {
@@ -428,7 +429,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
       // Menü üzerinde metin ve fiyat etiketleri YOK
       expect(find.text('Süre'), findsNothing);
       expect(find.text('30'), findsNothing);
@@ -503,8 +504,8 @@ void main() {
       final err = tester.takeException();
       expect(err, isNull);
 
-      // Blur katmanı ekranda
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      // Blur katmanı ekranda: 4 eşmerkezli halka
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
 
       // Butonları bul
       final sureFinder = find.bySemanticsLabel('Süre jokeri, 30 jeton');
@@ -539,29 +540,58 @@ void main() {
       expect(distance, greaterThanOrEqualTo(64.0));
 
       // 5. Blur katmanı tüm ekranı DEĞİL sadece sağ üst köşeyi kaplar
-      final blurRect = tester.getRect(find.byType(BackdropFilter));
+      final menuCenter = Offset(360 - (20 + 22), 8 + 22); // (318, 30)
+      final outermostBlurRect = tester.getRect(find.byType(BackdropFilter).first);
+
+      // Üst sınır: Durum çubuğuna taşar (Y <= 0)
+      expect(outermostBlurRect.top, lessThanOrEqualTo(0.0));
       // Sol sınırı en az 180 dp (ekran genişliğinin %50'sinden fazlası net kalır)
-      expect(blurRect.left, greaterThanOrEqualTo(180.0));
-      // Alt sınırı 160 dp'nin altında (ekran yüksekliğinin %75'i net kalır)
-      expect(blurRect.bottom, lessThanOrEqualTo(160.0));
-      // Boyutlar 2 * R = 248 dp
-      expect(blurRect.width, equals(248.0));
-      expect(blurRect.height, equals(248.0));
+      expect(outermostBlurRect.left, greaterThanOrEqualTo(180.0));
+      // Alt sınırı 170 dp'nin altında (ekran yüksekliğinin %70'inden fazlası net kalır)
+      expect(outermostBlurRect.bottom, lessThanOrEqualTo(170.0));
+      // En dış halkanın boyutları 2 * R = 272 dp (R = 136)
+      expect(outermostBlurRect.width, equals(272.0));
+      expect(outermostBlurRect.height, equals(272.0));
+
+      // 4 halkanın da merkezi menuCenter'dadır ve yarıçapları kPowerupBlurRadii ile eşleşir
+      for (int i = 0; i < kPowerupBlurRadii.length; i++) {
+        final ringRect = tester.getRect(find.byType(BackdropFilter).at(i));
+        final expectedR = kPowerupBlurRadii[i];
+        expect(ringRect.width, equals(expectedR * 2));
+        expect(ringRect.height, equals(expectedR * 2));
+        expect(ringRect.center, equals(menuCenter));
+      }
+
+      // En dış halkanın yarıçapı butonların en uzak köşesinden en az 20 dp büyüktür (R >= 131 dp)
+      final furthestCornerSure = [
+        sureRect.topLeft,
+        sureRect.topRight,
+        sureRect.bottomLeft,
+        sureRect.bottomRight,
+      ].map((p) => (p - menuCenter).distance).reduce(math.max);
+      final furthestCornerCevapVer = [
+        cevapVerRect.topLeft,
+        cevapVerRect.topRight,
+        cevapVerRect.bottomLeft,
+        cevapVerRect.bottomRight,
+      ].map((p) => (p - menuCenter).distance).reduce(math.max);
+      final furthestButtonCorner = math.max(furthestCornerSure, furthestCornerCevapVer);
+      expect(kPowerupBlurRadii.first, greaterThanOrEqualTo(furthestButtonCorner + 20.0));
+
+      // En iç halka (112 dp) butonları tamamen içine alır
+      expect(kPowerupBlurRadii.last, greaterThanOrEqualTo(furthestButtonCorner));
 
       // Sol oyuncu kartı (Sen) ve Cevap giriş kutusu bölge dışındadır (bulanıklaşmaz ve kararmaz)
       final meCardRect = tester.getRect(find.byType(PlayerCard).first);
-      expect(blurRect.overlaps(meCardRect), isFalse);
+      expect(outermostBlurRect.overlaps(meCardRect), isFalse);
       final inputRect = tester.getRect(find.byType(TextField));
-      expect(blurRect.overlaps(inputRect), isFalse);
+      expect(outermostBlurRect.overlaps(inputRect), isFalse);
 
-      // İki radial buton da dairesel blur bölgesi içindedir
-      expect(blurRect.contains(sureRect.topLeft), isTrue);
-      expect(blurRect.contains(sureRect.bottomRight), isTrue);
-      expect(blurRect.contains(cevapVerRect.topLeft), isTrue);
-      expect(blurRect.contains(cevapVerRect.bottomRight), isTrue);
-      final menuCenter = Offset(360 - (20 + 22), 8 + 22); // (318, 30)
-      expect((sureRect.center - menuCenter).distance, lessThanOrEqualTo(124.0));
-      expect((cevapVerRect.center - menuCenter).distance, lessThanOrEqualTo(124.0));
+      // İki radial buton da en dış dairesel blur bölgesi içindedir
+      expect(outermostBlurRect.contains(sureRect.topLeft), isTrue);
+      expect(outermostBlurRect.contains(sureRect.bottomRight), isTrue);
+      expect(outermostBlurRect.contains(cevapVerRect.topLeft), isTrue);
+      expect(outermostBlurRect.contains(cevapVerRect.bottomRight), isTrue);
     });
 
     testWidgets('11. Cevap Ver yetersiz jeton durumunda (%50 opaklık) tıklanınca panel AÇIK kalır ve SnackBar gösterir', (tester) async {
@@ -592,7 +622,7 @@ void main() {
       expect(session.giveAnswerCalled, isFalse);
       expect(find.text(AppStrings.notEnoughCoinsForGiveAnswer(50)), findsOneWidget);
       expect(cevapVerFinder, findsOneWidget); // Panel açık
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
     });
 
     testWidgets('12. Cevap Ver kullanıldıktan sonra (remainingUses = 0) onay (check) ikonuna dönüşür ve panel açık kalır', (tester) async {
@@ -735,7 +765,7 @@ void main() {
       // 1. Butona tıkla -> açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
       expect(find.byIcon(Icons.timer), findsOneWidget);
 
       // 2. Butona tekrar tıkla -> kapanır
@@ -747,7 +777,7 @@ void main() {
       // 3. Butona tıkla -> tekrar açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
       expect(find.byIcon(Icons.timer), findsOneWidget);
 
       // 4. Panel dışına (ekranın sol ortasına) tıkla -> kapanır
@@ -759,7 +789,7 @@ void main() {
       // 5. Butona tıkla -> tekrar açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
 
       // 6. Bulanık bölgenin butonlar harici boş bir noktasına dokun -> kapanır
       await tester.tapAt(const Offset(220, 25));
@@ -794,7 +824,7 @@ void main() {
       // Jokerler butonuna tıkla -> panel açılır
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
       expect(find.byIcon(Icons.timer), findsOneWidget);
 
       // Odak hâlâ cevap kutusundadır!
@@ -856,7 +886,7 @@ void main() {
       // Paneli aç
       await tester.tap(find.bySemanticsLabel('Jokerler'));
       await tester.pumpAndSettle();
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNWidgets(kPowerupBlurRadii.length));
       expect(find.byIcon(Icons.timer), findsOneWidget);
 
       // Sıra bota geçer (tur değişimi)
