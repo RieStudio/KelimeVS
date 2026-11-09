@@ -234,11 +234,13 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     final roundNumber = math.min(3, decisiveRounds + 1);
 
     final mode = ref.watch(activeMatchSessionModeProvider);
-    final isOnlineRanked =
-        mode == MatchSessionMode.online && !uiState.isFriendly;
+    final isPowerupEligibleMode =
+        (mode == MatchSessionMode.online || mode == MatchSessionMode.bot) &&
+            !uiState.isFriendly;
     final hasExtraTime = uiState.extraTimeCost != null;
     final hasGiveAnswer = uiState.giveAnswerCost != null;
-    final showPowerups = isOnlineRanked && (hasExtraTime || hasGiveAnswer);
+    final showPowerups =
+        isPowerupEligibleMode && (hasExtraTime || hasGiveAnswer);
 
     final isMyTurn = uiState.isMyTurn;
     final isBotTurn = matchState?.phase == MatchPhase.roundActive &&

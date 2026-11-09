@@ -105,6 +105,7 @@ void main() {
   }) {
     final stateNotifier = TestUiStateNotifier(uiState);
     return ProviderScope(
+      key: UniqueKey(),
       overrides: [
         activeMatchSessionModeProvider
             .overrideWith(() => FakeModeNotifier(mode)),
@@ -123,7 +124,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Bot maçında ek süre güçlendirici butonu gösterilmez', (tester) async {
+  testWidgets('1. Bot maçında ek süre güçlendirici butonu gösterilir ve tıklanabilir', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.bot,
@@ -138,8 +139,9 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('+5 sn'), findsNothing);
-    expect(find.text(AppStrings.extraTimeUsed), findsNothing);
+    expect(find.text('+5 sn'), findsOneWidget);
+    await tester.tap(find.text('+5 sn'));
+    expect(session.extraTimeCalled, isTrue);
   });
 
   testWidgets('2. Arkadaş maçında (friendly) ek süre güçlendirici butonu gösterilmez', (tester) async {
@@ -307,9 +309,9 @@ void main() {
   });
 
   group('Cevap Ver (give_answer) Widget & Yerleşim Testleri', () {
-    testWidgets('8. Bot ve arkadaş maçında Cevap Ver güçlendirici butonu gösterilmez', (tester) async {
+    testWidgets('8. Bot maçında Cevap Ver butonu gösterilir, arkadaş maçında gösterilmez', (tester) async {
       final session = MockPowerupSession();
-      // Bot maçı
+      // Bot maçı: gösterilir ve tıklanabilir
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.bot,
         uiState: MatchUiState(
@@ -321,9 +323,11 @@ void main() {
         session: session,
       ));
       await tester.pump();
-      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
+      await tester.tap(find.text(AppStrings.giveAnswerPowerup));
+      expect(session.giveAnswerCalled, isTrue);
 
-      // Arkadaş maçı
+      // Arkadaş maçı: gösterilmez
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.online,
         uiState: MatchUiState(

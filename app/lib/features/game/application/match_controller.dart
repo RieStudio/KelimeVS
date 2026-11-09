@@ -6,9 +6,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
 
+import '../data/powerup_api_client.dart';
 import '../data/question_repository.dart';
 import '../domain/attempt_text_sanitizer.dart';
 import '../domain/bot/bot_config.dart';
@@ -58,6 +60,9 @@ class MatchController extends Notifier<MatchUiState>
   final TextFilter? _injectedTextFilter;
   final SharedPreferences? _injectedPrefs;
   final String? _injectedSelfNickname;
+  final PowerupApiClient? _injectedPowerupApiClient;
+  final int Function()? _injectedCoinsProvider;
+  final void Function(int coins)? _injectedOnCoinsUpdated;
   final int roundTransitionDelayMs;
 
   MatchController({
@@ -69,6 +74,9 @@ class MatchController extends Notifier<MatchUiState>
     TextFilter? textFilter,
     SharedPreferences? prefs,
     String? selfNickname,
+    PowerupApiClient? powerupApiClient,
+    int Function()? coinsProvider,
+    void Function(int coins)? onCoinsUpdated,
     this.roundTransitionDelayMs = AppDimens.roundTransitionDurationMs,
   })  : _injectedClock = clock,
         _injectedRandom = random,
@@ -77,7 +85,12 @@ class MatchController extends Notifier<MatchUiState>
         _injectedMatchConfig = matchConfig,
         _injectedTextFilter = textFilter,
         _injectedPrefs = prefs,
-        _injectedSelfNickname = selfNickname;
+        _injectedSelfNickname = selfNickname,
+        _injectedPowerupApiClient = powerupApiClient,
+        _injectedCoinsProvider = coinsProvider,
+        _injectedOnCoinsUpdated = onCoinsUpdated;
+
+  String _botMatchId = '';
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -106,6 +119,9 @@ class MatchController extends Notifier<MatchUiState>
 
   @visibleForTesting
   bool get isPausedForTesting => _isPaused;
+
+  @visibleForTesting
+  String get botMatchIdForTesting => _botMatchId;
 
   @visibleForTesting
   void handleAppLifecycleStateForTesting(AppLifecycleState lifecycleState) {
@@ -294,6 +310,27 @@ class MatchController extends Notifier<MatchUiState>
   }
   MatchConfig get _matchConfig => _injectedMatchConfig ?? ref.read(matchConfigProvider);
   TextFilter get _textFilter => _injectedTextFilter ?? ref.read(textFilterProvider);
+  PowerupApiClient get _powerupApiClient =>
+      _injectedPowerupApiClient ?? ref.read(powerupApiClientProvider);
+
+  int _getCoins() {
+    if (_injectedCoinsProvider != null) return _injectedCoinsProvider();
+    try {
+      return ref.read(profileProvider).coins;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  void _updateCoins(int coins) {
+    if (_injectedOnCoinsUpdated != null) {
+      _injectedOnCoinsUpdated(coins);
+      return;
+    }
+    try {
+      ref.read(profileProvider.notifier).updateCoins(coins);
+    } catch (_) {}
+  }
 
   /// Yeni bir botlu maç başlatır.
   Future<void> startMatch({
@@ -318,6 +355,8 @@ class MatchController extends Notifier<MatchUiState>
     final random = _random;
     final clock = _clock;
 
+    _botMatchId = generateBotMatchId();
+
     state = state.copyWith(
       isPaused: false,
       isLoading: true,
@@ -332,6 +371,13 @@ class MatchController extends Notifier<MatchUiState>
       opponentConnected: true,
       isVoided: false,
       isDisconnectedPermanent: false,
+      extraTimeCost: PowerupConstants.defaultExtraTimeCost,
+      extraTimeSeconds: PowerupConstants.defaultExtraTimeSeconds,
+      extraTimeRemainingUses: PowerupConstants.defaultExtraTimeInitialUses,
+      giveAnswerCost: PowerupConstants.defaultGiveAnswerCost,
+      giveAnswerRemainingUses: PowerupConstants.defaultGiveAnswerInitialUses,
+      isUsingPowerup: false,
+      powerupErrorNotice: null,
       // Yeni maç başlarken önceki maçtan kalan boardScores kesinlikle temizlenir.
       // Aksi hâlde eski maçın son skoru yeni maçın ilk turunda görünür.
       clearBoardScores: true,
@@ -467,14 +513,207 @@ class MatchController extends Notifier<MatchUiState>
     );
   }
 
+  void _showPowerupError(String message) {
+    state = state.copyWith(
+      isUsingPowerup: false,
+      powerupErrorNotice: message,
+      powerupErrorCounter: state.powerupErrorCounter + 1,
+    );
+  }
+
+  void _resumeClockAfterPowerup(
+    MatchState match,
+    int newDeadlineMs,
+    int now, {
+    String? errorNotice,
+  }) {
+    final remaining = math.max(0, newDeadlineMs - now);
+    state = state.copyWith(
+      isUsingPowerup: false,
+      remainingMs: remaining,
+      matchState: match.copyWith(deadlineMs: newDeadlineMs),
+      powerupErrorNotice: errorNotice,
+      powerupErrorCounter: errorNotice != null
+          ? state.powerupErrorCounter + 1
+          : state.powerupErrorCounter,
+    );
+  }
+
+  Future<void> _executePowerup({
+    required String powerup,
+    required int cost,
+    required int Function() getRemainingUses,
+    required String Function(int cost) notEnoughCoinsMessage,
+    required Future<void> Function(
+      MatchState activeMatch,
+      int unpausedDeadlineMs,
+      int now,
+      int coins,
+      bool alreadySpent,
+    ) onSuccess,
+  }) async {
+    if (_isDisposed) return;
+    if (state.isUsingPowerup) return;
+
+    final match = state.matchState;
+    if (match == null || match.phase != MatchPhase.roundActive) return;
+    if (match.turnPlayerId != 'me') return;
+
+    if (getRemainingUses() <= 0) return;
+
+    final currentCoins = _getCoins();
+    if (currentCoins < cost) {
+      _showPowerupError(notEnoughCoinsMessage(cost));
+      return;
+    }
+
+    final freezeStartTime = _clock.nowMs();
+    state = state.copyWith(isUsingPowerup: true);
+
+    SpendPowerupResult result;
+    try {
+      result = await _powerupApiClient.spend(
+        matchId: _botMatchId,
+        powerup: powerup,
+      ).timeout(const Duration(seconds: 4));
+    } on TimeoutException catch (e) {
+      result = SpendPowerupNetworkError(AppStrings.powerupTemporaryError, e);
+    } catch (e) {
+      result = SpendPowerupNetworkError(AppStrings.powerupTemporaryError, e);
+    }
+
+    // 6) Maç sırasında controller dispose olursa veya maç biterse hiçbir değişiklik yapma
+    if (_isDisposed) return;
+    final activeMatch = state.matchState;
+    if (activeMatch == null ||
+        activeMatch.phase != MatchPhase.roundActive ||
+        activeMatch.turnPlayerId != 'me') {
+      return;
+    }
+
+    final now = _clock.nowMs();
+    final frozenDuration = math.max(0, now - freezeStartTime);
+    final unpausedDeadlineMs = activeMatch.deadlineMs + frozenDuration;
+
+    switch (result) {
+      case SpendPowerupSuccess(:final coins, :final alreadySpent):
+        _updateCoins(coins);
+        await onSuccess(activeMatch, unpausedDeadlineMs, now, coins, alreadySpent);
+
+      case SpendPowerupNotEnoughCoins(:final coins):
+        _updateCoins(coins);
+        _resumeClockAfterPowerup(
+          activeMatch,
+          unpausedDeadlineMs,
+          now,
+          errorNotice: notEnoughCoinsMessage(cost),
+        );
+
+      case SpendPowerupNetworkError(:final message):
+        _resumeClockAfterPowerup(
+          activeMatch,
+          unpausedDeadlineMs,
+          now,
+          errorNotice: message,
+        );
+
+      case SpendPowerupBadRequest(:final message):
+        _resumeClockAfterPowerup(
+          activeMatch,
+          unpausedDeadlineMs,
+          now,
+          errorNotice: message.isNotEmpty ? message : AppStrings.powerupGenericError,
+        );
+
+      case SpendPowerupAccountDeleted():
+        _resumeClockAfterPowerup(activeMatch, unpausedDeadlineMs, now);
+    }
+  }
+
   @override
   void useExtraTime() {
-    // Bot maçlarında ek süre güçlendiricisi kullanılamaz.
+    if (state.isUsingPowerup) return;
+    if ((state.extraTimeRemainingUses ?? 0) <= 0) return;
+    if (!state.isMyTurn) return;
+
+    _executePowerup(
+      powerup: 'extra_time',
+      cost: state.extraTimeCost ?? PowerupConstants.defaultExtraTimeCost,
+      getRemainingUses: () => state.extraTimeRemainingUses ?? 0,
+      notEnoughCoinsMessage: (cost) => AppStrings.notEnoughCoinsForExtraTime(cost),
+      onSuccess: (activeMatch, unpausedDeadlineMs, now, coins, alreadySpent) async {
+        final extendedDeadlineMs = unpausedDeadlineMs +
+            (state.extraTimeSeconds ?? PowerupConstants.defaultExtraTimeSeconds) * 1000;
+        final newRemainingMs = math.max(0, extendedDeadlineMs - now);
+        state = state.copyWith(
+          isUsingPowerup: false,
+          extraTimeRemainingUses: 0,
+          remainingMs: newRemainingMs,
+          matchState: activeMatch.copyWith(deadlineMs: extendedDeadlineMs),
+        );
+      },
+    );
   }
 
   @override
   void useGiveAnswer() {
-    // Bot maçlarında cevap ver güçlendiricisi kullanılamaz.
+    if (state.isUsingPowerup) return;
+    if ((state.giveAnswerRemainingUses ?? 0) <= 0) return;
+    if (!state.isMyTurn) return;
+
+    final match = state.matchState;
+    if (match != null && match.phase == MatchPhase.roundActive) {
+      final unusedAnswers = (match.currentQuestion?.answers ?? const [])
+          .where((a) => !match.usedAnswerIds.contains(a.id))
+          .toList();
+      if (unusedAnswers.isEmpty) {
+        _showPowerupError(AppStrings.noAnswersLeft);
+        return;
+      }
+    }
+
+    _executePowerup(
+      powerup: 'give_answer',
+      cost: state.giveAnswerCost ?? PowerupConstants.defaultGiveAnswerCost,
+      getRemainingUses: () => state.giveAnswerRemainingUses ?? 0,
+      notEnoughCoinsMessage: (cost) => AppStrings.notEnoughCoinsForGiveAnswer(cost),
+      onSuccess: (activeMatch, unpausedDeadlineMs, now, coins, alreadySpent) async {
+        final unpausedMatch = activeMatch.copyWith(deadlineMs: unpausedDeadlineMs);
+        final unusedAnswers = (unpausedMatch.currentQuestion?.answers ?? const [])
+            .where((a) => !unpausedMatch.usedAnswerIds.contains(a.id))
+            .toList();
+        if (unusedAnswers.isEmpty) {
+          _resumeClockAfterPowerup(
+            activeMatch,
+            unpausedDeadlineMs,
+            now,
+            errorNotice: AppStrings.noAnswersLeft,
+          );
+          return;
+        }
+
+        final chosenAnswer = unusedAnswers[_random.nextInt(unusedAnswers.length)];
+
+        state = state.copyWith(
+          isUsingPowerup: false,
+          giveAnswerRemainingUses: 0,
+        );
+
+        final res = MatchEngine.submit(
+          state: unpausedMatch,
+          playerId: 'me',
+          rawInput: chosenAnswer.display,
+          nowMs: now,
+          isSystemPowerup: true,
+        );
+
+        _applyEngineResult(
+          engineResult: res,
+          clock: _clock,
+          random: _random,
+        );
+      },
+    );
   }
 
   /// Kullanıcının maçı terk etmesini sağlar.
@@ -601,6 +840,7 @@ class MatchController extends Notifier<MatchUiState>
           isCorrect: att.resultType == AttemptResultType.correct,
           isClose: att.isClose,
           isRepeated: att.resultType == AttemptResultType.repeated,
+          viaPowerup: att.viaPowerup,
         );
       }).toList();
     }
@@ -875,7 +1115,7 @@ class MatchController extends Notifier<MatchUiState>
   void _startTickTimer(GameClock clock) {
     _tickTimer?.cancel();
     _tickTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (_isPaused) return;
+      if (_isPaused || state.isUsingPowerup) return;
       final match = state.matchState;
       if (match == null) return;
 

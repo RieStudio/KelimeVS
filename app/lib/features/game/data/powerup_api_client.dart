@@ -7,6 +7,18 @@ import '../../../core/network/auth_http_executor.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../online/data/auth_token_provider.dart';
 
+/// Güçlendirici fiyatları ve kullanım limitleri sabitleri.
+/// Sunucudaki varsayılan konfigürasyonla eşleşir; sunucu fiyatı kendisi belirler,
+/// istemci bu sabitleri başlangıç durumu ve arayüz gösterimi için kullanır.
+abstract final class PowerupConstants {
+  static const int defaultExtraTimeCost = 30;
+  static const int defaultExtraTimeSeconds = 5;
+  static const int defaultExtraTimeInitialUses = 1;
+
+  static const int defaultGiveAnswerCost = 50;
+  static const int defaultGiveAnswerInitialUses = 1;
+}
+
 /// Güçlendirici harcama işleminden dönebilen sonuçların mühürlü sınıfı.
 sealed class SpendPowerupResult {
   const SpendPowerupResult();

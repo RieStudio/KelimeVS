@@ -218,7 +218,9 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 
 ### 8.2 Maç İçi Güçlendiriciler (Power-ups)
 
-Maç içi güçlendiriciler oyuncunun zor anlarda taktiksel avantaj elde etmesini sağlayan, yalnızca **Online Dereceli (Ranked)** maçlarda geçerli jeton harcamalarıdır. Dostluk maçlarında rekabet adaletini korumak için kapalıdır (`not_allowed_in_match_type`), internetsiz yerel bot maçlarında yer almaz.
+Maç içi güçlendiriciler oyuncunun zor anlarda taktiksel avantaj elde etmesini sağlayan, **Online Dereceli (Ranked)** ve **Bot Maçlarında (`MatchSessionMode.bot`)** geçerli jeton harcamalarıdır. Dostluk maçlarında rekabet adaletini korumak için kapalıdır (`not_allowed_in_match_type`).
+
+- **Bot Maçlarında Güçlendirici Kullanımı:** Bot maçlarında da online ranked ile aynı kurallar ve fiyatlar geçerlidir (maç başına 1'er kullanım, sadece kendi sırasında; Ek Süre 30 jeton / +5 sn, Cevap Ver 50 jeton). Bot maçı cihazda yerel çalıştığından jeton sunucudan `POST /powerups/spend` endpoint'i üzerinden gerçek jeton olarak düşülür. İstemci her bot maçı için benzersiz bir `bot:<id>` oturum kimliği üretir; sunucu harcamayı idempotent olarak işler. Bot maçları oyuncuya 0 jeton kazandırdığı için bot maçlarında güçlendirici kullanımı doğrudan deflasyonisttir ve oyun ekonomisini korur.
 
 - **Ek Süre (`extra_time`):**
   - **Maliyet:** 30 jeton (`EXTRA_TIME_COST` env değişkeni ile yapılandırılabilir).
