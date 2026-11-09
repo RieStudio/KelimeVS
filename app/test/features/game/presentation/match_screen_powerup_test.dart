@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/app_widgets.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
@@ -536,6 +537,31 @@ void main() {
       // 4. Merkezler arası mesafe >= 64 dp
       final distance = (sureRect.center - cevapVerRect.center).distance;
       expect(distance, greaterThanOrEqualTo(64.0));
+
+      // 5. Blur katmanı tüm ekranı DEĞİL sadece sağ üst köşeyi kaplar
+      final blurRect = tester.getRect(find.byType(BackdropFilter));
+      // Sol sınırı en az 180 dp (ekran genişliğinin %50'sinden fazlası net kalır)
+      expect(blurRect.left, greaterThanOrEqualTo(180.0));
+      // Alt sınırı 160 dp'nin altında (ekran yüksekliğinin %75'i net kalır)
+      expect(blurRect.bottom, lessThanOrEqualTo(160.0));
+      // Boyutlar 2 * R = 248 dp
+      expect(blurRect.width, equals(248.0));
+      expect(blurRect.height, equals(248.0));
+
+      // Sol oyuncu kartı (Sen) ve Cevap giriş kutusu bölge dışındadır (bulanıklaşmaz ve kararmaz)
+      final meCardRect = tester.getRect(find.byType(PlayerCard).first);
+      expect(blurRect.overlaps(meCardRect), isFalse);
+      final inputRect = tester.getRect(find.byType(TextField));
+      expect(blurRect.overlaps(inputRect), isFalse);
+
+      // İki radial buton da dairesel blur bölgesi içindedir
+      expect(blurRect.contains(sureRect.topLeft), isTrue);
+      expect(blurRect.contains(sureRect.bottomRight), isTrue);
+      expect(blurRect.contains(cevapVerRect.topLeft), isTrue);
+      expect(blurRect.contains(cevapVerRect.bottomRight), isTrue);
+      final menuCenter = Offset(360 - (20 + 22), 8 + 22); // (318, 30)
+      expect((sureRect.center - menuCenter).distance, lessThanOrEqualTo(124.0));
+      expect((cevapVerRect.center - menuCenter).distance, lessThanOrEqualTo(124.0));
     });
 
     testWidgets('11. Cevap Ver yetersiz jeton durumunda (%50 opaklık) tıklanınca panel AÇIK kalır ve SnackBar gösterir', (tester) async {
@@ -726,6 +752,17 @@ void main() {
 
       // 4. Panel dışına (ekranın sol ortasına) tıkla -> kapanır
       await tester.tapAt(const Offset(30, 300));
+      await tester.pumpAndSettle();
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byIcon(Icons.timer), findsNothing);
+
+      // 5. Butona tıkla -> tekrar açılır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BackdropFilter), findsOneWidget);
+
+      // 6. Bulanık bölgenin butonlar harici boş bir noktasına dokun -> kapanır
+      await tester.tapAt(const Offset(220, 25));
       await tester.pumpAndSettle();
       expect(find.byType(BackdropFilter), findsNothing);
       expect(find.byIcon(Icons.timer), findsNothing);

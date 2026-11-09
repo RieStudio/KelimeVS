@@ -320,6 +320,11 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
         (uiState.remainingMs / (maxSec * 1000.0)).clamp(0.0, 1.0);
     final canLeaveWithoutPenalty = uiState.isMatchFinished;
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final menuCenterX = screenWidth -
+        (AppDimens.screenPaddingHorizontal + AppDimens.iconButtonSize / 2);
+    const menuCenterY = AppDimens.space8 + AppDimens.iconButtonSize / 2;
+
     return PopScope(
       canPop: canLeaveWithoutPenalty,
       onPopInvokedWithResult: (didPop, _) {
@@ -540,27 +545,47 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
             // 1.7 Joker Butonu ve Çeyrek Radial Menü
             if (showPowerups) ...[
               if (_isPowerupPanelOpen) ...[
-                // Dışarı dokunma bariyeri ve Arka Plan Bulanıklığı
-                // ExcludeFocus ile klavye odağını çalmaz
+                // 1. Dışarı dokunma bariyeri (Tüm ekran, şeffaf, ExcludeFocus ile klavye odağını çalmaz)
                 Positioned.fill(
                   child: ExcludeFocus(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => _closePowerupMenu(),
+                    ),
+                  ),
+                ),
+                // 2. Sağ üst köşeyle sınırlı dairesel arka plan bulanıklığı ve karartması
+                Positioned(
+                  left: menuCenterX - _kPowerupBlurRadius,
+                  top: menuCenterY - _kPowerupBlurRadius,
+                  width: _kPowerupBlurRadius * 2,
+                  height: _kPowerupBlurRadius * 2,
+                  child: ExcludeFocus(
+                    child: IgnorePointer(
                       child: AnimatedBuilder(
                         animation: _radialAnim,
                         builder: (context, _) {
                           final t = _radialAnim.value;
                           return Opacity(
                             opacity: t.clamp(0.0, 1.0),
-                            child: ClipRect(
+                            child: ClipOval(
                               child: BackdropFilter(
                                 filter: ImageFilter.blur(
                                   sigmaX: 5.0,
                                   sigmaY: 5.0,
                                 ),
                                 child: Container(
-                                  color: AppColors.ink.withValues(alpha: 0.24),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        AppColors.ink.withValues(alpha: 0.24),
+                                        AppColors.ink.withValues(alpha: 0.14),
+                                        AppColors.ink.withValues(alpha: 0.0),
+                                      ],
+                                      stops: const [0.0, 0.7, 1.0],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -570,7 +595,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                     ),
                   ),
                 ),
-                // Radial Menü Öğeleri (Bulanıklığın üstünde)
+                // 3. Radial Menü Öğeleri (Bulanıklığın üstünde)
                 ..._buildRadialMenuItems(
                   context: context,
                   hasExtraTime: hasExtraTime,
@@ -841,6 +866,9 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
 
 /// Joker butonu ikonu. İleride SVG ile değiştirilebilir.
 const IconData _kPowerupMenuIcon = Icons.auto_awesome;
+
+/// Sağ üst köşedeki dairesel arka plan bulanıklık/karartma bölgesi yarıçapı (~124 dp)
+const double _kPowerupBlurRadius = 124.0;
 
 /// Sağ üstteki küçük Jokerler menü butonu (~40 dp)
 class _PowerupMenuButton extends StatelessWidget {
