@@ -26,19 +26,49 @@ class MatchScreen extends ConsumerStatefulWidget {
   ConsumerState<MatchScreen> createState() => _MatchScreenState();
 }
 
-class _MatchScreenState extends ConsumerState<MatchScreen> {
+class _MatchScreenState extends ConsumerState<MatchScreen>
+    with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _inputController = TextEditingController();
   late final BannerSuppressionNotifier _suppressionNotifier;
   int _scrollGeneration = 0;
   double _lastBottomInset = 0.0;
   bool _isPowerupPanelOpen = false;
+  late final AnimationController _radialAnimController;
+  late final Animation<double> _radialAnim;
 
-  void _closePowerupPanel() {
-    if (_isPowerupPanelOpen && mounted) {
-      setState(() {
-        _isPowerupPanelOpen = false;
-      });
+  void _openPowerupMenu() {
+    setState(() {
+      _isPowerupPanelOpen = true;
+    });
+    _radialAnimController.forward(from: 0.0);
+  }
+
+  void _closePowerupMenu({bool immediate = false}) {
+    if (!_isPowerupPanelOpen && _radialAnimController.isDismissed) return;
+    if (immediate) {
+      _radialAnimController.reset();
+      if (mounted) {
+        setState(() {
+          _isPowerupPanelOpen = false;
+        });
+      }
+      return;
+    }
+    _radialAnimController.reverse().then((_) {
+      if (mounted) {
+        setState(() {
+          _isPowerupPanelOpen = false;
+        });
+      }
+    });
+  }
+
+  void _togglePowerupMenu() {
+    if (_isPowerupPanelOpen) {
+      _closePowerupMenu();
+    } else {
+      _openPowerupMenu();
     }
   }
 
@@ -46,6 +76,15 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   void initState() {
     super.initState();
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
+    _radialAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 160),
+    );
+    _radialAnim = CurvedAnimation(
+      parent: _radialAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _suppressionNotifier.suppress();
@@ -64,6 +103,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
 
   @override
   void dispose() {
+    _radialAnimController.dispose();
     _suppressionNotifier.unsuppress();
     _scrollController.dispose();
     _inputController.dispose();
@@ -233,7 +273,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
       },
     );
 
-    // Tur değiştiğinde veya maç bittiğinde joker panelini otomatik kapat
+    // Tur değiştiğinde veya maç bittiğinde joker menüsünü otomatik kapat
     ref.listen<String>(
       activeMatchUiStateProvider.select(
         (s) =>
@@ -241,7 +281,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
       ),
       (prev, next) {
         if (prev != null && prev != next && _isPowerupPanelOpen) {
-          _closePowerupPanel();
+          _closePowerupMenu(immediate: true);
         }
       },
     );
@@ -496,7 +536,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                 ),
               ),
 
-            // 1.7 Joker Butonu ve Paneli
+            // 1.7 Joker Butonu ve Çeyrek Radial Menü
             if (showPowerups) ...[
               if (_isPowerupPanelOpen) ...[
                 // Dışarı dokunma bariyeri (ExcludeFocus ile klavye odağını çalmaz)
@@ -504,79 +544,38 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                   child: ExcludeFocus(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: _closePowerupPanel,
+                      onTap: () => _closePowerupMenu(),
                     ),
                   ),
                 ),
-                // Joker Paneli
-                Positioned(
-                  top: AppDimens.space8 + AppDimens.iconButtonSize + AppDimens.space8,
-                  right: AppDimens.screenPaddingHorizontal,
-                  child: ExcludeFocus(
-                    child: _PowerupPanel(
-                      hasExtraTime: hasExtraTime,
-                      hasGiveAnswer: hasGiveAnswer,
-                      isMyTurn: isMyTurn,
-                      extraTimeRemainingUses:
-                          uiState.extraTimeRemainingUses ?? 1,
-                      extraTimeCost: uiState.extraTimeCost ?? 30,
-                      extraTimeSeconds: uiState.extraTimeSeconds ?? 5,
-                      giveAnswerRemainingUses:
-                          uiState.giveAnswerRemainingUses ?? 1,
-                      giveAnswerCost: uiState.giveAnswerCost ?? 50,
-                      isUsingPowerup: uiState.isUsingPowerup,
-                      userCoins: profile.coins,
-                      onExtraTimeTap: () {
-                        _closePowerupPanel();
-                        ref
-                            .read(activeMatchSessionProvider)
-                            .useExtraTime();
-                      },
-                      onGiveAnswerTap: () {
-                        _closePowerupPanel();
-                        _inputController.clear();
-                        ref
-                            .read(activeMatchSessionProvider)
-                            .useGiveAnswer();
-                      },
-                      onInsufficientCoinsForExtraTime: (cost) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              AppStrings.notEnoughCoinsForExtraTime(cost),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      onInsufficientCoinsForGiveAnswer: (cost) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              AppStrings.notEnoughCoinsForGiveAnswer(cost),
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                // Radial Menü Öğeleri
+                ..._buildRadialMenuItems(
+                  context: context,
+                  hasExtraTime: hasExtraTime,
+                  hasGiveAnswer: hasGiveAnswer,
+                  isMyTurn: isMyTurn,
+                  extraTimeRemainingUses:
+                      uiState.extraTimeRemainingUses ?? 1,
+                  extraTimeCost: uiState.extraTimeCost ?? 30,
+                  extraTimeSeconds: uiState.extraTimeSeconds ?? 5,
+                  giveAnswerRemainingUses:
+                      uiState.giveAnswerRemainingUses ?? 1,
+                  giveAnswerCost: uiState.giveAnswerCost ?? 50,
+                  isUsingPowerup: uiState.isUsingPowerup,
+                  userCoins: profile.coins,
                 ),
               ],
-              // Jokerler Butonu (Bariyerin üstünde, sağ üstte 40x40)
+              // Jokerler Ana Butonu (Bariyerin üstünde, sağ üstte 40x40)
               Positioned(
                 top: AppDimens.space8,
                 right: AppDimens.screenPaddingHorizontal,
                 child: ExcludeFocus(
                   child: _PowerupMenuButton(
+                    animation: _radialAnim,
                     isOpen: _isPowerupPanelOpen,
                     allUsed: allPowerupsUsed,
                     isLoading: uiState.isUsingPowerup,
-                    onTap: () {
-                      setState(() {
-                        _isPowerupPanelOpen = !_isPowerupPanelOpen;
-                      });
-                    },
+                    onTap: _togglePowerupMenu,
                   ),
                 ),
               ),
@@ -599,6 +598,159 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     ),
   );
 }
+
+  List<Widget> _buildRadialMenuItems({
+    required BuildContext context,
+    required bool hasExtraTime,
+    required bool hasGiveAnswer,
+    required bool isMyTurn,
+    required int extraTimeRemainingUses,
+    required int extraTimeCost,
+    required int extraTimeSeconds,
+    required int giveAnswerRemainingUses,
+    required int giveAnswerCost,
+    required bool isUsingPowerup,
+    required int userCoins,
+  }) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final cx = screenWidth -
+        (AppDimens.screenPaddingHorizontal + AppDimens.iconButtonSize / 2);
+    const cy = AppDimens.space8 + AppDimens.iconButtonSize / 2;
+
+    const radius = 82.0;
+
+    // Buton 1 (Süre): Doğrudan aşağı (90°)
+    const angleSure = 90.0 * (math.pi / 180.0);
+    final targetX1 = cx + radius * math.cos(angleSure);
+    final targetY1 = cy + radius * math.sin(angleSure);
+
+    // Buton 2 (Cevap Ver): Sol-aşağı (141°)
+    const angleCevapVer = 141.0 * (math.pi / 180.0);
+    final targetX2 = cx + radius * math.cos(angleCevapVer);
+    final targetY2 = cy + radius * math.sin(angleCevapVer);
+
+    return [
+      if (hasExtraTime)
+        AnimatedBuilder(
+          animation: _radialAnim,
+          builder: (context, _) {
+            final t = _radialAnim.value;
+            final currentX = cx + (targetX1 - cx) * t;
+            final currentY = cy + (targetY1 - cy) * t;
+            final rightOffset = screenWidth - currentX;
+
+            return Positioned(
+              right: rightOffset - 26.0,
+              top: currentY - 26.0,
+              child: Transform.scale(
+                scale: t,
+                child: Opacity(
+                  opacity: t.clamp(0.0, 1.0),
+                  child: ExcludeFocus(
+                    child: _RadialPowerupItem(
+                      title: AppStrings.extraTimePowerup,
+                      cost: extraTimeCost,
+                      icon: const Icon(
+                        Icons.timer,
+                        size: 24,
+                        color: AppColors.ink,
+                      ),
+                      isUsed: extraTimeRemainingUses <= 0,
+                      isInteractive: extraTimeRemainingUses > 0 &&
+                          isMyTurn &&
+                          !isUsingPowerup &&
+                          userCoins >= extraTimeCost,
+                      hasEnoughCoins: userCoins >= extraTimeCost,
+                      isLoading: isUsingPowerup,
+                      onTap: () {
+                        _closePowerupMenu(immediate: true);
+                        ref.read(activeMatchSessionProvider).useExtraTime();
+                      },
+                      onInsufficientCoins: (cost) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              AppStrings.notEnoughCoinsForExtraTime(cost),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      notMyTurnMessage: AppStrings.notYourTurnPowerup,
+                      semanticLabel: extraTimeRemainingUses <= 0
+                          ? '${AppStrings.extraTimePowerup} jokeri, ${AppStrings.extraTimeUsed}'
+                          : '${AppStrings.extraTimePowerup} jokeri, $extraTimeCost jeton',
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      if (hasGiveAnswer)
+        AnimatedBuilder(
+          animation: _radialAnim,
+          builder: (context, _) {
+            final t = _radialAnim.value;
+            final currentX = cx + (targetX2 - cx) * t;
+            final currentY = cy + (targetY2 - cy) * t;
+            final rightOffset = screenWidth - currentX;
+
+            return Positioned(
+              right: rightOffset - 28.0,
+              top: currentY - 26.0,
+              child: Transform.scale(
+                scale: t,
+                child: Opacity(
+                  opacity: t.clamp(0.0, 1.0),
+                  child: ExcludeFocus(
+                    child: _RadialPowerupItem(
+                      title: AppStrings.giveAnswerPowerup,
+                      cost: giveAnswerCost,
+                      icon: SvgPicture.asset(
+                        'assets/icons/powerup_auto_answer.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: const ColorFilter.mode(
+                          AppColors.ink,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      isUsed: giveAnswerRemainingUses <= 0,
+                      isInteractive: giveAnswerRemainingUses > 0 &&
+                          isMyTurn &&
+                          !isUsingPowerup &&
+                          userCoins >= giveAnswerCost,
+                      hasEnoughCoins: userCoins >= giveAnswerCost,
+                      isLoading: isUsingPowerup,
+                      onTap: () {
+                        _closePowerupMenu(immediate: true);
+                        _inputController.clear();
+                        ref.read(activeMatchSessionProvider).useGiveAnswer();
+                      },
+                      onInsufficientCoins: (cost) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              AppStrings.notEnoughCoinsForGiveAnswer(cost),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      notMyTurnMessage: AppStrings.notYourTurnGiveAnswer,
+                      semanticLabel: giveAnswerRemainingUses <= 0
+                          ? '${AppStrings.giveAnswerPowerup} jokeri, ${AppStrings.giveAnswerUsed}'
+                          : '${AppStrings.giveAnswerPowerup} jokeri, $giveAnswerCost jeton',
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+    ];
+  }
 }
 
 /// 200 ms aşağıdan yukarı kayarak giren cevap balonu
@@ -670,12 +822,14 @@ const IconData _kPowerupMenuIcon = Icons.auto_awesome;
 
 /// Sağ üstteki küçük Jokerler menü butonu (~40 dp)
 class _PowerupMenuButton extends StatelessWidget {
+  final Animation<double> animation;
   final bool isOpen;
   final bool allUsed;
   final bool isLoading;
   final VoidCallback onTap;
 
   const _PowerupMenuButton({
+    required this.animation,
     required this.isOpen,
     required this.allUsed,
     required this.isLoading,
@@ -698,41 +852,50 @@ class _PowerupMenuButton extends StatelessWidget {
           child: Center(
             child: Opacity(
               opacity: allUsed ? 0.5 : 1.0,
-              child: Container(
-                width: AppDimens.iconButtonSize,
-                height: AppDimens.iconButtonSize,
-                decoration: BoxDecoration(
-                  color: isOpen ? AppColors.coin : AppColors.card,
-                  borderRadius: AppDimens.borderRadiusIconBtn,
-                  border: Border.all(
-                    color: AppColors.ink,
-                    width: AppDimens.borderThin,
-                  ),
-                  boxShadow: isOpen
-                      ? null
-                      : const [
-                          BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(0, 2),
-                            blurRadius: 0,
-                          ),
-                        ],
-                ),
-                alignment: Alignment.center,
-                child: isLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.ink,
-                        ),
-                      )
-                    : const Icon(
-                        _kPowerupMenuIcon,
-                        size: 20,
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (context, _) {
+                  final t = animation.value;
+                  return Container(
+                    width: AppDimens.iconButtonSize,
+                    height: AppDimens.iconButtonSize,
+                    decoration: BoxDecoration(
+                      color: Color.lerp(AppColors.card, AppColors.coin, t),
+                      borderRadius: AppDimens.borderRadiusIconBtn,
+                      border: Border.all(
                         color: AppColors.ink,
+                        width: AppDimens.borderThin,
                       ),
+                      boxShadow: t > 0.5
+                          ? null
+                          : const [
+                              BoxShadow(
+                                color: AppColors.ink,
+                                offset: Offset(0, 2),
+                                blurRadius: 0,
+                              ),
+                            ],
+                    ),
+                    alignment: Alignment.center,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.ink,
+                            ),
+                          )
+                        : Transform.rotate(
+                            angle: t * (math.pi / 4), // 45° dönüş
+                            child: const Icon(
+                              _kPowerupMenuIcon,
+                              size: 20,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                  );
+                },
               ),
             ),
           ),
@@ -742,571 +905,194 @@ class _PowerupMenuButton extends StatelessWidget {
   }
 }
 
-/// Joker butonu tıklandığında açılan alt panel
-class _PowerupPanel extends StatelessWidget {
-  final bool hasExtraTime;
-  final bool hasGiveAnswer;
-  final bool isMyTurn;
-  final int extraTimeRemainingUses;
-  final int extraTimeCost;
-  final int extraTimeSeconds;
-  final int giveAnswerRemainingUses;
-  final int giveAnswerCost;
-  final bool isUsingPowerup;
-  final int userCoins;
-  final VoidCallback onExtraTimeTap;
-  final VoidCallback onGiveAnswerTap;
-  final void Function(int cost) onInsufficientCoinsForExtraTime;
-  final void Function(int cost) onInsufficientCoinsForGiveAnswer;
+/// Çeyrek radial menü üzerindeki yuvarlak joker butonu ve etiketi
+class _RadialPowerupItem extends StatelessWidget {
+  final String title;
+  final int cost;
+  final Widget icon;
+  final bool isUsed;
+  final bool isInteractive;
+  final bool hasEnoughCoins;
+  final bool isLoading;
+  final VoidCallback onTap;
+  final void Function(int cost) onInsufficientCoins;
+  final String notMyTurnMessage;
+  final String semanticLabel;
 
-  const _PowerupPanel({
-    required this.hasExtraTime,
-    required this.hasGiveAnswer,
-    required this.isMyTurn,
-    required this.extraTimeRemainingUses,
-    required this.extraTimeCost,
-    required this.extraTimeSeconds,
-    required this.giveAnswerRemainingUses,
-    required this.giveAnswerCost,
-    required this.isUsingPowerup,
-    required this.userCoins,
-    required this.onExtraTimeTap,
-    required this.onGiveAnswerTap,
-    required this.onInsufficientCoinsForExtraTime,
-    required this.onInsufficientCoinsForGiveAnswer,
+  const _RadialPowerupItem({
+    required this.title,
+    required this.cost,
+    required this.icon,
+    required this.isUsed,
+    required this.isInteractive,
+    required this.hasEnoughCoins,
+    required this.isLoading,
+    required this.onTap,
+    required this.onInsufficientCoins,
+    required this.notMyTurnMessage,
+    required this.semanticLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        maxWidth: math.max(160, MediaQuery.sizeOf(context).width - 32),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space12,
-        vertical: AppDimens.space10,
-      ),
+    final double itemWidth =
+        title == AppStrings.giveAnswerPowerup ? 56.0 : 52.0;
+
+    final circle = Container(
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        shape: BoxShape.circle,
+        color: isUsed
+            ? AppColors.surface
+            : (isInteractive ? AppColors.coin : AppColors.card),
         border: Border.all(
-          color: AppColors.ink,
+          color: isUsed
+              ? AppColors.ink.withValues(alpha: 0.3)
+              : AppColors.ink,
           width: AppDimens.borderThin,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.ink,
-            offset: Offset(0, 4),
-            blurRadius: 0,
-          ),
-        ],
+        boxShadow: isInteractive
+            ? const [
+                BoxShadow(
+                  color: AppColors.ink,
+                  offset: Offset(0, 2),
+                  blurRadius: 0,
+                ),
+              ]
+            : null,
       ),
+      alignment: Alignment.center,
+      child: isLoading
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.ink,
+              ),
+            )
+          : (isUsed
+              ? Icon(
+                  Icons.check_circle_outline,
+                  size: 24,
+                  color: AppColors.muted.withValues(alpha: 0.6),
+                )
+              : icon),
+    );
+
+    final content = SizedBox(
+      width: itemWidth,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (hasExtraTime)
-            Center(
-              child: _ExtraTimePowerupButton(
-                isMyTurn: isMyTurn,
-                remainingUses: extraTimeRemainingUses,
-                cost: extraTimeCost,
-                seconds: extraTimeSeconds,
-                isLoading: isUsingPowerup,
-                userCoins: userCoins,
-                onTap: onExtraTimeTap,
-                onInsufficientCoins: onInsufficientCoinsForExtraTime,
+          circle,
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: AppTextStyles.cardTitle.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isUsed
+                    ? AppColors.muted.withValues(alpha: 0.7)
+                    : AppColors.ink,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
             ),
-          if (hasExtraTime && hasGiveAnswer)
-            const SizedBox(height: AppDimens.space10),
-          if (hasGiveAnswer)
-            Center(
-              child: _GiveAnswerPowerupButton(
-                isMyTurn: isMyTurn,
-                remainingUses: giveAnswerRemainingUses,
-                cost: giveAnswerCost,
-                isLoading: isUsingPowerup,
-                userCoins: userCoins,
-                onTap: onGiveAnswerTap,
-                onInsufficientCoins: onInsufficientCoinsForGiveAnswer,
+          ),
+          const SizedBox(height: 1),
+          if (isUsed)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppStrings.extraTimeUsed, // "Kullanıldı"
+                style: AppTextStyles.secondaryText.copyWith(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted.withValues(alpha: 0.7),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+              ),
+            )
+          else
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CoinIcon(size: 11, opacity: hasEnoughCoins ? 1.0 : 0.5),
+                  const SizedBox(width: 2),
+                  Text(
+                    '$cost',
+                    style: AppTextStyles.cardTitle.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color:
+                          hasEnoughCoins ? AppColors.ink : AppColors.muted,
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
       ),
     );
-  }
-}
 
-/// Ek süre güçlendiricisi butonu
-class _ExtraTimePowerupButton extends StatelessWidget {
-  final bool isMyTurn;
-  final int remainingUses;
-  final int cost;
-  final int seconds;
-  final bool isLoading;
-  final int userCoins;
-  final VoidCallback onTap;
-  final void Function(int cost) onInsufficientCoins;
-
-  const _ExtraTimePowerupButton({
-    required this.isMyTurn,
-    required this.remainingUses,
-    required this.cost,
-    required this.seconds,
-    required this.isLoading,
-    required this.userCoins,
-    required this.onTap,
-    required this.onInsufficientCoins,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isUsed = remainingUses <= 0;
-    final hasEnoughCoins = userCoins >= cost;
-    final isInteractive = !isUsed && isMyTurn && !isLoading;
-
-    // Durum 1: Kullanıldı
-    if (isUsed) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.space10,
-          vertical: AppDimens.space4,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppDimens.borderRadiusFull,
-          border: Border.all(
-            color: AppColors.ink.withValues(alpha: 0.3),
-            width: AppDimens.borderThin,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 14,
-              color: AppColors.muted.withValues(alpha: 0.6),
-            ),
-            const SizedBox(width: AppDimens.space4),
-            Text(
-              AppStrings.extraTimeUsed,
-              style: AppTextStyles.secondaryText.copyWith(
-                fontSize: 11,
-                color: AppColors.muted.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+    Widget wrappedContent;
+    if (isInteractive) {
+      wrappedContent = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: content,
       );
-    }
-
-    // Durum 2: Yetersiz Jeton (Soluk, tıklandığında toast gösterir)
-    if (!hasEnoughCoins) {
-      return GestureDetector(
+    } else if (isUsed || isLoading) {
+      wrappedContent = Opacity(
+        opacity: isUsed ? 0.85 : 0.7,
+        child: content,
+      );
+    } else if (!hasEnoughCoins) {
+      wrappedContent = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => onInsufficientCoins(cost),
         child: Opacity(
           opacity: 0.5,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimens.space10,
-              vertical: AppDimens.space4,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: AppDimens.borderRadiusFull,
-              border: Border.all(
-                color: AppColors.ink,
-                width: AppDimens.borderThin,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.timer,
-                  size: 14,
-                  color: AppColors.ink,
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  AppStrings.extraTimePowerup,
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  '·',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                const CoinIcon(size: 14, opacity: 0.5),
-                const SizedBox(width: 2),
-                Text(
-                  '$cost',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: content,
         ),
       );
-    }
-
-    // Durum 3: Yeterli Jeton ve Kullanılabilir
-    final buttonContent = Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space10,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: isInteractive ? AppColors.coin : AppColors.card,
-        borderRadius: AppDimens.borderRadiusFull,
-        border: Border.all(
-          color: AppColors.ink,
-          width: AppDimens.borderThin,
-        ),
-        boxShadow: isInteractive
-            ? const [
-                BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(0, 2),
-                  blurRadius: 0,
-                ),
-              ]
-            : null,
-      ),
-      child: isLoading
-          ? const Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.ink,
-                ),
-              ),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.timer,
-                  size: 14,
-                  color: AppColors.ink,
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  AppStrings.extraTimePowerup,
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  '·',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                const CoinIcon(size: 14),
-                const SizedBox(width: 2),
-                Text(
-                  '$cost',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-    );
-
-    if (isInteractive) {
-      return GestureDetector(
+    } else {
+      wrappedContent = GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: buttonContent,
-      );
-    }
-
-    if (isLoading) {
-      return Opacity(
-        opacity: 0.7,
-        child: buttonContent,
-      );
-    }
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppStrings.notYourTurnPowerup),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      },
-      child: Opacity(
-        opacity: 0.5,
-        child: buttonContent,
-      ),
-    );
-  }
-}
-
-/// Cevap Ver (give_answer) güçlendiricisi butonu
-class _GiveAnswerPowerupButton extends StatelessWidget {
-  final bool isMyTurn;
-  final int remainingUses;
-  final int cost;
-  final bool isLoading;
-  final int userCoins;
-  final VoidCallback onTap;
-  final void Function(int cost) onInsufficientCoins;
-
-  const _GiveAnswerPowerupButton({
-    required this.isMyTurn,
-    required this.remainingUses,
-    required this.cost,
-    required this.isLoading,
-    required this.userCoins,
-    required this.onTap,
-    required this.onInsufficientCoins,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isUsed = remainingUses <= 0;
-    final hasEnoughCoins = userCoins >= cost;
-    final isInteractive = !isUsed && isMyTurn && !isLoading;
-
-    // Durum 1: Kullanıldı (soluk gri, tıklanamaz)
-    if (isUsed) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.space10,
-          vertical: AppDimens.space4,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppDimens.borderRadiusFull,
-          border: Border.all(
-            color: AppColors.ink.withValues(alpha: 0.3),
-            width: AppDimens.borderThin,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 14,
-              color: AppColors.muted.withValues(alpha: 0.6),
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(notMyTurnMessage),
+              duration: const Duration(seconds: 1),
             ),
-            const SizedBox(width: AppDimens.space4),
-            Text(
-              AppStrings.giveAnswerUsed,
-              style: AppTextStyles.secondaryText.copyWith(
-                fontSize: 11,
-                color: AppColors.muted.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Durum 2: Yetersiz Jeton (Soluk, tıklandığında SnackBar gösterir)
-    if (!hasEnoughCoins) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onInsufficientCoins(cost),
+          );
+        },
         child: Opacity(
           opacity: 0.5,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimens.space10,
-              vertical: AppDimens.space4,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: AppDimens.borderRadiusFull,
-              border: Border.all(
-                color: AppColors.ink,
-                width: AppDimens.borderThin,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/powerup_auto_answer.svg',
-                  width: 14,
-                  height: 14,
-                  colorFilter: const ColorFilter.mode(
-                    AppColors.ink,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  AppStrings.giveAnswerPowerup,
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  '·',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                const CoinIcon(size: 14, opacity: 0.5),
-                const SizedBox(width: 2),
-                Text(
-                  '$cost',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: content,
         ),
       );
     }
 
-    // Durum 3: Yeterli Jeton ve Kullanılabilir / Sıra Bende Değil / Yükleniyor
-    final buttonContent = Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.space10,
-        vertical: AppDimens.space4,
-      ),
-      decoration: BoxDecoration(
-        color: isInteractive ? AppColors.coin : AppColors.card,
-        borderRadius: AppDimens.borderRadiusFull,
-        border: Border.all(
-          color: AppColors.ink,
-          width: AppDimens.borderThin,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: 48,
+          minHeight: 48,
         ),
-        boxShadow: isInteractive
-            ? const [
-                BoxShadow(
-                  color: AppColors.ink,
-                  offset: Offset(0, 2),
-                  blurRadius: 0,
-                ),
-              ]
-            : null,
-      ),
-      child: isLoading
-          ? const Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.ink,
-                ),
-              ),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/powerup_auto_answer.svg',
-                  width: 14,
-                  height: 14,
-                  colorFilter: const ColorFilter.mode(
-                    AppColors.ink,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  AppStrings.giveAnswerPowerup,
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                Text(
-                  '·',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    color: AppColors.muted,
-                  ),
-                ),
-                const SizedBox(width: AppDimens.space4),
-                const CoinIcon(size: 14),
-                const SizedBox(width: 2),
-                Text(
-                  '$cost',
-                  style: AppTextStyles.cardTitle.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-    );
-
-    if (isInteractive) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: buttonContent,
-      );
-    }
-
-    if (isLoading) {
-      return Opacity(
-        opacity: 0.7,
-        child: buttonContent,
-      );
-    }
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppStrings.notYourTurnGiveAnswer),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      },
-      child: Opacity(
-        opacity: 0.5,
-        child: buttonContent,
+        child: wrappedContent,
       ),
     );
   }
