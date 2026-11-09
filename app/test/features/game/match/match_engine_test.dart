@@ -1031,5 +1031,150 @@ void main() {
       expect(state.currentRoundAttempts.last.isClose, isFalse);
       expect(state.currentRoundAttempts.last.hintShown, isFalse);
     });
+
+    group('isSystemPowerup & viaPowerup Testleri', () {
+      test('1. Yanlış cevaptan hemen sonra (minSubmitIntervalMs dolmadan) normal submit tooFast döner', () {
+        final random = math.Random(1);
+        final config = const MatchConfig(
+          answerSeconds: 15,
+          minSubmitIntervalMs: 600,
+        );
+        var res = MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [sampleQuestions[0]],
+          random: random,
+          nowMs: 1000,
+        );
+        var state = res.state;
+
+        // p1 yanlış cevap gönderir
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'YanlisKelime',
+          nowMs: 1100,
+        );
+        state = res.state;
+        expect(res.events.first, isA<WrongAnswer>());
+
+        // 100 ms sonra (600 ms dolmadan) normal submit -> tooFast olmalı
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'Audi',
+          nowMs: 1200,
+          isSystemPowerup: false,
+        );
+        expect(res.events.first, isA<Ignored>());
+        expect((res.events.first as Ignored).reason, 'tooFast');
+      });
+
+      test('2. Yanlış cevaptan hemen sonra isSystemPowerup: true ile gönderim tooFast engeline takılmaz', () {
+        final random = math.Random(1);
+        final config = const MatchConfig(
+          answerSeconds: 15,
+          minSubmitIntervalMs: 600,
+        );
+        var res = MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [sampleQuestions[0]],
+          random: random,
+          nowMs: 1000,
+        );
+        var state = res.state;
+
+        // p1 yanlış cevap gönderir
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'YanlisKelime',
+          nowMs: 1100,
+        );
+        state = res.state;
+        expect(res.events.first, isA<WrongAnswer>());
+
+        // 100 ms sonra isSystemPowerup: true ile gönderim -> kabul edilmeli (tooFast atlanır)
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'Audi',
+          nowMs: 1200,
+          isSystemPowerup: true,
+        );
+        state = res.state;
+        expect(res.events.first, isA<AnswerAccepted>());
+        expect(state.turnPlayerId, 'p2'); // Sıra rakibe geçti
+        expect(state.usedAnswerIds, contains('audi')); // usedAnswerIds güncellendi
+      });
+
+      test('3. isSystemPowerup: true ile maxAttemptsPerTurn limiti de atlanır', () {
+        final random = math.Random(1);
+        final config = const MatchConfig(
+          answerSeconds: 15,
+          minSubmitIntervalMs: 0,
+          maxAttemptsPerTurn: 2,
+        );
+        var res = MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [sampleQuestions[0]],
+          random: random,
+          nowMs: 1000,
+        );
+        var state = res.state;
+
+        // 2 kez yanlış cevap (limit doldu)
+        res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'Y1', nowMs: 1100);
+        state = res.state;
+        res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'Y2', nowMs: 1200);
+        state = res.state;
+
+        // 3. normal deneme -> tooManyAttempts
+        res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'Audi', nowMs: 1300, isSystemPowerup: false);
+        expect(res.events.first, isA<Ignored>());
+        expect((res.events.first as Ignored).reason, 'tooManyAttempts');
+
+        // isSystemPowerup: true ile deneme -> kabul edilir
+        res = MatchEngine.submit(state: state, playerId: 'p1', rawInput: 'Audi', nowMs: 1350, isSystemPowerup: true);
+        expect(res.events.first, isA<AnswerAccepted>());
+      });
+
+      test('4. viaPowerup bayrağı yalnızca isSystemPowerup: true olduğunda true taşır, normal submitte false kalır', () {
+        final random = math.Random(1);
+        final config = const MatchConfig(answerSeconds: 15);
+        var res = MatchEngine.start(
+          config: config,
+          playerIds: ['p1', 'p2'],
+          questions: [sampleQuestions[0]],
+          random: random,
+          nowMs: 1000,
+        );
+        var state = res.state;
+
+        // p1 normal submit ile doğru cevap verir -> viaPowerup false olmalı
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p1',
+          rawInput: 'Audi',
+          nowMs: 2000,
+          isSystemPowerup: false,
+        );
+        state = res.state;
+        expect(state.currentRoundAttempts.last.viaPowerup, isFalse);
+
+        // Sıra p2'ye geçti; p2 isSystemPowerup: true ile doğru cevap verir -> viaPowerup true olmalı
+        res = MatchEngine.submit(
+          state: state,
+          playerId: 'p2',
+          rawInput: 'BMW',
+          nowMs: 3000,
+          isSystemPowerup: true,
+        );
+        state = res.state;
+        expect(state.currentRoundAttempts.last.viaPowerup, isTrue);
+      });
+    });
   });
 }

@@ -93,6 +93,7 @@ abstract final class MatchEngine {
     required int nowMs,
     List<Question>? questionsPool,
     math.Random? random,
+    bool isSystemPowerup = false,
   }) {
     // 0. Girdi temizleme (sanitization)
     final sanitizedInput = AttemptTextSanitizer.sanitize(rawInput);
@@ -120,14 +121,17 @@ abstract final class MatchEngine {
       );
     }
 
-    // 3. Kötüye kullanım: minSubmitIntervalMs (600 ms) kontrolü
+    // 3. Kötüye kullanım: minSubmitIntervalMs (600 ms) kontrolü (sistem güçlendiricisi çağrısında atlanır)
     final lastSubmit = state.lastSubmitTimes[playerId];
-    if (lastSubmit != null && (nowMs - lastSubmit) < state.config.minSubmitIntervalMs) {
+    if (!isSystemPowerup &&
+        lastSubmit != null &&
+        (nowMs - lastSubmit) < state.config.minSubmitIntervalMs) {
       return EngineResult(state, const [Ignored('tooFast')]);
     }
 
-    // 4. Kötüye kullanım: maxAttemptsPerTurn (25 deneme) kontrolü
-    if (state.currentTurnAttempts >= state.config.maxAttemptsPerTurn) {
+    // 4. Kötüye kullanım: maxAttemptsPerTurn (25 deneme) kontrolü (sistem güçlendiricisi çağrısında atlanır)
+    if (!isSystemPowerup &&
+        state.currentTurnAttempts >= state.config.maxAttemptsPerTurn) {
       return EngineResult(state, const [Ignored('tooManyAttempts')]);
     }
 
@@ -154,6 +158,7 @@ abstract final class MatchEngine {
           answerId: answer.id,
           displayText: answer.display,
           nowMs: nowMs,
+          viaPowerup: isSystemPowerup,
         );
 
         final updatedUsedAnswerIds = {...state.usedAnswerIds, answer.id};

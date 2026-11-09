@@ -27,6 +27,7 @@ class TurnAttempt {
   final int nowMs;
   final bool isClose;
   final bool hintShown;
+  final bool viaPowerup;
 
   const TurnAttempt({
     required this.playerId,
@@ -37,6 +38,7 @@ class TurnAttempt {
     required this.nowMs,
     this.isClose = false,
     this.hintShown = false,
+    this.viaPowerup = false,
   });
 }
 

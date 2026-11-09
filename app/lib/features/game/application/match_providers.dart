@@ -3,12 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../auth/application/auth_notifier.dart';
 import '../../online/application/match_reconciler.dart';
 import '../../online/application/online_match_session.dart';
+import '../../online/data/auth_token_provider.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../online/data/online_match_client.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/local_question_repository.dart';
+import '../data/powerup_api_client.dart';
 import '../data/question_repository.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/match/match_config.dart';
@@ -109,5 +112,14 @@ final matchReconcilerProvider = Provider<MatchReconciler>((ref) {
     onCoinsUpdated: (coins) => ref.read(profileProvider.notifier).updateCoins(coins),
   );
 });
+
+final powerupApiClientProvider = Provider<PowerupApiClient>((ref) {
+  final onDeleted = ref.watch(accountDeletedHandlerProvider);
+  return HttpPowerupApiClient(
+    authTokenProvider: const FirebaseAuthTokenProvider(),
+    onAccountDeleted: onDeleted,
+  );
+});
+
 
 

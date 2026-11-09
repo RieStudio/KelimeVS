@@ -69,10 +69,15 @@ void main() {
 
     test('uç nokta yolları ve tam URL yardımcıları doğru üretilir', () {
       expect(ServerConfig.healthPath, '/health');
+      expect(ServerConfig.powerupsSpendPath, '/powerups/spend');
       expect(ServerConfig.matchmakingWsPath, '/ws/matchmaking');
       expect(ServerConfig.matchWsPath('m_test_99'), '/ws/match/m_test_99');
 
       expect(ServerConfig.healthUrl, '${ServerConfig.serverUrl}/health');
+      expect(
+        ServerConfig.powerupsSpendUrl,
+        '${ServerConfig.serverUrl}/powerups/spend',
+      );
       expect(
         ServerConfig.matchmakingWsUrl,
         '${ServerConfig.wsUrl}/ws/matchmaking',
