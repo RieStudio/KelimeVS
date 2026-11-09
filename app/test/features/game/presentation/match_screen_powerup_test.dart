@@ -23,6 +23,12 @@ class MockPowerupSession implements MatchSession {
   void submit(String text) {}
 
   @override
+  void leaveMatch() {}
+
+  @override
+  void dispose() {}
+
+  @override
   void useExtraTime() {
     extraTimeCalled = true;
   }
@@ -31,12 +37,19 @@ class MockPowerupSession implements MatchSession {
   void useGiveAnswer() {
     giveAnswerCalled = true;
   }
+}
+
+class FakeProfileNotifier extends ProfileNotifier {
+  final int initialCoins;
+  FakeProfileNotifier({this.initialCoins = 100});
 
   @override
-  void leaveMatch() {}
-
-  @override
-  void dispose() {}
+  ProfileState build() {
+    return ProfileState(
+      nickname: 'TestPlayer',
+      coins: initialCoins,
+    );
+  }
 }
 
 class FakeModeNotifier extends ActiveMatchSessionModeNotifier {
@@ -54,29 +67,18 @@ class TestUiStateNotifier extends Notifier<MatchUiState> {
   @override
   MatchUiState build() => initial;
 
+  MatchUiState get currentState => state;
+
   void updateState(MatchUiState next) {
     state = next;
   }
 }
 
-class FakeProfileNotifier extends ProfileNotifier {
-  final int initialCoins;
-  FakeProfileNotifier({this.initialCoins = 100});
-
-  @override
-  ProfileState build() {
-    return ProfileState(
-      nickname: 'TestPlayer',
-      coins: initialCoins,
-    );
-  }
-}
-
 void main() {
-  const testQuestion = Question(
+  final testQuestion = Question(
     id: 'q1',
     categoryId: 'c1',
-    text: 'Türkiye\'nin başkenti?',
+    text: 'Test Sorusu',
     answers: [],
   );
 
@@ -124,7 +126,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Bot maçında ek süre güçlendirici butonu gösterilir ve tıklanabilir', (tester) async {
+  testWidgets('1. Bot maçında Jokerler butonu gösterilir, tıklanınca panel açılır, Süre tıklanınca useExtraTime çağrılır ve panel kapanır', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.bot,
@@ -139,12 +141,26 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('+5 sn'), findsOneWidget);
-    await tester.tap(find.text('+5 sn'));
+    // Başlangıçta Jokerler butonu var, çipler gizli
+    expect(find.bySemanticsLabel('Jokerler'), findsOneWidget);
+    expect(find.text('Süre'), findsNothing);
+
+    // Butona bas -> panel açılır
+    await tester.tap(find.bySemanticsLabel('Jokerler'));
+    await tester.pump();
+
+    expect(find.text('Süre'), findsOneWidget);
+    expect(find.text('+5 sn'), findsNothing); // +5 sn metni kalktı
+
+    // Süre çipine bas -> useExtraTime çağrılır ve panel kapanır
+    await tester.tap(find.text('Süre'));
+    await tester.pump();
+
     expect(session.extraTimeCalled, isTrue);
+    expect(find.text('Süre'), findsNothing); // Panel kapandı
   });
 
-  testWidgets('2. Arkadaş maçında (friendly) ek süre güçlendirici butonu gösterilmez', (tester) async {
+  testWidgets('2. Arkadaş maçında (friendly) Jokerler butonu gösterilmez', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.online,
@@ -160,11 +176,12 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('+5 sn'), findsNothing);
+    expect(find.bySemanticsLabel('Jokerler'), findsNothing);
+    expect(find.text('Süre'), findsNothing);
     expect(find.text(AppStrings.extraTimeUsed), findsNothing);
   });
 
-  testWidgets('3. Çevrimiçi ranked maçta güçlendirici butonu "+5 sn · 30" olarak görünür ve tıklanınca useExtraTime çağrılır', (tester) async {
+  testWidgets('3. Çevrimiçi ranked maçta güçlendirici paneli açılınca "Süre · 30" olarak görünür ve tıklanınca useExtraTime çağrılır', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.online,
@@ -181,16 +198,21 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('+5 sn'), findsOneWidget);
+    expect(find.bySemanticsLabel('Jokerler'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Jokerler'));
+    await tester.pump();
+
+    expect(find.text('Süre'), findsOneWidget);
     expect(find.text('30'), findsOneWidget);
 
-    await tester.tap(find.text('+5 sn'));
+    await tester.tap(find.text('Süre'));
     await tester.pump();
 
     expect(session.extraTimeCalled, isTrue);
+    expect(find.text('Süre'), findsNothing);
   });
 
-  testWidgets('4. Jeton yetersizken (bakiye < cost) buton soluk görünür ve tıklanınca yetersiz bakiye uyarısı verir', (tester) async {
+  testWidgets('4. Jeton yetersizken buton soluk görünür, tıklanınca panel AÇIK kalır ve yetersiz bakiye uyarısı verir', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.online,
@@ -207,16 +229,21 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('+5 sn'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Jokerler'));
+    await tester.pump();
 
-    await tester.tap(find.text('+5 sn'));
+    expect(find.text('Süre'), findsOneWidget);
+
+    await tester.tap(find.text('Süre'));
     await tester.pump();
 
     expect(session.extraTimeCalled, isFalse);
     expect(find.text(AppStrings.notEnoughCoinsForExtraTime(30)), findsOneWidget);
+    // Pasif duruma basıldığında panel AÇIK kalır
+    expect(find.text('Süre'), findsOneWidget);
   });
 
-  testWidgets('5. Güçlendirici maçta kullanıldıktan sonra (remainingUses = 0) "Kullanıldı" rozetine dönüşür', (tester) async {
+  testWidgets('5. Güçlendirici maçta kullanıldıktan sonra panelde "Kullanıldı" rozetine dönüşür ve tıklanınca panel açık kalır', (tester) async {
     final session = MockPowerupSession();
     await tester.pumpWidget(createWidget(
       mode: MatchSessionMode.online,
@@ -233,13 +260,17 @@ void main() {
     ));
     await tester.pump();
 
+    await tester.tap(find.bySemanticsLabel('Jokerler'));
+    await tester.pump();
+
     expect(find.text(AppStrings.extraTimeUsed), findsOneWidget);
-    expect(find.text('+5 sn'), findsNothing);
+    expect(find.text('Süre'), findsNothing);
 
     await tester.tap(find.text(AppStrings.extraTimeUsed));
     await tester.pump();
 
     expect(session.extraTimeCalled, isFalse);
+    expect(find.text(AppStrings.extraTimeUsed), findsOneWidget); // Panel açık
   });
 
   testWidgets('6. Rakip ek süre kullandığında üst çubuk altında bildirim şeridi görünür', (tester) async {
@@ -296,7 +327,7 @@ void main() {
 
     // temporary_error geldiğinde
     stateNotifier.updateState(
-      stateNotifier.state.copyWith(
+      stateNotifier.currentState.copyWith(
         isUsingPowerup: false,
         powerupErrorNotice: AppStrings.powerupTemporaryError,
         powerupErrorCounter: 1,
@@ -309,9 +340,9 @@ void main() {
   });
 
   group('Cevap Ver (give_answer) Widget & Yerleşim Testleri', () {
-    testWidgets('8. Bot maçında Cevap Ver butonu gösterilir, arkadaş maçında gösterilmez', (tester) async {
+    testWidgets('8. Bot maçında Cevap Ver butonu panelde gösterilir, tıklanınca panel kapanır; arkadaş maçında Jokerler butonu gösterilmez', (tester) async {
       final session = MockPowerupSession();
-      // Bot maçı: gösterilir ve tıklanabilir
+      // Bot maçı: Jokerler butonu var, panel açılınca Cevap Ver görünür ve tıklanabilir
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.bot,
         uiState: MatchUiState(
@@ -323,9 +354,17 @@ void main() {
         session: session,
       ));
       await tester.pump();
+      expect(find.bySemanticsLabel('Jokerler'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
       expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
       await tester.tap(find.text(AppStrings.giveAnswerPowerup));
+      await tester.pump();
+
       expect(session.giveAnswerCalled, isTrue);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing); // Panel kapandı
 
       // Arkadaş maçı: gösterilmez
       await tester.pumpWidget(createWidget(
@@ -340,10 +379,11 @@ void main() {
         session: session,
       ));
       await tester.pump();
+      expect(find.bySemanticsLabel('Jokerler'), findsNothing);
       expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
     });
 
-    testWidgets('9. Çevrimiçi ranked maçta iki çip yan yana ("+5 sn · 30" ve "Cevap Ver · 50") yerleşir', (tester) async {
+    testWidgets('9. Çevrimiçi ranked maçta panel açılınca iki çip alt alta ("Süre · 30" ve "Cevap Ver · 50") yerleşir', (tester) async {
       final session = MockPowerupSession();
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.online,
@@ -362,7 +402,10 @@ void main() {
       ));
       await tester.pump();
 
-      expect(find.text('+5 sn'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
+      expect(find.text('Süre'), findsOneWidget);
       expect(find.text('30'), findsOneWidget);
       expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
       expect(find.text('50'), findsOneWidget);
@@ -371,9 +414,10 @@ void main() {
       await tester.pump();
 
       expect(session.giveAnswerCalled, isTrue);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
     });
 
-    testWidgets('10. 360x640 ekranda, klavye açıkken (viewInsets) ve uzun metinlerle iki çip overflow yapmaz', (tester) async {
+    testWidgets('10. 360x640 ekranda, klavye açıkken (viewInsets) ve panel açıkken overflow yapmaz', (tester) async {
       tester.view.physicalSize = const Size(360, 640);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -415,13 +459,17 @@ void main() {
       );
       await tester.pump();
 
+      // Paneli aç
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
       final err = tester.takeException();
       expect(err, isNull);
       expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
-      expect(find.text('+5 sn'), findsOneWidget);
+      expect(find.text('Süre'), findsOneWidget);
     });
 
-    testWidgets('11. Cevap Ver yetersiz jeton durumunda (%50 opaklık) tıklanınca SnackBar gösterir', (tester) async {
+    testWidgets('11. Cevap Ver yetersiz jeton durumunda (%50 opaklık) tıklanınca panel AÇIK kalır ve SnackBar gösterir', (tester) async {
       final session = MockPowerupSession();
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.online,
@@ -437,6 +485,9 @@ void main() {
       ));
       await tester.pump();
 
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
       expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget);
 
       await tester.tap(find.text(AppStrings.giveAnswerPowerup));
@@ -444,9 +495,10 @@ void main() {
 
       expect(session.giveAnswerCalled, isFalse);
       expect(find.text(AppStrings.notEnoughCoinsForGiveAnswer(50)), findsOneWidget);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget); // Panel açık
     });
 
-    testWidgets('12. Cevap Ver kullanıldıktan sonra (remainingUses = 0) "Kullanıldı" rozetine dönüşür', (tester) async {
+    testWidgets('12. Cevap Ver kullanıldıktan sonra (remainingUses = 0) "Kullanıldı" rozetine dönüşür ve panel açık kalır', (tester) async {
       final session = MockPowerupSession();
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.online,
@@ -462,6 +514,9 @@ void main() {
       ));
       await tester.pump();
 
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
       expect(find.text(AppStrings.giveAnswerUsed), findsOneWidget);
       expect(find.text(AppStrings.giveAnswerPowerup), findsNothing);
 
@@ -469,9 +524,10 @@ void main() {
       await tester.pump();
 
       expect(session.giveAnswerCalled, isFalse);
+      expect(find.text(AppStrings.giveAnswerUsed), findsOneWidget); // Panel açık
     });
 
-    testWidgets('13. Sıra bende değilken Cevap Ver tıklandığında sıra uyarısı verir', (tester) async {
+    testWidgets('13. Sıra bende değilken Cevap Ver tıklandığında panel AÇIK kalır ve sıra uyarısı verir', (tester) async {
       final botTurnMatchState = testMatchState.copyWith(
         turnPlayerId: 'bot',
       );
@@ -490,14 +546,18 @@ void main() {
       ));
       await tester.pump();
 
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
       await tester.tap(find.text(AppStrings.giveAnswerPowerup));
       await tester.pump();
 
       expect(session.giveAnswerCalled, isFalse);
       expect(find.text(AppStrings.notYourTurnGiveAnswer), findsOneWidget);
+      expect(find.text(AppStrings.giveAnswerPowerup), findsOneWidget); // Panel açık
     });
 
-    testWidgets('14. isUsingPowerup aktifken Cevap Ver içinde yükleniyor çemberi görünür', (tester) async {
+    testWidgets('14. isUsingPowerup aktifken Jokerler butonunda CircularProgressIndicator görünür', (tester) async {
       final session = MockPowerupSession();
       await tester.pumpWidget(createWidget(
         mode: MatchSessionMode.online,
@@ -540,12 +600,181 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Ankara'), findsOneWidget);
-      // AnswerBubble içinde WidgetSpan ile powerup_auto_answer.svg çizildiğini doğrula
       expect(find.byWidgetPredicate((w) =>
           w is Text &&
           w.textSpan != null &&
           w.textSpan!.toPlainText().contains('Ankara')),
           findsOneWidget);
+    });
+
+    testWidgets('16. Panel açılıp kapanma mekaniği: butona bas -> açılır, butona tekrar bas -> kapanır, dışarı dokun -> kapanır', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 1,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 1,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      // Başlangıçta kapalı
+      expect(find.text('Süre'), findsNothing);
+
+      // 1. Butona tıkla -> açılır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+      expect(find.text('Süre'), findsOneWidget);
+
+      // 2. Butona tekrar tıkla -> kapanır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+      expect(find.text('Süre'), findsNothing);
+
+      // 3. Butona tıkla -> tekrar açılır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+      expect(find.text('Süre'), findsOneWidget);
+
+      // 4. Panel dışına (ekranın sol ortasına) tıkla -> kapanır
+      await tester.tapAt(const Offset(30, 300));
+      await tester.pump();
+      expect(find.text('Süre'), findsNothing);
+    });
+
+    testWidgets('17. Odak Koruması Testi: Cevap kutusu odaklıyken panel açılıp kapandığında odak korunur', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 1,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      // Cevap alanına odaklan
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.pump();
+
+      expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
+
+      // Jokerler butonuna tıkla -> panel açılır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+      expect(find.text('Süre'), findsOneWidget);
+
+      // Odak hâlâ cevap kutusundadır!
+      expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
+
+      // Panel dışına dokun -> panel kapanır
+      await tester.tapAt(const Offset(30, 300));
+      await tester.pump();
+      expect(find.text('Süre'), findsNothing);
+
+      // Odak hâlâ cevap kutusundadır!
+      expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
+    });
+
+    testWidgets('18. Tur değiştiğinde açık panel kendiliğinden kapanır', (tester) async {
+      final session = MockPowerupSession();
+      final stateNotifier = TestUiStateNotifier(
+        MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 1,
+        ),
+      );
+
+      final testUiStateProvider =
+          NotifierProvider<TestUiStateNotifier, MatchUiState>(
+        () => stateNotifier,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeMatchSessionModeProvider
+                .overrideWith(() => FakeModeNotifier(MatchSessionMode.online)),
+            activeMatchUiStateProvider
+                .overrideWith((ref) => ref.watch(testUiStateProvider)),
+            activeMatchSessionProvider.overrideWithValue(session),
+            profileProvider.overrideWith(() => FakeProfileNotifier(initialCoins: 100)),
+          ],
+          child: const MaterialApp(
+            home: MatchScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Paneli aç
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+      expect(find.text('Süre'), findsOneWidget);
+
+      // Sıra bota geçer (tur değişimi)
+      stateNotifier.updateState(
+        stateNotifier.currentState.copyWith(
+          matchState: testMatchState.copyWith(turnPlayerId: 'bot'),
+        ),
+      );
+      await tester.pump();
+
+      // Panel kendiliğinden kapanmıştır
+      expect(find.text('Süre'), findsNothing);
+    });
+
+    testWidgets('19. İki joker de kullanıldıysa Jokerler butonu soluk görünür ama panel yine açılabilir', (tester) async {
+      final session = MockPowerupSession();
+      await tester.pumpWidget(createWidget(
+        mode: MatchSessionMode.online,
+        uiState: MatchUiState(
+          matchState: testMatchState,
+          opponentName: 'Rakip Zeynep',
+          isFriendly: false,
+          extraTimeCost: 30,
+          extraTimeSeconds: 5,
+          extraTimeRemainingUses: 0,
+          giveAnswerCost: 50,
+          giveAnswerRemainingUses: 0,
+        ),
+        session: session,
+        coins: 100,
+      ));
+      await tester.pump();
+
+      expect(find.bySemanticsLabel('Jokerler'), findsOneWidget);
+
+      // Butonun Opacity widget'ı 0.5 opaklıktadır
+      final opacities = tester.widgetList<Opacity>(
+        find.ancestor(of: find.byType(Icon), matching: find.byType(Opacity)),
+      );
+      expect(opacities.any((op) => op.opacity == 0.5), isTrue);
+
+      // Butona tıklanınca panel yine açılır
+      await tester.tap(find.bySemanticsLabel('Jokerler'));
+      await tester.pump();
+
+      // Her iki çip de "Kullanıldı" durumundadır
+      expect(find.text('Kullanıldı'), findsNWidgets(2));
     });
   });
 }

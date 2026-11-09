@@ -438,7 +438,8 @@ abstract final class AppStrings {
       'Dostluk Düellosu • Jeton verilmez';
 
   // Güçlendiriciler (Power-ups)
-  static const String extraTimePowerup = '+5 sn';
+  static const String powerups = 'Jokerler';
+  static const String extraTimePowerup = 'Süre';
   static const String extraTimeUsed = 'Kullanıldı';
   static const String extraTimeAdded = '+5 sn eklendi!';
   static const String opponentUsedExtraTime = 'Rakip +5 sn ek süre kullandı';

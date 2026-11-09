@@ -32,6 +32,15 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
   late final BannerSuppressionNotifier _suppressionNotifier;
   int _scrollGeneration = 0;
   double _lastBottomInset = 0.0;
+  bool _isPowerupPanelOpen = false;
+
+  void _closePowerupPanel() {
+    if (_isPowerupPanelOpen && mounted) {
+      setState(() {
+        _isPowerupPanelOpen = false;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -224,6 +233,19 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
       },
     );
 
+    // Tur değiştiğinde veya maç bittiğinde joker panelini otomatik kapat
+    ref.listen<String>(
+      activeMatchUiStateProvider.select(
+        (s) =>
+            '${s.matchState?.totalRoundsPlayed}_${s.matchState?.phase}_${s.matchState?.turnPlayerId}_${s.isMatchFinished}',
+      ),
+      (prev, next) {
+        if (prev != null && prev != next && _isPowerupPanelOpen) {
+          _closePowerupPanel();
+        }
+      },
+    );
+
     final uiState = ref.watch(activeMatchUiStateProvider);
     final matchState = uiState.matchState;
 
@@ -241,6 +263,11 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
     final hasGiveAnswer = uiState.giveAnswerCost != null;
     final showPowerups =
         isPowerupEligibleMode && (hasExtraTime || hasGiveAnswer);
+    final extraTimeUsed = (uiState.extraTimeRemainingUses ?? 1) <= 0;
+    final giveAnswerUsed = (uiState.giveAnswerRemainingUses ?? 1) <= 0;
+    final allPowerupsUsed =
+        (hasExtraTime ? extraTimeUsed : true) &&
+        (hasGiveAnswer ? giveAnswerUsed : true);
 
     final isMyTurn = uiState.isMyTurn;
     final isBotTurn = matchState?.phase == MatchPhase.roundActive &&
@@ -357,75 +384,6 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                       ),
                     ],
                   ),
-                  if (showPowerups) ...[
-                    const SizedBox(height: AppDimens.space8),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                        if (hasExtraTime) ...[
-                          _ExtraTimePowerupButton(
-                            isMyTurn: isMyTurn,
-                            remainingUses:
-                                uiState.extraTimeRemainingUses ?? 1,
-                            cost: uiState.extraTimeCost ?? 30,
-                            seconds: uiState.extraTimeSeconds ?? 5,
-                            isLoading: uiState.isUsingPowerup,
-                            userCoins: profile.coins,
-                            onTap: () {
-                              ref
-                                  .read(activeMatchSessionProvider)
-                                  .useExtraTime();
-                            },
-                            onInsufficientCoins: (cost) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    AppStrings.notEnoughCoinsForExtraTime(
-                                        cost),
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                        if (hasExtraTime && hasGiveAnswer)
-                          const SizedBox(width: AppDimens.space8),
-                        if (hasGiveAnswer) ...[
-                          _GiveAnswerPowerupButton(
-                            isMyTurn: isMyTurn,
-                            remainingUses:
-                                uiState.giveAnswerRemainingUses ?? 1,
-                            cost: uiState.giveAnswerCost ?? 50,
-                            isLoading: uiState.isUsingPowerup,
-                            userCoins: profile.coins,
-                            onTap: () {
-                              _inputController.clear();
-                              ref
-                                  .read(activeMatchSessionProvider)
-                                  .useGiveAnswer();
-                            },
-                            onInsufficientCoins: (cost) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    AppStrings.notEnoughCoinsForGiveAnswer(
-                                        cost),
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
                   const SizedBox(height: AppDimens.space12),
 
                   // 3. Soru Kartı
@@ -538,6 +496,92 @@ class _MatchScreenState extends ConsumerState<MatchScreen> {
                 ),
               ),
 
+            // 1.7 Joker Butonu ve Paneli
+            if (showPowerups) ...[
+              if (_isPowerupPanelOpen) ...[
+                // Dışarı dokunma bariyeri (ExcludeFocus ile klavye odağını çalmaz)
+                Positioned.fill(
+                  child: ExcludeFocus(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _closePowerupPanel,
+                    ),
+                  ),
+                ),
+                // Joker Paneli
+                Positioned(
+                  top: AppDimens.space8 + AppDimens.iconButtonSize + AppDimens.space8,
+                  right: AppDimens.screenPaddingHorizontal,
+                  child: ExcludeFocus(
+                    child: _PowerupPanel(
+                      hasExtraTime: hasExtraTime,
+                      hasGiveAnswer: hasGiveAnswer,
+                      isMyTurn: isMyTurn,
+                      extraTimeRemainingUses:
+                          uiState.extraTimeRemainingUses ?? 1,
+                      extraTimeCost: uiState.extraTimeCost ?? 30,
+                      extraTimeSeconds: uiState.extraTimeSeconds ?? 5,
+                      giveAnswerRemainingUses:
+                          uiState.giveAnswerRemainingUses ?? 1,
+                      giveAnswerCost: uiState.giveAnswerCost ?? 50,
+                      isUsingPowerup: uiState.isUsingPowerup,
+                      userCoins: profile.coins,
+                      onExtraTimeTap: () {
+                        _closePowerupPanel();
+                        ref
+                            .read(activeMatchSessionProvider)
+                            .useExtraTime();
+                      },
+                      onGiveAnswerTap: () {
+                        _closePowerupPanel();
+                        _inputController.clear();
+                        ref
+                            .read(activeMatchSessionProvider)
+                            .useGiveAnswer();
+                      },
+                      onInsufficientCoinsForExtraTime: (cost) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              AppStrings.notEnoughCoinsForExtraTime(cost),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      onInsufficientCoinsForGiveAnswer: (cost) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              AppStrings.notEnoughCoinsForGiveAnswer(cost),
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              // Jokerler Butonu (Bariyerin üstünde, sağ üstte 40x40)
+              Positioned(
+                top: AppDimens.space8,
+                right: AppDimens.screenPaddingHorizontal,
+                child: ExcludeFocus(
+                  child: _PowerupMenuButton(
+                    isOpen: _isPowerupPanelOpen,
+                    allUsed: allPowerupsUsed,
+                    isLoading: uiState.isUsingPowerup,
+                    onTap: () {
+                      setState(() {
+                        _isPowerupPanelOpen = !_isPowerupPanelOpen;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+
             // 6. Tur Sonu Ekranı
             if (uiState.isRoundEnded)
               const Positioned.fill(
@@ -621,7 +665,180 @@ class _AnimatedBubbleState extends State<_AnimatedBubble>
   }
 }
 
-/// Ek süre güçlendiricisi (+5 sn) butonu
+/// Joker butonu ikonu. İleride SVG ile değiştirilebilir.
+const IconData _kPowerupMenuIcon = Icons.auto_awesome;
+
+/// Sağ üstteki küçük Jokerler menü butonu (~40 dp)
+class _PowerupMenuButton extends StatelessWidget {
+  final bool isOpen;
+  final bool allUsed;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _PowerupMenuButton({
+    required this.isOpen,
+    required this.allUsed,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: AppStrings.powerups,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: isLoading ? null : onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppDimens.minTouchTarget,
+            minHeight: AppDimens.minTouchTarget,
+          ),
+          child: Center(
+            child: Opacity(
+              opacity: allUsed ? 0.5 : 1.0,
+              child: Container(
+                width: AppDimens.iconButtonSize,
+                height: AppDimens.iconButtonSize,
+                decoration: BoxDecoration(
+                  color: isOpen ? AppColors.coin : AppColors.card,
+                  borderRadius: AppDimens.borderRadiusIconBtn,
+                  border: Border.all(
+                    color: AppColors.ink,
+                    width: AppDimens.borderThin,
+                  ),
+                  boxShadow: isOpen
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: AppColors.ink,
+                            offset: Offset(0, 2),
+                            blurRadius: 0,
+                          ),
+                        ],
+                ),
+                alignment: Alignment.center,
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.ink,
+                        ),
+                      )
+                    : const Icon(
+                        _kPowerupMenuIcon,
+                        size: 20,
+                        color: AppColors.ink,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Joker butonu tıklandığında açılan alt panel
+class _PowerupPanel extends StatelessWidget {
+  final bool hasExtraTime;
+  final bool hasGiveAnswer;
+  final bool isMyTurn;
+  final int extraTimeRemainingUses;
+  final int extraTimeCost;
+  final int extraTimeSeconds;
+  final int giveAnswerRemainingUses;
+  final int giveAnswerCost;
+  final bool isUsingPowerup;
+  final int userCoins;
+  final VoidCallback onExtraTimeTap;
+  final VoidCallback onGiveAnswerTap;
+  final void Function(int cost) onInsufficientCoinsForExtraTime;
+  final void Function(int cost) onInsufficientCoinsForGiveAnswer;
+
+  const _PowerupPanel({
+    required this.hasExtraTime,
+    required this.hasGiveAnswer,
+    required this.isMyTurn,
+    required this.extraTimeRemainingUses,
+    required this.extraTimeCost,
+    required this.extraTimeSeconds,
+    required this.giveAnswerRemainingUses,
+    required this.giveAnswerCost,
+    required this.isUsingPowerup,
+    required this.userCoins,
+    required this.onExtraTimeTap,
+    required this.onGiveAnswerTap,
+    required this.onInsufficientCoinsForExtraTime,
+    required this.onInsufficientCoinsForGiveAnswer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxWidth: math.max(160, MediaQuery.sizeOf(context).width - 32),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space12,
+        vertical: AppDimens.space10,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.ink,
+          width: AppDimens.borderThin,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.ink,
+            offset: Offset(0, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasExtraTime)
+            Center(
+              child: _ExtraTimePowerupButton(
+                isMyTurn: isMyTurn,
+                remainingUses: extraTimeRemainingUses,
+                cost: extraTimeCost,
+                seconds: extraTimeSeconds,
+                isLoading: isUsingPowerup,
+                userCoins: userCoins,
+                onTap: onExtraTimeTap,
+                onInsufficientCoins: onInsufficientCoinsForExtraTime,
+              ),
+            ),
+          if (hasExtraTime && hasGiveAnswer)
+            const SizedBox(height: AppDimens.space10),
+          if (hasGiveAnswer)
+            Center(
+              child: _GiveAnswerPowerupButton(
+                isMyTurn: isMyTurn,
+                remainingUses: giveAnswerRemainingUses,
+                cost: giveAnswerCost,
+                isLoading: isUsingPowerup,
+                userCoins: userCoins,
+                onTap: onGiveAnswerTap,
+                onInsufficientCoins: onInsufficientCoinsForGiveAnswer,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ek süre güçlendiricisi butonu
 class _ExtraTimePowerupButton extends StatelessWidget {
   final bool isMyTurn;
   final int remainingUses;
@@ -718,7 +935,7 @@ class _ExtraTimePowerupButton extends StatelessWidget {
                 ),
                 const SizedBox(width: AppDimens.space4),
                 Text(
-                  '+$seconds sn',
+                  AppStrings.extraTimePowerup,
                   style: AppTextStyles.cardTitle.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -794,7 +1011,7 @@ class _ExtraTimePowerupButton extends StatelessWidget {
                 ),
                 const SizedBox(width: AppDimens.space4),
                 Text(
-                  '+$seconds sn',
+                  AppStrings.extraTimePowerup,
                   style: AppTextStyles.cardTitle.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
