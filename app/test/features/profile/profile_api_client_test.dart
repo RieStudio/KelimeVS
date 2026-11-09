@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/core/strings/app_strings.dart';
 import 'package:app/features/online/data/auth_token_provider.dart';
 import 'package:app/features/profile/data/profile_api_client.dart';
 import 'package:app/features/profile/domain/energy_state.dart';
@@ -359,7 +360,7 @@ void main() {
           statusCode: 429,
           responseBody: jsonEncode({
             'error': 'nickname_cooldown',
-            'message': 'Takma adınızı 24 saatte bir değiştirebilirsiniz.',
+            'message': 'Takma adını 24 saat içinde en fazla 2 kez değiştirebilirsin. Bir sonraki değişiklik hakkın: 2 saat sonra.',
             'remainingSeconds': 7200,
           }),
         ),
@@ -369,7 +370,27 @@ void main() {
       expect(res, isA<ProfileUpdateCooldown>());
       final cooldown = res as ProfileUpdateCooldown;
       expect(cooldown.remainingSeconds, 7200);
-      expect(cooldown.message, 'Takma adınızı 24 saatte bir değiştirebilirsiniz.');
+      expect(cooldown.message, 'Takma adını 24 saat içinde en fazla 2 kez değiştirebilirsin. Bir sonraki değişiklik hakkın: 2 saat sonra.');
+    });
+
+    test('6b. updateNickname() 429 döndüğünde gövdede message yoksa AppStrings.nicknameCooldownError fallback kullanılır', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_123');
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 429,
+          responseBody: jsonEncode({
+            'error': 'nickname_cooldown',
+            'remainingSeconds': 7200,
+          }),
+        ),
+      );
+
+      final res = await client.updateNickname('YeniAd');
+      expect(res, isA<ProfileUpdateCooldown>());
+      final cooldown = res as ProfileUpdateCooldown;
+      expect(cooldown.remainingSeconds, 7200);
+      expect(cooldown.message, AppStrings.nicknameCooldownError);
     });
   });
 }

@@ -26,6 +26,23 @@ import {
 
 export const GUEST_NICKNAME_LOCK_MIN_BUILD = 13;
 
+export const NICKNAME_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const NICKNAME_MAX_CHANGES = 2;
+
+export function formatRemainingCooldown(remainingSeconds: number): string {
+  if (remainingSeconds >= 3600) {
+    const hours = Math.ceil(remainingSeconds / 3600);
+    return `${hours} saat sonra`;
+  }
+  const minutes = Math.max(1, Math.ceil(remainingSeconds / 60));
+  return `${minutes} dakika sonra`;
+}
+
+export function getNicknameCooldownMessage(remainingSeconds: number): string {
+  const timeStr = formatRemainingCooldown(remainingSeconds);
+  return `Takma adını 24 saat içinde en fazla 2 kez değiştirebilirsin. Bir sonraki değişiklik hakkın: ${timeStr}.`;
+}
+
 export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUILD?: string }): number {
   if (env?.GUEST_NICKNAME_LOCK_MIN_BUILD) {
     const parsed = parseInt(env.GUEST_NICKNAME_LOCK_MIN_BUILD, 10);
@@ -233,7 +250,7 @@ export class UserProfile extends DurableObject<Env> {
     super(ctx, env);
   }
 
-  private ensureSchema(): void {
+  private ensureSchema(nowMs = Date.now()): void {
     if (this.initialized) return;
 
     this.ctx.storage.sql.exec(`
@@ -370,6 +387,41 @@ export class UserProfile extends DurableObject<Env> {
       }
     }
 
+    const hasNicknameChangesTable = this.ctx.storage.sql
+      .exec<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'nickname_changes'"
+      )
+      .toArray().length > 0;
+
+    if (!hasNicknameChangesTable) {
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS nickname_changes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          changed_at INTEGER NOT NULL
+        );
+      `);
+
+      // KRİTİK GÖÇ: Yalnızca tablo ilk kez oluşturulurken BİR KEZ çalışır.
+      // profiles tablosunda is_system_nickname = 0 VE nickname_updated_at > 0 VE (şimdi - nickname_updated_at) < NICKNAME_WINDOW_MS
+      // ise kullanıcının tek bir geçmiş değişikliği olduğu kabul edilip nickname_changes tablosuna eklenir (1 hakkı kalır).
+      const legacyProfiles = this.ctx.storage.sql
+        .exec<{ nickname_updated_at: number | null; is_system_nickname: number | null }>(
+          'SELECT nickname_updated_at, is_system_nickname FROM profiles LIMIT 1'
+        )
+        .toArray();
+
+      if (legacyProfiles.length > 0) {
+        const lastUpdated = legacyProfiles[0].nickname_updated_at ?? 0;
+        const isSystem = legacyProfiles[0].is_system_nickname ?? 0;
+        if (isSystem === 0 && lastUpdated > 0 && nowMs - lastUpdated < NICKNAME_WINDOW_MS) {
+          this.ctx.storage.sql.exec(
+            'INSERT INTO nickname_changes (changed_at) VALUES (?)',
+            lastUpdated
+          );
+        }
+      }
+    }
+
     this.initialized = true;
   }
 
@@ -410,6 +462,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM owned_items;
       DELETE FROM energy_spends;
       DELETE FROM energy_purchases;
+      DELETE FROM nickname_changes;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -576,9 +629,10 @@ export class UserProfile extends DurableObject<Env> {
   async getProfile(
     uid?: string,
     clientBuild = 0,
-    isGuest?: boolean
+    isGuest?: boolean,
+    nowMs = Date.now()
   ): Promise<UserProfileData> {
-    this.ensureSchema();
+    this.ensureSchema(nowMs);
 
     if (this.isDeleted()) {
       throw new Error('account_deleted');
@@ -664,7 +718,6 @@ export class UserProfile extends DurableObject<Env> {
     const effectiveUid = uid && uid.trim().length > 0 ? uid.trim() : 'unknown';
     const startCoins = parseInt(this.env.START_COINS ?? '100', 10);
     const initialCoins = Number.isFinite(startCoins) && startCoins >= 0 ? startCoins : 100;
-    const nowMs = Date.now();
     const maxEnergy = getEnergyMax(this.env);
 
     const initialIsGuest = isGuest === true ? 1 : 0;
@@ -697,7 +750,8 @@ export class UserProfile extends DurableObject<Env> {
 
   /**
    * Takma adı sanitize/validate edip kaydeder.
-   * İlk belirleme serbesttir; sonraki değişiklikler için 24 saat bekleme süresi şartı aranır.
+   * İlk özel ad belirleme kotaya sayılmaz ve serbesttir.
+   * Sonraki değişiklikler 24 saatlik kayan pencerede en fazla 2 kez yapılabilir (NICKNAME_MAX_CHANGES).
    */
   async setNickname(
     nickname: string,
@@ -705,7 +759,7 @@ export class UserProfile extends DurableObject<Env> {
     nowMs = Date.now(),
     isGuest?: boolean
   ): Promise<{ ok: true; nickname: string }> {
-    this.ensureSchema();
+    this.ensureSchema(nowMs);
 
     if (this.isDeleted()) {
       throw new Error('account_deleted');
@@ -726,57 +780,78 @@ export class UserProfile extends DurableObject<Env> {
     const normalized = validation.normalized;
 
     // Profil yoksa önce oluştur
-    await this.getProfile(uid, 0, isGuest);
+    await this.getProfile(uid, 0, isGuest, nowMs);
 
-    // 24 saat bekleme süresi (cooldown) ve misafir kilidi kontrolü:
-    const rows = this.ctx.storage.sql
-      .exec<{
-        nickname: string | null;
-        nickname_updated_at: number | null;
-        is_guest: number | null;
-        is_system_nickname: number | null;
-      }>(
-        'SELECT nickname, nickname_updated_at, is_guest, is_system_nickname FROM profiles LIMIT 1'
-      )
-      .toArray();
+    return this.ctx.storage.transactionSync(() => {
+      // 1. 24 saatten eski kayıtları temizle
+      const windowStart = nowMs - NICKNAME_WINDOW_MS;
+      this.ctx.storage.sql.exec(
+        'DELETE FROM nickname_changes WHERE changed_at < ?',
+        windowStart
+      );
 
-    if (rows.length > 0) {
-      if (rows[0].is_guest === 1) {
-        throw new Error('guest_nickname_locked');
-      }
+      // 2. Mevcut profil bilgilerini al
+      const rows = this.ctx.storage.sql
+        .exec<{
+          nickname: string | null;
+          nickname_updated_at: number | null;
+          is_guest: number | null;
+          is_system_nickname: number | null;
+        }>(
+          'SELECT nickname, nickname_updated_at, is_guest, is_system_nickname FROM profiles LIMIT 1'
+        )
+        .toArray();
 
-      const currentNickname = rows[0].nickname;
-      const lastUpdatedAt = rows[0].nickname_updated_at ?? 0;
-      const isSystemNickname = rows[0].is_system_nickname ?? 0;
+      if (rows.length > 0) {
+        if (rows[0].is_guest === 1) {
+          throw new Error('guest_nickname_locked');
+        }
 
-      const hasExistingNickname =
-        typeof currentNickname === 'string' && currentNickname.trim().length > 0;
+        const currentNickname = rows[0].nickname;
+        const lastUpdatedAt = rows[0].nickname_updated_at ?? 0;
+        const isSystemNickname = rows[0].is_system_nickname ?? 0;
 
-      // Cooldown kontrolü:
-      // Eğer mevcut ad null/boş ise VEYA sistem tarafından atanmışsa (is_system_nickname === 1)
-      // VEYA lastUpdatedAt <= 0 ise: İLK ÖZEL AD SEÇİMİDİR -> Cooldown uygulanmaz!
-      const isFirstCustomNickname =
-        !hasExistingNickname || isSystemNickname === 1 || lastUpdatedAt <= 0;
+        const hasExistingNickname =
+          typeof currentNickname === 'string' && currentNickname.trim().length > 0;
 
-      if (!isFirstCustomNickname) {
-        const NICKNAME_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-        const elapsed = nowMs - lastUpdatedAt;
-        if (elapsed < NICKNAME_COOLDOWN_MS) {
-          const remainingSeconds = Math.ceil((NICKNAME_COOLDOWN_MS - elapsed) / 1000);
-          const error = new Error('nickname_cooldown');
-          (error as any).remainingSeconds = remainingSeconds;
-          throw error;
+        // İlk özel ad belirleme kontrolü (SEÇENEK A):
+        // Eğer mevcut ad null/boş ise VEYA sistem tarafından atanmışsa (is_system_nickname === 1)
+        // VEYA lastUpdatedAt <= 0 ise: İLK ÖZEL AD SEÇİMİDİR -> Cooldown uygulanmaz ve kotaya sayılmaz!
+        const isFirstCustomNickname =
+          !hasExistingNickname || isSystemNickname === 1 || lastUpdatedAt <= 0;
+
+        if (!isFirstCustomNickname) {
+          const recentChanges = this.ctx.storage.sql
+            .exec<{ changed_at: number }>(
+              'SELECT changed_at FROM nickname_changes WHERE changed_at >= ? ORDER BY changed_at ASC',
+              windowStart
+            )
+            .toArray();
+
+          if (recentChanges.length >= NICKNAME_MAX_CHANGES) {
+            const oldestChange = recentChanges[0].changed_at;
+            const nextAvailable = oldestChange + NICKNAME_WINDOW_MS;
+            const remainingSeconds = Math.max(1, Math.ceil((nextAvailable - nowMs) / 1000));
+            const error = new Error('nickname_cooldown');
+            (error as any).remainingSeconds = remainingSeconds;
+            throw error;
+          }
+
+          this.ctx.storage.sql.exec(
+            'INSERT INTO nickname_changes (changed_at) VALUES (?)',
+            nowMs
+          );
         }
       }
-    }
 
-    this.ctx.storage.sql.exec(
-      'UPDATE profiles SET nickname = ?, nickname_updated_at = ?, is_system_nickname = 0',
-      normalized,
-      nowMs
-    );
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET nickname = ?, nickname_updated_at = ?, is_system_nickname = 0',
+        normalized,
+        nowMs
+      );
 
-    return { ok: true, nickname: normalized };
+      return { ok: true, nickname: normalized };
+    });
   }
 
   /**

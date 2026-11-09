@@ -139,33 +139,54 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
     await expect(profileDO.setNickname('Admin_Ahmet', 'user_1')).rejects.toThrow('reserved_nickname');
   });
 
-  it('3b. Takma ad 24 saat bekleme süresi (cooldown) kuralı doğru uygulanır', async () => {
+  it('3b. Takma ad 24 saat içinde 2 kez değiştirme (kayan pencere) kuralı doğru uygulanır', async () => {
     const ctx = createMockCtx();
     const env = createEnv();
     const profileDO = new UserProfile(ctx, env);
 
     const t0 = 1_000_000_000;
 
-    // 1. İlk belirleme serbesttir
+    // 1. İlk belirleme serbesttir ve kota harcamaz
     const r1 = await profileDO.setNickname('IlkAdim', 'user_cd', t0);
     expect(r1.ok).toBe(true);
     expect(r1.nickname).toBe('IlkAdim');
 
-    // 2. 1 saat sonra değiştirme denenirse (3600 sn < 86400 sn) 429 nickname_cooldown fırlatılır
-    const tPlus1Hour = t0 + 3600 * 1000;
+    // 2. İlk adın 10 dk sonrası 1. değişiklik: başarılı
+    const t1 = t0 + 10 * 60 * 1000;
+    const r2 = await profileDO.setNickname('IkinciAdim', 'user_cd', t1);
+    expect(r2.ok).toBe(true);
+    expect(r2.nickname).toBe('IkinciAdim');
+
+    // 3. Ondan 20 dk sonra 2. değişiklik: başarılı
+    const t2 = t1 + 20 * 60 * 1000;
+    const r3 = await profileDO.setNickname('UcuncuAdim', 'user_cd', t2);
+    expect(r3.ok).toBe(true);
+    expect(r3.nickname).toBe('UcuncuAdim');
+
+    // 4. Ondan 5 dk sonra 3. deneme: 429 nickname_cooldown fırlatılır
+    const t3 = t2 + 5 * 60 * 1000;
     try {
-      await profileDO.setNickname('IkinciAdim', 'user_cd', tPlus1Hour);
+      await profileDO.setNickname('DorduncuAdim', 'user_cd', t3);
       expect.unreachable('nickname_cooldown hatası fırlatılmalıydı');
     } catch (err) {
       expect((err as Error).message).toBe('nickname_cooldown');
-      expect((err as any).remainingSeconds).toBe(23 * 3600);
+      const expectedRemaining = Math.ceil((t1 + 24 * 3600 * 1000 - t3) / 1000);
+      expect((err as any).remainingSeconds).toBe(expectedRemaining);
     }
 
-    // 3. 24 saat 1 saniye sonra (t0 + 86401 sn) değiştirme başarılı olur
-    const tPlus24Hours = t0 + 86401 * 1000;
-    const r2 = await profileDO.setNickname('IkinciAdim', 'user_cd', tPlus24Hours);
-    expect(r2.ok).toBe(true);
-    expect(r2.nickname).toBe('IkinciAdim');
+    // 5. 1. değişikliğin 24 saat + 1 sn sonrası: bir hak açılır, değişiklik başarılı olur
+    const t4 = t1 + 86401 * 1000;
+    const r4 = await profileDO.setNickname('DorduncuAdim', 'user_cd', t4);
+    expect(r4.ok).toBe(true);
+    expect(r4.nickname).toBe('DorduncuAdim');
+
+    // 6. Hemen ardından tekrar deneme 429 alır (çünkü 2. değişiklik henüz dolmadı)
+    try {
+      await profileDO.setNickname('BesinciAdim', 'user_cd', t4 + 1000);
+      expect.unreachable('nickname_cooldown hatası fırlatılmalıydı');
+    } catch (err) {
+      expect((err as Error).message).toBe('nickname_cooldown');
+    }
   });
 
   it('4. applyMatchReward galibiyet, mağlubiyet ve kopma ödüllerini doğru uygular', async () => {
@@ -372,7 +393,7 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
       expect(profile.nickname).toBe('OzelAdim123');
     });
 
-    it('12. Google\'a bağlanan kullanıcının ilk özel ad seçimi 24 saatlik cooldown\'a takılmaz, ikinci seçim takılır', async () => {
+    it('12. Google\'a bağlanan kullanıcının ilk özel ad seçimi kota harcamaz; sonrasında 24 saatte 2 değişiklik hakkı uygulanır', async () => {
       const ctx = createMockCtx();
       const env = createEnv();
       const profileDO = new UserProfile(ctx, env);
@@ -385,7 +406,7 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
       await profileDO.getProfile('user_cooldown_test', 0, false);
 
       const t0 = 100_000_000;
-      // 1. İlk özel ad seçimi: cooldown baypas edilir, başarıyla kaydedilir
+      // 1. İlk özel ad seçimi: cooldown baypas edilir ve kotaya sayılmaz
       const res1 = await profileDO.setNickname('IlkOzelAdim', 'user_cooldown_test', t0, false);
       expect(res1.ok).toBe(true);
       expect(res1.nickname).toBe('IlkOzelAdim');
@@ -394,20 +415,32 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
       expect(afterRes1.nickname).toBe('IlkOzelAdim');
       expect(afterRes1.isSystemNickname).toBe(false);
 
-      // 2. 1 saat sonra (t0 + 3600_000) ikinci değişiklik denenirse cooldown'a takılır
-      await expect(
-        profileDO.setNickname('IkinciOzelAdim', 'user_cooldown_test', t0 + 3600_000, false)
-      ).rejects.toThrow('nickname_cooldown');
-
-      // 3. 24 saat + 1 sn sonra (t0 + 86401_000) değişiklik serbesttir
-      const res2 = await profileDO.setNickname(
-        'IkinciOzelAdim',
-        'user_cooldown_test',
-        t0 + 86401_000,
-        false
-      );
+      // 2. 1 saat sonra (t0 + 3600_000) 1. değişiklik serbesttir
+      const t1 = t0 + 3600_000;
+      const res2 = await profileDO.setNickname('IkinciOzelAdim', 'user_cooldown_test', t1, false);
       expect(res2.ok).toBe(true);
       expect(res2.nickname).toBe('IkinciOzelAdim');
+
+      // 3. 2 saat sonra (t0 + 7200_000) 2. değişiklik serbesttir
+      const t2 = t0 + 7200_000;
+      const res3 = await profileDO.setNickname('UcuncuOzelAdim', 'user_cooldown_test', t2, false);
+      expect(res3.ok).toBe(true);
+      expect(res3.nickname).toBe('UcuncuOzelAdim');
+
+      // 4. 3 saat sonra (t0 + 10800_000) 3. değişiklik denenirse cooldown'a takılır
+      await expect(
+        profileDO.setNickname('DorduncuOzelAdim', 'user_cooldown_test', t0 + 10800_000, false)
+      ).rejects.toThrow('nickname_cooldown');
+
+      // 5. 1. değişikliğin üzerinden 24 saat + 1 sn sonra (t1 + 86401_000) değişiklik serbesttir
+      const res4 = await profileDO.setNickname(
+        'DorduncuOzelAdim',
+        'user_cooldown_test',
+        t1 + 86401_000,
+        false
+      );
+      expect(res4.ok).toBe(true);
+      expect(res4.nickname).toBe('DorduncuOzelAdim');
     });
 
     it('13. Şema değişikliğinden ÖNCE oluşturulmuş Google kullanıcısı (Sevbans): ensureSchema sonrası Google token ile getProfile çağrılınca nickname "Sevbans" AYNEN kalır, Leaderboard değişmez, is_guest=0 ve is_system_nickname=0 olur', async () => {
@@ -517,7 +550,7 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
       expect(row.nickname).toBe(profile.nickname);
     });
 
-    it('15. Şema değişikliğinden ÖNCE oluşturulmuş Google kullanıcısı (Sevbans) için cooldown normal çalışır (is_system_nickname=0)', async () => {
+    it('15. Şema değişikliğinden ÖNCE oluşturulmuş Google kullanıcısı (Sevbans) göç sonrası 2. hakkını kullanabilir, 3. değişiklikte cooldown uygulanır', async () => {
       const ctx = createMockCtx();
       const env = createEnv();
 
@@ -543,22 +576,32 @@ describe('UserProfile Durable Object - SQLite & Ekonomi Kuralları', () => {
       `);
 
       const profileDO = new UserProfile(ctx, env);
-      await profileDO.getProfile('u_sevbans_cooldown', 0, false);
+      await profileDO.getProfile('u_sevbans_cooldown', 0, false, tLastUpdated + 3600_000);
 
-      // 1 saat sonra yeni ad seçmeye çalışırsa cooldown uygulanmalı (çünkü is_system_nickname=0)
+      // Göç sonrası: Kullanıcının 1 hakkı kullanılmış sayılır, 2. hakkı vardır -> başarılı olur!
+      const res1 = await profileDO.setNickname(
+        'Sevbans2',
+        'u_sevbans_cooldown',
+        tLastUpdated + 3600_000,
+        false
+      );
+      expect(res1.ok).toBe(true);
+      expect(res1.nickname).toBe('Sevbans2');
+
+      // 2 hak dolduktan sonra hemen yeni ad denenirse cooldown uygulanır
       await expect(
-        profileDO.setNickname('Sevbans2', 'u_sevbans_cooldown', tLastUpdated + 3600_000, false)
+        profileDO.setNickname('Sevbans3', 'u_sevbans_cooldown', tLastUpdated + 3600_000 + 1000, false)
       ).rejects.toThrow('nickname_cooldown');
 
-      // 24 saat 1 saniye sonra serbesttir
-      const res = await profileDO.setNickname(
-        'Sevbans2',
+      // İlk eski değişikliğin üzerinden 24 saat 1 saniye sonra tekrar serbesttir
+      const res2 = await profileDO.setNickname(
+        'Sevbans3',
         'u_sevbans_cooldown',
         tLastUpdated + 86401_000,
         false
       );
-      expect(res.ok).toBe(true);
-      expect(res.nickname).toBe('Sevbans2');
+      expect(res2.ok).toBe(true);
+      expect(res2.nickname).toBe('Sevbans3');
     });
 
     it('16. getProfile isGuest parametresi verilmediğinde (undefined) misafir dönüşümü asla tetiklenmez', async () => {

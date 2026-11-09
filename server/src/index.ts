@@ -9,7 +9,7 @@ import {
 } from './powerup';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
-import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild } from './userProfile';
+import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild, getNicknameCooldownMessage } from './userProfile';
 import { Leaderboard, type LeaderboardSeedEntry } from './leaderboard';
 import { ReportStore } from './reportStore';
 
@@ -289,7 +289,7 @@ export default {
           return new Response(
             JSON.stringify({
               error: 'nickname_cooldown',
-              message: 'Takma adınızı 24 saatte bir değiştirebilirsiniz.',
+              message: getNicknameCooldownMessage(remainingSeconds),
               remainingSeconds,
             }),
             {

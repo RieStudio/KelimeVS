@@ -505,8 +505,8 @@ describe('API Routes: /me & /me/nickname (auth & validation)', () => {
       expect(body.ok).toBe(true);
       expect(body.nickname).toBe('GoogleAd');
 
-      // 24 saat geçmeden tekrar ad değiştirmeye çalışırsa 429 Cooldown almalı
-      const reqCooldown = new Request('http://127.0.0.1/me/nickname', {
+      // 1. değişiklik: başarılı (200)
+      const reqChange1 = new Request('http://127.0.0.1/me/nickname', {
         method: 'PUT',
         headers: {
           Authorization: 'Bearer dev:google_user_b12',
@@ -515,11 +515,39 @@ describe('API Routes: /me & /me/nickname (auth & validation)', () => {
         },
         body: JSON.stringify({ nickname: 'YeniGoogleAd' }),
       });
+      const resChange1 = await worker.fetch(reqChange1, env);
+      expect(resChange1.status).toBe(200);
+
+      // 2. değişiklik: başarılı (200)
+      const reqChange2 = new Request('http://127.0.0.1/me/nickname', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer dev:google_user_b12',
+          'X-App-Build': '12',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: 'DahaYeniGoogleAd' }),
+      });
+      const resChange2 = await worker.fetch(reqChange2, env);
+      expect(resChange2.status).toBe(200);
+
+      // 3. değişiklik (24 saat dolmadan): 429 Cooldown almalı
+      const reqCooldown = new Request('http://127.0.0.1/me/nickname', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer dev:google_user_b12',
+          'X-App-Build': '12',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname: 'UcuncuGoogleAd' }),
+      });
       const resCooldown = await worker.fetch(reqCooldown, env);
       expect(resCooldown.status).toBe(429);
       expect(resCooldown.headers.get('Retry-After')).toBeTruthy();
       const bodyCooldown = (await resCooldown.json()) as any;
       expect(bodyCooldown.error).toBe('nickname_cooldown');
+      expect(bodyCooldown.message).toContain('Takma adını 24 saat içinde en fazla 2 kez değiştirebilirsin');
+      expect(bodyCooldown.remainingSeconds).toBeGreaterThan(0);
     });
   });
 

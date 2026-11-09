@@ -301,7 +301,7 @@ abstract final class AppStrings {
   static const String guestNicknameLocked =
       'Misafir hesaplar takma ad değiştiremez.';
   static const String nicknameCooldownError =
-      'Takma adınızı 24 saatte bir değiştirebilirsiniz.';
+      'Takma adını 24 saat içinde en fazla 2 kez değiştirebilirsin.';
   static const String profileLoadErrorTitle = 'Profil yüklenemedi';
   static const String profileLoadErrorMessage =
       'Profil bilgilerin alınamadı. Lütfen internet bağlantını kontrol edip tekrar dene.';
