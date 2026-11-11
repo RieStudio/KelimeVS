@@ -98,6 +98,7 @@ abstract final class OnlineMatchHistoryMapper {
     required FinalServerMessage finalMessage,
     required String matchId,
     required String opponentName,
+    String? opponentUid,
     String opponentFrame = 'classic',
     required int finishedAtMs,
     required Map<String, String> questionTextsById,
@@ -132,6 +133,7 @@ abstract final class OnlineMatchHistoryMapper {
       opponentName: opponentName.isNotEmpty
           ? opponentName
           : AppStrings.opponent,
+      opponentUid: opponentUid ?? finalMessage.opponentUid,
       finishedAtMs: finishedAtMs,
       myScore: finalMessage.myScore,
       opponentScore: finalMessage.opponentScore,
@@ -178,6 +180,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   OnlineMatchState? _lastOnlineState;
   String? _currentMatchId;
+  String? _opponentUid;
   bool _isMatchSaved = false;
   bool _hasReceivedFinal = false;
   bool _isLeaving = false;
@@ -231,6 +234,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    String? opponentUid,
     String opponentFrame = 'classic',
     bool isFriendly = false,
     OnlineMatchClient? client,
@@ -243,6 +247,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     }
 
     _currentMatchId = matchId;
+    _opponentUid = opponentUid;
     _isFriendly = isFriendly;
     _isMatchSaved = false;
     _hasReceivedFinal = false;
@@ -634,6 +639,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       finalMessage: finalMsg,
       matchId: matchId,
       opponentName: resolvedOpponentName,
+      opponentUid: finalMsg.opponentUid ?? _opponentUid,
       opponentFrame: resolvedOpponentFrame,
       finishedAtMs: finishedAtMs,
       questionTextsById: _questionTextCache,
@@ -780,6 +786,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       opponentName: state.opponentName.isNotEmpty
           ? state.opponentName
           : AppStrings.opponent,
+      opponentUid: _opponentUid,
       finishedAtMs: finishedAtMs,
       myScore: myScore,
       opponentScore: opponentScore,
@@ -1085,6 +1092,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     _wasReconnecting = false;
     _opponentEverDisconnected = false;
     _hasReceivedFinal = false;
+    _currentMatchId = null;
+    _opponentUid = null;
     if (_isObserverRegistered) {
       WidgetsBinding.instance.removeObserver(this);
       _isObserverRegistered = false;

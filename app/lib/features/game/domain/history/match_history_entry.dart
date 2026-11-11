@@ -24,6 +24,7 @@ class MatchHistoryEntry {
   final String id;
   final String? matchId;
   final String opponentName;
+  final String? opponentUid;
   final int finishedAtMs;
   final int myScore;
   final int opponentScore;
@@ -42,6 +43,7 @@ class MatchHistoryEntry {
     required this.id,
     this.matchId,
     required this.opponentName,
+    this.opponentUid,
     required this.finishedAtMs,
     required this.myScore,
     required this.opponentScore,

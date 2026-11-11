@@ -95,6 +95,7 @@ class FakeMatchController extends MatchController {
 class FakeOnlineMatchSession extends OnlineMatchSession {
   String? startedWithMatchId;
   String? startedWithOpponentName;
+  String? startedWithOpponentUid;
   bool startOnlineMatchCalled = false;
 
   @override
@@ -104,6 +105,7 @@ class FakeOnlineMatchSession extends OnlineMatchSession {
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    String? opponentUid,
     String opponentFrame = 'classic',
     bool isFriendly = false,
     OnlineMatchClient? client,
@@ -111,6 +113,7 @@ class FakeOnlineMatchSession extends OnlineMatchSession {
     startOnlineMatchCalled = true;
     startedWithMatchId = matchId;
     startedWithOpponentName = opponentName;
+    startedWithOpponentUid = opponentUid;
     state = state.copyWith(opponentName: opponentName, isLoading: true);
   }
 }

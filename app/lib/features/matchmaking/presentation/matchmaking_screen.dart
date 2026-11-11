@@ -71,6 +71,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
 
   late String _fallbackOpponentName;
   String _opponentName = '';
+  String? _opponentUid;
   String _opponentFrame = 'classic';
   String? _matchedMatchId;
   bool _isOnlineMatch = false;
@@ -196,6 +197,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
         _isOnlineMatch = true;
         _isMatchedLocked = true;
         _matchedMatchId = event.matchId;
+        _opponentUid = event.opponentUid;
         _opponentName = event.opponentName.isNotEmpty
             ? event.opponentName
             : _fallbackOpponentName;
@@ -333,6 +335,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
             .startOnlineMatch(
               matchId: matchId,
               opponentName: oppName,
+              opponentUid: _opponentUid,
               opponentFrame: _opponentFrame,
             ),
       );

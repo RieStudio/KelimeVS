@@ -398,6 +398,26 @@ abstract final class AppStrings {
   static const String blockedUsersLoading = 'Engellenenler yükleniyor…';
   static const String blockedUsersError = 'Engellenenler yüklenemedi';
 
+  // Herkese Açık Oyuncu Profili
+  static const String publicProfileTitle = 'Oyuncu Profili';
+  static const String profileNotFound = 'Profil bulunamadı.';
+  static const String profileDeleted = 'Bu hesap silinmiş.';
+  static const String profileAlreadyReported = 'Bu oyuncuyu zaten bildirdin.';
+  static const String profileDailyReportLimit =
+      'Günlük bildirim sınırına ulaştın.';
+  static const String profileBlockLimit =
+      'En fazla 100 oyuncu engelleyebilirsin.';
+  static const String profileConnectionError =
+      'Bağlantı hatası oluştu. Lütfen internetini kontrol et.';
+  static const String profileBlockedSuccess = 'Oyuncu engellendi.';
+  static const String profileUnblockedSuccess = 'Engel kaldırıldı.';
+  static const String profileReportedSuccess =
+      'Bildirimin alındı. Teşekkür ederiz.';
+  static const String profileCannotBlockSelf = 'Kendini engelleyemezsin.';
+  static const String profileCannotReportSelf = 'Kendini bildiremezsin.';
+  static const String profileGenericError =
+      'Bir hata oluştu. Lütfen tekrar dene.';
+
   // Arkadaşla Düello
   static const String friendDuel = 'Arkadaşla Düello';
   static const String friendDuelSubtitle =

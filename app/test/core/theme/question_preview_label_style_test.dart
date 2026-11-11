@@ -82,6 +82,7 @@ class _FakeOnlineMatchSession extends OnlineMatchSession {
   Future<void> startOnlineMatch({
     required String matchId,
     required String opponentName,
+    String? opponentUid,
     String opponentFrame = 'classic',
     bool isFriendly = false,
     OnlineMatchClient? client,

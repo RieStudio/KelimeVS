@@ -129,6 +129,7 @@ class MatchReconciler {
           id: entry.id,
           matchId: entry.matchId,
           opponentName: entry.opponentName,
+          opponentUid: finalMsg.opponentUid ?? entry.opponentUid,
           finishedAtMs: entry.finishedAtMs,
           myScore: finalMsg.myScore,
           opponentScore: finalMsg.opponentScore,
@@ -141,6 +142,7 @@ class MatchReconciler {
           botlaOynandi: entry.botlaOynandi,
           isFinal: true,
           isFriendly: entry.isFriendly,
+          opponentFrame: entry.opponentFrame,
         );
 
         await repo.add(updatedEntry);

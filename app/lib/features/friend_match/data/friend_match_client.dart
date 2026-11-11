@@ -53,17 +53,19 @@ class FriendMatchRoomResumed extends FriendMatchEvent {
 class FriendMatchMatched extends FriendMatchEvent {
   final String matchId;
   final String opponentName;
+  final String? opponentUid;
   final String opponentFrame;
 
   const FriendMatchMatched({
     required this.matchId,
     required this.opponentName,
+    this.opponentUid,
     this.opponentFrame = 'classic',
   });
 
   @override
   String toString() =>
-      'FriendMatchMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame)';
+      'FriendMatchMatched(matchId: $matchId, opponentName: $opponentName, opponentUid: $opponentUid, opponentFrame: $opponentFrame)';
 }
 
 /// Odanın 5 dakikalık süresi doldu.
@@ -228,6 +230,7 @@ class FriendMatchClient {
           FriendMatchMatched(
             matchId: message.matchId,
             opponentName: message.opponentName,
+            opponentUid: message.opponentUid,
             opponentFrame: message.opponentFrame,
           ),
         );

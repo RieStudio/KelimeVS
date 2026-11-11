@@ -30,6 +30,7 @@ class MatchmakingQueued extends MatchmakingEvent {
 class MatchmakingMatched extends MatchmakingEvent {
   final String matchId;
   final String opponentName;
+  final String? opponentUid;
   final String opponentFrame;
   final MatchedEnergyInfo? energy;
   final int? serverNowMs;
@@ -38,6 +39,7 @@ class MatchmakingMatched extends MatchmakingEvent {
   const MatchmakingMatched({
     required this.matchId,
     required this.opponentName,
+    this.opponentUid,
     this.opponentFrame = 'classic',
     this.energy,
     this.serverNowMs,
@@ -46,7 +48,7 @@ class MatchmakingMatched extends MatchmakingEvent {
 
   @override
   String toString() =>
-      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentFrame: $opponentFrame, energy: $energy, firstQuestion: $firstQuestion)';
+      'MatchmakingMatched(matchId: $matchId, opponentName: $opponentName, opponentUid: $opponentUid, opponentFrame: $opponentFrame, energy: $energy, firstQuestion: $firstQuestion)';
 }
 
 /// Kullanıcı veya sistem tarafından eşleştirme iptal edildi.
@@ -239,6 +241,7 @@ class MatchmakingClient {
         MatchmakingMatched(
           matchId: msg.matchId,
           opponentName: msg.opponentName,
+          opponentUid: msg.opponentUid,
           opponentFrame: msg.opponentFrame,
           energy: msg.energy,
           serverNowMs: msg.serverNowMs,

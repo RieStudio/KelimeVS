@@ -115,6 +115,7 @@ class FirstQuestionPreview {
 class MatchedServerMessage extends ServerMessage {
   final String matchId;
   final String opponentName;
+  final String? opponentUid;
   final bool isFriendly;
   final String opponentFrame;
   final MatchedEnergyInfo? energy;
@@ -124,6 +125,7 @@ class MatchedServerMessage extends ServerMessage {
   const MatchedServerMessage({
     required this.matchId,
     required this.opponentName,
+    this.opponentUid,
     this.isFriendly = false,
     this.opponentFrame = 'classic',
     this.energy,
@@ -133,7 +135,7 @@ class MatchedServerMessage extends ServerMessage {
 
   @override
   String toString() =>
-      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, isFriendly: $isFriendly, energy: $energy, firstQuestion: $firstQuestion)';
+      'MatchedServerMessage(matchId: $matchId, opponentName: $opponentName, opponentUid: $opponentUid, isFriendly: $isFriendly, energy: $energy, firstQuestion: $firstQuestion)';
 }
 
 /// Arkadaş odası kuruldu bildirimi (`room_created`).
@@ -207,6 +209,7 @@ class FinalServerMessage extends ServerMessage {
   final bool winnerIsMe;
   final String endedBy; // 'normal', 'forfeit'
   final String? opponentName;
+  final String? opponentUid;
   final String opponentFrame;
   final int? coinsAwarded;
   final int? coins;
@@ -218,6 +221,7 @@ class FinalServerMessage extends ServerMessage {
     required this.winnerIsMe,
     required this.endedBy,
     this.opponentName,
+    this.opponentUid,
     this.opponentFrame = 'classic',
     this.coinsAwarded,
     this.coins,
@@ -225,7 +229,7 @@ class FinalServerMessage extends ServerMessage {
 
   @override
   String toString() =>
-      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName, coinsAwarded: $coinsAwarded, coins: $coins)';
+      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName, opponentUid: $opponentUid, coinsAwarded: $coinsAwarded, coins: $coins)';
 }
 
 /// İptal edilen maç bildirimi (`voided`).
@@ -308,6 +312,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final opponentName = json['opponentName'];
         final isFriendly = json['isFriendly'] as bool? ?? false;
         final opponentFrame = json['opponentFrame'] as String? ?? 'classic';
+        final opponentUid = json['opponentUid'] as String?;
         if (matchId is! String || opponentName is! String) {
           return UnknownServerMessage(raw);
         }
@@ -323,6 +328,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         return MatchedServerMessage(
           matchId: matchId,
           opponentName: opponentName,
+          opponentUid: opponentUid,
           isFriendly: isFriendly,
           opponentFrame: opponentFrame,
           energy: energy,
@@ -372,6 +378,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final winnerIsMe = json['winnerIsMe'] as bool? ?? false;
         final endedBy = json['endedBy'] as String? ?? 'normal';
         final opponentName = json['opponentName'] as String?;
+        final opponentUid = json['opponentUid'] as String?;
         final opponentFrame = json['opponentFrame'] as String? ?? 'classic';
         final coinsAwarded = (json['coinsAwarded'] as num?)?.toInt();
         final coins = (json['coins'] as num?)?.toInt();
@@ -382,6 +389,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           winnerIsMe: winnerIsMe,
           endedBy: endedBy,
           opponentName: opponentName,
+          opponentUid: opponentUid,
           opponentFrame: opponentFrame,
           coinsAwarded: coinsAwarded,
           coins: coins,
