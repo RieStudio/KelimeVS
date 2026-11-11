@@ -399,7 +399,7 @@ abstract final class AppStrings {
   static const String blockedUsersError = 'Engellenenler yüklenemedi';
 
   // Herkese Açık Oyuncu Profili
-  static const String publicProfileTitle = 'Oyuncu Profili';
+  static const String publicProfileTitle = 'Profil';
   static const String profileNotFound = 'Profil bulunamadı.';
   static const String profileDeleted = 'Bu hesap silinmiş.';
   static const String profileAlreadyReported = 'Bu oyuncuyu zaten bildirdin.';
@@ -417,6 +417,19 @@ abstract final class AppStrings {
   static const String profileCannotReportSelf = 'Kendini bildiremezsin.';
   static const String profileGenericError =
       'Bir hata oluştu. Lütfen tekrar dene.';
+  static const String statsWon = 'Galibiyet';
+  static const String profileGuestBadge = 'Misafir';
+  static const String profileBlockedBanner =
+      'ENGELLENDİ · Seninle eşleşmeyecek';
+  static const String profileBlockHelpText =
+      'Engellediğin oyuncuyla eşleşmezsin.';
+  static const String profileDeletedTitle = 'Bu oyuncu hesabını silmiş';
+  static const String profileDeletedMessage =
+      'Bu oyuncunun profiline artık ulaşılamıyor.';
+  static const String backAction = 'Geri Dön';
+  static const String reasonCheatingSuspicion = 'Hile şüphesi';
+  static String reportUserSubtitle(String nickname) =>
+      '$nickname için bildirim sebebini seç.';
 
   // Arkadaşla Düello
   static const String friendDuel = 'Arkadaşla Düello';
