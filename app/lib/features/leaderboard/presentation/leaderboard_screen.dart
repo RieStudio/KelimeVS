@@ -15,8 +15,22 @@ import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/application/public_profile_provider.dart';
+import '../../profile/presentation/profile_screen.dart';
+import '../../profile/presentation/public_profile_screen.dart';
+import '../../../main.dart';
 import '../application/leaderboard_providers.dart';
 import '../domain/models/leaderboard_models.dart';
+
+void _navigateToOwnProfile(BuildContext context, WidgetRef ref) {
+  if (Navigator.of(context).canPop()) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
+    );
+  } else {
+    ref.read(bottomNavIndexProvider.notifier).setIndex(3);
+  }
+}
 
 /// DESIGN.md Bölüm 7 & GDD 5.4: Haftalık Liderlik Tablosu
 class LeaderboardScreen extends ConsumerWidget {
@@ -350,7 +364,7 @@ BoxDecoration _buildCardDecoration({
 }
 
 /// Liderlik tablosundaki her bir oyuncu kartı
-class _LeaderboardItemCard extends StatelessWidget {
+class _LeaderboardItemCard extends ConsumerWidget {
   final LeaderboardEntry entry;
 
   const _LeaderboardItemCard({
@@ -359,10 +373,13 @@ class _LeaderboardItemCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isMe = entry.isMe;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasUid = entry.uid != null && entry.uid!.trim().isNotEmpty;
+    final isMe = entry.isMe ||
+        (hasUid && ref.watch(isCurrentUserProvider(entry.uid!)));
+    final isTappable = isMe || hasUid;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimens.space12,
         vertical: AppDimens.space12,
@@ -428,7 +445,40 @@ class _LeaderboardItemCard extends StatelessWidget {
               ),
             ),
           ),
+
+          if (isTappable) ...[
+            const SizedBox(width: AppDimens.space6),
+            AppIcon(
+              AppIcons.arrowList,
+              size: 14,
+              color: isMe
+                  ? AppColors.ink.withValues(alpha: 0.4)
+                  : AppColors.muted.withValues(alpha: 0.4),
+            ),
+          ],
         ],
+      ),
+    );
+
+    if (!isTappable) {
+      return card;
+    }
+
+    return Semantics(
+      button: true,
+      label: isMe
+          ? AppStrings.openOwnProfileSemantic
+          : AppStrings.openProfileSemantic(entry.nickname),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          if (isMe) {
+            _navigateToOwnProfile(context, ref);
+          } else {
+            openPublicProfile(context, entry.uid!);
+          }
+        },
+        child: card,
       ),
     );
   }
@@ -659,7 +709,7 @@ class _StickyMeBar extends ConsumerWidget {
         : AppStrings.defaultPlayerName;
     final myFrame = profile.equippedFrame;
 
-    return Container(
+    final barContent = Container(
       key: const Key('leaderboard_sticky_me'),
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimens.space12,
@@ -746,7 +796,24 @@ class _StickyMeBar extends ConsumerWidget {
               ),
             ),
           ),
+
+          const SizedBox(width: AppDimens.space6),
+          AppIcon(
+            AppIcons.arrowList,
+            size: 14,
+            color: AppColors.ink.withValues(alpha: 0.4),
+          ),
         ],
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      label: AppStrings.openOwnProfileSemantic,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _navigateToOwnProfile(context, ref),
+        child: barContent,
       ),
     );
   }

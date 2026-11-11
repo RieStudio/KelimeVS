@@ -8,6 +8,8 @@ import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/bot_frame_resolver.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/application/public_profile_provider.dart';
+import '../../profile/presentation/public_profile_screen.dart';
 import '../../../../core/widgets/answer_bubble.dart';
 import '../../../../core/widgets/app_icon_button.dart';
 import '../../../../core/widgets/player_avatar.dart';
@@ -341,12 +343,22 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
               final oppDisplayName = widget.match.opponentName.trim().isNotEmpty
                   ? widget.match.opponentName.trim()
                   : AppStrings.opponent;
-              return Column(
+              final oppUid = widget.match.opponentUid;
+              final isBot = widget.match.botlaOynandi;
+              final isSelf = oppUid != null &&
+                  oppUid.isNotEmpty &&
+                  ref.read(isCurrentUserProvider(oppUid));
+              final canOpenProfile = oppUid != null &&
+                  oppUid.trim().isNotEmpty &&
+                  !isBot &&
+                  !isSelf;
+
+              final opponentColumn = Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   PlayerAvatar.opponent(
                     name: oppDisplayName,
-                    frame: widget.match.botlaOynandi
+                    frame: isBot
                         ? BotFrameResolver.resolve(oppDisplayName)
                         : widget.match.opponentFrame,
                     size: 54,
@@ -354,16 +366,56 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                   ),
                   const SizedBox(height: AppDimens.matchDetailNameGap),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 80),
-                    child: Text(
-                      oppDisplayName,
-                      style: AppTextStyles.playerName.copyWith(fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 88),
+                    child: canOpenProfile
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  oppDisplayName,
+                                  style: AppTextStyles.playerName.copyWith(
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              AppIcon(
+                                AppIcons.arrowList,
+                                size: 11,
+                                color: AppColors.muted.withValues(alpha: 0.6),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            oppDisplayName,
+                            style: AppTextStyles.playerName.copyWith(
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
                   ),
                 ],
+              );
+
+              if (!canOpenProfile) {
+                return opponentColumn;
+              }
+
+              return Semantics(
+                button: true,
+                label: AppStrings.openProfileSemantic(oppDisplayName),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => openPublicProfile(context, oppUid),
+                  child: opponentColumn,
+                ),
               );
             },
           ),

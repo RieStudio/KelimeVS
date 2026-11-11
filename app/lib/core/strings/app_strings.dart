@@ -430,6 +430,8 @@ abstract final class AppStrings {
   static const String reasonCheatingSuspicion = 'Hile şüphesi';
   static String reportUserSubtitle(String nickname) =>
       '$nickname için bildirim sebebini seç.';
+  static String openProfileSemantic(String name) => '$name profilini aç';
+  static const String openOwnProfileSemantic = 'Kendi profilini aç';
 
   // Arkadaşla Düello
   static const String friendDuel = 'Arkadaşla Düello';
