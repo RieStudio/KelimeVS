@@ -630,9 +630,6 @@ abstract final class AppStrings {
   static const String energyDisabled = 'Enerji sistemi şu anda aktif değil';
 
   static const String energyDepletedTitle = 'Enerjin bitti';
-  static const String energyDepletedSubtitle =
-      'Sıralı online maç oynamak için en az 1 enerjiye ihtiyacın var.';
-  static const String playWithBotEnergyFree = 'Botla Oyna';
 
   // Ayarlar Ekranı
   static const String settingsTitle = 'Ayarlar';

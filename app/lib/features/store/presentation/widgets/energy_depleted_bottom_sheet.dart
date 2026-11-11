@@ -13,7 +13,6 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_icon_button.dart';
 import '../../../../core/widgets/energy_icon.dart';
 import '../../../../core/widgets/primary_button.dart';
-import '../../../../core/widgets/secondary_button.dart';
 import '../../../profile/domain/energy_state.dart';
 import '../../application/store_notifier.dart';
 import '../../data/store_api_client.dart';
@@ -21,16 +20,14 @@ import '../../data/store_api_client.dart';
 /// DESIGN.md 9b: Enerjin Bitti Sayfası (BottomSheet)
 /// Enerji 0 iken "Hızlı Maç"a basıldığında veya maç kuyruğunda enerji bittiğinde açılır.
 /// - Başlık: "Enerjin bitti" (Fredoka 24/700)
-/// - Canlı geri sayım: "Sonraki enerji: mm:ss"
-/// - 3 buton:
-///   1. "1 Enerji · 20" (ana)
-///   2. "Botla Oyna" (ikincil)
-///   3. "Vazgeç" (metin butonu)
+/// - Canlı geri sayım: "Sonraki enerji: mm:ss" (dolgu rengisiz şeffaf kart)
+/// - 2 buton:
+///   1. "1 Enerji · 20 Jeton" (ana)
+///   2. "Vazgeç" (metin butonu)
 class EnergyDepletedBottomSheet extends ConsumerStatefulWidget {
   final EnergyState energy;
   final int userCoins;
   final int? serverNowMs;
-  final VoidCallback? onPlayWithBot;
   final VoidCallback? onEnergyPurchased;
 
   const EnergyDepletedBottomSheet({
@@ -38,7 +35,6 @@ class EnergyDepletedBottomSheet extends ConsumerStatefulWidget {
     required this.energy,
     required this.userCoins,
     this.serverNowMs,
-    this.onPlayWithBot,
     this.onEnergyPurchased,
   });
 
@@ -194,38 +190,22 @@ class _EnergyDepletedBottomSheetState
               ],
             ),
 
-            const SizedBox(height: AppDimens.space12),
+            const SizedBox(height: AppDimens.space16),
 
             // Büyük Enerji Rozeti
             const Center(
               child: EnergyIcon(size: 64),
             ),
 
-            const SizedBox(height: AppDimens.space12),
-
-            // Açıklama Metni
-            const Text(
-              AppStrings.energyDepletedSubtitle,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontNunito,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: AppColors.muted,
-                height: 1.4,
-              ),
-            ),
-
-            const SizedBox(height: AppDimens.space16),
-
-            // Canlı Geri Sayım Kartı
-            if (countdownStr.isNotEmpty)
+            // Canlı Geri Sayım Kartı (şeffaf zemin)
+            if (countdownStr.isNotEmpty) ...[
+              const SizedBox(height: AppDimens.space16),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppDimens.space16,
                   vertical: AppDimens.space12,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
                   borderRadius: AppDimens.borderRadiusListCard,
                   border: Border.all(
                     color: AppColors.mint,
@@ -250,10 +230,11 @@ class _EnergyDepletedBottomSheetState
                   ],
                 ),
               ),
+            ],
 
             const SizedBox(height: AppDimens.space20),
 
-            // Buton 1: "1 Enerji · 20"
+            // Buton 1: "1 Enerji · 20 Jeton"
             PrimaryButton(
               key: const Key('energy_sheet_buy_button'),
               text: '1 Enerji  ·  ${packOne.cost} Jeton',
@@ -262,21 +243,9 @@ class _EnergyDepletedBottomSheetState
                   : () => _handleBuyOneEnergy(packOne.cost),
             ),
 
-            const SizedBox(height: AppDimens.space10),
+            const SizedBox(height: AppDimens.space8),
 
-            // Buton 2: "Botla Oyna"
-            SecondaryButton(
-              key: const Key('energy_sheet_bot_button'),
-              text: AppStrings.playWithBotEnergyFree,
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onPlayWithBot?.call();
-              },
-            ),
-
-            const SizedBox(height: AppDimens.space6),
-
-            // Buton 3: "Vazgeç"
+            // Buton 2: "Vazgeç"
             Center(
               child: TextButton(
                 key: const Key('energy_sheet_cancel_button'),

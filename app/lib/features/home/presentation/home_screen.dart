@@ -197,15 +197,6 @@ class HomeScreen extends ConsumerWidget {
                         energy: energy,
                         userCoins: profile.coins,
                         serverNowMs: profile.serverNowMs,
-                        onPlayWithBot: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const MatchmakingScreen(
-                                forceBotFallback: true,
-                              ),
-                            ),
-                          );
-                        },
                         onEnergyPurchased: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
