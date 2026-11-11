@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/network/network_guard.dart';
 import '../../../core/strings/app_strings.dart';
@@ -12,6 +13,15 @@ import 'friend_join_screen.dart';
 /// "Arkadaşla Düello" modunda "Oda Kur" veya "Koda Katıl" seçimi sunan alt sayfa modalı.
 class FriendDuelBottomSheet extends ConsumerWidget {
   const FriendDuelBottomSheet({super.key});
+
+  /// "Oda Kur" kartı için çok renkli SVG ikonu.
+  static const String createRoomAsset = 'assets/icons/friend_create_room.svg';
+
+  /// "Koda Katıl" kartı için çok renkli SVG ikonu.
+  static const String joinRoomAsset = 'assets/icons/friend_join_code.svg';
+
+  /// Kart içi SVG ikon boyutu (dp).
+  static const double iconSize = 56.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,19 +55,10 @@ class FriendDuelBottomSheet extends ConsumerWidget {
           ),
           const SizedBox(height: AppDimens.space16),
 
-          // Başlık ve Kapat
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                AppStrings.friendDuel,
-                style: AppTextStyles.screenTitle,
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: AppColors.ink),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
+          // Başlık
+          const Text(
+            AppStrings.friendDuel,
+            style: AppTextStyles.screenTitle,
           ),
           const SizedBox(height: AppDimens.space4),
           Text(
@@ -69,8 +70,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
           // 1. "Oda Kur" Seçim Kartı
           _buildActionCard(
             context: context,
-            icon: Icons.add_circle_outline_rounded,
-            iconColor: AppColors.primary,
+            svgAsset: createRoomAsset,
             title: AppStrings.createRoom,
             subtitle: AppStrings.createRoomSubtitle,
             onTap: () {
@@ -88,8 +88,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
           // 2. "Koda Katıl" Seçim Kartı
           _buildActionCard(
             context: context,
-            icon: Icons.key_rounded,
-            iconColor: AppColors.mint,
+            svgAsset: joinRoomAsset,
             title: AppStrings.joinRoom,
             subtitle: AppStrings.joinRoomSubtitle,
             onTap: () {
@@ -109,8 +108,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
 
   Widget _buildActionCard({
     required BuildContext context,
-    required IconData icon,
-    required Color iconColor,
+    required String svgAsset,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -137,18 +135,13 @@ class FriendDuelBottomSheet extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppDimens.radiusBadge),
-                border: Border.all(
-                  color: iconColor,
-                  width: AppDimens.borderThin,
-                ),
+            ExcludeSemantics(
+              child: SvgPicture.asset(
+                svgAsset,
+                width: iconSize,
+                height: iconSize,
+                fit: BoxFit.contain,
               ),
-              child: Icon(icon, color: iconColor, size: 26),
             ),
             const SizedBox(width: AppDimens.space16),
             Expanded(
@@ -181,4 +174,3 @@ class FriendDuelBottomSheet extends ConsumerWidget {
     );
   }
 }
-

@@ -228,6 +228,8 @@ class HomeScreen extends ConsumerWidget {
                   showModalBottomSheet<void>(
                     context: context,
                     isScrollControlled: true,
+                    isDismissible: true,
+                    enableDrag: true,
                     backgroundColor: Colors.transparent,
                     builder: (_) => const FriendDuelBottomSheet(),
                   );

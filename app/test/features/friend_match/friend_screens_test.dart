@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -12,6 +13,44 @@ import 'package:app/features/friend_match/presentation/friend_duel_bottom_sheet.
 import 'package:app/features/friend_match/presentation/friend_host_screen.dart';
 import 'package:app/features/friend_match/presentation/friend_join_screen.dart';
 import 'package:app/features/game/presentation/match_screen.dart';
+
+Finder findSvgAsset(String assetName) {
+  return find.byWidgetPredicate((widget) {
+    if (widget is SvgPicture) {
+      final loader = widget.bytesLoader;
+      if (loader is SvgAssetLoader) {
+        return loader.assetName == assetName;
+      }
+    }
+    return false;
+  });
+}
+
+Widget _buildBottomSheetHostApp() {
+  return ProviderScope(
+    child: MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => Center(
+            child: ElevatedButton(
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  isDismissible: true,
+                  enableDrag: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const FriendDuelBottomSheet(),
+                );
+              },
+              child: const Text('Aç'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 class MockFriendMatchClient implements FriendMatchClient {
   final StreamController<FriendMatchEvent> _controller =
@@ -59,19 +98,119 @@ class MockFriendMatchClient implements FriendMatchClient {
 
 void main() {
   group('FriendDuelBottomSheet Widget Tests', () {
-    testWidgets('1. BottomSheet "Oda Kur" ve "Koda Katıl" seçeneklerini gösterir',
+    testWidgets(
+        '1. BottomSheet başlığı sola hizalı gösterir, kapatma (X) butonu yoktur ve iki SVG ikonu çerçevesiz görünür',
         (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: FriendDuelBottomSheet(),
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: FriendDuelBottomSheet(),
+            ),
           ),
         ),
       );
 
+      // Başlık ve alt başlık
       expect(find.text(AppStrings.friendDuel), findsOneWidget);
+      expect(find.text(AppStrings.friendDuelSubtitle), findsOneWidget);
+
+      // Kapatma (X) butonu bulunmaz
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
+      expect(find.byType(IconButton), findsNothing);
+
+      // Kart seçenekleri
       expect(find.text(AppStrings.createRoom), findsOneWidget);
+      expect(find.text(AppStrings.createRoomSubtitle), findsOneWidget);
       expect(find.text(AppStrings.joinRoom), findsOneWidget);
+      expect(find.text(AppStrings.joinRoomSubtitle), findsOneWidget);
+
+      // Eski ikon kutuları ve ikonlar bulunmaz
+      expect(find.byIcon(Icons.add_circle_outline_rounded), findsNothing);
+      expect(find.byIcon(Icons.key_rounded), findsNothing);
+
+      // İki SVG ikonu çerçevesiz ve 56 dp boyutunda gösterilir
+      final createSvgFinder = findSvgAsset(FriendDuelBottomSheet.createRoomAsset);
+      final joinSvgFinder = findSvgAsset(FriendDuelBottomSheet.joinRoomAsset);
+      expect(createSvgFinder, findsOneWidget);
+      expect(joinSvgFinder, findsOneWidget);
+
+      final createSvg = tester.widget<SvgPicture>(createSvgFinder);
+      final joinSvg = tester.widget<SvgPicture>(joinSvgFinder);
+      expect(createSvg.width, FriendDuelBottomSheet.iconSize);
+      expect(createSvg.height, FriendDuelBottomSheet.iconSize);
+      expect(joinSvg.width, FriendDuelBottomSheet.iconSize);
+      expect(joinSvg.height, FriendDuelBottomSheet.iconSize);
+
+      // Erişilebilirlik: İkonlar ExcludeSemantics ile sarılı olmalıdır
+      expect(
+        find.ancestor(of: createSvgFinder, matching: find.byType(ExcludeSemantics)),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(of: joinSvgFinder, matching: find.byType(ExcludeSemantics)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('1b. "Oda Kur" kartına dokunulduğunda modal kapanır ve FriendHostScreen açılır',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.createRoom));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsNothing);
+      expect(find.byType(FriendHostScreen), findsOneWidget);
+    });
+
+    testWidgets('1c. "Koda Katıl" kartına dokunulduğunda modal kapanır ve FriendJoinScreen açılır',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.joinRoom));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsNothing);
+      expect(find.byType(FriendJoinScreen), findsOneWidget);
+    });
+
+    testWidgets('1d. Modal pencere dışına dokunulduğunda (barrier tap) kapanır',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      // Modal dışındaki üst alana dokun
+      await tester.tapAt(const Offset(50, 50));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsNothing);
+    });
+
+    testWidgets('1e. Modal aşağı sürüklendiğinde (drag down) kapanır',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      // Başlık veya tutamaç üzerinden aşağı kaydır
+      await tester.drag(find.text(AppStrings.friendDuel), const Offset(0, 400));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsNothing);
     });
   });
 
