@@ -23,7 +23,6 @@ import 'package:app/features/profile/application/public_profile_provider.dart';
 import 'package:app/features/profile/domain/public_profile_model.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
 import 'package:app/features/profile/presentation/public_profile_screen.dart';
-import 'package:app/main.dart';
 
 class FakeUser implements User {
   @override

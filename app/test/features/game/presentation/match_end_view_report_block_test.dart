@@ -193,6 +193,11 @@ void main() {
 
     // Bottom sheet görünmeli
     expect(find.text(AppStrings.reportDialogTitle), findsOneWidget);
+    expect(
+      find.text(AppStrings.reportMatchPrompt('CanliRakip')),
+      findsOneWidget,
+    );
+    expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
     expect(find.text(AppStrings.reasonInappropriateNickname), findsOneWidget);
     expect(find.text(AppStrings.reasonInappropriateContent), findsOneWidget);
     expect(find.text(AppStrings.reasonCheating), findsOneWidget);
@@ -253,6 +258,15 @@ void main() {
     // AlertDialog açılmalı
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text(AppStrings.blockDialogTitle), findsOneWidget);
+    expect(
+      find.text(AppStrings.blockDialogMessage('CanliRakip')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('CanliRakip adlı oyuncuyu engellemek istediğinden emin misin?'),
+      findsOneWidget,
+    );
+    expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
 
     // Onayla ("Engelle" PrimaryButton)
     await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.blockConfirm));
@@ -270,5 +284,34 @@ void main() {
       find.widgetWithText(SecondaryButton, AppStrings.blockedStatus),
     );
     expect(blockedBtn.onPressed, isNull);
+  });
+
+  testWidgets('5. Engelleme ve bildirme metinleri: Boş veya null isimde güvenli yedek metin kullanılır', (tester) async {
+    expect(
+      AppStrings.blockDialogMessage(null),
+      'Bu oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.',
+    );
+    expect(
+      AppStrings.blockDialogMessage(''),
+      'Bu oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.',
+    );
+    expect(
+      AppStrings.blockDialogMessage('   '),
+      'Bu oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.',
+    );
+    expect(AppStrings.blockDialogMessage('').startsWith(' adlı'), isFalse);
+
+    expect(AppStrings.blockSuccess(null), 'Oyuncu engellendi.');
+    expect(AppStrings.blockSuccess(''), 'Oyuncu engellendi.');
+    expect(AppStrings.blockSuccess('  '), 'Oyuncu engellendi.');
+
+    expect(AppStrings.reportMatchPrompt(null), 'Bu oyuncuyu neden bildirmek istiyorsun?');
+    expect(AppStrings.reportMatchPrompt(''), 'Bu oyuncuyu neden bildirmek istiyorsun?');
+    expect(AppStrings.reportMatchPrompt('   '), 'Bu oyuncuyu neden bildirmek istiyorsun?');
+    expect(AppStrings.reportMatchPrompt('').startsWith(' adlı'), isFalse);
+
+    expect(AppStrings.reportUserSubtitle(null), 'Bildirim sebebini seç.');
+    expect(AppStrings.reportUserSubtitle(''), 'Bildirim sebebini seç.');
+    expect(AppStrings.reportUserSubtitle('   '), 'Bildirim sebebini seç.');
   });
 }

@@ -154,7 +154,7 @@ void main() {
       expect(mockClient.getProfileCallCount, 1);
 
       // blockedUsersProvider dinle
-      container.listen(blockedUsersProvider, (_, __) {});
+      container.listen(blockedUsersProvider, (_, _) {});
       await container.read(blockedUsersProvider.future);
       expect(mockBlockedClient.getBlockedUsersCallCount, 1);
 

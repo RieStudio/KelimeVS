@@ -370,12 +370,30 @@ abstract final class AppStrings {
       'Maç süresi dolduğu için bildirim yapılamadı.';
   static const String reportGenericError =
       'Bildirim gönderilemedi. Lütfen internetini kontrol et.';
+  static String reportMatchPrompt([String? opponentName]) {
+    final trimmed = opponentName?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'Bu oyuncuyu neden bildirmek istiyorsun?';
+    }
+    return '$trimmed adlı oyuncuyu neden bildirmek istiyorsun?';
+  }
 
   static const String blockDialogTitle = 'Oyuncuyu Engelle';
-  static String blockDialogMessage(String nickname) =>
-      ' adlı oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.';
+  static String blockDialogMessage([String? nickname]) {
+    final trimmed = nickname?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'Bu oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.';
+    }
+    return '$trimmed adlı oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.';
+  }
   static const String blockConfirm = 'Engelle';
-  static String blockSuccess(String nickname) => ' engellendi.';
+  static String blockSuccess([String? nickname]) {
+    final trimmed = nickname?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'Oyuncu engellendi.';
+    }
+    return '$trimmed engellendi.';
+  }
   static const String blockLimitReached =
       'En fazla 100 oyuncu engelleyebilirsin.';
   static const String blockMatchExpired =
@@ -428,8 +446,13 @@ abstract final class AppStrings {
       'Bu oyuncunun profiline artık ulaşılamıyor.';
   static const String backAction = 'Geri Dön';
   static const String reasonCheatingSuspicion = 'Hile şüphesi';
-  static String reportUserSubtitle(String nickname) =>
-      '$nickname için bildirim sebebini seç.';
+  static String reportUserSubtitle([String? nickname]) {
+    final trimmed = nickname?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'Bildirim sebebini seç.';
+    }
+    return '$trimmed için bildirim sebebini seç.';
+  }
   static String openProfileSemantic(String name) => '$name profilini aç';
   static const String openOwnProfileSemantic = 'Kendi profilini aç';
 

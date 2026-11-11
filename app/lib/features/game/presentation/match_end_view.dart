@@ -631,7 +631,7 @@ class _ReportBottomSheetState extends State<_ReportBottomSheet> {
             ),
             const SizedBox(height: AppDimens.space6),
             Text(
-              '${widget.opponentName} adlı oyuncuyu neden bildirmek istiyorsun?',
+              AppStrings.reportMatchPrompt(widget.opponentName),
               style: AppTextStyles.bodyText.copyWith(color: AppColors.muted),
               textAlign: TextAlign.center,
             ),

@@ -352,6 +352,11 @@ void main() {
         find.text(AppStrings.blockDialogMessage('TargetUser')),
         findsOneWidget,
       );
+      expect(
+        find.textContaining('TargetUser adlı oyuncuyu engellemek istediğinden emin misin?'),
+        findsOneWidget,
+      );
+      expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
 
       // Diyalogda "Engelle"ye bas
       await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.blockConfirm));
@@ -432,6 +437,11 @@ void main() {
         find.text(AppStrings.reportUserSubtitle('SuspectUser')),
         findsOneWidget,
       );
+      expect(
+        find.textContaining('SuspectUser için bildirim sebebini seç.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining(RegExp(r'^\s*için')), findsNothing);
       expect(find.text(AppStrings.reasonInappropriateNickname), findsOneWidget);
       expect(find.text(AppStrings.reasonCheatingSuspicion), findsOneWidget);
       expect(find.text(AppStrings.reasonOther), findsOneWidget);
@@ -511,6 +521,42 @@ void main() {
       // Profil yükleme çağrısı yapılmamalı ve ekran boş kalmalı
       expect(fakeClient.getProfileCallCount, 0);
       expect(find.text(AppStrings.publicProfileTitle), findsNothing);
+    });
+
+    testWidgets(
+        'Engelle akışı: Boş takma adlı profilde varsayılan adla diyalog açılır ve " adlı" ile başlamaz',
+        (tester) async {
+      const profile = PublicProfile(
+        uid: 'user_empty_name',
+        nickname: '',
+        equippedFrame: 'classic',
+        isBlocked: false,
+      );
+
+      final fakeClient = FakePublicProfileApiClient(profileToReturn: profile);
+
+      await tester.pumpWidget(
+        buildTestWidget(
+          child: const PublicProfileScreen(uid: 'user_empty_name'),
+          overrides: [
+            publicProfileApiClientProvider.overrideWithValue(fakeClient),
+            authRepositoryProvider
+                .overrideWithValue(FakeAuthRepository(FakeUser('my_self_uid'))),
+          ],
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.blockAction));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.blockDialogTitle), findsOneWidget);
+      expect(
+        find.textContaining('Oyuncu adlı oyuncuyu engellemek istediğinden emin misin?'),
+        findsOneWidget,
+      );
+      expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
     });
   });
 }

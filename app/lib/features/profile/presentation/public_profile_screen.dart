@@ -594,18 +594,20 @@ class _PublicProfileReportBottomSheetState
           .reportUser(widget.uid, _selectedReason);
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-          const SnackBar(
-            content: Text(
-              AppStrings.profileReportedSuccess,
-              style: TextStyle(
-                fontFamily: AppTextStyles.fontNunito,
-                fontWeight: FontWeight.w700,
+        if (widget.parentContext.mounted) {
+          ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+            const SnackBar(
+              content: Text(
+                AppStrings.profileReportedSuccess,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontNunito,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
+              backgroundColor: AppColors.ink,
             ),
-            backgroundColor: AppColors.ink,
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -616,18 +618,20 @@ class _PublicProfileReportBottomSheetState
         final msg = e is PublicProfileException
             ? e.message
             : AppStrings.reportGenericError;
-        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              msg,
-              style: const TextStyle(
-                fontFamily: AppTextStyles.fontNunito,
-                fontWeight: FontWeight.w700,
+        if (widget.parentContext.mounted) {
+          ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+            SnackBar(
+              content: Text(
+                msg,
+                style: const TextStyle(
+                  fontFamily: AppTextStyles.fontNunito,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
+              backgroundColor: AppColors.ink,
             ),
-            backgroundColor: AppColors.ink,
-          ),
-        );
+          );
+        }
       }
     }
   }
