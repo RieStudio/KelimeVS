@@ -222,6 +222,11 @@ export function buildFinalMessage(params: {
     reason: r.reason,
   }));
 
+  const isBot =
+    opponentUid === 'bot' ||
+    opponentUid.startsWith('bot_') ||
+    (typeof state.matchId === 'string' && state.matchId.startsWith('bot_'));
+
   return {
     t: 'final',
     rounds,
@@ -233,6 +238,7 @@ export function buildFinalMessage(params: {
     endedBy: state.endedBy ?? 'normal',
     ...(opponentName ? { opponentName } : {}),
     ...(opponentFrame ? { opponentFrame } : {}),
+    ...(!isBot && opponentUid ? { opponentUid } : {}),
     ...(coinsAwarded !== undefined ? { coinsAwarded } : {}),
     ...(coins !== undefined ? { coins } : {}),
   };

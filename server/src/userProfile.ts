@@ -70,6 +70,28 @@ export interface FrameMigrationResult {
   readonly removedFrames: readonly string[];
 }
 
+export interface PublicProfileStats {
+  readonly played: number;
+  readonly won: number;
+  readonly lost: number;
+  readonly winRate: number;
+}
+
+export interface PublicProfileData {
+  readonly nickname: string;
+  readonly equippedFrame: string;
+  readonly stats: PublicProfileStats;
+  readonly isGuest: boolean;
+}
+
+export type PublicProfileResult =
+  | { readonly kind: 'deleted' }
+  | { readonly kind: 'not_found' }
+  | {
+      readonly kind: 'ok';
+      readonly profile: PublicProfileData;
+    };
+
 export interface UserProfileData {
   readonly uid: string;
   readonly nickname: string | null;
@@ -621,6 +643,63 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     return null;
+  }
+
+  /**
+   * Herkese açık profil verisini döndürür.
+   * SADECE OKUMA yapar. Var olmayan bir uid için profil oluşturmaz ve yan etki yaratmaz.
+   * Silinmiş hesap (tombstone) için { kind: 'deleted' }, bulunamazsa { kind: 'not_found' } döner.
+   */
+  async getPublicProfile(): Promise<PublicProfileResult> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { kind: 'deleted' };
+    }
+
+    const cursor = this.ctx.storage.sql.exec<{
+      uid: string;
+      nickname: string | null;
+      played: number;
+      won: number;
+      lost: number;
+      equipped_frame: string | null;
+      is_guest: number | null;
+    }>(
+      'SELECT uid, nickname, played, won, lost, equipped_frame, is_guest FROM profiles LIMIT 1'
+    );
+    const rows = cursor.toArray();
+
+    if (rows.length === 0) {
+      return { kind: 'not_found' };
+    }
+
+    const row = rows[0];
+    const isGuest = (row.is_guest as number | undefined) === 1;
+    let nickname = row.nickname?.trim();
+    if (!nickname) {
+      nickname = isGuest ? generateGuestNickname(row.uid) : 'Oyuncu';
+    }
+
+    const played = Math.max(0, row.played ?? 0);
+    const won = Math.max(0, row.won ?? 0);
+    const lost = Math.max(0, row.lost ?? 0);
+    const winRate = played === 0 ? 0 : Math.round((won / played) * 100);
+
+    return {
+      kind: 'ok',
+      profile: {
+        nickname,
+        equippedFrame: (row.equipped_frame as string) || 'classic',
+        stats: {
+          played,
+          won,
+          lost,
+          winRate,
+        },
+        isGuest,
+      },
+    };
   }
 
   /**
@@ -1233,6 +1312,46 @@ export class UserProfile extends DurableObject<Env> {
     ).toArray();
 
     return rows.map((r) => r.blocked_uid);
+  }
+
+  /**
+   * İstek yapan kullanıcının verilen UID'yi engelleyip engellemediğini ve varsa blok UUID'sini döner.
+   */
+  async getBlockInfoForUid(blockedUid: string): Promise<{ isBlocked: boolean; blockId: string | null }> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      return { isBlocked: false, blockId: null };
+    }
+
+    const rows = this.ctx.storage.sql.exec<{ id: string }>(
+      'SELECT id FROM blocked_users WHERE blocked_uid = ? LIMIT 1',
+      blockedUid
+    ).toArray();
+
+    if (rows.length > 0) {
+      return { isBlocked: true, blockId: rows[0].id };
+    }
+
+    return { isBlocked: false, blockId: null };
+  }
+
+  /**
+   * UID bazında engeli kaldırır. İdempotenttir; kullanıcı engelli değilse de hata vermez.
+   */
+  async unblockUserByUid(blockedUid: string): Promise<{ ok: true }> {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    this.ctx.storage.sql.exec(
+      'DELETE FROM blocked_users WHERE blocked_uid = ?',
+      blockedUid
+    );
+
+    return { ok: true };
   }
 
   /**

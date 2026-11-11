@@ -105,6 +105,7 @@ export interface StoredFriendRoom {
   matchedMatchId?: string;
   matchedOpponentName?: string;
   matchedOpponentFrame?: string;
+  matchedOpponentUid?: string;
 }
 
 interface RateLimitEntry {
@@ -129,7 +130,7 @@ export class Matchmaker extends DurableObject<Env> {
   private friendRooms = new Map<string, StoredFriendRoom>();
   private matchedPendingByHostUid = new Map<
     string,
-    { matchId: string; opponentName: string; opponentFrame?: string; expiresAt: number }
+    { matchId: string; opponentName: string; opponentFrame?: string; opponentUid?: string; expiresAt: number }
   >();
   private failedAttemptsByUid = new Map<string, RateLimitEntry>();
   private failedAttemptsByIp = new Map<string, IpRateLimitEntry>();
@@ -414,6 +415,7 @@ export class Matchmaker extends DurableObject<Env> {
             matchId: pendingMatched.matchId,
             opponentName: pendingMatched.opponentName,
             opponentFrame: pendingMatched.opponentFrame || 'classic',
+            ...(pendingMatched.opponentUid ? { opponentUid: pendingMatched.opponentUid } : {}),
             isFriendly: true,
           })
         );
@@ -459,6 +461,7 @@ export class Matchmaker extends DurableObject<Env> {
             matchId: room.matchedMatchId,
             opponentName: room.matchedOpponentName,
             opponentFrame: room.matchedOpponentFrame || 'classic',
+            ...(room.matchedOpponentUid ? { opponentUid: room.matchedOpponentUid } : {}),
             isFriendly: true,
           })
         );
@@ -616,6 +619,7 @@ export class Matchmaker extends DurableObject<Env> {
     room.matchedMatchId = matchId;
     room.matchedOpponentName = guestInfo.name;
     room.matchedOpponentFrame = guestInfo.frame;
+    room.matchedOpponentUid = uid;
 
     // Katılana matched mesajı gönder
     try {
@@ -625,6 +629,7 @@ export class Matchmaker extends DurableObject<Env> {
           matchId,
           opponentName: room.hostName,
           opponentFrame: room.hostFrame || 'classic',
+          opponentUid: room.hostUid,
           isFriendly: true,
         })
       );
@@ -641,6 +646,7 @@ export class Matchmaker extends DurableObject<Env> {
             matchId,
             opponentName: guestInfo.name,
             opponentFrame: guestInfo.frame || 'classic',
+            opponentUid: uid,
             isFriendly: true,
           })
         );
@@ -654,6 +660,7 @@ export class Matchmaker extends DurableObject<Env> {
         matchId,
         opponentName: guestInfo.name,
         opponentFrame: guestInfo.frame || 'classic',
+        opponentUid: uid,
         expiresAt: Date.now() + 2 * 60 * 1000,
       });
     }
@@ -1190,6 +1197,7 @@ export class Matchmaker extends DurableObject<Env> {
         matchId,
         opponentName: p2.name,
         opponentFrame: p2.frame || 'classic',
+        opponentUid: p2.uid,
         ...(firstQuestionData ? { firstQuestion: firstQuestionData } : {}),
         ...(p1EnergyData ? { energy: p1EnergyData, serverNowMs: nowMs } : {}),
       };
@@ -1198,6 +1206,7 @@ export class Matchmaker extends DurableObject<Env> {
         matchId,
         opponentName: p1.name,
         opponentFrame: p1.frame || 'classic',
+        opponentUid: p1.uid,
         ...(firstQuestionData ? { firstQuestion: firstQuestionData } : {}),
         ...(p2EnergyData ? { energy: p2EnergyData, serverNowMs: nowMs } : {}),
       };

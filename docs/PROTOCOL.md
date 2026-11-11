@@ -83,9 +83,12 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
   "t": "matched",
   "matchId": "m_1728518400000_abc123",
   "opponentName": "Mehmet",
+  "opponentFrame": "classic",
+  "opponentUid": "user_xyz789",
   "isFriendly": false
 }
 ```
+- `opponentUid`: Rakip oyuncunun kullanıcı kimliği (String). Gerçek oyuncu maçlarında döner; bot maçlarında bu alan hiç gönderilmez (omitted).
 - İstemci bu mesajı aldığında eşleştirme WebSocket bağlantısını kapatır ve doğrudan `/ws/match/:matchId` adresine bağlanır.
 
 #### Hata (`error`)
@@ -342,10 +345,12 @@ Maç sonuçlandığında her iki oyuncuya gönderilir. Maç detay ekranı ve ge�
   },
   "opponentName": "Mehmet",
   "opponentFrame": "classic",
+  "opponentUid": "user_xyz789",
   "winnerIsMe": true,
   "endedBy": "normal" | "forfeit"
 }
 ```
+- `opponentUid`: Rakip oyuncunun kullanıcı kimliği (String). Gerçek oyuncu maçlarında döner; bot maçlarında bu alan hiç gönderilmez (omitted).
 
 #### İptal Edilen Maç (`voided`)
 Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton verilmez, lig/istatistik kaydı yapılmaz ve maça enerji harcamış tüm oyunculara enerjileri iade edilir:
@@ -586,9 +591,90 @@ Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmi�
 - **Eski İstemci Uyumluluğu:** Liderlik tablosu (`GET /leaderboard`) ve maç mesajlarında (`opponentFrame` vb.) hiçbir filtreleme yapılmaz; yeni çerçeve kimlikleri doğrudan iletilir. Eski istemciler bilinmeyen kimliklerle karşılaştığında çökmeden `'classic'` (Klasik) çerçeveye güvenli bir şekilde geri düşer.
 
 ### Liderlik Tablosu
-- `GET /leaderboard`: Haftalık ilk 100 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `frame` (varsayılan: `"classic"`) yer alır.
+- `GET /leaderboard`: Haftalık ilk 100 oyuncuyu ve istek yapanın sırasını döndürür. Her öğede `uid` (oyuncu kimliği), `nickname`, `wins`, `isMe` ve `frame` (varsayılan: `"classic"`) yer alır.
 - `POST /admin/leaderboard/seed` (Yalnızca Yerel Geliştirme): Güncel hafta için toplu test oyuncusu ekler (`{ "entries": [...] }`). Canlı ortamda 403 Forbidden ile engellenmiştir.
 - `POST /admin/leaderboard/clear` (Yalnızca Yerel Geliştirme): Tablodaki `seed_` ön ekli test oyuncularını temizler. Gerçek kullanıcılara dokunmaz. Canlı ortamda 403 Forbidden ile engellenmiştir.
+
+### Herkese Açık Oyuncu Profili ve Kullanıcı Aksiyonları
+
+Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. `uid` parametresi `^[a-zA-Z0-9_-]{1,128}$` kuralına uymalıdır; geçersiz biçimlerde `400 Bad Request` (`{"error": "invalid_uid"}`) döner.
+
+#### Herkese Açık Profil Sorgulama: `GET /users/:uid/public`
+Hedef oyuncunun herkese açık profil bilgilerini döndürür. Salt-okunurdur; var olmayan UID için asla profil oluşturmaz (sıfır yan etki).
+- **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "uid": "target_user_uid",
+    "nickname": "Sevbans",
+    "equippedFrame": "classic",
+    "stats": {
+      "played": 142,
+      "won": 88,
+      "lost": 54,
+      "winRate": 62
+    },
+    "isBlocked": false,
+    "blockId": null,
+    "isGuest": false
+  }
+  ```
+  - `stats`: Yalnızca rekabetçi ranked maçları içerir (arkadaş düellosu sayılmaz). `winRate`, `played === 0` ise `0`, aksi halde `Math.round((won / played) * 100)` olarak sunucu tarafından hesaplanmış tam sayı yüzdedir.
+  - `isBlocked`: İstek yapan kullanıcının bu oyuncuyu engelleyip engellemediği.
+  - `blockId`: Engellendiyse ilgili engelleme kaydının UUID kimliği, aksi halde `null`.
+  - `isGuest`: Kullanıcının misafir olup olmadığı (istemcide rozet gösterimi için).
+  - Kullanıcı kendi UID'si için bu ucu çağırdığında da `200 OK` döner (`isBlocked: false, blockId: null`).
+  - **Hassas Veri Koruması:** `coins`, `energy`, `email`, `token`, `correctAnswers`, `createdAt` gibi iç/özel alanlar ASLA dönülmez.
+- **Hata Durumları:**
+  - `401 Unauthorized`: Yetkisiz veya geçersiz token.
+  - `400 Bad Request`: `{"error": "invalid_uid"}`
+  - `404 Not Found`: `{"error": "not_found", "message": "Kullanıcı bulunamadı"}` (UID hiç var olmamışsa)
+  - `410 Gone`: `{"error": "deleted", "message": "Hesap silinmiş"}` (Hesap silinmişse / tombstone)
+
+#### Profil Üzerinden Oyuncu Engelleme: `POST /users/:uid/block`
+Hedef oyuncuyu istek yapan kullanıcının engellenenler listesine ekler.
+- **İdempotentlik:** Zaten engelliyse mevcut `blockId` ile `200 OK` döner.
+- **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "ok": true,
+    "blockId": "c8b211a5-8c34-4537-8091-a64d1f2a36b1"
+  }
+  ```
+- **Hata Durumları:**
+  - `400 Bad Request`: Kendini engelleme (`{"error": "cannot_block_self"}`), geçersiz UID (`{"error": "invalid_uid"}`) veya 100 kişi sınırı dolmuşsa (`{"error": "block_limit_reached"}`).
+  - `404 Not Found`: `{"error": "not_found"}`
+  - `410 Gone`: `{"error": "deleted"}`
+
+#### Profil Üzerinden Engeli Kaldırma: `DELETE /users/:uid/block`
+Hedef oyuncunun engelini kaldırır.
+- **İdempotentlik:** Kullanıcı zaten engelli değilse de `200 OK` döner.
+- **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "ok": true
+  }
+  ```
+
+#### Profil Üzerinden Oyuncuyu Bildirme: `POST /users/:uid/report`
+Hedef oyuncuyu `ReportStore` üzerinden inceleme amacıyla yönetici havuzuna bildirir. Maça bağlı olmadığı için sentetik `matchId: "profile_<uid>"` kullanılır.
+- **İstek Gövdesi:**
+  ```json
+  {
+    "reason": "inappropriate_nickname" | "cheating" | "other"
+  }
+  ```
+- **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "ok": true
+  }
+  ```
+- **Hata Durumları:**
+  - `400 Bad Request`: Geçersiz sebep (`{"error": "invalid_reason"}`), kendini bildirme (`{"error": "cannot_report_self"}`) veya geçersiz UID.
+  - `404 Not Found`: `{"error": "not_found"}`
+  - `409 Conflict`: Aynı hedef profil için mükerrer bildirim (`{"error": "already_reported"}`).
+  - `410 Gone`: `{"error": "deleted"}`
+  - `429 Too Many Requests`: 24 saatlik günlük bildirim kotası (10) aşıldığında (`{"error": "daily_limit_exceeded"}`).
 
 ### Bot Maçı Güçlendirici Harcama (`POST /powerups/spend`)
 Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından ve sunucuda canlı bir maç odası (`MatchRoom`) bulunmadığından, bot maçlarında kullanılan jokerlerin ("Ek süre" ve "Cevap Ver") jeton bedeli bu HTTP endpoint'i üzerinden doğrudan `UserProfile` Durable Object'inden düşülür.

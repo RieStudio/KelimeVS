@@ -45,6 +45,7 @@ export type MatchmakerServerMessage =
       readonly matchId: string;
       readonly opponentName: string;
       readonly opponentFrame?: string;
+      readonly opponentUid?: string;
       readonly isFriendly?: boolean;
       readonly serverNowMs?: number;
       readonly energy?: {
@@ -130,6 +131,7 @@ export interface ClientFinalMessage {
   readonly endedBy: string;
   readonly opponentName?: string;
   readonly opponentFrame?: string;
+  readonly opponentUid?: string;
   readonly coinsAwarded?: number;
   readonly coins?: number;
 }

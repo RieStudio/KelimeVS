@@ -9,6 +9,7 @@ export const DEFAULT_PAIR_WIN_CAP = 20;
 
 export interface LeaderboardEntry {
   readonly rank: number;
+  readonly uid: string;
   readonly nickname: string;
   readonly wins: number;
   readonly isMe: boolean;
@@ -424,6 +425,7 @@ export class Leaderboard extends DurableObject<Env> {
     const topRows = topCursor.toArray();
     const top: LeaderboardEntry[] = topRows.map((r) => ({
       rank: Number(r.rank),
+      uid: String(r.uid),
       nickname: String(r.nickname),
       wins: Number(r.wins),
       isMe: callerUid ? r.uid === callerUid : false,

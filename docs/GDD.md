@@ -162,6 +162,7 @@ Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad
 
 - **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
 - Tabloda ilk 100 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
+- **[KARAR] Herkese Açık Oyuncu Profili:** Liderlik tablosu satırlarına veya maç geçmişi kayıtlarına dokunulduğunda oyuncunun herkese açık profil ekranı açılır (`GET /users/:uid/public`). Sunucu salt-okunur olarak ad, çerçeve, maç istatistikleri (`played`, `won`, `lost`, `winRate`), misafir durumu (`isGuest`) ve engel durumunu (`isBlocked`, `blockId`) döner; e-posta, bakiye gibi özel veriler asla sızdırılmaz. Profil ekranından doğrudan engelleme (`POST /users/:uid/block`), engeli kaldırma (`DELETE /users/:uid/block`) ve bildirme (`POST /users/:uid/report`) yapılabilir.
 - Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
 - Aynı rakibe karşı bir haftada en fazla **20 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için; `LEADERBOARD_PAIR_WIN_CAP` ortam değişkeniyle ayarlanabilir, varsayılan 20). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
 - Takma adı henüz olmayan oyuncu tabloda görünmez.

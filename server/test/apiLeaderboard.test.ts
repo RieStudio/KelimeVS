@@ -137,9 +137,9 @@ describe('API Route: GET /leaderboard (Auth & Response Format)', () => {
     expect(Array.isArray(body.top)).toBe(true);
     expect(body.top).toHaveLength(2);
 
-    // Kural 2: Yanıtta uid DÖNMEZ!
+    // Her satırda uid döner
     for (const item of body.top) {
-      expect(item.uid).toBeUndefined();
+      expect(typeof item.uid).toBe('string');
       expect(typeof item.rank).toBe('number');
       expect(typeof item.nickname).toBe('string');
       expect(typeof item.wins).toBe('number');

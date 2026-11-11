@@ -60,6 +60,10 @@ function parseClientBuild(request: Request): number {
   return parsed;
 }
 
+function isValidUid(uid: unknown): uid is string {
+  return typeof uid === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(uid);
+}
+
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
   'Access-Control-Allow-Origin': '*',
@@ -1075,6 +1079,328 @@ export default {
             { status: 410, headers: jsonHeaders }
           );
         }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Herkese Açık Oyuncu Profili: GET /users/:uid/public
+    const userPublicMatch = pathname.match(/^\/users\/([^/]+)\/public$/);
+    if (request.method === 'GET' && userPublicMatch) {
+      const targetUid = userPublicMatch[1];
+      const callerUid = await authenticateRequest(request, env);
+      if (!callerUid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!isValidUid(targetUid)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.USER_PROFILE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
+        const pubResult = await targetProfileStub.getPublicProfile();
+
+        if (pubResult.kind === 'deleted') {
+          return new Response(
+            JSON.stringify({ error: 'deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
+        if (pubResult.kind === 'not_found') {
+          return new Response(
+            JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+            { status: 404, headers: jsonHeaders }
+          );
+        }
+
+        let isBlocked = false;
+        let blockId: string | null = null;
+
+        if (callerUid !== targetUid) {
+          const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+          const blockInfo = await callerProfileStub.getBlockInfoForUid(targetUid);
+          isBlocked = blockInfo.isBlocked;
+          blockId = blockInfo.blockId;
+        }
+
+        return new Response(
+          JSON.stringify({
+            uid: targetUid,
+            nickname: pubResult.profile.nickname,
+            equippedFrame: pubResult.profile.equippedFrame,
+            stats: pubResult.profile.stats,
+            isBlocked,
+            blockId,
+            isGuest: pubResult.profile.isGuest,
+          }),
+          { status: 200, headers: jsonHeaders }
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Profil Üzerinden Oyuncu Engelleme: POST /users/:uid/block
+    const userBlockMatch = pathname.match(/^\/users\/([^/]+)\/block$/);
+    if (request.method === 'POST' && userBlockMatch) {
+      const targetUid = userBlockMatch[1];
+      const callerUid = await authenticateRequest(request, env);
+      if (!callerUid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!isValidUid(targetUid)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (callerUid === targetUid) {
+        return new Response(
+          JSON.stringify({ error: 'cannot_block_self', message: 'Kendini engelleyemezsin' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.USER_PROFILE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
+        const pubResult = await targetProfileStub.getPublicProfile();
+
+        if (pubResult.kind === 'deleted') {
+          return new Response(
+            JSON.stringify({ error: 'deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
+        if (pubResult.kind === 'not_found') {
+          return new Response(
+            JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+            { status: 404, headers: jsonHeaders }
+          );
+        }
+
+        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        const blockRes = await callerProfileStub.blockUser({
+          blockedUid: targetUid,
+          blockedNickname: pubResult.profile.nickname,
+          uid: callerUid,
+        });
+
+        if (!blockRes.ok) {
+          return new Response(
+            JSON.stringify({
+              error: 'block_limit_reached',
+              message: 'En fazla 100 oyuncu engelleyebilirsin.',
+            }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(JSON.stringify({ ok: true, blockId: blockRes.id }), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Profil Üzerinden Engeli Kaldırma: DELETE /users/:uid/block
+    if (request.method === 'DELETE' && userBlockMatch) {
+      const targetUid = userBlockMatch[1];
+      const callerUid = await authenticateRequest(request, env);
+      if (!callerUid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!isValidUid(targetUid)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.USER_PROFILE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        const res = await callerProfileStub.unblockUserByUid(targetUid);
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Profil Üzerinden Oyuncuyu Bildirme: POST /users/:uid/report
+    const userReportMatch = pathname.match(/^\/users\/([^/]+)\/report$/);
+    if (request.method === 'POST' && userReportMatch) {
+      const targetUid = userReportMatch[1];
+      const callerUid = await authenticateRequest(request, env);
+      if (!callerUid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      if (!isValidUid(targetUid)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (callerUid === targetUid) {
+        return new Response(
+          JSON.stringify({ error: 'cannot_report_self', message: 'Kendini bildiremezsin' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      let body: any;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const validReasons = ['inappropriate_nickname', 'cheating', 'other'];
+      if (typeof body?.reason !== 'string' || !validReasons.includes(body.reason)) {
+        return new Response(
+          JSON.stringify({ error: 'invalid_reason', message: 'Geçersiz bildirim sebebi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!env.USER_PROFILE || !env.REPORT_STORE) {
+        return new Response(JSON.stringify({ error: 'service_unavailable' }), {
+          status: 503,
+          headers: jsonHeaders,
+        });
+      }
+
+      try {
+        const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
+        const pubResult = await targetProfileStub.getPublicProfile();
+
+        if (pubResult.kind === 'deleted') {
+          return new Response(
+            JSON.stringify({ error: 'deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
+        if (pubResult.kind === 'not_found') {
+          return new Response(
+            JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+            { status: 404, headers: jsonHeaders }
+          );
+        }
+
+        const reportStore = env.REPORT_STORE.get(env.REPORT_STORE.idFromName('global'));
+        const addRes = await reportStore.addReport({
+          reporterUid: callerUid,
+          reportedUid: targetUid,
+          matchId: `profile_${targetUid}`,
+          reason: body.reason,
+          reportedNickname: pubResult.profile.nickname,
+          answers: [],
+        });
+
+        if (!addRes.ok) {
+          if (addRes.error === 'already_reported') {
+            return new Response(
+              JSON.stringify({
+                error: 'already_reported',
+                message: 'Bu oyuncuyu daha önce bildirdin.',
+              }),
+              { status: 409, headers: jsonHeaders }
+            );
+          }
+          if (addRes.error === 'daily_limit_exceeded') {
+            return new Response(
+              JSON.stringify({
+                error: 'daily_limit_exceeded',
+                message: 'Günlük bildirim sınırına ulaştın.',
+              }),
+              { status: 429, headers: jsonHeaders }
+            );
+          }
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
           status: 500,
           headers: jsonHeaders,
