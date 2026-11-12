@@ -13,12 +13,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/match_tip_card.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
-import '../../game/application/match_providers.dart';
-import '../../game/application/match_session.dart';
-import '../../game/presentation/match_screen.dart';
 import '../../matchmaking/domain/match_tip_selector.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
+import 'friend_reveal_screen.dart';
 
 /// "Oda Kur" ekranı: 6 haneli kodu üretir, gösterir, paylaşım menüsünü açar
 /// ve rakip katıldığında maça yönlendirir.
@@ -149,25 +147,18 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
     _isMatched = true;
     _countdownTimer?.cancel();
     _dotsTimer?.cancel();
-
-    ref
-        .read(activeMatchSessionModeProvider.notifier)
-        .setMode(MatchSessionMode.online);
+    _subscription?.cancel();
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const MatchScreen(),
+        builder: (_) => FriendMatchRevealScreen(
+          matchId: matchId,
+          opponentName: opponentName,
+          opponentFrame: opponentFrame,
+          opponentUid: opponentUid,
+          isHost: true,
+        ),
       ),
-    );
-
-    unawaited(
-      ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
-            matchId: matchId,
-            opponentName: opponentName,
-            opponentUid: opponentUid,
-            opponentFrame: opponentFrame,
-            isFriendly: true,
-          ),
     );
   }
 

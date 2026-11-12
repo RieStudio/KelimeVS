@@ -15,6 +15,8 @@ import type {
   ClientStateMessage,
 } from './protocol';
 
+export type { MatchState };
+
 export interface SerializedMatchState {
   readonly config: MatchConfig;
   readonly playerIds: [string, string];
@@ -225,7 +227,7 @@ export function buildFinalMessage(params: {
   const isBot =
     opponentUid === 'bot' ||
     opponentUid.startsWith('bot_') ||
-    (typeof state.matchId === 'string' && state.matchId.startsWith('bot_'));
+    (typeof (state as any).matchId === 'string' && (state as any).matchId.startsWith('bot_'));
 
   return {
     t: 'final',

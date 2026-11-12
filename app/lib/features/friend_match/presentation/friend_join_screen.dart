@@ -9,11 +9,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../../game/application/match_providers.dart';
-import '../../game/application/match_session.dart';
-import '../../game/presentation/match_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
+import 'friend_reveal_screen.dart';
 
 /// "Koda Katıl" ekranı: Arkadaşının paylaştığı 6 haneli kodu girmesini sağlar.
 class FriendJoinScreen extends ConsumerStatefulWidget {
@@ -89,25 +87,18 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
   void _onMatched(String matchId, String opponentName, String opponentFrame, [String? opponentUid]) {
     if (_isMatched) return;
     _isMatched = true;
-
-    ref
-        .read(activeMatchSessionModeProvider.notifier)
-        .setMode(MatchSessionMode.online);
+    _subscription?.cancel();
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const MatchScreen(),
+        builder: (_) => FriendMatchRevealScreen(
+          matchId: matchId,
+          opponentName: opponentName,
+          opponentFrame: opponentFrame,
+          opponentUid: opponentUid,
+          isHost: false,
+        ),
       ),
-    );
-
-    unawaited(
-      ref.read(onlineMatchSessionProvider.notifier).startOnlineMatch(
-            matchId: matchId,
-            opponentName: opponentName,
-            opponentUid: opponentUid,
-            opponentFrame: opponentFrame,
-            isFriendly: true,
-          ),
     );
   }
 

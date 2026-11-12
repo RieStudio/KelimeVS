@@ -23,11 +23,14 @@ export type DueActionType =
   | 'refundRetry'
   | 'energyRefundRetry';
 
+export const FRIENDLY_CONNECT_TIMEOUT_MS = 15000;
+
 export interface RoomDurations {
   readonly answerSeconds: number;
   readonly roundTransitionMs: number;
   readonly disconnectTimeoutMs: number;
   readonly connectTimeoutMs: number;
+  readonly friendlyConnectTimeoutMs: number;
   readonly cleanupMs: number;
 }
 
@@ -38,6 +41,7 @@ export function getRoomDurations(isFastTimers: boolean): RoomDurations {
       roundTransitionMs: 500,
       disconnectTimeoutMs: 3000,
       connectTimeoutMs: 3000,
+      friendlyConnectTimeoutMs: 4500,
       cleanupMs: 600000,
     };
   }
@@ -46,6 +50,7 @@ export function getRoomDurations(isFastTimers: boolean): RoomDurations {
     roundTransitionMs: 3500,
     disconnectTimeoutMs: 30000,
     connectTimeoutMs: 10000,
+    friendlyConnectTimeoutMs: FRIENDLY_CONNECT_TIMEOUT_MS,
     cleanupMs: 600000,
   };
 }

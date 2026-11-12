@@ -192,7 +192,11 @@ export class MatchRoom extends DurableObject<Env> {
   /** Matchmaker tarafından maç başlangıcı verileriyle çağrılır */
   async initMatch(params: MatchRoomInitParams): Promise<void> {
     const nowMs = Date.now();
-    const connectTimeoutAtMs = nowMs + this.durations.connectTimeoutMs;
+    const isFriendly = params.matchType === 'friendly';
+    const connectTimeoutMs = isFriendly
+      ? this.durations.friendlyConnectTimeoutMs
+      : this.durations.connectTimeoutMs;
+    const connectTimeoutAtMs = nowMs + connectTimeoutMs;
 
     this.data = {
       matchId: params.matchId,

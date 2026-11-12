@@ -56,6 +56,7 @@ Oyun konsepti mevcut benzer oyunlarla aynı türdendir. Arayüz, isim, ikon, kar
 - **[KARAR]** Uygulama arka plana alınır ya da ekran kilitlenirse maç durmaz: süre sunucuda akmaya devam eder ve bağlantı kopmuş sayılır (yukarıdaki kural). Uygulama öne dönünce istemci hemen yeniden bağlanır ve güncel durumu sunucudan alır.
 - Bağlantısı kopan oyuncu kendi ekranında bir bağlantı uyarısı görür; rakibi de karşı tarafın bağlantısının koptuğunu görür (rakip kartında küçük bir not). Geri sayım süresi gösterilmez.
 - Bağlantı kopması sunucu tarafından algılanır (WebSocket kapanışı ve periyodik ping); 30 sn'lik bekleme süresi Durable Object alarmıyla sayılır.
+- **[KARAR]** Eşleşme sonrası odaya ilk bağlantı zaman aşımı (`connectTimeoutMs`): Online hızlı maçlarda eşleşme sonrası odanın açılmasını bekleme süresi 10 sn'dir. Arkadaş düellolarında (`matchType === 'friendly'`) ise maç öncesi 3.5 sn'lik eşleşme ekranı (`FriendMatchRevealScreen`) ve WhatsApp/Telegram geçişinden dönüş payı nedeniyle bu süre 15 sn olarak uygulanır. Süre dolana kadar iki taraf da odaya girmezse maç hükmen iptal (`voided`, `opponent_absent`) edilir.
 
 ## 4. Cevap doğrulama
 

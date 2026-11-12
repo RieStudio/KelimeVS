@@ -128,6 +128,15 @@ abstract final class AppStrings {
   // Maç İçi
   static const String you = 'Sen';
   static const String opponent = 'Rakip';
+
+  /// Rakip adı boş veya salt boşluk gelirse güvenli yedek olarak [opponent] döner.
+  static String safeOpponentName(String? opponentName) {
+    final trimmed = opponentName?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return opponent;
+    }
+    return trimmed;
+  }
   static const String inputPlaceholder = 'Cevabını yaz…';
   static const String questionMark = '?';
 
@@ -458,6 +467,7 @@ abstract final class AppStrings {
 
   // Arkadaşla Düello
   static const String friendDuel = 'Arkadaşla Düello';
+  static const String duelStarting = 'Düello başlıyor!';
   static const String friendDuelSubtitle =
       'Kendi odanı kur veya arkadaşının koduna katıl';
   static const String createRoom = 'Oda Kur';

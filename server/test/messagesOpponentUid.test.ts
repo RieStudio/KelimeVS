@@ -3,7 +3,7 @@ import { buildFinalMessage } from '../src/storage';
 import type { MatchState } from '../src/storage';
 
 describe('Messages opponentUid Protocol Tests', () => {
-  const dummyState: MatchState = {
+  const dummyState: any = {
     matchId: 'm_normal_123',
     currentRoundNumber: 3,
     scores: { p1: 2, p2: 1 },

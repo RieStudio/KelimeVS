@@ -481,7 +481,7 @@ Rakip oyuncu `extra_time` güçlendiricisini kullandığında bilgi amaçlı ile
 | Hamle Süresi (`answerSeconds`) | 20 sn | 3 sn | Oyuncunun doğru cevap vermek için sahip olduğu süre |
 | Tur Geçiş Süresi (`roundTransitionMs`) | 2000 ms | 500 ms | Tur sonu ile yeni turun başlaması arasındaki bekleme |
 | Bağlantı Kopma Toleransı (`disconnectTimeoutMs`) | 30 sn | 3 sn | Kopan oyuncunun geri dönmesi için tanınan süre |
-| İlk Bağlantı Bekleme (`connectTimeoutMs`) | 10 sn | 3 sn | Eşleşme sonrası rakibin odaya ilk bağlantısını bekleme |
+| İlk Bağlantı Bekleme (`connectTimeoutMs`) | 10 sn (Arkadaş: 15 sn) | 3 sn (Arkadaş: 4.5 sn) | Eşleşme sonrası oyuncuların odaya ilk bağlantısını bekleme. Arkadaş düellolarında 3.5 sn'lik eşleşme tanıtım ekranı ve WhatsApp geçiş payı nedeniyle 15 sn uygulanır. |
 | Oda Temizlik Süresi (`cleanupMs`) | 10 dk | 5 sn | Maç bittikten sonra DO SQLite verilerinin silinmesi |
 
 ---

@@ -4,6 +4,7 @@ import {
   getRoomDurations,
   processDueTimers,
   type TimersSchedule,
+  FRIENDLY_CONNECT_TIMEOUT_MS,
 } from '../src/scheduler';
 
 describe('Scheduler and Alarm Management', () => {
@@ -14,6 +15,8 @@ describe('Scheduler and Alarm Management', () => {
       expect(d.roundTransitionMs).toBe(3500);
       expect(d.disconnectTimeoutMs).toBe(30000);
       expect(d.connectTimeoutMs).toBe(10000);
+      expect(d.friendlyConnectTimeoutMs).toBe(FRIENDLY_CONNECT_TIMEOUT_MS);
+      expect(d.friendlyConnectTimeoutMs).toBe(15000);
       expect(d.cleanupMs).toBe(600000);
     });
 
@@ -23,6 +26,7 @@ describe('Scheduler and Alarm Management', () => {
       expect(d.roundTransitionMs).toBe(500);
       expect(d.disconnectTimeoutMs).toBe(3000);
       expect(d.connectTimeoutMs).toBe(3000);
+      expect(d.friendlyConnectTimeoutMs).toBe(4500);
       expect(d.cleanupMs).toBe(600000);
     });
   });

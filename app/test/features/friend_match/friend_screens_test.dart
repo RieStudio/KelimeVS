@@ -12,7 +12,12 @@ import 'package:app/features/friend_match/data/friend_match_client.dart';
 import 'package:app/features/friend_match/presentation/friend_duel_bottom_sheet.dart';
 import 'package:app/features/friend_match/presentation/friend_host_screen.dart';
 import 'package:app/features/friend_match/presentation/friend_join_screen.dart';
+import 'package:app/features/friend_match/presentation/friend_reveal_screen.dart';
+import 'package:app/features/game/application/match_providers.dart';
+import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/presentation/match_screen.dart';
+import 'package:app/features/online/application/online_match_session.dart';
+import 'package:app/features/online/data/online_match_client.dart';
 
 Finder findSvgAsset(String assetName) {
   return find.byWidgetPredicate((widget) {
@@ -93,6 +98,35 @@ class MockFriendMatchClient implements FriendMatchClient {
 
   void emit(FriendMatchEvent event) {
     _controller.add(event);
+  }
+}
+
+class MockOnlineMatchSession extends OnlineMatchSession {
+  int startOnlineMatchCallCount = 0;
+  String? lastMatchId;
+  String? lastOpponentName;
+  String? lastOpponentUid;
+  String? lastOpponentFrame;
+  bool? lastIsFriendly;
+
+  @override
+  MatchUiState build() => const MatchUiState();
+
+  @override
+  Future<void> startOnlineMatch({
+    required String matchId,
+    required String opponentName,
+    String? opponentUid,
+    String opponentFrame = 'classic',
+    bool isFriendly = false,
+    OnlineMatchClient? client,
+  }) async {
+    startOnlineMatchCallCount++;
+    lastMatchId = matchId;
+    lastOpponentName = opponentName;
+    lastOpponentUid = opponentUid;
+    lastOpponentFrame = opponentFrame;
+    lastIsFriendly = isFriendly;
   }
 }
 
@@ -269,10 +303,16 @@ void main() {
       expect(find.text(AppStrings.codeCopied), findsOneWidget);
     });
 
-    testWidgets('3. matched olayı geldiğinde MatchScreen sayfasına geçiş yapar',
+    testWidgets(
+        '3. Host: matched olayı gelince önce FriendMatchRevealScreen gösterilir, 3.5 sn sonra MatchScreen ve startOnlineMatch başlar',
         (tester) async {
+      final mockOnlineSession = MockOnlineMatchSession();
+
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
           child: MaterialApp(
             home: FriendHostScreen(client: mockClient),
           ),
@@ -285,7 +325,7 @@ void main() {
           expiresAt: DateTime.now().millisecondsSinceEpoch + 300000,
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       // Rakip katıldı
       mockClient.emit(
@@ -295,10 +335,68 @@ void main() {
         ),
       );
 
+      // matched geldiğinde hemen FriendMatchRevealScreen görünür
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(FriendMatchRevealScreen), findsOneWidget);
+      expect(find.text(AppStrings.duelStarting), findsOneWidget);
+      expect(find.textContaining('Ahmet'), findsOneWidget);
+      expect(find.byType(MatchScreen), findsNothing);
+      // Henüz startOnlineMatch çağrılmamış olmalı (3.5 sn beklenir)
+      expect(mockOnlineSession.startOnlineMatchCallCount, 0);
+
+      // 3.5 saniye sonra MatchScreen'e geçmiş ve startOnlineMatch çağrılmış olmalı
+      await tester.pump(const Duration(milliseconds: 3500));
       await tester.pumpAndSettle();
 
-      // MatchScreen'e geçmiş olmalıdır
       expect(find.byType(MatchScreen), findsOneWidget);
+      expect(mockOnlineSession.startOnlineMatchCallCount, 1);
+      expect(mockOnlineSession.lastMatchId, 'friend_match_123');
+      expect(mockOnlineSession.lastOpponentName, 'Ahmet');
+      expect(mockOnlineSession.lastIsFriendly, isTrue);
+    });
+
+    testWidgets(
+        '3c. Host: matched ile boş rakip adı gelirse güvenli yedek "Rakip" gösterilir',
+        (tester) async {
+      final mockOnlineSession = MockOnlineMatchSession();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: MaterialApp(
+            home: FriendHostScreen(client: mockClient),
+          ),
+        ),
+      );
+
+      mockClient.emit(
+        FriendMatchRoomCreated(
+          code: 'K7M9P2',
+          expiresAt: DateTime.now().millisecondsSinceEpoch + 300000,
+        ),
+      );
+      await tester.pump();
+
+      // Rakip boş isimle katıldı
+      mockClient.emit(
+        const FriendMatchMatched(
+          matchId: 'friend_match_empty',
+          opponentName: '   ',
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(FriendMatchRevealScreen), findsOneWidget);
+      expect(find.text(AppStrings.opponent), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pumpAndSettle();
+
+      expect(mockOnlineSession.lastOpponentName, AppStrings.opponent);
     });
 
     testWidgets('3b. İpucu kartı initState içinde bir kez seçilir ve nokta animasyonlarında değişmez',
@@ -409,6 +507,194 @@ void main() {
       await tester.pump();
 
       expect(find.text(AppStrings.roomNotFound), findsOneWidget);
+    });
+
+    testWidgets(
+        '6. Join: matched olayı gelince önce FriendMatchRevealScreen gösterilir, 3.5 sn sonra MatchScreen ve startOnlineMatch başlar',
+        (tester) async {
+      final mockOnlineSession = MockOnlineMatchSession();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: MaterialApp(
+            home: FriendJoinScreen(client: mockClient),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byKey(const Key('friend_join_button'));
+      final inputFinder = find.byKey(const Key('friend_code_input_field'));
+
+      await tester.enterText(inputFinder, 'BCDFGH');
+      await tester.pump();
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      // Sunucudan matched gelsin
+      mockClient.emit(
+        const FriendMatchMatched(
+          matchId: 'friend_match_456',
+          opponentName: 'Ayşe',
+        ),
+      );
+
+      // matched geldiğinde hemen FriendMatchRevealScreen görünür
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(FriendMatchRevealScreen), findsOneWidget);
+      expect(find.text(AppStrings.duelStarting), findsOneWidget);
+      expect(find.textContaining('Ayşe'), findsOneWidget);
+      expect(find.byType(MatchScreen), findsNothing);
+      expect(mockOnlineSession.startOnlineMatchCallCount, 0);
+
+      // 3.5 saniye sonra MatchScreen'e geçer ve startOnlineMatch çağrılır
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MatchScreen), findsOneWidget);
+      expect(mockOnlineSession.startOnlineMatchCallCount, 1);
+      expect(mockOnlineSession.lastMatchId, 'friend_match_456');
+      expect(mockOnlineSession.lastOpponentName, 'Ayşe');
+      expect(mockOnlineSession.lastIsFriendly, isTrue);
+    });
+  });
+
+  group('FriendMatchRevealScreen Widget & Interaction Tests', () {
+    late MockOnlineMatchSession mockOnlineSession;
+
+    setUp(() {
+      mockOnlineSession = MockOnlineMatchSession();
+    });
+
+    testWidgets(
+        '7a. Boş rakip adı yedeği: opponentName boş gelirse "Rakip" gösterilir',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: const MaterialApp(
+            home: FriendMatchRevealScreen(
+              matchId: 'm1',
+              opponentName: '   ',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text(AppStrings.opponent), findsOneWidget);
+      expect(find.text(AppStrings.duelStarting), findsOneWidget);
+      expect(find.text(AppStrings.you), findsOneWidget);
+      expect(find.text(AppStrings.vs), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pumpAndSettle();
+      expect(mockOnlineSession.lastOpponentName, AppStrings.opponent);
+    });
+
+    testWidgets(
+        '7b. Rakip adı dolu olduğunda ad ekranda görünür (find.textContaining)',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: const MaterialApp(
+            home: FriendMatchRevealScreen(
+              matchId: 'm2',
+              opponentName: 'Zeynep',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('Zeynep'), findsOneWidget);
+      expect(find.text(AppStrings.duelStarting), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pumpAndSettle();
+      expect(mockOnlineSession.lastOpponentName, 'Zeynep');
+    });
+
+    testWidgets(
+        '7c. Geri tuşu ve çıkış tamamen kilitlidir (PopScope canPop: false)',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: FriendMatchRevealScreen(
+                matchId: 'm3',
+                opponentName: 'Mehmet',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(FriendMatchRevealScreen), findsOneWidget);
+
+      // PopScope canPop false olmalı
+      final popScope = tester.widget<PopScope>(find.byType(PopScope));
+      expect(popScope.canPop, isFalse);
+
+      // Navigator pop denemesi ekranı kapatamaz
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      navigator.maybePop();
+      await tester.pump();
+
+      expect(find.byType(FriendMatchRevealScreen), findsOneWidget);
+
+      // Süre dolunca normal şekilde MatchScreen'e geçer
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pumpAndSettle();
+      expect(find.byType(MatchScreen), findsOneWidget);
+    });
+
+    testWidgets(
+        '7d. Çift geçiş koruması: Timer ve Lifecycle Resumed çakışsa dahi startOnlineMatch tek kez çağrılır',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            onlineMatchSessionProvider.overrideWith(() => mockOnlineSession),
+          ],
+          child: const MaterialApp(
+            home: FriendMatchRevealScreen(
+              matchId: 'm4',
+              opponentName: 'Can',
+            ),
+          ),
+        ),
+      );
+
+      // Süre dolmadan önce ve tam dolma anında lifecycle resumed tetikle
+      await tester.pump(const Duration(milliseconds: 3600));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      // İkinci kez lifecycle tetikle
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(mockOnlineSession.startOnlineMatchCallCount, 1);
+      expect(find.byType(MatchScreen), findsOneWidget);
+    });
+
+    test('7e. AppStrings.safeOpponentName parametre doğrulama ve yedek metin testi', () {
+      expect(AppStrings.safeOpponentName(null), AppStrings.opponent);
+      expect(AppStrings.safeOpponentName(''), AppStrings.opponent);
+      expect(AppStrings.safeOpponentName('    '), AppStrings.opponent);
+      expect(AppStrings.safeOpponentName('Zeynep'), 'Zeynep');
+      expect(AppStrings.safeOpponentName('  Ali  '), 'Ali');
     });
   });
 }
