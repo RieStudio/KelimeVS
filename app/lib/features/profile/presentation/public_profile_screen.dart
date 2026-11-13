@@ -525,17 +525,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                                   : () => _showReportSheet(context, nickname),
                             ),
                           ),
-                          const SizedBox(height: AppDimens.space8),
-
-                          // Yardımcı Metin
-                          Text(
-                            AppStrings.profileBlockHelpText,
-                            style: AppTextStyles.secondaryText.copyWith(
-                              color: AppColors.muted,
-                              fontSize: 12,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
                         ],
                       ],
                     ),

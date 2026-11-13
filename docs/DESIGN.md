@@ -238,7 +238,7 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
   3. **Kazanma:** `${stats.winRateDisplay}` (örn. `%65` veya maç yoksa `—`)
   *(Mağlubiyet kartı, e-posta, bağlı hesap bilgileri, jeton/bakiye ve ad değiştirme alanları herkese açık profilde yer almaz).*
 - **Butonlar ve Eylemler:**
-  - *Engellenmemiş durum (`!isBlocked`):* İstatistiklerin altında `PrimaryButton` ("Engelle") ve `SecondaryButton` ("Bildir") butonları (aralarında 16 dp boşluk). Butonların altında Nunito 12/700 `muted` yardımcı açıklama metni: *"Engellediğin oyuncuyla eşleşmezsin."*
+  - *Engellenmemiş durum (`!isBlocked`):* İstatistiklerin altında `SecondaryButton` ("Engelle") ve `SecondaryButton` ("Bildir") butonları (aralarında 16 dp boşluk).
     - "Engelle" eylemine basıldığında onay diyalogu açılır (`AppConfirmDialog`: "Vazgeç" / "Engelle", "Bu oyuncuyu engellemek istediğinden emin misin?"). Onaylanınca `PublicProfileService.blockUser(uid)` çağrılır, başarılı olunca sayfa anında engelli duruma güncellenir ve "Oyuncu engellendi" SnackBar'ı gösterilir.
   - *Engellenmiş durum (`isBlocked`):* İstatistiklerin hemen altında dikkat çekici bir uyarı kartı yer alır: *"ENGELLENDİ · Seninle eşleşmeyecek"* (`dangerSurface` zemin, `dangerSoft` kenarlık, `dangerDark` etiket metni). Altında doğrudan `SecondaryButton` ("Engeli Kaldır") ve `SecondaryButton` ("Bildir") butonları bulunur.
     - "Engeli Kaldır" eylemi onay sormadan doğrudan `PublicProfileService.unblockUser(uid)` çağrısı yapar; başarılı olunca sayfa engellenmemiş duruma döner ve "Engel kaldırıldı" SnackBar'ı çıkar.

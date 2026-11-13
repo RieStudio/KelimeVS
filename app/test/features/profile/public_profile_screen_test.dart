@@ -168,10 +168,10 @@ void main() {
       expect(find.text(AppStrings.statsWinRate), findsOneWidget);
       expect(find.text('%62'), findsOneWidget);
 
-      // Engelle ve Bildir butonları
+      // Engelle ve Bildir butonları (yardımcı açıklama metni kaldırıldı)
       expect(find.text(AppStrings.blockAction), findsOneWidget);
       expect(find.text(AppStrings.reportAction), findsOneWidget);
-      expect(find.text(AppStrings.profileBlockHelpText), findsOneWidget);
+      expect(find.text('Engellediğin oyuncuyla eşleşmezsin.'), findsNothing);
 
       // Kendi profiline ait alanlar bulunmamalı
       expect(find.text(AppStrings.linkedAccount), findsNothing);
@@ -239,6 +239,7 @@ void main() {
 
       // Engellendi banner'ı
       expect(find.text(AppStrings.profileBlockedBanner), findsOneWidget);
+      expect(find.text('Engellediğin oyuncuyla eşleşmezsin.'), findsNothing);
 
       // Engeli Kaldır ve Bildir görünmeli, Engelle görünmemeli
       expect(find.text(AppStrings.unblockAction), findsOneWidget);

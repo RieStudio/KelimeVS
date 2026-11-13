@@ -448,8 +448,6 @@ abstract final class AppStrings {
   static const String profileGuestBadge = 'Misafir';
   static const String profileBlockedBanner =
       'ENGELLENDİ · Seninle eşleşmeyecek';
-  static const String profileBlockHelpText =
-      'Engellediğin oyuncuyla eşleşmezsin.';
   static const String profileDeletedTitle = 'Bu oyuncu hesabını silmiş';
   static const String profileDeletedMessage =
       'Bu oyuncunun profiline artık ulaşılamıyor.';
