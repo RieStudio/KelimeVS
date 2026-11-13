@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
@@ -148,168 +150,191 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
     super.dispose();
   }
 
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.screenPaddingHorizontal,
+        vertical: AppDimens.space12,
+      ),
+      child: Row(
+        children: [
+          AppIconButton(
+            key: const Key('friend_join_back_button'),
+            icon: AppIcons.back,
+            semanticLabel: AppStrings.back,
+            onTap: () => Navigator.of(context).pop(),
+          ),
+          const Expanded(
+            child: Text(
+              AppStrings.joinRoom,
+              style: AppTextStyles.screenTitle,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: AppDimens.iconButtonSize, height: AppDimens.iconButtonSize),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isValidLength = _controller.text.trim().length == 6;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.ink),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          AppStrings.joinRoom,
-          style: AppTextStyles.screenTitle,
-        ),
-        centerTitle: true,
-      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.screenPaddingHorizontal,
-            vertical: AppDimens.space16,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: AppDimens.space12),
-
-              // Açıklama
-              Text(
-                AppStrings.enterInviteCodeDescription,
-                style: AppTextStyles.bodyText.copyWith(
-                  fontSize: 16,
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w600,
+        child: Column(
+          children: [
+            _buildTopBar(context),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimens.screenPaddingHorizontal,
+                  0,
+                  AppDimens.screenPaddingHorizontal,
+                  AppDimens.space16,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppDimens.space24),
-
-              // 6 Haneli Giriş Alanı
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.space16,
-                  vertical: AppDimens.space8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: AppDimens.borderRadiusListCard,
-                  border: Border.all(
-                    color: _errorMessage != null ? AppColors.danger : AppColors.ink,
-                    width: AppDimens.borderThin,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: AppColors.ink,
-                      offset: Offset(0, 3),
-                      blurRadius: 0,
-                    ),
-                  ],
-                ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        key: const Key('friend_code_input_field'),
-                        controller: _controller,
-                        textCapitalization: TextCapitalization.characters,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontFamily: AppTextStyles.fontFredoka,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 6,
-                          color: AppColors.ink,
-                        ),
-                        inputFormatters: [
-                          _UppercaseAndCleanFormatter(),
-                        ],
-                        decoration: InputDecoration(
-                          hintText: '------',
-                          hintStyle: TextStyle(
-                            fontFamily: AppTextStyles.fontFredoka,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 6,
-                            color: AppColors.muted.withValues(alpha: 0.4),
-                          ),
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) {
-                          if (isValidLength) _submitCode();
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.content_paste_rounded,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                      tooltip: 'Yapıştır',
-                      onPressed: _pasteFromClipboard,
-                    ),
-                  ],
-                ),
-              ),
+                    const SizedBox(height: AppDimens.space12),
 
-              // Hata Mesajı
-              if (_errorMessage != null) ...[
-                const SizedBox(height: AppDimens.space12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.space12,
-                    vertical: AppDimens.space8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerSoft.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.danger,
-                      width: AppDimens.borderThin,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline_rounded,
-                        color: AppColors.danger,
-                        size: 20,
+                    // Açıklama
+                    Text(
+                      AppStrings.enterInviteCodeDescription,
+                      style: AppTextStyles.bodyText.copyWith(
+                        fontSize: 16,
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: AppDimens.space8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: AppTextStyles.bodyText.copyWith(
-                            color: AppColors.danger,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppDimens.space24),
+
+                    // 6 Haneli Giriş Alanı
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppDimens.space16,
+                        vertical: AppDimens.space8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: AppDimens.borderRadiusListCard,
+                        border: Border.all(
+                          color: _errorMessage != null ? AppColors.danger : AppColors.ink,
+                          width: AppDimens.borderThin,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: AppColors.ink,
+                            offset: Offset(0, 3),
+                            blurRadius: 0,
                           ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              key: const Key('friend_code_input_field'),
+                              controller: _controller,
+                              textCapitalization: TextCapitalization.characters,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontFamily: AppTextStyles.fontFredoka,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 6,
+                                color: AppColors.ink,
+                              ),
+                              inputFormatters: [
+                                _UppercaseAndCleanFormatter(),
+                              ],
+                              decoration: InputDecoration(
+                                hintText: '------',
+                                hintStyle: TextStyle(
+                                  fontFamily: AppTextStyles.fontFredoka,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 6,
+                                  color: AppColors.muted.withValues(alpha: 0.4),
+                                ),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) {
+                                if (isValidLength) _submitCode();
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.content_paste_rounded,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                            tooltip: 'Yapıştır',
+                            onPressed: _pasteFromClipboard,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Hata Mesajı
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: AppDimens.space12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimens.space12,
+                          vertical: AppDimens.space8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.dangerSoft.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.danger,
+                            width: AppDimens.borderThin,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: AppColors.danger,
+                              size: 20,
+                            ),
+                            const SizedBox(width: AppDimens.space8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: AppTextStyles.bodyText.copyWith(
+                                  color: AppColors.danger,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
+
+                    const SizedBox(height: AppDimens.space24),
+
+                    // "Katıl" Butonu
+                    PrimaryButton(
+                      key: const Key('friend_join_button'),
+                      text: _isLoading ? AppStrings.joiningRoom : AppStrings.joinMatch,
+                      isLarge: true,
+                      onPressed: (isValidLength && !_isLoading) ? _submitCode : null,
+                    ),
+
+                    const Spacer(),
+                  ],
                 ),
-              ],
-
-              const SizedBox(height: AppDimens.space24),
-
-              // "Katıl" Butonu
-              PrimaryButton(
-                key: const Key('friend_join_button'),
-                text: _isLoading ? AppStrings.joiningRoom : AppStrings.joinMatch,
-                isLarge: true,
-                onPressed: (isValidLength && !_isLoading) ? _submitCode : null,
               ),
-
-              const Spacer(),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

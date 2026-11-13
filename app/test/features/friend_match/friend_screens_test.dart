@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/widgets/app_icon_button.dart';
 import 'package:app/core/widgets/match_tip_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/features/friend_match/data/friend_match_client.dart';
@@ -288,19 +292,42 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Kod ekranda görünür
+      // Kod ekranda görünür, ipucu kartı bulunmaz
       expect(find.text('K7M9P2'), findsOneWidget);
       expect(find.text(AppStrings.shareCode), findsOneWidget);
       expect(find.text(AppStrings.waitingForOpponent), findsOneWidget);
-      expect(find.byType(MatchTipCard), findsOneWidget);
-      expect(find.text(AppStrings.searchTipTitle), findsOneWidget);
+      expect(find.byType(MatchTipCard), findsNothing);
+      expect(find.text(AppStrings.searchTipTitle), findsNothing);
 
       // Kopyalama düğmesine bas
       await tester.tap(find.byKey(const Key('copy_invite_code_button')));
       await tester.pump();
 
-      // Panoya kopyalandı mesajı görünür
+      // Panoya kopyalandı mesajı görünür ve SnackBar stili doğrulanır
       expect(find.text(AppStrings.codeCopied), findsOneWidget);
+      final snackBarFinder = find.byType(SnackBar);
+      expect(snackBarFinder, findsOneWidget);
+      final snackBar = tester.widget<SnackBar>(snackBarFinder);
+
+      // Koyu yeşil / ink zemin ve floating davranış
+      expect(snackBar.backgroundColor, AppColors.ink);
+      expect(snackBar.behavior, SnackBarBehavior.floating);
+      expect(snackBar.margin, isNotNull);
+
+      // WCAG AA Kontrast Oranı Hesaplama ve Doğrulama (en az 4.5:1)
+      final textFinder = find.descendant(
+        of: snackBarFinder,
+        matching: find.text(AppStrings.codeCopied),
+      );
+      final textWidget = tester.widget<Text>(textFinder);
+      final textColor = textWidget.style?.color ?? AppColors.card;
+      final bgLuminance = snackBar.backgroundColor!.computeLuminance();
+      final textLuminance = textColor.computeLuminance();
+      final lMax = math.max(bgLuminance, textLuminance);
+      final lMin = math.min(bgLuminance, textLuminance);
+      final contrastRatio = (lMax + 0.05) / (lMin + 0.05);
+
+      expect(contrastRatio, greaterThanOrEqualTo(4.5));
     });
 
     testWidgets(
@@ -399,7 +426,7 @@ void main() {
       expect(mockOnlineSession.lastOpponentName, AppStrings.opponent);
     });
 
-    testWidgets('3b. İpucu kartı initState içinde bir kez seçilir ve nokta animasyonlarında değişmez',
+    testWidgets('3b. İpucu kartı gösterilmez, bekleme göstergesi ve nokta animasyonu dengeli kalır',
         (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -417,17 +444,52 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final tipCardFinder = find.byType(MatchTipCard);
-      expect(tipCardFinder, findsOneWidget);
-      final tipBefore = tester.widget<MatchTipCard>(tipCardFinder).tip;
-      expect(tipBefore, isNotEmpty);
+      // İpucu kartı kesinlikle bulunmaz
+      expect(find.byType(MatchTipCard), findsNothing);
+      expect(find.text(AppStrings.waitingForOpponent), findsOneWidget);
 
-      // 3 nokta animasyonunun tetiklediği setState'ler
+      // 3 nokta animasyonunun tetiklediği setState'lerde ekran dengeli kalır
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 350));
 
-      final tipAfter = tester.widget<MatchTipCard>(tipCardFinder).tip;
-      expect(tipAfter, equals(tipBefore));
+      expect(find.text(AppStrings.waitingForOpponent), findsOneWidget);
+      expect(find.byType(MatchTipCard), findsNothing);
+    });
+
+    testWidgets('3d. Host: Sol üst geri butonu AppIconButton olarak yer alır, başlık ortalıdır ve dokunulduğunda cancelRoom çağrılır',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: FriendHostScreen(client: mockClient),
+          ),
+        ),
+      );
+
+      mockClient.emit(
+        FriendMatchRoomCreated(
+          code: 'K7M9P2',
+          expiresAt: DateTime.now().millisecondsSinceEpoch + 300000,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Sol üstte AppIconButton geri butonu
+      final backButtonFinder = find.byKey(const Key('friend_host_back_button'));
+      expect(backButtonFinder, findsOneWidget);
+
+      final iconBtn = tester.widget<AppIconButton>(backButtonFinder);
+      expect(iconBtn.icon, equals(AppIcons.back));
+      expect(iconBtn.semanticLabel, equals(AppStrings.back));
+
+      // Başlık ortalı
+      expect(find.text(AppStrings.friendDuel), findsOneWidget);
+
+      // Geri butonuna basılınca odayı iptal eder
+      await tester.tap(backButtonFinder);
+      await tester.pumpAndSettle();
+
+      expect(mockClient.cancelledCode, equals('K7M9P2'));
     });
   });
 
@@ -507,6 +569,53 @@ void main() {
       await tester.pump();
 
       expect(find.text(AppStrings.roomNotFound), findsOneWidget);
+    });
+
+    testWidgets(
+        '5b. Join: Sol üst geri butonu AppIconButton olarak yer alır, başlık ortalıdır ve dokunulduğunda Navigator.pop çalışır',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Builder(
+              builder: (ctx) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).push(
+                      MaterialPageRoute(
+                        builder: (_) => FriendJoinScreen(client: mockClient),
+                      ),
+                    );
+                  },
+                  child: const Text('Katıl Ekranını Aç'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Katıl Ekranını Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendJoinScreen), findsOneWidget);
+
+      // Sol üstte AppIconButton geri butonu
+      final backButtonFinder = find.byKey(const Key('friend_join_back_button'));
+      expect(backButtonFinder, findsOneWidget);
+
+      final iconBtn = tester.widget<AppIconButton>(backButtonFinder);
+      expect(iconBtn.icon, equals(AppIcons.back));
+      expect(iconBtn.semanticLabel, equals(AppStrings.back));
+
+      // Başlık ortalı
+      expect(find.text(AppStrings.joinRoom), findsOneWidget);
+
+      // Geri butonuna basılınca ekran pop edilir
+      await tester.tap(backButtonFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendJoinScreen), findsNothing);
     });
 
     testWidgets(

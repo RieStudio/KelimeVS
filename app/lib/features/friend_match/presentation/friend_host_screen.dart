@@ -1,19 +1,18 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../core/widgets/match_tip_card.dart';
+import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
-import '../../matchmaking/domain/match_tip_selector.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
 import 'friend_reveal_screen.dart';
@@ -22,12 +21,10 @@ import 'friend_reveal_screen.dart';
 /// ve rakip katıldığında maça yönlendirir.
 class FriendHostScreen extends ConsumerStatefulWidget {
   final FriendMatchClient? client;
-  final math.Random? random;
 
   const FriendHostScreen({
     super.key,
     this.client,
-    this.random,
   });
 
   @override
@@ -48,12 +45,10 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
   String? _errorMessage;
   bool _isMatched = false;
   late final BannerSuppressionNotifier _suppressionNotifier;
-  late final String _tipText;
 
   @override
   void initState() {
     super.initState();
-    _tipText = MatchTipSelector.selectTip(random: widget.random);
     WidgetsBinding.instance.addObserver(this);
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -204,14 +199,31 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
   void _copyCode() {
     if (_code == null) return;
     Clipboard.setData(ClipboardData(text: _code!));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(AppStrings.codeCopied),
-        backgroundColor: AppColors.mint,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text(
+            AppStrings.codeCopied,
+            style: TextStyle(
+              color: AppColors.card,
+              fontFamily: AppTextStyles.fontNunito,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: AppColors.ink,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(
+            left: AppDimens.screenPaddingHorizontal,
+            right: AppDimens.screenPaddingHorizontal,
+            bottom: AppDimens.space16 + AppDimens.secondaryButtonHeight + AppDimens.space16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   void _shareCode() {
@@ -246,227 +258,246 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildTopBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.screenPaddingHorizontal,
+        vertical: AppDimens.space12,
+      ),
+      child: Row(
+        children: [
+          AppIconButton(
+            key: const Key('friend_host_back_button'),
+            icon: AppIcons.back,
+            semanticLabel: AppStrings.back,
+            onTap: _cancelAndExit,
+          ),
+          const Expanded(
+            child: Text(
+              AppStrings.friendDuel,
+              style: AppTextStyles.screenTitle,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: AppDimens.iconButtonSize, height: AppDimens.iconButtonSize),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWarningTime = _remainingSeconds <= 60;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.ink),
-          onPressed: _cancelAndExit,
-        ),
-        title: const Text(
-          AppStrings.friendDuel,
-          style: AppTextStyles.screenTitle,
-        ),
-        centerTitle: true,
-      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.screenPaddingHorizontal,
-            vertical: AppDimens.space16,
-          ),
-          child: _isLoading
-              ? const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: AppColors.primary),
-                      SizedBox(height: AppDimens.space16),
-                      Text(
-                        AppStrings.creatingRoom,
-                        style: AppTextStyles.bodyText,
-                      ),
-                    ],
-                  ),
-                )
-              : _errorMessage != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            size: 48,
-                            color: AppColors.danger,
-                          ),
-                          const SizedBox(height: AppDimens.space16),
-                          Text(
-                            _errorMessage!,
-                            style: AppTextStyles.bodyText,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: AppDimens.space24),
-                          SecondaryButton(
-                            text: AppStrings.cancel,
-                            onPressed: _cancelAndExit,
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: AppDimens.space12),
-
-                        // 1. Davet Kodu Kartı
-                        Container(
-                          padding: const EdgeInsets.all(AppDimens.space24),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: AppDimens.borderRadiusListCard,
-                            border: Border.all(
-                              color: AppColors.ink,
-                              width: AppDimens.borderThin,
+        child: Column(
+          children: [
+            _buildTopBar(context),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimens.screenPaddingHorizontal,
+                  0,
+                  AppDimens.screenPaddingHorizontal,
+                  AppDimens.space16,
+                ),
+                child: _isLoading
+                    ? const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(color: AppColors.primary),
+                            SizedBox(height: AppDimens.space16),
+                            Text(
+                              AppStrings.creatingRoom,
+                              style: AppTextStyles.bodyText,
                             ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: AppColors.ink,
-                                offset: Offset(0, 4),
-                                blurRadius: 0,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                AppStrings.yourInviteCode,
-                                style: AppTextStyles.sectionLabel.copyWith(
-                                  fontSize: 13,
-                                  letterSpacing: 1.2,
-                                  color: AppColors.muted,
+                          ],
+                        ),
+                      )
+                    : _errorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 48,
+                                  color: AppColors.danger,
                                 ),
-                              ),
+                                const SizedBox(height: AppDimens.space16),
+                                Text(
+                                  _errorMessage!,
+                                  style: AppTextStyles.bodyText,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: AppDimens.space24),
+                                SecondaryButton(
+                                  text: AppStrings.cancel,
+                                  onPressed: _cancelAndExit,
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
                               const SizedBox(height: AppDimens.space12),
 
-                              // 6 Haneli Kod
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    _code ?? '------',
-                                    style: const TextStyle(
-                                      fontFamily: AppTextStyles.fontFredoka,
-                                      fontSize: 38,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 6,
+                              // 1. Davet Kodu Kartı
+                              Container(
+                                padding: const EdgeInsets.all(AppDimens.space24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius: AppDimens.borderRadiusListCard,
+                                  border: Border.all(
+                                    color: AppColors.ink,
+                                    width: AppDimens.borderThin,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
                                       color: AppColors.ink,
+                                      offset: Offset(0, 4),
+                                      blurRadius: 0,
                                     ),
-                                  ),
-                                  const SizedBox(width: AppDimens.space12),
-                                  IconButton(
-                                    key: const Key('copy_invite_code_button'),
-                                    icon: const Icon(
-                                      Icons.copy_rounded,
-                                      color: AppColors.primary,
-                                      size: 26,
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      AppStrings.yourInviteCode,
+                                      style: AppTextStyles.sectionLabel.copyWith(
+                                        fontSize: 13,
+                                        letterSpacing: 1.2,
+                                        color: AppColors.muted,
+                                      ),
                                     ),
-                                    tooltip: AppStrings.copyCode,
-                                    onPressed: _copyCode,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AppDimens.space16),
+                                    const SizedBox(height: AppDimens.space12),
 
-                              // Geri Sayım Sayacı
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.timer_outlined,
-                                    size: 16,
-                                    color: isWarningTime
-                                        ? AppColors.danger
-                                        : AppColors.muted,
-                                  ),
-                                  const SizedBox(width: AppDimens.space6),
-                                  Text(
-                                    '${AppStrings.codeValidity} ${_formatDuration(_remainingSeconds)}',
-                                    style: AppTextStyles.bodyText.copyWith(
-                                      color: isWarningTime
-                                          ? AppColors.danger
-                                          : AppColors.muted,
-                                      fontWeight: isWarningTime
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                      fontSize: 14,
+                                    // 6 Haneli Kod
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          _code ?? '------',
+                                          style: const TextStyle(
+                                            fontFamily: AppTextStyles.fontFredoka,
+                                            fontSize: 38,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 6,
+                                            color: AppColors.ink,
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppDimens.space12),
+                                        IconButton(
+                                          key: const Key('copy_invite_code_button'),
+                                          icon: const Icon(
+                                            Icons.copy_rounded,
+                                            color: AppColors.primary,
+                                            size: 26,
+                                          ),
+                                          tooltip: AppStrings.copyCode,
+                                          onPressed: _copyCode,
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppDimens.space20),
+                                    const SizedBox(height: AppDimens.space16),
 
-                        // 2. "Paylaş" Butonu
-                        PrimaryButton(
-                          key: const Key('share_invite_code_button'),
-                          text: AppStrings.shareCode,
-                          isLarge: true,
-                          onPressed: _shareCode,
-                        ),
-                        const SizedBox(height: AppDimens.space16),
-
-                        // 2b. İpucu Kartı
-                        MatchTipCard(tip: _tipText),
-
-                        const Spacer(),
-
-                        // 3. Bekleme Göstergesi ve 3 Nokta
-                        Center(
-                          child: Column(
-                            children: [
-                              Text(
-                                AppStrings.waitingForOpponent,
-                                style: AppTextStyles.bodyText.copyWith(
-                                  color: AppColors.ink,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                                    // Geri Sayım Sayacı
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.timer_outlined,
+                                          size: 16,
+                                          color: isWarningTime
+                                              ? AppColors.danger
+                                              : AppColors.muted,
+                                        ),
+                                        const SizedBox(width: AppDimens.space6),
+                                        Text(
+                                          '${AppStrings.codeValidity} ${_formatDuration(_remainingSeconds)}',
+                                          style: AppTextStyles.bodyText.copyWith(
+                                            color: isWarningTime
+                                                ? AppColors.danger
+                                                : AppColors.muted,
+                                            fontWeight: isWarningTime
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: AppDimens.space12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: List.generate(3, (index) {
-                                  final isActive = index == _activeDotIndex;
-                                  return AnimatedContainer(
-                                    duration: const Duration(milliseconds: 250),
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                    ),
-                                    width: isActive ? 12 : 8,
-                                    height: isActive ? 12 : 8,
-                                    decoration: BoxDecoration(
-                                      color: index == 0
-                                          ? AppColors.primary
-                                          : index == 1
-                                              ? AppColors.bright
-                                              : AppColors.mint,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  );
-                                }),
+                              const SizedBox(height: AppDimens.space20),
+
+                              // 2. "Paylaş" Butonu
+                              PrimaryButton(
+                                key: const Key('share_invite_code_button'),
+                                text: AppStrings.shareCode,
+                                isLarge: true,
+                                onPressed: _shareCode,
                               ),
+
+                              const Spacer(),
+
+                              // 3. Bekleme Göstergesi ve 3 Nokta
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      AppStrings.waitingForOpponent,
+                                      style: AppTextStyles.bodyText.copyWith(
+                                        color: AppColors.ink,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppDimens.space12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: List.generate(3, (index) {
+                                        final isActive = index == _activeDotIndex;
+                                        return AnimatedContainer(
+                                          duration: const Duration(milliseconds: 250),
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                          ),
+                                          width: isActive ? 12 : 8,
+                                          height: isActive ? 12 : 8,
+                                          decoration: BoxDecoration(
+                                            color: index == 0
+                                                ? AppColors.primary
+                                                : index == 1
+                                                    ? AppColors.bright
+                                                    : AppColors.mint,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const Spacer(),
+
+                              // 4. "Odayı Kapat" Butonu
+                              SecondaryButton(
+                                text: AppStrings.cancelRoom,
+                                onPressed: _cancelAndExit,
+                              ),
+                              const SizedBox(height: AppDimens.space10),
                             ],
                           ),
-                        ),
-
-                        const Spacer(),
-
-                        // 4. "Odayı Kapat" Butonu
-                        SecondaryButton(
-                          text: AppStrings.cancelRoom,
-                          onPressed: _cancelAndExit,
-                        ),
-                        const SizedBox(height: AppDimens.space10),
-                      ],
-                    ),
+              ),
+            ),
+          ],
         ),
       ),
     );
