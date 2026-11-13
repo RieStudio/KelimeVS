@@ -502,8 +502,6 @@ abstract final class AppStrings {
   static const String friendRoomLobbyBusy =
       'Lobi şu anda yoğun. Lütfen birkaç dakika sonra tekrar dene.';
   static const String friendMatchNote = 'Arkadaş maçı';
-  static const String friendDuelMatchBadge =
-      'Dostluk Düellosu • Jeton verilmez';
 
   // Güçlendiriciler (Power-ups)
   static const String powerups = 'Jokerler';

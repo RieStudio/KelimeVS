@@ -378,46 +378,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 ),
               ),
 
-              // 6. Dostluk Maçı Rozeti veya Jeton Ödülü Kartı
-              if (isFriendly) ...[
-                const SizedBox(height: AppDimens.space20),
-                Semantics(
-                  container: true,
-                  label: AppStrings.friendDuelMatchBadge,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space20,
-                      vertical: AppDimens.space8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusFull,
-                      border: Border.all(
-                        color: AppColors.mint,
-                        width: AppDimens.borderThin,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.people_alt_rounded,
-                          size: 20,
-                          color: AppColors.mint,
-                        ),
-                        const SizedBox(width: AppDimens.space8),
-                        Text(
-                          AppStrings.friendDuelMatchBadge,
-                          style: AppTextStyles.bodyText.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ] else if (coinsAwarded != null) ...[
+              // 6. Jeton Ödülü Kartı (Yalnızca normal maçlarda ve coinsAwarded varsa)
+              if (!isFriendly && coinsAwarded != null) ...[
                 const SizedBox(height: AppDimens.space20),
                 Semantics(
                   container: true,
@@ -457,7 +419,11 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
               // 6b. Rakip Kartı (Yalnızca online maçta gösterilir, bot maçında ASLA gösterilmez)
               if (isOnlineMatch && matchId != null) ...[
-                const SizedBox(height: AppDimens.space16),
+                SizedBox(
+                  height: (!isFriendly && coinsAwarded != null)
+                      ? AppDimens.space16
+                      : AppDimens.space20,
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppDimens.space16,

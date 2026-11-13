@@ -3,14 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/coin_icon.dart';
 import 'package:app/core/widgets/match_card.dart';
 import 'package:app/features/game/application/match_providers.dart';
+import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
+
+class FakeSessionModeNotifier extends ActiveMatchSessionModeNotifier {
+  final MatchSessionMode mode;
+  FakeSessionModeNotifier(this.mode);
+
+  @override
+  MatchSessionMode build() => mode;
+}
 
 void main() {
   group('Friend Duel UI & History Badges', () {
@@ -44,7 +54,7 @@ void main() {
     });
 
     testWidgets(
-        '2. MatchEndView isFriendly: true olduğunda "Dostluk Düellosu • Jeton verilmez" rozeti gösterir, jeton kartı gösterilmez',
+        '2. MatchEndView isFriendly: true olduğunda "Dostluk Düellosu" / "Jeton verilmez" rozeti gösterilmez; skor, rakip kartı, Tekrar Oyna ve Maç Detayı gösterilir',
         (tester) async {
       final finishedMatchState = MatchState(
         config: const MatchConfig(),
@@ -75,11 +85,26 @@ void main() {
         isFriendly: true,
         opponentName: 'Mehmet',
         coinsAwarded: 0,
+        lastSavedMatch: const MatchHistoryEntry(
+          id: 'friend_match_1',
+          matchId: 'friend_match_1',
+          opponentName: 'Mehmet',
+          finishedAtMs: 12345678,
+          myScore: 2,
+          opponentScore: 1,
+          result: MatchResult.win,
+          endType: MatchEndType.normal,
+          roundRecords: [],
+          isFriendly: true,
+          botlaOynandi: false,
+        ),
       );
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            activeMatchSessionModeProvider
+                .overrideWith(() => FakeSessionModeNotifier(MatchSessionMode.online)),
             activeMatchUiStateProvider.overrideWithValue(uiState),
           ],
           child: const MaterialApp(
@@ -91,12 +116,27 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Dostluk rozeti görünmeli
-      expect(find.text(AppStrings.friendDuelMatchBadge), findsOneWidget);
+      // Dostluk Düellosu / Jeton verilmez rozeti görünmemeli
+      expect(find.textContaining('Dostluk Düellosu'), findsNothing);
+      expect(find.textContaining('Jeton verilmez'), findsNothing);
 
-      // +0 Jeton veya standart jeton ödülü kartı görünmemeli
+      // Jeton ödülü kartı görünmemeli
       expect(find.text('+0 Jeton'), findsNothing);
       expect(find.text('+30 Jeton'), findsNothing);
+      expect(find.byType(CoinIcon), findsNothing);
+
+      // Skor görünmeli ("Sen", "2 – 1", "Mehmet")
+      expect(find.text(AppStrings.you), findsOneWidget);
+      expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
+      expect(find.text('Mehmet'), findsWidgets);
+
+      // Rakip kartı (Bildir ve Engelle butonları) görünmeli
+      expect(find.text(AppStrings.reportAction), findsOneWidget);
+      expect(find.text(AppStrings.blockAction), findsOneWidget);
+
+      // Butonlar görünmeli
+      expect(find.text(AppStrings.playAgain), findsOneWidget);
+      expect(find.text(AppStrings.matchDetail), findsOneWidget);
     });
   });
 }
