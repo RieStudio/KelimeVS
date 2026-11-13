@@ -78,6 +78,7 @@ void main() {
     List<RoundRecord>? rounds,
     List<String>? questionTexts,
     bool isFinal = true,
+    bool isFriendly = false,
   }) {
     final sampleRounds = rounds ??
         [
@@ -179,6 +180,7 @@ void main() {
       roundQuestionTexts: questionTexts ??
           const ['Kışlık sebzeler', 'G20 ülkeleri', 'B ile başlayan hayvanlar'],
       isFinal: isFinal,
+      isFriendly: isFriendly,
     );
   }
 
@@ -204,6 +206,22 @@ void main() {
       expect(find.text('Zeynep'), findsOneWidget);
       expect(find.text('2 – 1'), findsOneWidget);
       expect(find.text(AppStrings.won), findsAtLeastNWidgets(1));
+      expect(find.text(AppStrings.friendMatchNote), findsNothing);
+    });
+
+    testWidgets('2b. Arkadaş maçında (isFriendly: true) özet kartında "Arkadaş maçı" notu gösterilir, normal maçta gösterilmez', (tester) async {
+      final friendlyMatch = createSampleMatch(
+        opponentName: 'Can',
+        myScore: 2,
+        opponentScore: 0,
+        result: MatchResult.win,
+        isFriendly: true,
+      );
+      await tester.pumpWidget(createDetailTestWidget(match: friendlyMatch));
+
+      expect(find.text(AppStrings.friendMatchNote), findsOneWidget);
+      expect(find.text('Can'), findsOneWidget);
+      expect(find.text('2 – 0'), findsOneWidget);
     });
 
     testWidgets('3. Terk edilen maçta terk notu görünür', (tester) async {

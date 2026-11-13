@@ -501,7 +501,7 @@ abstract final class AppStrings {
       'Çok fazla hatalı deneme yaptın. Lütfen biraz bekleyip tekrar dene.';
   static const String friendRoomLobbyBusy =
       'Lobi şu anda yoğun. Lütfen birkaç dakika sonra tekrar dene.';
-  static const String friendDuelBadge = 'Dostluk';
+  static const String friendMatchNote = 'Arkadaş maçı';
   static const String friendDuelMatchBadge =
       'Dostluk Düellosu • Jeton verilmez';
 

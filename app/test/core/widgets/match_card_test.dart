@@ -151,7 +151,7 @@ void main() {
     );
 
     testWidgets(
-      '5. Dostluk maçı olduğunda Dostluk rozeti ad ile birlikte gösterilir ve taşma olmaz',
+      '5. Dostluk maçı olduğunda Dostluk rozeti gösterilmez, satır normal maç gibi çizilir ve taşma olmaz',
       (tester) async {
         const entry = MatchHistoryEntry(
           id: 'test_friend',
@@ -176,7 +176,12 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Zeynep'), findsOneWidget);
-        expect(find.text(AppStrings.friendDuelBadge), findsOneWidget);
+        expect(find.text('Dostluk'), findsNothing);
+        expect(
+          find.text('2${AppStrings.scoreDash}1'),
+          findsOneWidget,
+        );
+        expect(find.text(AppStrings.won), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );

@@ -309,6 +309,17 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                         ? ResultBadgeVariant.won
                         : ResultBadgeVariant.lost,
                   ),
+                  if (widget.match.isFriendly) ...[
+                    const SizedBox(height: AppDimens.space4),
+                    Text(
+                      AppStrings.friendMatchNote,
+                      style: AppTextStyles.secondaryText.copyWith(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   if (endNote != null) ...[
                     const SizedBox(height: AppDimens.space4),
                     Text(

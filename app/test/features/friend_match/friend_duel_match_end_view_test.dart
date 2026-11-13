@@ -14,7 +14,7 @@ import 'package:app/features/game/presentation/match_end_view.dart';
 
 void main() {
   group('Friend Duel UI & History Badges', () {
-    testWidgets('1. MatchCard isFriendly: true olduğunda "Dostluk" rozeti gösterir',
+    testWidgets('1. MatchCard isFriendly: true olduğunda "Dostluk" rozeti göstermez, normal maç görünümü sunar',
         (tester) async {
       const entry = MatchHistoryEntry(
         id: 'friend_1',
@@ -38,7 +38,9 @@ void main() {
       );
 
       expect(find.text('Zeynep'), findsOneWidget);
-      expect(find.text(AppStrings.friendDuelBadge), findsOneWidget);
+      expect(find.text('Dostluk'), findsNothing);
+      expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
+      expect(find.text(AppStrings.won), findsOneWidget);
     });
 
     testWidgets(
