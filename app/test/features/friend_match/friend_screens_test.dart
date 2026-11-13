@@ -250,6 +250,24 @@ void main() {
 
       expect(find.byType(FriendDuelBottomSheet), findsNothing);
     });
+
+    testWidgets(
+        '1f. Sheet açıldığında zemin renginin AppColors.card olduğunu doğrular',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      final rootContainerFinder = find.descendant(
+        of: find.byType(FriendDuelBottomSheet),
+        matching: find.byType(Container),
+      ).first;
+      final rootContainer = tester.widget<Container>(rootContainerFinder);
+      final decoration = rootContainer.decoration as BoxDecoration?;
+      expect(decoration?.color, AppColors.card);
+    });
   });
 
   group('FriendHostScreen Widget Tests', () {

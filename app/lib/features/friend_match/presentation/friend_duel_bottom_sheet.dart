@@ -27,7 +27,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.card,
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(AppDimens.radiusCardLarge),
         ),
