@@ -124,7 +124,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
   ProfileState build() {
     final authRepo = ref.watch(authRepositoryProvider);
     if (!authRepo.isAuthenticated) {
-      return const ProfileState(isLoaded: true);
+      return const ProfileState(isLoaded: false);
     }
     _loadProfile();
     return const ProfileState(isLoaded: false);
@@ -198,6 +198,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           isGuest: remote.isGuest,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
+          isLoaded: true,
         );
 
         // 2. Takma ad senkronizasyonu (Kural 2)
@@ -259,6 +260,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
         if (!state.hasNickname) {
           state = state.copyWith(
             syncError: AppStrings.profileLoadErrorTitle,
+            isLoaded: true,
           );
         }
       }
@@ -270,6 +272,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
       if (!state.hasNickname) {
         state = state.copyWith(
           syncError: AppStrings.profileLoadErrorTitle,
+          isLoaded: true,
         );
       }
     } finally {
@@ -472,7 +475,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
     state = const ProfileState(
       nickname: null,
       coins: 100,
-      isLoaded: true,
+      isLoaded: false,
       stats: UserStats(),
     );
   }

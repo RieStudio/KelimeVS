@@ -225,17 +225,6 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     final profile = ref.watch(profileProvider);
-    if (!profile.isLoaded) {
-      return const Scaffold(
-        backgroundColor: AppColors.surface,
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-          ),
-        ),
-      );
-    }
-
     if (profile.syncError != null && !profile.hasNickname) {
       return Scaffold(
         key: const Key('profile_load_error_screen'),
@@ -299,6 +288,19 @@ class _MainShellState extends ConsumerState<MainShell>
                 const SizedBox(height: AppDimens.space24),
               ],
             ),
+          ),
+        ),
+      );
+    }
+
+    if (!profile.isLoaded ||
+        authState.isLoading ||
+        (profile.isSyncing && !profile.hasNickname)) {
+      return const Scaffold(
+        backgroundColor: AppColors.surface,
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
         ),
       );

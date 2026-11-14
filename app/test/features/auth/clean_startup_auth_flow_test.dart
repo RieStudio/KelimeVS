@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,10 +110,14 @@ class _TrackingProfileApiClient implements ProfileApiClient {
   int getProfileCallCount = 0;
   UserProfileModel? profileToReturn;
   Object? errorToThrow;
+  Completer<UserProfileModel?>? getProfileCompleter;
 
   @override
   Future<UserProfileModel?> getProfile() async {
     getProfileCallCount++;
+    if (getProfileCompleter != null) {
+      return getProfileCompleter!.future;
+    }
     if (errorToThrow != null) throw errorToThrow!;
     return profileToReturn;
   }
@@ -275,6 +280,80 @@ void main() {
       expect(authRepo.signOutCallCount, 1);
       expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(find.byType(OnboardingNicknameScreen), findsNothing);
+    });
+
+    testWidgets('3c. Mevcut hesaba Google ile giriş: profil yüklenene kadar takma ad ekranı hiç açılmaz, doğrudan HomeScreen açılır', (tester) async {
+      final authRepo = _TrackingAuthRepo(initialAuthenticated: false);
+      final completer = Completer<UserProfileModel?>();
+      final apiClient = _TrackingProfileApiClient()
+        ..getProfileCompleter = completer
+        ..profileToReturn = const UserProfileModel(
+          uid: 'google_user_existing',
+          nickname: 'MevcutKullanici',
+          coins: 200,
+          isGuest: false,
+        );
+
+      await tester.pumpWidget(buildApp(authRepo: authRepo, apiClient: apiClient));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+
+      // Google ile giriş yap butonuna bas
+      await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.signInWithGoogle));
+      // Tek kare ilerlet (Firebase Auth tamamlandı, sunucu profili hala bekleniyor)
+      await tester.pump();
+
+      // Takma ad ekranı HİÇ AÇILMAMALI, yükleme göstergesi görünmeli
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Birkaç kare daha ilerletilse bile profil henüz gelmediği için takma ad ekranı asla açılmamalı
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Sunucudan profil yanıtı geldi
+      completer.complete(apiClient.profileToReturn);
+      await tester.pumpAndSettle();
+
+      // Takma ad ekranı HİÇ açılmadan doğrudan ana sayfaya geçilmeli
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('3d. Google ile girişte profil yükleme hatası/zaman aşımı: takılı kalınmaz, profile_load_error_screen açılır ve tekrar dene çalışır', (tester) async {
+      final authRepo = _TrackingAuthRepo(initialAuthenticated: false);
+      final apiClient = _TrackingProfileApiClient()
+        ..errorToThrow = const SocketException('Ağ bağlantısı kesildi');
+
+      await tester.pumpWidget(buildApp(authRepo: authRepo, apiClient: apiClient));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.signInWithGoogle));
+      await tester.pumpAndSettle();
+
+      // Takma ad ekranı açılmaz, kullanıcı takılı kalmaz, hata ekranı açılır
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byKey(const Key('profile_load_error_screen')), findsOneWidget);
+      expect(find.byKey(const Key('profile_load_retry_button')), findsOneWidget);
+
+      // Ağ düzeldi
+      apiClient.errorToThrow = null;
+      apiClient.profileToReturn = const UserProfileModel(
+        uid: 'google_user_existing',
+        nickname: 'KurtarilanOyuncu',
+        coins: 150,
+      );
+
+      // Tekrar dene butonuna bas
+      await tester.tap(find.byKey(const Key('profile_load_retry_button')));
+      await tester.pumpAndSettle();
+
+      // Takma ad ekranına düşmeden doğrudan HomeScreen açılır
+      expect(find.byKey(const Key('profile_load_error_screen')), findsNothing);
+      expect(find.byType(OnboardingNicknameScreen), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
     });
 
     testWidgets('4. Çıkış yapınca (signOut) WelcomeScreen açılır ve YENİ anonim hesap açılmaz', (tester) async {
