@@ -1,3 +1,4 @@
+import '../../online/domain/models/rematch_state.dart';
 import '../domain/history/match_history_entry.dart';
 import '../domain/match/match_events.dart';
 import '../domain/match/match_state.dart';
@@ -93,6 +94,7 @@ class MatchUiState {
   final int powerupErrorCounter;
   final bool isPaused;
   final Map<String, int>? boardScores;
+  final RematchState rematchState;
 
   const MatchUiState({
     this.matchState,
@@ -133,6 +135,7 @@ class MatchUiState {
     this.powerupErrorCounter = 0,
     this.isPaused = false,
     this.boardScores,
+    this.rematchState = RematchState.unavailable,
   });
 
   ConnectionStatus get kendiBaglanti => connectionStatus;
@@ -226,6 +229,7 @@ class MatchUiState {
     bool? isPaused,
     Map<String, int>? boardScores,
     bool clearBoardScores = false,
+    RematchState? rematchState,
   }) {
     return MatchUiState(
       matchState: matchState ?? this.matchState,
@@ -280,6 +284,7 @@ class MatchUiState {
       // clearBoardScores=true ise sıfırla (yeni maç başlarken kullanılır),
       // aksi hâlde verilen değeri al, o da null ise mevcut değeri koru.
       boardScores: clearBoardScores ? null : (boardScores ?? this.boardScores),
+      rematchState: rematchState ?? this.rematchState,
     );
   }
 }

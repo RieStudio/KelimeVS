@@ -205,6 +205,14 @@ class _OnlineTestPageState extends State<OnlineTestPage> {
         );
       case OnlineMatchError(:final message):
         _addLog('error: $message');
+      case OnlineMatchRematchOffered(:final message):
+        _addLog('rematch_offered: by ${message.byUid}');
+      case OnlineMatchRematchStatus(:final message):
+        _addLog('rematch_status: ${message.status}');
+      case OnlineMatchRematchError(:final message):
+        _addLog('rematch_error: ${message.code}');
+      case OnlineMatchMatched(:final message):
+        _addLog('matched: ${message.matchId}');
     }
   }
 

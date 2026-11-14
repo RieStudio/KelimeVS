@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../game/application/match_controller.dart';
 import '../../game/application/match_history_provider.dart';
 import '../../game/application/match_providers.dart';
@@ -177,6 +178,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   Timer? _tickTimer;
   Timer? _leaveTimeoutTimer;
   Timer? _opponentBannerTimer;
+  Timer? _rematchCountdownTimer;
+  int _rematchSecondsRemaining = 45;
+  int _rematchGraceTicks = 0;
+  bool _rematchLeaveSent = false;
 
   OnlineMatchState? _lastOnlineState;
   String? _currentMatchId;
@@ -241,6 +246,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   }) async {
     _cleanupSession();
 
+    try {
+      ref.read(activeMatchSessionModeProvider.notifier).setMode(MatchSessionMode.online);
+    } catch (_) {}
+
     if (!_isObserverRegistered) {
       WidgetsBinding.instance.addObserver(this);
       _isObserverRegistered = true;
@@ -300,6 +309,14 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       _handleOpponentPowerup(event.message);
     } else if (event is OnlineMatchDisconnected) {
       _handleDisconnected(event.reason);
+    } else if (event is OnlineMatchRematchOffered) {
+      _handleRematchOffered(event.message);
+    } else if (event is OnlineMatchRematchStatus) {
+      _handleRematchStatus(event.message);
+    } else if (event is OnlineMatchRematchError) {
+      _handleRematchError(event.message);
+    } else if (event is OnlineMatchMatched) {
+      _handleMatched(event.message);
     }
   }
 
@@ -671,6 +688,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       endedBy: finalMsg.endedBy,
     );
 
+    final bool canRematch =
+        finalMsg.rematchAvailable && !isForfeit && !state.isVoided;
+
     state = state.copyWith(
       matchState: finishedMatchState,
       boardScores: scores,
@@ -686,6 +706,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
       ),
       coinsAwarded: finalMsg.coinsAwarded,
       opponentFrame: resolvedOpponentFrame,
+      rematchState: canRematch ? RematchState.idle : RematchState.unavailable,
     );
 
     if (finalMsg.coins != null) {
@@ -806,10 +827,26 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   }
 
   void _handleDisconnected(DisconnectReason reason) {
-    // Maç zaten tamamlandıysa veya terk sonucu bekleniyorsa kopma olayını yok say
-    if (_isLeaving ||
-        state.matchState?.phase == MatchPhase.matchFinished ||
-        state.isVoided) {
+    if (reason == DisconnectReason.rematchStarted) {
+      // Rövanş başladı, eski oda soketi beklenen şekilde kapandı. Hata üretme.
+      return;
+    }
+
+    // Maç zaten tamamlandıysa maç sonu ekranını bozma; kalıcı kopma durumunda rövanşı kapa
+    if (state.matchState?.phase == MatchPhase.matchFinished) {
+      if (reason == DisconnectReason.permanent ||
+          reason == DisconnectReason.error ||
+          reason == DisconnectReason.replaced) {
+        _cancelRematchCountdown();
+        if (!state.rematchState.isTerminal) {
+          state = state.copyWith(rematchState: RematchState.opponentLeft);
+        }
+      }
+      return;
+    }
+
+    // Terk sonucu bekleniyorsa veya voided ise kopma olayını yok say
+    if (_isLeaving || state.isVoided) {
       return;
     }
 
@@ -1043,6 +1080,157 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     }
   }
 
+  bool _isMyOffer(String byUid) {
+    if (byUid.isEmpty) return false;
+    try {
+      final myUid = ref.read(authRepositoryProvider).currentUser?.uid;
+      if (myUid != null && myUid.isNotEmpty) {
+        return byUid == myUid;
+      }
+    } catch (_) {}
+    if (_opponentUid != null && _opponentUid!.isNotEmpty) {
+      return byUid != _opponentUid;
+    }
+    return false;
+  }
+
+  void _handleRematchOffered(RematchOfferedServerMessage msg) {
+    // Yalnızca maç bitmişse ve oturum geçerliyse teklif işlenir
+    if (state.matchState?.phase != MatchPhase.matchFinished || _isLeaving) {
+      return;
+    }
+
+    final isMine = _isMyOffer(msg.byUid);
+
+    // Kendi teklifimiz için zaten yerel sayaç başlattıysak sunucu yankısında sayacı sıfırlama
+    if (isMine && state.rematchState is RematchPendingSent) {
+      return;
+    }
+
+    _startRematchCountdown(isSent: isMine);
+  }
+
+  void _startRematchCountdown({required bool isSent}) {
+    _cancelRematchCountdown();
+    _rematchSecondsRemaining = 45;
+    _rematchGraceTicks = 0;
+    state = state.copyWith(
+      rematchState: isSent
+          ? RematchState.pendingSent(secondsRemaining: _rematchSecondsRemaining)
+          : RematchState.pendingReceived(secondsRemaining: _rematchSecondsRemaining),
+    );
+
+    _rematchCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_rematchSecondsRemaining > 0) {
+        _rematchSecondsRemaining--;
+        state = state.copyWith(
+          rematchState: isSent
+              ? RematchState.pendingSent(secondsRemaining: _rematchSecondsRemaining)
+              : RematchState.pendingReceived(secondsRemaining: _rematchSecondsRemaining),
+        );
+      } else {
+        _rematchGraceTicks++;
+        if (_rematchGraceTicks >= 3) {
+          timer.cancel();
+          _rematchCountdownTimer = null;
+          if (!state.rematchState.isTerminal) {
+            state = state.copyWith(rematchState: RematchState.expired);
+          }
+        }
+      }
+    });
+  }
+
+  void _cancelRematchCountdown() {
+    _rematchCountdownTimer?.cancel();
+    _rematchCountdownTimer = null;
+  }
+
+  void _handleRematchStatus(RematchStatusServerMessage msg) {
+    _cancelRematchCountdown();
+    final RematchState nextState;
+    switch (msg.status) {
+      case RematchStatusType.declined:
+        nextState = RematchState.declined;
+      case RematchStatusType.expired:
+        nextState = RematchState.expired;
+      case RematchStatusType.opponentLeft:
+        nextState = RematchState.opponentLeft;
+      case RematchStatusType.closed:
+        nextState = RematchState.closed;
+      case RematchStatusType.unknown:
+        nextState = RematchState.closed;
+    }
+    state = state.copyWith(rematchState: nextState);
+  }
+
+  void _handleRematchError(RematchErrorServerMessage msg) {
+    _cancelRematchCountdown();
+    state = state.copyWith(
+      rematchState: RematchState.error(msg.code, rawCode: msg.rawCode),
+    );
+  }
+
+  void _handleMatched(MatchedServerMessage msg) {
+    _cancelRematchCountdown();
+    state = state.copyWith(
+      rematchState: RematchState.matched(msg),
+    );
+  }
+
+  /// Kullanıcı tarafından rövanş teklifi gönderilmesi (`rematch_offer`).
+  bool offerRematch() {
+    if (state.rematchState is! RematchIdle || _client == null || _isLeaving) {
+      return false;
+    }
+    final sent = _client!.offerRematch();
+    if (sent) {
+      _startRematchCountdown(isSent: true);
+      return true;
+    }
+    return false;
+  }
+
+  /// Karşı tarafın rövanş teklifini kabul etme (`rematch_accept`).
+  bool acceptRematch() {
+    if (state.rematchState is! RematchPendingReceived ||
+        _client == null ||
+        _isLeaving) {
+      return false;
+    }
+    _cancelRematchCountdown();
+    state = state.copyWith(rematchState: RematchState.starting);
+    return _client!.acceptRematch();
+  }
+
+  /// Karşı tarafın rövanş teklifini reddetme (`rematch_decline`).
+  bool declineRematch() {
+    if (state.rematchState is! RematchPendingReceived ||
+        _client == null ||
+        _isLeaving) {
+      return false;
+    }
+    _cancelRematchCountdown();
+    state = state.copyWith(rematchState: RematchState.declined);
+    return _client!.declineRematch();
+  }
+
+  /// Maç sonu ekranından ayrılma / rövanşı terk etme (`rematch_leave`).
+  /// Tamamen idempotenttir; ekran kapatıldığında veya rota değiştiğinde güvenle çağrılabilir.
+  void leaveRematch() {
+    if (_rematchLeaveSent) return;
+    _rematchLeaveSent = true;
+    _cancelRematchCountdown();
+
+    if (_client != null) {
+      try {
+        _client!.leaveRematch();
+      } catch (_) {}
+    }
+    state = state.copyWith(rematchState: RematchState.closed);
+    _cleanupSession();
+  }
+
   void _startTickTimer() {
     _cancelTickTimer();
     _tickTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
@@ -1081,6 +1269,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   void _cancelAllTimers() {
     _cancelTickTimer();
+    _cancelRematchCountdown();
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
     _opponentBannerTimer?.cancel();
@@ -1089,6 +1278,8 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
   void _cleanupSession() {
     _cancelAllTimers();
+    _rematchLeaveSent = false;
+    _rematchSecondsRemaining = 45;
     _wasReconnecting = false;
     _opponentEverDisconnected = false;
     _hasReceivedFinal = false;

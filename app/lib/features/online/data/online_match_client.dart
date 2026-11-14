@@ -18,6 +18,9 @@ enum DisconnectReason {
   /// İstemci tarafından kasıtlı olarak kapatıldı (close/leave).
   closed,
 
+  /// Rövanş maçı başladı; sunucu eski soketi beklenen şekilde kapattı (kod 1000 / rematch_started).
+  rematchStarted,
+
   /// Beklenmeyen bir ağ hatası.
   error,
 }
@@ -89,11 +92,60 @@ class OnlineMatchVoided extends OnlineMatchEvent {
 /// Bağlantı koptu.
 class OnlineMatchDisconnected extends OnlineMatchEvent {
   final DisconnectReason reason;
+  final int? closeCode;
+  final String? closeReason;
 
-  const OnlineMatchDisconnected(this.reason);
+  const OnlineMatchDisconnected(
+    this.reason, {
+    this.closeCode,
+    this.closeReason,
+  });
 
   @override
-  String toString() => 'OnlineMatchDisconnected(reason: $reason)';
+  String toString() =>
+      'OnlineMatchDisconnected(reason: $reason, closeCode: $closeCode, closeReason: $closeReason)';
+}
+
+/// Rövanş teklif edildi bildirimi (`rematch_offered`).
+class OnlineMatchRematchOffered extends OnlineMatchEvent {
+  final RematchOfferedServerMessage message;
+
+  const OnlineMatchRematchOffered(this.message);
+
+  @override
+  String toString() =>
+      'OnlineMatchRematchOffered(byUid: ${message.byUid}, expiresAtMs: ${message.expiresAtMs})';
+}
+
+/// Rövanş durumu bildirimi (`rematch_status`).
+class OnlineMatchRematchStatus extends OnlineMatchEvent {
+  final RematchStatusServerMessage message;
+
+  const OnlineMatchRematchStatus(this.message);
+
+  @override
+  String toString() => 'OnlineMatchRematchStatus(status: ${message.status})';
+}
+
+/// Rövanş hata bildirimi (`rematch_error`).
+class OnlineMatchRematchError extends OnlineMatchEvent {
+  final RematchErrorServerMessage message;
+
+  const OnlineMatchRematchError(this.message);
+
+  @override
+  String toString() => 'OnlineMatchRematchError(code: ${message.code})';
+}
+
+/// Rövanş kabulü sonrası yeni maç oluşturuldu bildirimi (`matched`).
+class OnlineMatchMatched extends OnlineMatchEvent {
+  final MatchedServerMessage message;
+
+  const OnlineMatchMatched(this.message);
+
+  @override
+  String toString() =>
+      'OnlineMatchMatched(matchId: ${message.matchId}, opponentName: ${message.opponentName})';
 }
 
 /// Sunucudan hata mesajı geldi.
@@ -278,6 +330,14 @@ class OnlineMatchClient {
       _emit(OnlineMatchOpponentPowerup(msg));
     } else if (msg is ErrorServerMessage) {
       _emit(OnlineMatchError(msg.code));
+    } else if (msg is RematchOfferedServerMessage) {
+      _emit(OnlineMatchRematchOffered(msg));
+    } else if (msg is RematchStatusServerMessage) {
+      _emit(OnlineMatchRematchStatus(msg));
+    } else if (msg is RematchErrorServerMessage) {
+      _emit(OnlineMatchRematchError(msg));
+    } else if (msg is MatchedServerMessage) {
+      _emit(OnlineMatchMatched(msg));
     }
   }
 
@@ -289,9 +349,28 @@ class OnlineMatchClient {
   void _handleStreamDone() {
     if (_isClosed) return;
 
+    final code = _connection?.closeCode;
+    final reason = _connection?.closeReason;
+
     // Kod 4000: Aynı hesap başka bir yerden bağlandı, kesinlikle tekrar bağlanma
-    if (_connection?.closeCode == 4000) {
-      _emit(const OnlineMatchDisconnected(DisconnectReason.replaced));
+    if (code == 4000) {
+      _emit(OnlineMatchDisconnected(
+        DisconnectReason.replaced,
+        closeCode: code,
+        closeReason: reason,
+      ));
+      unawaited(_cleanupConnection());
+      return;
+    }
+
+    // Kod 1000 + "rematch_started": Rövanş başladı, eski oda soketi beklenen şekilde kapandı
+    if (code == 1000 &&
+        (reason == 'rematch_started' || reason?.contains('rematch') == true)) {
+      _emit(OnlineMatchDisconnected(
+        DisconnectReason.rematchStarted,
+        closeCode: code,
+        closeReason: reason,
+      ));
       unawaited(_cleanupConnection());
       return;
     }
@@ -463,6 +542,50 @@ class OnlineMatchClient {
     if (_isClosed || _connection == null) return false;
     try {
       _connection!.send(createUsePowerupMessage(type));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Rövanş teklif etme isteği (`rematch_offer`) gönderir.
+  bool offerRematch() {
+    if (_isClosed || _connection == null) return false;
+    try {
+      _connection!.send(createRematchOfferMessage());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Rövanş kabul isteği (`rematch_accept`) gönderir.
+  bool acceptRematch() {
+    if (_isClosed || _connection == null) return false;
+    try {
+      _connection!.send(createRematchAcceptMessage());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Rövanş ret isteği (`rematch_decline`) gönderir.
+  bool declineRematch() {
+    if (_isClosed || _connection == null) return false;
+    try {
+      _connection!.send(createRematchDeclineMessage());
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Maç sonu ekranından ayrılma / rövanş iptal isteği (`rematch_leave`) gönderir.
+  bool leaveRematch() {
+    if (_isClosed || _connection == null) return false;
+    try {
+      _connection!.send(createRematchLeaveMessage());
       return true;
     } catch (_) {
       return false;

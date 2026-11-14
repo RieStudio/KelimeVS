@@ -17,6 +17,8 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
+import '../application/match_session.dart';
+import '../../online/application/online_match_session.dart';
 import '../domain/history/match_history_entry.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
@@ -36,6 +38,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
+  OnlineMatchSession? _onlineSession;
+  bool _isOnline = false;
 
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
   static String _sanitizeOpponentName(String? raw) => OpponentNameSanitizer.sanitize(raw);
@@ -55,9 +59,23 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _isOnline = ref.read(activeMatchSessionModeProvider) == MatchSessionMode.online;
+    _onlineSession = _isOnline ? ref.read(onlineMatchSessionProvider.notifier) : null;
+  }
+
+  @override
   void dispose() {
     _animController.dispose();
+    _leaveRematchIfOnline();
     super.dispose();
+  }
+
+  void _leaveRematchIfOnline() {
+    if (_isOnline) {
+      _onlineSession?.leaveRematch();
+    }
   }
 
   @override
@@ -165,6 +183,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                     icon: AppIcons.close,
                     semanticLabel: AppStrings.close,
                     onTap: () {
+                      _leaveRematchIfOnline();
                       Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                   ),
@@ -309,6 +328,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 text: AppStrings.playAgain,
                 onPressed: () {
                   if (!ensureNetworkConnected(context, ref)) return;
+                  _leaveRematchIfOnline();
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (_) => const MatchmakingScreen(),
@@ -356,13 +376,21 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     );
 
     final disableAnimations = MediaQuery.of(context).disableAnimations;
-    if (disableAnimations) {
-      return content;
-    }
+    final body = disableAnimations
+        ? content
+        : FadeTransition(
+            opacity: _fadeAnim,
+            child: content,
+          );
 
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: content,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _leaveRematchIfOnline();
+        }
+      },
+      child: body,
     );
   }
 }
