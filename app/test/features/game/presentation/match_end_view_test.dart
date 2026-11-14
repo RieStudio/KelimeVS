@@ -684,4 +684,99 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text(longName), findsOneWidget);
   });
+
+  testWidgets('20. Online maçta rakip kartı ve Engelle butonu bulunmaz (findsNothing); skor, jeton bilgisi, Tekrar Oyna ve Maç Detayı bulunur', (tester) async {
+    final matchState = createMatchState(
+      scores: {'me': 2, 'bot': 1},
+      winnerId: 'me',
+    );
+    final historyEntry = MatchHistoryEntry(
+      id: 'online_123',
+      matchId: 'match_server_123',
+      opponentName: 'CanliRakip',
+      finishedAtMs: 1000,
+      myScore: 2,
+      opponentScore: 1,
+      result: MatchResult.win,
+      endType: MatchEndType.normal,
+      roundRecords: const [],
+      botlaOynandi: false, // Online maç
+    );
+    final uiState = MatchUiState(
+      matchState: matchState,
+      opponentName: 'CanliRakip',
+      lastSavedMatch: historyEntry,
+      coinsAwarded: 30,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeMatchUiStateProvider.overrideWithValue(uiState),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: MatchEndView(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Rakip kartı ve Engelle butonu kaldırıldı -> ASLA bulunmaz
+    expect(find.text(AppStrings.blockAction), findsNothing);
+    expect(find.text(AppStrings.blockedStatus), findsNothing);
+    expect(find.text('Bildir'), findsNothing);
+
+    // Skor, jeton ödülü, Tekrar Oyna ve Maç Detayı butonları bulunur
+    expect(find.text(AppStrings.you), findsOneWidget);
+    expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
+    expect(find.text('CanliRakip'), findsOneWidget); // Sadece skor satırında (kartta değil)
+    expect(find.text('+30${AppStrings.coinSuffix}'), findsOneWidget);
+    expect(find.widgetWithText(PrimaryButton, AppStrings.playAgain), findsOneWidget);
+    expect(find.widgetWithText(SecondaryButton, AppStrings.matchDetail), findsOneWidget);
+  });
+
+  testWidgets('21. 320 dp ve 360 dp genişlikte 1.3 yazı ölçeğinde sıfır taşma oluşur', (tester) async {
+    for (final width in [320.0, 360.0]) {
+      tester.view.physicalSize = Size(width, 640);
+      tester.view.devicePixelRatio = 1.0;
+
+      final matchState = createMatchState(
+        scores: {'me': 2, 'bot': 1},
+        winnerId: 'me',
+      );
+      final uiState = MatchUiState(
+        matchState: matchState,
+        opponentName: 'UzunOyuncuAdi123',
+        coinsAwarded: 30,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeMatchUiStateProvider.overrideWithValue(uiState),
+          ],
+          child: MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(
+                size: Size(width, 640),
+                textScaler: const TextScaler.linear(1.3),
+              ),
+              child: const Scaffold(
+                body: MatchEndView(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text(AppStrings.blockAction), findsNothing);
+      expect(find.widgetWithText(PrimaryButton, AppStrings.playAgain), findsOneWidget);
+      expect(find.widgetWithText(SecondaryButton, AppStrings.matchDetail), findsOneWidget);
+    }
+    tester.view.resetPhysicalSize();
+  });
 }

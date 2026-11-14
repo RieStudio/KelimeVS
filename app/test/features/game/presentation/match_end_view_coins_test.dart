@@ -187,5 +187,59 @@ void main() {
       );
       expect(find.text('+30${AppStrings.coinSuffix}'), findsNothing);
     });
+
+    testWidgets('4. Online maçta coinsAwarded 0 ise "+0 jeton" yerine "0 jeton" kartı gösterilir', (tester) async {
+      final finishedMatchState = MatchState(
+        config: const MatchConfig(),
+        playerIds: const ['me', 'bot'],
+        scores: const {'me': 2, 'bot': 1},
+        decisiveRounds: 3,
+        totalRoundsPlayed: 3,
+        phase: MatchPhase.matchFinished,
+        currentQuestion: testQuestion,
+        usedAnswerIds: const {},
+        turnPlayerId: null,
+        deadlineMs: 0,
+        remainingNearMisses: const {'me': 0, 'bot': 0},
+        usedQuestionIds: const {},
+        currentRoundAttempts: const [],
+        roundHistory: const [],
+        winnerId: 'me',
+      );
+
+      final uiState = MatchUiState(
+        matchState: finishedMatchState,
+        myPlayerId: 'me',
+        coinsAwarded: 0,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            activeMatchSessionModeProvider.overrideWith(
+              () => _TestSessionModeNotifier(MatchSessionMode.online),
+            ),
+            activeMatchUiStateProvider.overrideWithValue(uiState),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: MatchEndView(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Jeton kartı ve "0 jeton" görünür, "+0 jeton" ASLA görünmez
+      expect(find.text('0${AppStrings.coinSuffix}'), findsOneWidget);
+      expect(find.text('+0${AppStrings.coinSuffix}'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.label == 'Jeton ödülü: 0',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }

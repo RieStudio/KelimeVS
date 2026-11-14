@@ -44,6 +44,12 @@ abstract final class AppStrings {
   static const String coinSuffix = ' jeton';
   static const String scoreDash = ' – ';
 
+  /// Kazanılan jeton miktarını biçimlendirir.
+  /// Kazanılan miktar 0 ise "0 jeton", pozitif ise "+N jeton" döner.
+  static String coinReward(int amount) =>
+      amount <= 0 ? '0$coinSuffix' : '+$amount$coinSuffix';
+  static String formatCoinReward(int amount) => coinReward(amount);
+
   // Butonlar ve Eylemler
   static const String playAgain = 'Tekrar Oyna';
   static const String matchDetail = 'Maç Detayı';
@@ -403,7 +409,7 @@ abstract final class AppStrings {
       'Engellediğin oyuncularla eşleşmezsin';
   static const String emptyBlockedUsers = 'Henüz engellenen oyuncu yok';
   static const String emptyBlockedUsersSubtitle =
-      'Maç sonu ekranından uygunsuz oyuncuları engelleyebilirsin.';
+      'Oyuncunun profilinden uygunsuz oyuncuları engelleyebilirsin.';
   static const String unblockAction = 'Kaldır';
   static const String unblockSuccess = 'Engel kaldırıldı.';
   static const String unblockGenericError =

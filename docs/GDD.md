@@ -163,7 +163,7 @@ Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad
 
 - **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
 - Tabloda ilk 100 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
-- **[KARAR] Herkese Açık Oyuncu Profili:** Liderlik tablosu satırlarına veya maç geçmişi kayıtlarına dokunulduğunda oyuncunun herkese açık profil ekranı açılır (`GET /users/:uid/public`). Sunucu salt-okunur olarak ad, çerçeve, maç istatistikleri (`played`, `won`, `lost`, `winRate`), misafir durumu (`isGuest`) ve engel durumunu (`isBlocked`, `blockId`) döner; e-posta, bakiye gibi özel veriler asla sızdırılmaz. Profil ekranından doğrudan engelleme (`POST /users/:uid/block`) ve engeli kaldırma (`DELETE /users/:uid/block`) yapılabilir (bildirme uç noktası sunucu tarafında hazırdır ancak arayüzden kaldırılmıştır).
+- **[KARAR] Herkese Açık Oyuncu Profili:** Liderlik tablosu satırlarına veya maç geçmişi kayıtlarına dokunulduğunda oyuncunun herkese açık profil ekranı açılır (`GET /users/:uid/public`). Sunucu salt-okunur olarak ad, çerçeve, maç istatistikleri (`played`, `won`, `lost`, `winRate`), misafir durumu (`isGuest`) ve engel durumunu (`isBlocked`, `blockId`) döner; e-posta, bakiye gibi özel veriler asla sızdırılmaz. Profil ekranından doğrudan engelleme (`POST /users/:uid/block`) ve engeli kaldırma (`DELETE /users/:uid/block`) yapılabilir (bildirme uç noktası sunucu tarafında hazırdır ancak arayüzden kaldırılmıştır). Oyuncu engelleme işlemi yalnızca oyuncunun herkese açık profil ekranından (`PublicProfileScreen`) gerçekleştirilir; maç sonu ekranında rakip kartı veya engelleme butonu yer almaz.
 - Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
 - Aynı rakibe karşı bir haftada en fazla **20 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için; `LEADERBOARD_PAIR_WIN_CAP` ortam değişkeniyle ayarlanabilir, varsayılan 20). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
 - Takma adı henüz olmayan oyuncu tabloda görünmez.
@@ -188,7 +188,7 @@ Sürümleme ve hangi modun ne zaman çıkacağı proje sahibi tarafından belirl
 
 ## 8. Ekonomi (taslak)
 
-- **[VARSAYIM]** İlk sürüm değerleri (sunucu ortam değişkeni olarak ayarlanır, kodda sabit değildir): başlangıç bakiyesi 100; maç kazanma +30; maç kaybetme +5; rakibin bağlantısı kopup kazanılan maç +30; bağlantısı kopup kaybedilen maç +0; günlük maç ödülü üst sınırı 300 jeton; botla oynanan maçlar jeton vermez (bot maçı istemcide oynandığı için sunucu doğrulayamaz).
+- **[VARSAYIM]** İlk sürüm değerleri (sunucu ortam değişkeni olarak ayarlanır, kodda sabit değildir): başlangıç bakiyesi 100; maç kazanma +30; maç kaybetme +5; rakibin bağlantısı kopup kazanılan maç +30; bağlantısı kopup kaybedilen maç +0; günlük maç ödülü üst sınırı 300 jeton; botla oynanan maçlar jeton vermez (bot maçı istemcide oynandığı için sunucu doğrulayamaz). Maç sonu ekranında jeton ödülü gösterilirken kazanılan jeton 0 ise "0 jeton", pozitif ise "+N jeton" (örn. "+30 jeton") kuralı uygulanır.
 - Ödüller yalnızca sunucuda canlı maç bitince verilir; istemcinin "şu kadar jeton kazandım" demesine güvenilmez.
 - Harcama (güçlendirici, kozmetik) ve ödüllü reklam sonraki aşamadadır.
 - **[AÇIK]** Jeton kazanma/harcama kuralları henüz tam belirlenmedi. Öneriler:

@@ -54,7 +54,7 @@ void main() {
     });
 
     testWidgets(
-        '2. MatchEndView isFriendly: true olduğunda "Dostluk Düellosu" / "Jeton verilmez" rozeti gösterilmez; skor, rakip kartı, Tekrar Oyna ve Maç Detayı gösterilir',
+        '2. MatchEndView isFriendly: true olduğunda "Dostluk Düellosu" / "Jeton verilmez" rozeti ve rakip kartı gösterilmez; skor, Tekrar Oyna ve Maç Detayı gösterilir',
         (tester) async {
       final finishedMatchState = MatchState(
         config: const MatchConfig(),
@@ -128,10 +128,10 @@ void main() {
       // Skor görünmeli ("Sen", "2 – 1", "Mehmet")
       expect(find.text(AppStrings.you), findsOneWidget);
       expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
-      expect(find.text('Mehmet'), findsWidgets);
+      expect(find.text('Mehmet'), findsOneWidget);
 
-      // Rakip kartı (Engelle butonu görünmeli, Bildir butonu görünmemeli)
-      expect(find.text(AppStrings.blockAction), findsOneWidget);
+      // Rakip kartı ve Engelle butonu görünmemeli
+      expect(find.text(AppStrings.blockAction), findsNothing);
       expect(find.text('Bildir'), findsNothing);
 
       // Butonlar görünmeli

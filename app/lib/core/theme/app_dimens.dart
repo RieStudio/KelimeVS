@@ -81,7 +81,6 @@ abstract final class AppDimens {
   static const double matchmakingAvatarSlotHeight = 172.0;
   static const double matchmakingBelowAvatarsGap = 20.0;
   static const double matchDetailNameGap = 8.0;
-  static const double matchEndOpponentNameGap = 10.0;
 
   // Eşleşme Ekranı Zamanlamaları (ms)
   static const int matchmakingMinSearchDurationMs = 1500;

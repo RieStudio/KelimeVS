@@ -10,7 +10,6 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/opponent_name_sanitizer.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_icon.dart';
-import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/match_result_icon.dart';
 import '../../../core/widgets/secondary_button.dart';
@@ -18,18 +17,14 @@ import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
-import '../application/match_session.dart';
 import '../domain/history/match_history_entry.dart';
-import '../../profile/application/blocked_users_notifier.dart';
-import '../../profile/data/blocked_users_api_client.dart';
 
 /// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
 ///
 /// Sol üstte kapat (ana ekrana; şimdilik galeriye döner).
 /// Ortada MatchResultIcon (kazandın: match_win.svg, kaybettin: match_lose.svg), başlık,
 /// terk notu (varsa), skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı.
-/// Altta "Tekrar Oyna" (ana buton).
-/// // TODO: Sonraki adımda "Maç Detayı" butonu eklenecek.
+/// Altta "Tekrar Oyna" (ana buton) ve "Maç Detayı" (ikincil buton).
 class MatchEndView extends ConsumerStatefulWidget {
   const MatchEndView({super.key});
 
@@ -42,83 +37,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
 
-  bool _isBlocked = false;
-  bool _isSubmittingBlock = false;
-
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
   static String _sanitizeOpponentName(String? raw) => OpponentNameSanitizer.sanitize(raw);
-
-  void _showSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontFamily: AppTextStyles.fontNunito,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        backgroundColor: AppColors.ink,
-      ),
-    );
-  }
-
-  void _showBlockDialog(BuildContext context, String matchId, String opponentName) {
-    if (!ensureNetworkConnected(context, ref)) return;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppDimens.borderRadiusDialog,
-            side: const BorderSide(
-              color: AppColors.ink,
-              width: AppDimens.borderThick,
-            ),
-          ),
-          title: const Text(
-            AppStrings.blockDialogTitle,
-            style: AppTextStyles.cardTitle,
-          ),
-          content: Text(
-            AppStrings.blockDialogMessage(opponentName),
-            style: AppTextStyles.bodyText,
-          ),
-          actions: [
-            PrimaryButton(
-              text: AppStrings.blockConfirm,
-              backgroundColor: AppColors.danger,
-              shadowColor: AppColors.dangerDark,
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                setState(() => _isSubmittingBlock = true);
-                final client = ref.read(blockedUsersApiClientProvider);
-                final res = await client.blockUser(matchId);
-                if (!mounted) return;
-                setState(() => _isSubmittingBlock = false);
-
-                if (res is BlockUserSuccess) {
-                  ref.invalidate(blockedUsersProvider);
-                  setState(() => _isBlocked = true);
-                  _showSnackBar(AppStrings.blockSuccess(opponentName));
-                } else if (res is BlockUserError) {
-                  _showSnackBar(res.message);
-                }
-              },
-            ),
-            const SizedBox(height: AppDimens.space8),
-            SecondaryButton(
-              text: AppStrings.cancel,
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   void initState() {
@@ -202,18 +122,11 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final myScore = matchState?.scores['me'] ?? 0;
     final opponentScore = matchState?.scores['bot'] ?? 0;
 
-    final mode = ref.watch(activeMatchSessionModeProvider);
     final lastMatch = uiState.lastSavedMatch;
-    final isOnlineMatch = mode == MatchSessionMode.online &&
-        lastMatch != null &&
-        lastMatch.matchId != null &&
-        !lastMatch.botlaOynandi;
-    final matchId = lastMatch?.matchId;
     final rawOpponentName = (lastMatch?.opponentName.trim().isNotEmpty ?? false)
         ? lastMatch!.opponentName
         : uiState.opponentName;
     final opponentDisplayName = _sanitizeOpponentName(rawOpponentName);
-    final oppFrame = lastMatch?.opponentFrame ?? uiState.opponentFrame;
 
     final MatchResultVariant resultVariant;
     final String title;
@@ -271,10 +184,14 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
               // 3. Başlık ("Kazandın!" / "Kaybettin")
               Semantics(
                 header: true,
-                child: Text(
-                  title,
-                  style: titleStyle,
-                  textAlign: TextAlign.center,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: titleStyle,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
 
@@ -362,84 +279,25 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                         width: AppDimens.borderThin,
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Jeton Simgesi (CoinIcon)
-                        const CoinIcon(size: 32),
-                        const SizedBox(width: AppDimens.space10),
-                        Text(
-                          '+$coinsAwarded${AppStrings.coinSuffix}',
-                          style: AppTextStyles.questionText.copyWith(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Jeton Simgesi (CoinIcon)
+                          const CoinIcon(size: 32),
+                          const SizedBox(width: AppDimens.space10),
+                          Text(
+                            AppStrings.coinReward(coinsAwarded),
+                            style: AppTextStyles.questionText.copyWith(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-
-              // 6b. Rakip Kartı (Yalnızca online maçta gösterilir, bot maçında ASLA gösterilmez)
-              if (isOnlineMatch && matchId != null) ...[
-                SizedBox(
-                  height: (!isFriendly && coinsAwarded != null)
-                      ? AppDimens.space16
-                      : AppDimens.space20,
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.space16,
-                    vertical: AppDimens.space12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppDimens.borderRadiusListCard,
-                    border: Border.all(
-                      color: AppColors.mint,
-                      width: AppDimens.borderThin,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(0, 2),
-                        blurRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Rakip Avatar
-                      PlayerAvatar.opponent(
-                        name: opponentDisplayName,
-                        frame: oppFrame,
-                        size: 36,
-                        includeFramePadding: true,
-                      ),
-                      const SizedBox(width: AppDimens.matchEndOpponentNameGap),
-
-                      // Rakip Takma Adı
-                      Expanded(
-                        child: Text(
-                          opponentDisplayName,
-                          style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-
-                      // Engelle Düğmesi
-                      SecondaryButton.danger(
-                        text: _isBlocked ? AppStrings.blockedStatus : AppStrings.blockAction,
-                        height: 38,
-                        width: 82,
-                        onPressed: (_isBlocked || _isSubmittingBlock)
-                            ? null
-                            : () => _showBlockDialog(context, matchId, opponentDisplayName),
-                      ),
-                    ],
                   ),
                 ),
               ],

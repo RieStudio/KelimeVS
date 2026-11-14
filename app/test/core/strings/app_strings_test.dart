@@ -34,5 +34,29 @@ void main() {
         expect(AppStrings.blockSuccess(), equals('Oyuncu engellendi.'));
       });
     });
+
+    group('emptyBlockedUsersSubtitle', () {
+      test('profil ekranı yönlendirmesini içerir', () {
+        expect(
+          AppStrings.emptyBlockedUsersSubtitle,
+          equals('Oyuncunun profilinden uygunsuz oyuncuları engelleyebilirsin.'),
+        );
+      });
+    });
+  });
+
+  group('AppStrings Coin Reward Tests', () {
+    test('pozitif jeton miktarları için +N jeton formatında döner', () {
+      expect(AppStrings.coinReward(30), equals('+30 jeton'));
+      expect(AppStrings.coinReward(10), equals('+10 jeton'));
+      expect(AppStrings.coinReward(1), equals('+1 jeton'));
+      expect(AppStrings.formatCoinReward(30), equals('+30 jeton'));
+    });
+
+    test('0 ve negatif jeton miktarları için 0 jeton formatında döner (+ işareti olmaz)', () {
+      expect(AppStrings.coinReward(0), equals('0 jeton'));
+      expect(AppStrings.coinReward(-5), equals('0 jeton'));
+      expect(AppStrings.formatCoinReward(0), equals('0 jeton'));
+    });
   });
 }
