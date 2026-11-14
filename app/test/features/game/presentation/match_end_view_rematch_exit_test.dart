@@ -98,7 +98,7 @@ void main() {
       expect(mockOnlineSession.leaveRematchCalls, 1);
     });
 
-    testWidgets('2. Online maçta Tekrar Oyna butonuna basılınca leaveRematch çağrılır', (tester) async {
+    testWidgets('2. Online maçta Ana Sayfa butonuna basılınca leaveRematch çağrılır', (tester) async {
       final mockOnlineSession = _MockOnlineMatchSession();
 
       await tester.pumpWidget(
@@ -121,10 +121,10 @@ void main() {
 
       expect(mockOnlineSession.leaveRematchCalls, 0);
 
-      // Tekrar Oyna butonuna bas
-      final playAgainBtn = find.widgetWithText(PrimaryButton, AppStrings.playAgain);
-      expect(playAgainBtn, findsOneWidget);
-      await tester.tap(playAgainBtn);
+      // Ana Sayfa butonuna bas
+      final homeBtn = find.widgetWithText(PrimaryButton, AppStrings.homeAction);
+      expect(homeBtn, findsOneWidget);
+      await tester.tap(homeBtn);
       await tester.pump();
 
       expect(mockOnlineSession.leaveRematchCalls, 1);

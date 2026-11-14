@@ -200,7 +200,7 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
 - **Beraberlik:** daire `mint` zemin, `ink` kenarlık, içinde eşit işareti. Başlık "Tur berabere" (`ink`). Neden: "Tüm cevaplar söylendi". Alt yazı "Yeni tur birazdan başlıyor" (berabere tur sayıya dahil olmadığı için tur numarası değişmez).
 - Tur sonu nedeni yalnızca iki türdür: süre dolması ya da cevapların tükenmesi (beraberlik). Ara turlarda (maçı bitirmeyen turlarda) bu ekran 3 sn boyunca geri sayım çubuğuyla gösterilir. **Maçı bitiren turda ise bu ara tur-sonu ekranı gösterilmez;** tahta üzerinde ~500 ms'lik kısa ve doğal bir duraklamanın ardından doğrudan maç sonucu ekranına yumuşak geçiş (350 ms easeOut) yapılır. Rakip terk ettiyse ya da oyuncu maçtan çıktıysa ara ekran zaten atlanır.
 
-**5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada tur sonuyla aynı boyutta (104 px) ikon dairesi, başlık, skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı. Altta "Tekrar Oyna" (ana) ve "Maç Detayı" (ikincil). Varyantlar:
+**5) Maç sonucu** – Sol üstte kapat (ana ekrana). Ortada tur sonuyla aynı boyutta (104 px) ikon dairesi, başlık, skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı. Altta Rövanş Eylem Alanı (ana buton yuvası) ve her zaman "Maç Detayı" (ikincil). Varyantlar:
 - **Kazandın:** daire `bright` zemin, içinde kupa (gövdesi `coin`). Başlık "Kazandın!" (46, `ink`).
 - **Kaybettin:** daire `dangerSoft` zemin, 4 px `dangerDark` kenarlık ve gölge, içinde `dangerText` "tekrar" oku. Başlık "Kaybettin" (46, `dangerText`).
 - **Bitiş Sebebi / Terk Notu:** Başlığın altında 14 pt kalın alt satır olarak gösterilir:
@@ -208,11 +208,29 @@ Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
   - Tur sınırına (5 tur) ulaşılarak skor üstünlüğüyle bitişte: "Tur sınırına ulaşıldı" (`muted`).
   - Terk ve kopma durumlarında: "Rakip maçtan ayrıldı" (`muted`), "Maçı terk ettin" (`dangerText`), "Bağlantın koptu" (`dangerText`), "Rakibin bağlantısı koptu" (`muted`).
 - Jeton ödülü kartı normal çevrimiçi maçlarda kazanılan jeton miktarını gösterir: kazanılan jeton 0 ise "0 jeton", pozitif ise "+N jeton" (örn. `+30 jeton`) yazılır. Arkadaş maçlarında jeton ödülü verilmediği için bu kart gösterilmez. Maç sonu ekranında rakip kartı veya engelle butonu yer almaz; ekran düzeni üst bar, sonuç ikonu, başlık, skor, jeton kartı ve altta aksiyon butonlarıyla dengeli dağılır. Oyuncu engelleme işlemi Maç Detayı ekranından veya sıralama tablosundan açılan oyuncunun herkese açık profil ekranından (`PublicProfileScreen`) gerçekleştirilir.
+- **Rövanş Eylem Alanı ve Arayüz Durumları [ADIM 4/4]:**
+  - Eski "Tekrar Oyna" butonu tamamen kaldırılmıştır; yerine maç sonu durumuna göre dinamik rövanş eylem alanı konumlandırılmıştır.
+  - **idle:** `PrimaryButton` "Rövanş". Dokununca online ise oturuma teklif iletir (`offerRematch()`), bot maçı ise istemci bot simülasyonunu başlatır.
+  - **pendingSent:** Pasif (dokunulamaz) `PrimaryButton` "Rövanş bekleniyor (N)" (N = kalan saniye, 45'ten geri sayım).
+  - **pendingReceived:** Üstte küçük, okunaklı satır "<Rakip adı> rövanş istiyor!" (`muted`, 14 pt, kalın); altında yan yana iki buton: "Reddet" (`SecondaryButton`) ve "Kabul Et (N)" (`PrimaryButton`). Reddet -> `declineRematch()`, Kabul -> `acceptRematch()`.
+  - **starting / matched:** Pasif `PrimaryButton` "Rövanş başlıyor...".
+  - **declined / expired / opponentLeft / closed / error / unavailable:** Ana buton yuvasında `PrimaryButton` "Ana Sayfa" (sol üst X ile aynı kök navigasyon pop mekanizmasını kullanır).
+    - Butonun hemen üstünde 8 dp boşlukla ortalı durum bilgi satırı yer alır:
+      - `declined`: "Rövanş reddedildi" (`muted`).
+      - `expired`: "Süre doldu" (`muted`).
+      - `opponentLeft`: "Rakip ayrıldı" (`muted`).
+      - `closed`: "Rövanş şu anda mümkün değil" (`muted`).
+      - `error`: hata koduna göre "Enerjin yetersiz" (`no_energy`, `dangerText`), "Rakibin enerjisi yetersiz" (`opponent_no_energy`, `dangerText`), "Rövanş şu anda mümkün değil" (`blocked`, `account_deleted`, `not_available`, `unavailable`, `unknown`, `dangerText`).
+      - `unavailable`: Üstte bilgi satırı GÖRÜNMEZ, yalnızca "Ana Sayfa" butonu yer alır.
+  - **Ranked Enerji Ön Kontrolü:** Maç rankli ise (`isFriendly: false`) ve profil enerjisi < 1 ise Rövanş veya Kabul Et butonuna basıldığında sunucuya istek atılmaz, doğrudan `EnergyDepletedBottomSheet` açılır. Arkadaş ve bot maçlarında enerji kontrolü bypass edilir.
+  - **Bot Maçı Rövanş Simülasyonu:** Sunucuya hiçbir ağ isteği göndermez. Normal bitişte `idle` ile başlar; kullanıcı Rövanş'a basınca ~%85 olasılıkla 5–10 sn rastgele bekleme sonrası bot reddeder ("Rövanş reddedildi"), ~%15 olasılıkla bot sessiz kalarak 45 sn dolunca süre aşımına uğrar ("Süre doldu"). Terk / kopma bitişlerinde rövanş sunulmaz (`unavailable` -> "Ana Sayfa"). Sayfa kapatıldığında zamanlayıcılar güvenle iptal edilir.
+  - **Rövanş Geçişi ve Çıkış Çakışması Koruması:** `matched` mesajı gelip `openRematchReveal` ile yeni maça rota değiştirildiğinde (`pushReplacement`), `MatchEndView.dispose` sırasında `leaveRematch` ÇAĞRILMAZ (`_hasHandledMatched` ve `RematchMatched`/`RematchStarting` filtreleri). X, Ana Sayfa veya sistem geri tuşuyla çıkıldığında ise `leaveRematch` çalışır.
+  - **Duyarlı Tasarım (Responsive Layout):** `LayoutBuilder + SingleChildScrollView + ConstrainedBox + IntrinsicHeight` mimarisiyle 320–360 dp genişliklerde ve %150 yazı ölçeğinde (textScaler 1.5) hiçbir RenderFlex taşması yaşanmaz.
 - **Rövanş (Rematch) İstemci Durum Makinesi ve Oturum Akışı [ADIM 2/4]:**
   - Sunucudan gelen `final` mesajında `rematchAvailable: true` olduğunda `OnlineMatchSession.rematchState` `unavailable` durumundan `idle` durumuna geçer (`false` veya yoksa `unavailable` kalır).
   - İstemci `rematch_offer`, `rematch_accept`, `rematch_decline` ve `rematch_leave` mesajlarını yönetir; teklif gönderildiğinde (`pendingSent`) veya alındığında (`pendingReceived`) 45 saniyelik yerel sayaç başlatılır (`testWidgets`/zamanlayıcı uyumlu; süre sonunda kısa toleransla yerel zaman aşımı fallback'i devreye girer).
   - Teklif kabul edildiğinde durum `starting` olur. Sunucudan yeni maç bilgisi (`matched`) geldiğinde durum `matched(newMatch)` olur ve eski oda soketi sunucu tarafından `1000 / "rematch_started"` koduyla beklenen şekilde kapatıldığında oturum bunu kopma veya hata olarak algılamaz (`DisconnectReason.rematchStarted`), yeniden bağlanma tetiklemez.
-  - Maç sonu ekranı açıkken kullanıcı Kapat (X), Tekrar Oyna veya sistem geri tuşu/rota pop (`PopScope`) ile ayrıldığında idempotent `leaveRematch()` çağrılır ve karşı tarafa anında `opponent_left` bildirimi ulaştırılır.
+  - Maç sonu ekranı açıkken kullanıcı Kapat (X), Ana Sayfa veya sistem geri tuşu/rota pop (`PopScope`) ile ayrıldığında idempotent `leaveRematch()` çağrılır ve karşı tarafa anında `opponent_left` bildirimi ulaştırılır.
   - Maç bittikten sonra beklenmeyen bir soket kopması yaşanırsa, `lastSavedMatch` ve maç verileri korunur (maç sonu ekranı kapanmaz/silinmez), yalnızca `rematchState` `opponentLeft` veya `unavailable` olarak güncellenir.
 
 **6) Maç detayı** – Ana ekrandaki maç kartına ya da maç sonucu ekranındaki "Maç Detayı" butonuna dokununca açılır. Üstte geri ikon butonu + "Maç Detayı". Özet kartı: solda kendi avatarın ("Sen"), ortada skor (Fredoka 42) ve altında sonuç etiketi, sağda rakibin avatarı ve adı. Arkadaş maçlarında (`isFriendly: true`), sonuç etiketinin hemen altında ikincil metin stiliyle (12, `muted`) "Arkadaş maçı" notu yer alır. Terk ya da kopma durumunda etiketin altında küçük not (12, `muted`): "Rakip maçtan ayrıldı" / "Maçı terk ettin" / "Bağlantın koptu" / "Rakibin bağlantısı koptu". Bağlantı kopması yüzünden kesinleşmemiş kayıtlarda (sunucudan kesin sonuç alınamamışsa) bu notun altına ikinci bir satır eklenir: "Skor, bağlantı kopmadan önceki duruma göredir." (12, `muted`).

@@ -240,7 +240,7 @@ class ComponentGallery extends StatelessWidget {
             ),
             const SizedBox(height: AppDimens.space14),
             PrimaryButton(
-              text: AppStrings.playAgain,
+              text: AppStrings.rematchAction,
               onPressed: () {},
             ),
             const SizedBox(height: AppDimens.space14),

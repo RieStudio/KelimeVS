@@ -13,6 +13,7 @@ import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
+import 'package:app/features/online/domain/models/rematch_state.dart';
 
 class FakeSessionModeNotifier extends ActiveMatchSessionModeNotifier {
   final MatchSessionMode mode;
@@ -106,6 +107,7 @@ void main() {
             activeMatchSessionModeProvider
                 .overrideWith(() => FakeSessionModeNotifier(MatchSessionMode.online)),
             activeMatchUiStateProvider.overrideWithValue(uiState),
+            rematchStateProvider.overrideWithValue(RematchState.idle),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -135,7 +137,7 @@ void main() {
       expect(find.text('Bildir'), findsNothing);
 
       // Butonlar görünmeli
-      expect(find.text(AppStrings.playAgain), findsOneWidget);
+      expect(find.text(AppStrings.rematchAction), findsOneWidget);
       expect(find.text(AppStrings.matchDetail), findsOneWidget);
     });
   });

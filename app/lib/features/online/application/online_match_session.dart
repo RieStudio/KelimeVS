@@ -1219,6 +1219,10 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   /// Tamamen idempotenttir; ekran kapatıldığında veya rota değiştiğinde güvenle çağrılabilir.
   void leaveRematch() {
     if (_rematchLeaveSent) return;
+    if (state.rematchState is RematchMatched ||
+        state.rematchState is RematchStarting) {
+      return;
+    }
     _rematchLeaveSent = true;
     _cancelRematchCountdown();
 

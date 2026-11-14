@@ -18,7 +18,6 @@ import 'package:app/features/game/domain/match/match_events.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
-import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
 import 'package:app/features/game/application/match_session.dart';
 
 class _TestSessionModeNotifier extends ActiveMatchSessionModeNotifier {
@@ -228,7 +227,7 @@ void main() {
     );
   });
 
-  testWidgets('5. "Tekrar Oyna" butonuna tıklandığında MatchmakingScreen açılır', (tester) async {
+  testWidgets('5. "Rövanş" butonuna tıklandığında bot rövanş bekleme durumuna geçer', (tester) async {
     final matchState = createMatchState(
       scores: {'me': 2, 'bot': 1},
       winnerId: 'me',
@@ -242,13 +241,13 @@ void main() {
     await tester.pumpWidget(_buildTestApp(controller));
     await tester.pumpAndSettle();
 
-    expect(find.byType(MatchmakingScreen), findsNothing);
+    final rematchBtn = find.widgetWithText(PrimaryButton, AppStrings.rematchAction);
+    expect(rematchBtn, findsOneWidget);
 
-    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.playAgain));
+    await tester.tap(rematchBtn);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(MatchmakingScreen), findsOneWidget);
+    expect(find.widgetWithText(PrimaryButton, AppStrings.rematchWaiting(45)), findsOneWidget);
   });
 
   testWidgets('6. "Maç Detayı" butonu ekranda ikincil buton olarak bulunur', (tester) async {
@@ -728,12 +727,12 @@ void main() {
     expect(find.text(AppStrings.blockedStatus), findsNothing);
     expect(find.text('Bildir'), findsNothing);
 
-    // Skor, jeton ödülü, Tekrar Oyna ve Maç Detayı butonları bulunur
+    // Skor, jeton ödülü, Rövanş ve Maç Detayı butonları bulunur
     expect(find.text(AppStrings.you), findsOneWidget);
     expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
     expect(find.text('CanliRakip'), findsOneWidget); // Sadece skor satırında (kartta değil)
     expect(find.text('+30${AppStrings.coinSuffix}'), findsOneWidget);
-    expect(find.widgetWithText(PrimaryButton, AppStrings.playAgain), findsOneWidget);
+    expect(find.widgetWithText(PrimaryButton, AppStrings.rematchAction), findsOneWidget);
     expect(find.widgetWithText(SecondaryButton, AppStrings.matchDetail), findsOneWidget);
   });
 
@@ -774,7 +773,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text(AppStrings.blockAction), findsNothing);
-      expect(find.widgetWithText(PrimaryButton, AppStrings.playAgain), findsOneWidget);
+      expect(find.widgetWithText(PrimaryButton, AppStrings.rematchAction), findsOneWidget);
       expect(find.widgetWithText(SecondaryButton, AppStrings.matchDetail), findsOneWidget);
     }
     tester.view.resetPhysicalSize();

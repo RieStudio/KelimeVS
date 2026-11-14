@@ -51,10 +51,27 @@ abstract final class AppStrings {
   static String formatCoinReward(int amount) => coinReward(amount);
 
   // Butonlar ve Eylemler
-  static const String playAgain = 'Tekrar Oyna';
   static const String matchDetail = 'Maç Detayı';
   static const String cancel = 'Vazgeç';
   static const String appeal = 'İtiraz et';
+  static const String homeAction = 'Ana Sayfa';
+
+  // Rövanş (Rematch)
+  static const String rematchAction = 'Rövanş';
+  static String rematchWaiting(int n) => 'Rövanş bekleniyor ($n)';
+  static const String rematchStarting = 'Rövanş başlıyor...';
+  static String rematchOfferedBy(String? name) {
+    final sanitized = (name != null && name.trim().isNotEmpty) ? name.trim() : opponent;
+    return '$sanitized rövanş istiyor!';
+  }
+  static String rematchAccept(int n) => 'Kabul Et ($n)';
+  static const String rematchDecline = 'Reddet';
+  static const String rematchDeclined = 'Rövanş reddedildi';
+  static const String rematchExpired = 'Süre doldu';
+  static const String rematchOpponentLeft = 'Rakip ayrıldı';
+  static const String rematchNoEnergy = 'Enerjin yetersiz';
+  static const String rematchOpponentNoEnergy = 'Rakibin enerjisi yetersiz';
+  static const String rematchUnavailable = 'Rövanş şu anda mümkün değil';
 
   // Eşleşme
   static const String searchingOpponent = 'Rakip aranıyor…';
