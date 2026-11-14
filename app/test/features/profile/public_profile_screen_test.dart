@@ -121,7 +121,7 @@ void main() {
 
   group('PublicProfileScreen Layout Tests', () {
     testWidgets(
-        'Normal profil: ad, avatar, 3 istatistik kartı ve Engelle+Bildir butonları görünür',
+        'Normal profil: ad, avatar, 3 istatistik kartı ve Engelle butonu görünür, Bildir butonu bulunmaz',
         (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -168,9 +168,9 @@ void main() {
       expect(find.text(AppStrings.statsWinRate), findsOneWidget);
       expect(find.text('%62'), findsOneWidget);
 
-      // Engelle ve Bildir butonları (yardımcı açıklama metni kaldırıldı)
+      // Engelle butonu görünmeli, Bildir butonu görünmemeli
       expect(find.text(AppStrings.blockAction), findsOneWidget);
-      expect(find.text(AppStrings.reportAction), findsOneWidget);
+      expect(find.text('Bildir'), findsNothing);
       expect(find.text('Engellediğin oyuncuyla eşleşmezsin.'), findsNothing);
 
       // Kendi profiline ait alanlar bulunmamalı
@@ -207,10 +207,12 @@ void main() {
 
       expect(find.text('M-4821'), findsOneWidget);
       expect(find.text(AppStrings.profileGuestBadge), findsOneWidget);
+      expect(find.text(AppStrings.blockAction), findsOneWidget);
+      expect(find.text('Bildir'), findsNothing);
     });
 
     testWidgets(
-        'Engellenmiş oyuncu: uyarı kartı ve "Engeli Kaldır" ile "Bildir" butonları görünür',
+        'Engellenmiş oyuncu: uyarı kartı ve "Engeli Kaldır" butonu görünür, "Bildir" butonu görünmez',
         (tester) async {
       const profile = PublicProfile(
         uid: 'user_bad',
@@ -241,10 +243,10 @@ void main() {
       expect(find.text(AppStrings.profileBlockedBanner), findsOneWidget);
       expect(find.text('Engellediğin oyuncuyla eşleşmezsin.'), findsNothing);
 
-      // Engeli Kaldır ve Bildir görünmeli, Engelle görünmemeli
+      // Engeli Kaldır görünmeli, Engelle ve Bildir görünmemeli
       expect(find.text(AppStrings.unblockAction), findsOneWidget);
-      expect(find.text(AppStrings.reportAction), findsOneWidget);
       expect(find.text(AppStrings.blockAction), findsNothing);
+      expect(find.text('Bildir'), findsNothing);
     });
   });
 
@@ -404,7 +406,7 @@ void main() {
     });
 
     testWidgets(
-        'Bildir akışı: Bottom sheet açılır, 3 seçenek listelenir, gönderim başarılı olunca sheet kapanır',
+        'Bildirme arayüzü kaldırılmıştır: "Bildir" butonu veya alt sayfası bulunmaz',
         (tester) async {
       const profile = PublicProfile(
         uid: 'user_suspect',
@@ -428,78 +430,9 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // "Bildir" butonuna bas
-      await tester.tap(find.text(AppStrings.reportAction));
-      await tester.pumpAndSettle();
-
-      // Bottom sheet öğeleri
-      expect(find.text(AppStrings.reportDialogTitle), findsOneWidget);
-      expect(
-        find.text(AppStrings.reportUserSubtitle('SuspectUser')),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('SuspectUser için bildirim sebebini seç.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining(RegExp(r'^\s*için')), findsNothing);
-      expect(find.text(AppStrings.reasonInappropriateNickname), findsOneWidget);
-      expect(find.text(AppStrings.reasonCheatingSuspicion), findsOneWidget);
-      expect(find.text(AppStrings.reasonOther), findsOneWidget);
-
-      // "Hile şüphesi" seç
-      await tester.tap(find.text(AppStrings.reasonCheatingSuspicion));
-      await tester.pumpAndSettle();
-
-      // "Bildir"e bas
-      await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.reportAction));
-      await tester.pumpAndSettle();
-
-      expect(fakeClient.reportCallCount, 1);
-      expect(fakeClient.lastReportReason, 'cheating');
-      expect(find.text(AppStrings.profileReportedSuccess), findsOneWidget);
-      // Bottom sheet kapanmış olmalı
-      expect(find.text(AppStrings.reasonCheatingSuspicion), findsNothing);
-    });
-
-    testWidgets('Bildir akışı: alreadyReported hatasında sheet kapanır ve mesaj görünür',
-        (tester) async {
-      const profile = PublicProfile(
-        uid: 'user_rep',
-        nickname: 'RepUser',
-        equippedFrame: 'classic',
-      );
-
-      final fakeClient = FakePublicProfileApiClient(
-        profileToReturn: profile,
-      );
-      fakeClient.reportErrorToThrow = const PublicProfileException(
-        kind: PublicProfileErrorKind.alreadyReported,
-        message: AppStrings.profileAlreadyReported,
-        statusCode: 409,
-      );
-
-      await tester.pumpWidget(
-        buildTestWidget(
-          child: const PublicProfileScreen(uid: 'user_rep'),
-          overrides: [
-            publicProfileApiClientProvider.overrideWithValue(fakeClient),
-            authRepositoryProvider
-                .overrideWithValue(FakeAuthRepository(FakeUser('my_self_uid'))),
-          ],
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text(AppStrings.reportAction));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.reportAction));
-      await tester.pumpAndSettle();
-
-      expect(find.text(AppStrings.profileAlreadyReported), findsOneWidget);
-      expect(find.text(AppStrings.reasonInappropriateNickname), findsNothing);
+      expect(find.text('Bildir'), findsNothing);
+      expect(find.text('Oyuncuyu Bildir'), findsNothing);
+      expect(fakeClient.reportCallCount, 0);
     });
 
     testWidgets('Kendi UID ile açılmaya çalışılırsa ekran hemen kapanır (güvenlik kontrolü)',

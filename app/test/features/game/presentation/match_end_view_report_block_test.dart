@@ -128,11 +128,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.reportAction), findsNothing);
+    expect(find.text('Bildir'), findsNothing);
     expect(find.text(AppStrings.blockAction), findsNothing);
   });
 
-  testWidgets('2. Online maçta rakip kartı ile Bildir ve Engelle düğmeleri görünür', (tester) async {
+  testWidgets('2. Online maçta rakip kartı ile Engelle düğmesi görünür, Bildir düğmesi bulunmaz', (tester) async {
     final client = FakeBlockedUsersClient();
     final uiState = MatchUiState(
       matchState: createMatchState(),
@@ -158,11 +158,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CanliRakip'), findsNWidgets(2)); // Skor satırı ve rakip kartı
-    expect(find.text(AppStrings.reportAction), findsOneWidget);
+    expect(find.text('Bildir'), findsNothing);
     expect(find.text(AppStrings.blockAction), findsOneWidget);
   });
 
-  testWidgets('3. Bildir akışı: Bottom sheet açılır, sebep seçilir ve bildirim gönderilip buton Bildirildi olur', (tester) async {
+  testWidgets('3. Online maçta Bildir butonu ve bildirme sheet\'i bulunmaz', (tester) async {
     final client = FakeBlockedUsersClient();
     final uiState = MatchUiState(
       matchState: createMatchState(),
@@ -187,43 +187,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Bildir düğmesine dokun
-    await tester.tap(find.widgetWithText(SecondaryButton, AppStrings.reportAction));
-    await tester.pumpAndSettle();
-
-    // Bottom sheet görünmeli
-    expect(find.text(AppStrings.reportDialogTitle), findsOneWidget);
-    expect(
-      find.text(AppStrings.reportMatchPrompt('CanliRakip')),
-      findsOneWidget,
-    );
-    expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
-    expect(find.text(AppStrings.reasonInappropriateNickname), findsOneWidget);
-    expect(find.text(AppStrings.reasonInappropriateContent), findsOneWidget);
-    expect(find.text(AppStrings.reasonCheating), findsOneWidget);
-    expect(find.text(AppStrings.reasonOther), findsOneWidget);
-
-    // Bir sebep seç ("Uygunsuz takma ad")
-    await tester.tap(find.text(AppStrings.reasonInappropriateNickname));
-    await tester.pumpAndSettle();
-
-    // Bildir (PrimaryButton) düğmesine dokun
-    await tester.tap(find.widgetWithText(PrimaryButton, AppStrings.reportAction));
-    await tester.pumpAndSettle();
-
-    expect(client.reportCalled, isTrue);
-    expect(client.reportedMatchId, 'match_server_123');
-    expect(client.reportedReason, 'inappropriate_nickname');
-
-    // Başarı SnackBar'ı görünmeli
-    expect(find.text(AppStrings.reportSuccess), findsOneWidget);
-
-    // Düğme "Bildirildi" olmuş ve kapanmış (onPressed: null) olmalı
-    expect(find.text(AppStrings.reportedStatus), findsOneWidget);
-    final reportedBtn = tester.widget<SecondaryButton>(
-      find.widgetWithText(SecondaryButton, AppStrings.reportedStatus),
-    );
-    expect(reportedBtn.onPressed, isNull);
+    expect(find.text('Bildir'), findsNothing);
+    expect(find.text('Bildirildi'), findsNothing);
+    expect(find.text('Oyuncuyu Bildir'), findsNothing);
+    expect(client.reportCalled, isFalse);
   });
 
   testWidgets('4. Engelle akışı: Onay penceresi açılır, onaylanınca engellenir ve buton Engellendi olur', (tester) async {
@@ -286,7 +253,7 @@ void main() {
     expect(blockedBtn.onPressed, isNull);
   });
 
-  testWidgets('5. Engelleme ve bildirme metinleri: Boş veya null isimde güvenli yedek metin kullanılır', (tester) async {
+  testWidgets('5. Engelleme metinleri: Boş veya null isimde güvenli yedek metin kullanılır', (tester) async {
     expect(
       AppStrings.blockDialogMessage(null),
       'Bu oyuncuyu engellemek istediğinden emin misin?\nBir daha bu oyuncuyla eşleştirilmeyeceksin.',
@@ -304,14 +271,5 @@ void main() {
     expect(AppStrings.blockSuccess(null), 'Oyuncu engellendi.');
     expect(AppStrings.blockSuccess(''), 'Oyuncu engellendi.');
     expect(AppStrings.blockSuccess('  '), 'Oyuncu engellendi.');
-
-    expect(AppStrings.reportMatchPrompt(null), 'Bu oyuncuyu neden bildirmek istiyorsun?');
-    expect(AppStrings.reportMatchPrompt(''), 'Bu oyuncuyu neden bildirmek istiyorsun?');
-    expect(AppStrings.reportMatchPrompt('   '), 'Bu oyuncuyu neden bildirmek istiyorsun?');
-    expect(AppStrings.reportMatchPrompt('').startsWith(' adlı'), isFalse);
-
-    expect(AppStrings.reportUserSubtitle(null), 'Bildirim sebebini seç.');
-    expect(AppStrings.reportUserSubtitle(''), 'Bildirim sebebini seç.');
-    expect(AppStrings.reportUserSubtitle('   '), 'Bildirim sebebini seç.');
   });
 }

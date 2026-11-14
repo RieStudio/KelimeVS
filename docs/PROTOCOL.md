@@ -656,6 +656,8 @@ Hedef oyuncunun engelini kaldırır.
   ```
 
 #### Profil Üzerinden Oyuncuyu Bildirme: `POST /users/:uid/report`
+> **Not:** Bu endpoint sunucuda ve istemci API katmanında mevcuttur ancak şu an istemci arayüzünde kullanılmamaktadır.
+
 Hedef oyuncuyu `ReportStore` üzerinden inceleme amacıyla yönetici havuzuna bildirir. Maça bağlı olmadığı için sentetik `matchId: "profile_<uid>"` kullanılır.
 - **İstek Gövdesi:**
   ```json

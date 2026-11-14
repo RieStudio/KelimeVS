@@ -160,24 +160,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     }
   }
 
-  void _showReportSheet(BuildContext context, String nickname) {
-    if (!ensureNetworkConnected(context, ref)) return;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => _PublicProfileReportBottomSheet(
-        parentContext: context,
-        uid: widget.uid,
-        nickname: nickname,
-      ),
-    );
-  }
-
   Widget _buildTopBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -487,19 +469,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                                   : () => _handleUnblock(context),
                             ),
                           ),
-                          const SizedBox(height: AppDimens.space16),
-
-                          // Bildir Butonu
-                          Semantics(
-                            button: true,
-                            label: AppStrings.reportAction,
-                            child: SecondaryButton(
-                              text: AppStrings.reportAction,
-                              onPressed: _isBusy
-                                  ? null
-                                  : () => _showReportSheet(context, nickname),
-                            ),
-                          ),
                         ] else ...[
                           // Engelle Butonu
                           Semantics(
@@ -512,19 +481,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                                   : () => _handleBlock(context, nickname),
                             ),
                           ),
-                          const SizedBox(height: AppDimens.space16),
-
-                          // Bildir Butonu
-                          Semantics(
-                            button: true,
-                            label: AppStrings.reportAction,
-                            child: SecondaryButton(
-                              text: AppStrings.reportAction,
-                              onPressed: _isBusy
-                                  ? null
-                                  : () => _showReportSheet(context, nickname),
-                            ),
-                          ),
                         ],
                       ],
                     ),
@@ -535,213 +491,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           },
         ),
       ),
-    );
-  }
-}
-
-class _PublicProfileReportBottomSheet extends StatefulWidget {
-  final BuildContext parentContext;
-  final String uid;
-  final String nickname;
-
-  const _PublicProfileReportBottomSheet({
-    required this.parentContext,
-    required this.uid,
-    required this.nickname,
-  });
-
-  @override
-  State<_PublicProfileReportBottomSheet> createState() =>
-      _PublicProfileReportBottomSheetState();
-}
-
-class _PublicProfileReportBottomSheetState
-    extends State<_PublicProfileReportBottomSheet> {
-  String _selectedReason = 'inappropriate_nickname';
-  bool _isSubmitting = false;
-
-  final _reasons = const [
-    (
-      key: 'inappropriate_nickname',
-      label: AppStrings.reasonInappropriateNickname,
-    ),
-    (
-      key: 'cheating',
-      label: AppStrings.reasonCheatingSuspicion,
-    ),
-    (
-      key: 'other',
-      label: AppStrings.reasonOther,
-    ),
-  ];
-
-  Future<void> _submit(WidgetRef ref) async {
-    setState(() => _isSubmitting = true);
-    try {
-      await ref
-          .read(publicProfileServiceProvider)
-          .reportUser(widget.uid, _selectedReason);
-      if (mounted) {
-        Navigator.of(context).pop();
-        if (widget.parentContext.mounted) {
-          ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-            const SnackBar(
-              content: Text(
-                AppStrings.profileReportedSuccess,
-                style: TextStyle(
-                  fontFamily: AppTextStyles.fontNunito,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              backgroundColor: AppColors.ink,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-        if (e is PublicProfileException && e.isAlreadyReported) {
-          Navigator.of(context).pop();
-        }
-        final msg = e is PublicProfileException
-            ? e.message
-            : AppStrings.reportGenericError;
-        if (widget.parentContext.mounted) {
-          ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-            SnackBar(
-              content: Text(
-                msg,
-                style: const TextStyle(
-                  fontFamily: AppTextStyles.fontNunito,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              backgroundColor: AppColors.ink,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimens.screenPaddingHorizontal,
-              vertical: AppDimens.space16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Tutamaç (Handle)
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.muted.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppDimens.space16),
-
-                // Başlık
-                Text(
-                  AppStrings.reportDialogTitle,
-                  style: AppTextStyles.cardTitle.copyWith(fontSize: 20),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppDimens.space6),
-
-                // Alt başlık
-                Text(
-                  AppStrings.reportUserSubtitle(widget.nickname),
-                  style:
-                      AppTextStyles.bodyText.copyWith(color: AppColors.muted),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppDimens.space16),
-
-                // Seçenekler
-                ..._reasons.map((r) {
-                  final isSelected = _selectedReason == r.key;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppDimens.space8),
-                    child: InkWell(
-                      onTap: _isSubmitting
-                          ? null
-                          : () => setState(() => _selectedReason = r.key),
-                      borderRadius: AppDimens.borderRadiusListCard,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space16,
-                          vertical: AppDimens.space12,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected ? AppColors.surface : AppColors.card,
-                          borderRadius: AppDimens.borderRadiusListCard,
-                          border: Border.all(
-                            color: isSelected ? AppColors.ink : AppColors.mint,
-                            width: isSelected
-                                ? AppDimens.borderThick
-                                : AppDimens.borderThin,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.muted,
-                            ),
-                            const SizedBox(width: AppDimens.space12),
-                            Expanded(
-                              child: Text(
-                                r.label,
-                                style: AppTextStyles.bodyText.copyWith(
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w600,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: AppDimens.space16),
-
-                // Butonlar: Bildir ve Vazgeç
-                PrimaryButton(
-                  text: AppStrings.reportAction,
-                  onPressed: _isSubmitting ? null : () => _submit(ref),
-                ),
-                const SizedBox(height: AppDimens.space8),
-                SecondaryButton(
-                  text: AppStrings.cancel,
-                  onPressed:
-                      _isSubmitting ? null : () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

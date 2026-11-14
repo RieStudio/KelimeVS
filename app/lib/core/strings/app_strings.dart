@@ -360,18 +360,11 @@ abstract final class AppStrings {
   static const String reauthWrongAccountError =
       'Lütfen uygulamaya bağlı Google hesabını seç.';
 
-  // Oyuncu Bildirme ve Engelleme
-  static const String reportAction = 'Bildir';
+  // Oyuncu Engelleme
   static const String blockAction = 'Engelle';
-  static const String reportedStatus = 'Bildirildi';
   static const String blockedStatus = 'Engellendi';
-  static const String reportDialogTitle = 'Oyuncuyu Bildir';
-  static const String reportReasonPrompt = 'Bildirme Sebebi Seç';
-  static const String reasonInappropriateNickname = 'Uygunsuz takma ad';
-  static const String reasonInappropriateContent = 'Hakaret / uygunsuz cevap';
-  static const String reasonCheating = 'Hile veya kötüye kullanım';
-  static const String reasonOther = 'Diğer';
-  static const String reportSuccess = 'Bildirimin alındı. Teşekkür ederiz.';
+
+  // İstemci API Katmanı Rapor Hata Mesajları (Arayüzde doğrudan kullanılmaz; geri dönüş için bırakıldı)
   static const String reportAlreadyReported =
       'Bu maç için zaten bildirim yaptın.';
   static const String reportDailyLimit = 'Günlük bildirim sınırına ulaştın.';
@@ -379,13 +372,6 @@ abstract final class AppStrings {
       'Maç süresi dolduğu için bildirim yapılamadı.';
   static const String reportGenericError =
       'Bildirim gönderilemedi. Lütfen internetini kontrol et.';
-  static String reportMatchPrompt([String? opponentName]) {
-    final trimmed = opponentName?.trim();
-    if (trimmed == null || trimmed.isEmpty) {
-      return 'Bu oyuncuyu neden bildirmek istiyorsun?';
-    }
-    return '$trimmed adlı oyuncuyu neden bildirmek istiyorsun?';
-  }
 
   static const String blockDialogTitle = 'Oyuncuyu Engelle';
   static String blockDialogMessage([String? nickname]) {
@@ -438,8 +424,6 @@ abstract final class AppStrings {
       'Bağlantı hatası oluştu. Lütfen internetini kontrol et.';
   static const String profileBlockedSuccess = 'Oyuncu engellendi.';
   static const String profileUnblockedSuccess = 'Engel kaldırıldı.';
-  static const String profileReportedSuccess =
-      'Bildirimin alındı. Teşekkür ederiz.';
   static const String profileCannotBlockSelf = 'Kendini engelleyemezsin.';
   static const String profileCannotReportSelf = 'Kendini bildiremezsin.';
   static const String profileGenericError =
@@ -452,14 +436,6 @@ abstract final class AppStrings {
   static const String profileDeletedMessage =
       'Bu oyuncunun profiline artık ulaşılamıyor.';
   static const String backAction = 'Geri Dön';
-  static const String reasonCheatingSuspicion = 'Hile şüphesi';
-  static String reportUserSubtitle([String? nickname]) {
-    final trimmed = nickname?.trim();
-    if (trimmed == null || trimmed.isEmpty) {
-      return 'Bildirim sebebini seç.';
-    }
-    return '$trimmed için bildirim sebebini seç.';
-  }
   static String openProfileSemantic(String name) => '$name profilini aç';
   static const String openOwnProfileSemantic = 'Kendi profilini aç';
 

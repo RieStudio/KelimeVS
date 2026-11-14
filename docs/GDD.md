@@ -103,7 +103,7 @@ Yanlış denemeler rakibe gösterildiği için oyuncunun yazdığı metin fiilen
 
 - **[VARSAYIM]** Deneme metni en fazla 40 karakterdir; baştaki/sondaki boşluklar silinir, ardışık boşluklar tek boşluğa iner.
 - **[VARSAYIM]** Rakibe gösterilmeden önce sunucu, metni küfür/hakaret listesine karşı süzer ve eşleşen kısmı maskeler (`***`). Liste sunucuda tutulur ve güncellenebilir.
-- Bir oyuncu rakibin metnini **raporlayabilir** ve rakibi **engelleyebilir**; mağazalar kullanıcı üretimli içerik için bu mekanizmaları ister (bölüm 9). Tasarımı Faz 5'te yapılır.
+- Bir oyuncu uygunsuz rakibi **engelleyebilir**; mağazalar kullanıcı üretimli içerik için güvenlik mekanizmaları ister (bölüm 9).
 - Botların yanlış denemeleri kısa, zararsız bir kelime listesinden gelir.
 
 ## 5. Veri modeli
@@ -163,7 +163,7 @@ Her kullanıcının `uid`'ye bağlı bir `UserProfile` nesnesi vardır: takma ad
 
 - **[VARSAYIM]** Sıralama **haftalık galibiyet sayısına** göre yapılır. Hafta, Türkiye saatiyle (Europe/Istanbul) pazartesi 00:00'da başlar ve sıfırlanır. Eşitlikte sırayla: daha az mağlubiyet, sonra galibiyete daha erken ulaşan üstte.
 - Tabloda ilk 100 oyuncu ve oyuncunun kendi sırası görünür. Her satırda sıra, harf avatarı, takma ad ve galibiyet sayısı bulunur.
-- **[KARAR] Herkese Açık Oyuncu Profili:** Liderlik tablosu satırlarına veya maç geçmişi kayıtlarına dokunulduğunda oyuncunun herkese açık profil ekranı açılır (`GET /users/:uid/public`). Sunucu salt-okunur olarak ad, çerçeve, maç istatistikleri (`played`, `won`, `lost`, `winRate`), misafir durumu (`isGuest`) ve engel durumunu (`isBlocked`, `blockId`) döner; e-posta, bakiye gibi özel veriler asla sızdırılmaz. Profil ekranından doğrudan engelleme (`POST /users/:uid/block`), engeli kaldırma (`DELETE /users/:uid/block`) ve bildirme (`POST /users/:uid/report`) yapılabilir.
+- **[KARAR] Herkese Açık Oyuncu Profili:** Liderlik tablosu satırlarına veya maç geçmişi kayıtlarına dokunulduğunda oyuncunun herkese açık profil ekranı açılır (`GET /users/:uid/public`). Sunucu salt-okunur olarak ad, çerçeve, maç istatistikleri (`played`, `won`, `lost`, `winRate`), misafir durumu (`isGuest`) ve engel durumunu (`isBlocked`, `blockId`) döner; e-posta, bakiye gibi özel veriler asla sızdırılmaz. Profil ekranından doğrudan engelleme (`POST /users/:uid/block`) ve engeli kaldırma (`DELETE /users/:uid/block`) yapılabilir (bildirme uç noktası sunucu tarafında hazırdır ancak arayüzden kaldırılmıştır).
 - Yalnızca gerçek online maçlar sayılır (bot maçları sayılmaz). Bağlantı kopması nedeniyle kazanılan maç da sayılır.
 - Aynı rakibe karşı bir haftada en fazla **20 galibiyet** sayılır (iki hesapla puan basmayı zorlaştırmak için; `LEADERBOARD_PAIR_WIN_CAP` ortam değişkeniyle ayarlanabilir, varsayılan 20). Sınırı aşan galibiyetler jetonu etkilemez, yalnızca sıralamaya yazılmaz.
 - Takma adı henüz olmayan oyuncu tabloda görünmez.
@@ -244,7 +244,7 @@ Maç içi güçlendiriciler oyuncunun zor anlarda taktiksel avantaj elde etmesin
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.
 - Oyun durumu ve jeton yazma yetkisi yalnızca sunucudadır.
-- Hesap silme özelliği, raporlama/engelleme mekanizması ve gizlilik politikası (KVKK/GDPR) yayın için zorunludur.
+- Hesap silme özelliği, engelleme mekanizması ve gizlilik politikası (KVKK/GDPR) yayın için zorunludur.
 - iOS'ta başka sosyal giriş sunulursa Sign in with Apple zorunludur.
 - Servis hesabı anahtarları ve gizli bilgiler asla repoya konmaz; sunucu tarafında Cloudflare gizli değişkenleri (`wrangler secret`) kullanılır.
 

@@ -130,9 +130,9 @@ void main() {
       expect(find.text('2${AppStrings.scoreDash}1'), findsOneWidget);
       expect(find.text('Mehmet'), findsWidgets);
 
-      // Rakip kartı (Bildir ve Engelle butonları) görünmeli
-      expect(find.text(AppStrings.reportAction), findsOneWidget);
+      // Rakip kartı (Engelle butonu görünmeli, Bildir butonu görünmemeli)
       expect(find.text(AppStrings.blockAction), findsOneWidget);
+      expect(find.text('Bildir'), findsNothing);
 
       // Butonlar görünmeli
       expect(find.text(AppStrings.playAgain), findsOneWidget);

@@ -11,10 +11,10 @@ import 'package:app/core/widgets/secondary_button.dart';
 
 void main() {
   Widget buildOpponentCard({
-    required String reportText,
     required String blockText,
     required double width,
     required double textScale,
+    String opponentName = 'CanliRakip',
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -45,24 +45,17 @@ void main() {
                   ),
                   child: Row(
                     children: [
-                      const PlayerAvatar.opponent(
-                        name: 'CanliRakip',
+                      PlayerAvatar.opponent(
+                        name: opponentName,
                         size: 36,
                       ),
-                      const SizedBox(width: AppDimens.space10),
+                      const SizedBox(width: AppDimens.matchEndOpponentNameGap),
                       Expanded(
                         child: Text(
-                          'CanliRakip',
+                          opponentName,
                           style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-                      SecondaryButton(
-                        text: reportText,
-                        height: 38,
-                        width: 78,
-                        onPressed: () {},
                       ),
                       const SizedBox(width: AppDimens.space8),
                       SecondaryButton.danger(
@@ -82,13 +75,12 @@ void main() {
     );
   }
 
-  group('Bildir ve Engelle Butonları Taşma ve Düzen Testleri', () {
+  group('Engelle Butonu Taşma ve Düzen Testleri', () {
     testWidgets(
-      '320 dp genişlik ve textScaler 1.5 iken "Bildir" ve "Engelle" butonları taşmaz, tek satırda kalır ve yüksekliği korunur',
+      '320 dp genişlik ve textScaler 1.5 iken "Engelle" butonu taşmaz, "Bildir" bulunmaz ve yükseklik korunur',
       (tester) async {
         await tester.pumpWidget(
           buildOpponentCard(
-            reportText: AppStrings.reportAction,
             blockText: AppStrings.blockAction,
             width: 320,
             textScale: 1.5,
@@ -97,48 +89,61 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.text(AppStrings.reportAction), findsOneWidget);
+        expect(find.text('Bildir'), findsNothing);
         expect(find.text(AppStrings.blockAction), findsOneWidget);
 
-        // Her iki butonun içindeki Text widget'larının tek satır olduğunu doğrula
-        final reportTextWidget = tester.widget<Text>(find.descendant(
-          of: find.widgetWithText(SecondaryButton, AppStrings.reportAction),
-          matching: find.byType(Text),
-        ));
+        // Engelle butonunun içindeki Text widget'ının tek satır olduğunu doğrula
         final blockTextWidget = tester.widget<Text>(find.descendant(
           of: find.widgetWithText(SecondaryButton, AppStrings.blockAction),
           matching: find.byType(Text),
         ));
-        expect(reportTextWidget.maxLines, 1);
         expect(blockTextWidget.maxLines, 1);
 
         // Buton boyutlarının ve dokunma alanının (minTouchTarget) bozulmadığını doğrula
-        final reportRect = tester.getRect(
-          find.widgetWithText(SecondaryButton, AppStrings.reportAction),
-        );
         final blockRect = tester.getRect(
           find.widgetWithText(SecondaryButton, AppStrings.blockAction),
         );
-        expect(reportRect.height, AppDimens.minTouchTarget); // 48.0 dokunma alanı
-        expect(reportRect.width, 78.0);
         expect(blockRect.height, AppDimens.minTouchTarget); // 48.0 dokunma alanı
         expect(blockRect.width, 82.0);
 
         // İç buton gövdesinin 38 dp yüksekliğini koruduğunu doğrula
-        final reportContainers = tester.widgetList<Container>(find.descendant(
-          of: find.widgetWithText(SecondaryButton, AppStrings.reportAction),
+        final blockContainers = tester.widgetList<Container>(find.descendant(
+          of: find.widgetWithText(SecondaryButton, AppStrings.blockAction),
           matching: find.byType(Container),
         ));
-        expect(reportContainers.first.constraints?.maxHeight ?? 38.0, 38.0);
+        expect(blockContainers.first.constraints?.maxHeight ?? 38.0, 38.0);
       },
     );
 
     testWidgets(
-      '320 dp genişlik ve textScaler 1.5 iken "Bildirildi" ve "Engellendi" (uzun metinler) taşmaz ve tek satırda kalır',
+      '320 dp ve 360 dp genişlikte çok uzun rakip adında ellipsis uygulanır ve taşma olmaz',
+      (tester) async {
+        for (final width in [320.0, 360.0]) {
+          await tester.pumpWidget(
+            buildOpponentCard(
+              blockText: AppStrings.blockAction,
+              width: width,
+              textScale: 1.5,
+              opponentName: 'CokUzunBirKullaniciAdi123456789',
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(find.text('Bildir'), findsNothing);
+          expect(find.text(AppStrings.blockAction), findsOneWidget);
+
+          final nameTextWidget = tester.widget<Text>(find.text('CokUzunBirKullaniciAdi123456789'));
+          expect(nameTextWidget.overflow, TextOverflow.ellipsis);
+        }
+      },
+    );
+
+    testWidgets(
+      '320 dp genişlik ve textScaler 1.5 iken "Engellendi" (uzun metin) taşmaz ve tek satırda kalır',
       (tester) async {
         await tester.pumpWidget(
           buildOpponentCard(
-            reportText: AppStrings.reportedStatus,
             blockText: AppStrings.blockedStatus,
             width: 320,
             textScale: 1.5,
@@ -147,28 +152,18 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.text(AppStrings.reportedStatus), findsOneWidget);
+        expect(find.text('Bildirildi'), findsNothing);
         expect(find.text(AppStrings.blockedStatus), findsOneWidget);
 
-        final reportedTextWidget = tester.widget<Text>(find.descendant(
-          of: find.widgetWithText(SecondaryButton, AppStrings.reportedStatus),
-          matching: find.byType(Text),
-        ));
         final blockedTextWidget = tester.widget<Text>(find.descendant(
           of: find.widgetWithText(SecondaryButton, AppStrings.blockedStatus),
           matching: find.byType(Text),
         ));
-        expect(reportedTextWidget.maxLines, 1);
         expect(blockedTextWidget.maxLines, 1);
 
-        final reportedRect = tester.getRect(
-          find.widgetWithText(SecondaryButton, AppStrings.reportedStatus),
-        );
         final blockedRect = tester.getRect(
           find.widgetWithText(SecondaryButton, AppStrings.blockedStatus),
         );
-        expect(reportedRect.height, AppDimens.minTouchTarget);
-        expect(reportedRect.width, 78.0);
         expect(blockedRect.height, AppDimens.minTouchTarget);
         expect(blockedRect.width, 82.0);
       },
@@ -196,11 +191,6 @@ void main() {
                           onPressed: () {},
                         ),
                         const SizedBox(height: AppDimens.space12),
-                        PrimaryButton(
-                          text: AppStrings.reportAction,
-                          onPressed: () {},
-                        ),
-                        const SizedBox(height: AppDimens.space12),
                         SecondaryButton(
                           text: AppStrings.unblockAction,
                           height: 42,
@@ -223,20 +213,14 @@ void main() {
           of: find.widgetWithText(PrimaryButton, AppStrings.blockConfirm),
           matching: find.byType(Text),
         ));
-        final reportActionText = tester.widget<Text>(find.descendant(
-          of: find.widgetWithText(PrimaryButton, AppStrings.reportAction),
-          matching: find.byType(Text),
-        ));
         final unblockText = tester.widget<Text>(find.descendant(
           of: find.widgetWithText(SecondaryButton, AppStrings.unblockAction),
           matching: find.byType(Text),
         ));
 
         expect(blockConfirmText.maxLines, 1);
-        expect(reportActionText.maxLines, 1);
         expect(unblockText.maxLines, 1);
       },
     );
   });
 }
-

@@ -42,9 +42,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
 
-  bool _isReported = false;
   bool _isBlocked = false;
-  bool _isSubmittingReport = false;
   bool _isSubmittingBlock = false;
 
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
@@ -62,39 +60,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
           ),
         ),
         backgroundColor: AppColors.ink,
-      ),
-    );
-  }
-
-  void _showReportBottomSheet(BuildContext context, String matchId, String opponentName) {
-    if (!ensureNetworkConnected(context, ref)) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => _ReportBottomSheet(
-        opponentName: opponentName,
-        onSubmit: (reason) async {
-          Navigator.of(sheetContext).pop();
-          setState(() => _isSubmittingReport = true);
-          final client = ref.read(blockedUsersApiClientProvider);
-          final res = await client.reportUser(matchId: matchId, reason: reason);
-          if (!mounted) return;
-          setState(() => _isSubmittingReport = false);
-
-          if (res is ReportUserSuccess) {
-            setState(() => _isReported = true);
-            _showSnackBar(AppStrings.reportSuccess);
-          } else if (res is ReportUserError) {
-            if (res.isAlreadyReported) {
-              setState(() => _isReported = true);
-            }
-            _showSnackBar(res.message);
-          }
-        },
       ),
     );
   }
@@ -465,17 +430,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                       ),
                       const SizedBox(width: AppDimens.space8),
 
-                      // Bildir Düğmesi
-                      SecondaryButton(
-                        text: _isReported ? AppStrings.reportedStatus : AppStrings.reportAction,
-                        height: 38,
-                        width: 78,
-                        onPressed: (_isReported || _isSubmittingReport)
-                            ? null
-                            : () => _showReportBottomSheet(context, matchId, opponentDisplayName),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-
                       // Engelle Düğmesi
                       SecondaryButton.danger(
                         text: _isBlocked ? AppStrings.blockedStatus : AppStrings.blockAction,
@@ -551,114 +505,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     return FadeTransition(
       opacity: _fadeAnim,
       child: content,
-    );
-  }
-}
-
-class _ReportBottomSheet extends StatefulWidget {
-  final String opponentName;
-  final ValueChanged<String> onSubmit;
-
-  const _ReportBottomSheet({
-    required this.opponentName,
-    required this.onSubmit,
-  });
-
-  @override
-  State<_ReportBottomSheet> createState() => _ReportBottomSheetState();
-}
-
-class _ReportBottomSheetState extends State<_ReportBottomSheet> {
-  String? _selectedReason;
-
-  final _reasons = const [
-    (key: 'inappropriate_nickname', label: AppStrings.reasonInappropriateNickname),
-    (key: 'inappropriate_content', label: AppStrings.reasonInappropriateContent),
-    (key: 'cheating', label: AppStrings.reasonCheating),
-    (key: 'other', label: AppStrings.reasonOther),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.screenPaddingHorizontal,
-          vertical: AppDimens.space20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.reportDialogTitle,
-              style: AppTextStyles.cardTitle.copyWith(fontSize: 20),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimens.space6),
-            Text(
-              AppStrings.reportMatchPrompt(widget.opponentName),
-              style: AppTextStyles.bodyText.copyWith(color: AppColors.muted),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimens.space16),
-            ..._reasons.map((r) {
-              final isSelected = _selectedReason == r.key;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppDimens.space8),
-                child: InkWell(
-                  onTap: () => setState(() => _selectedReason = r.key),
-                  borderRadius: AppDimens.borderRadiusListCard,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space16,
-                      vertical: AppDimens.space12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.surface : AppColors.card,
-                      borderRadius: AppDimens.borderRadiusListCard,
-                      border: Border.all(
-                        color: isSelected ? AppColors.ink : AppColors.mint,
-                        width: isSelected ? AppDimens.borderThick : AppDimens.borderThin,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                          color: isSelected ? AppColors.primary : AppColors.muted,
-                        ),
-                        const SizedBox(width: AppDimens.space12),
-                        Expanded(
-                          child: Text(
-                            r.label,
-                            style: AppTextStyles.bodyText.copyWith(
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: AppDimens.space16),
-            PrimaryButton(
-              text: AppStrings.reportAction,
-              onPressed: _selectedReason != null
-                  ? () => widget.onSubmit(_selectedReason!)
-                  : null,
-            ),
-            const SizedBox(height: AppDimens.space8),
-            SecondaryButton(
-              text: AppStrings.cancel,
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
