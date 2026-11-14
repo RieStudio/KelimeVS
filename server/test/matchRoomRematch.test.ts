@@ -109,6 +109,80 @@ const sampleQuestions: Question[] = Array.from({ length: 8 }, (_, i) => ({
   ],
 }));
 
+async function setupFinishedMatch(options?: {
+  matchType?: 'ranked' | 'friendly';
+  forfeit?: boolean;
+  bot?: boolean;
+  envOverrides?: Partial<Env>;
+}) {
+  const fixedNow = 1_700_000_000_000;
+  vi.setSystemTime(fixedNow);
+
+  const { ctx, store, sockets, getAlarm } = createMockRoomCtx();
+  const ws1 = createMockSocket('p1');
+  const p2Uid = options?.bot ? 'bot' : 'p2';
+  const ws2 = createMockSocket(p2Uid);
+  sockets.push(ws1, ws2);
+
+  const env: Partial<Env> = {
+    FAST_TIMERS: 'false',
+    USER_PROFILE: {
+      idFromName: (name: string) => ({ toString: () => name } as any),
+      get: (id: any) => ({
+        applyMatchReward: vi.fn(async () => ({ coinsAwarded: 10, coins: 100, nickname: id.toString() })),
+      }),
+    } as any,
+    MATCHMAKER: {
+      idFromName: (name: string) => ({ toString: () => name } as any),
+      get: () => ({
+        createDirectMatch: vi.fn(async () => ({
+          ok: true,
+          matchId: 'new-match-456',
+          p1: { uid: 'p1', name: 'Alice', frame: 'classic' },
+          p2: { uid: p2Uid, name: options?.bot ? 'Bot' : 'Bob', frame: 'gold' },
+          isFriendly: options?.matchType === 'friendly',
+        })),
+      }),
+    } as any,
+    ...options?.envOverrides,
+  };
+
+  const room = new MatchRoom(ctx, env as Env);
+  await room.initMatch({
+    matchId: 'old-match-123',
+    p1: { uid: 'p1', name: 'Alice', frame: 'classic' },
+    p2: { uid: p2Uid, name: options?.bot ? 'Bot' : 'Bob', frame: 'gold' },
+    questions: sampleQuestions,
+    questionOrder: sampleQuestions.map((q) => q.id),
+    matchType: options?.matchType || 'ranked',
+  });
+
+  // Connect players
+  await (room as any).handlePlayerConnected('p1');
+  await (room as any).handlePlayerConnected(p2Uid);
+
+  // Update roomData engineState to be finished
+  const roomData = store.get('roomData');
+  const baseEngine = deserializeMatchState(roomData.engineState);
+  const finishedEngine: MatchState = {
+    ...baseEngine,
+    phase: 'matchFinished',
+    endedBy: options?.forfeit ? 'forfeit' : 'normal',
+    winnerId: 'p1',
+  };
+  roomData.engineState = serializeMatchState(finishedEngine);
+  store.set('roomData', roomData);
+
+  // Call handleMatchFinished so everything (final message, rewards, rematch state) is initialized properly
+  await (room as any).handleMatchFinished();
+
+  // Clear initial sent messages
+  ws1.sent.length = 0;
+  ws2.sent.length = 0;
+
+  return { room, ctx, store, ws1, ws2, getAlarm, fixedNow, env, p2Uid };
+}
+
 describe('MatchRoom Rematch State Machine & Lifecycle', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -117,80 +191,6 @@ describe('MatchRoom Rematch State Machine & Lifecycle', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
-
-  async function setupFinishedMatch(options?: {
-    matchType?: 'ranked' | 'friendly';
-    forfeit?: boolean;
-    bot?: boolean;
-    envOverrides?: Partial<Env>;
-  }) {
-    const fixedNow = 1_700_000_000_000;
-    vi.setSystemTime(fixedNow);
-
-    const { ctx, store, sockets, getAlarm } = createMockRoomCtx();
-    const ws1 = createMockSocket('p1');
-    const p2Uid = options?.bot ? 'bot' : 'p2';
-    const ws2 = createMockSocket(p2Uid);
-    sockets.push(ws1, ws2);
-
-    const env: Partial<Env> = {
-      FAST_TIMERS: 'false',
-      USER_PROFILE: {
-        idFromName: (name: string) => ({ toString: () => name } as any),
-        get: (id: any) => ({
-          applyMatchReward: vi.fn(async () => ({ coinsAwarded: 10, coins: 100, nickname: id.toString() })),
-        }),
-      } as any,
-      MATCHMAKER: {
-        idFromName: (name: string) => ({ toString: () => name } as any),
-        get: () => ({
-          createDirectMatch: vi.fn(async () => ({
-            ok: true,
-            matchId: 'new-match-456',
-            p1: { uid: 'p1', name: 'Alice', frame: 'classic' },
-            p2: { uid: p2Uid, name: options?.bot ? 'Bot' : 'Bob', frame: 'gold' },
-            isFriendly: options?.matchType === 'friendly',
-          })),
-        }),
-      } as any,
-      ...options?.envOverrides,
-    };
-
-    const room = new MatchRoom(ctx, env as Env);
-    await room.initMatch({
-      matchId: 'old-match-123',
-      p1: { uid: 'p1', name: 'Alice', frame: 'classic' },
-      p2: { uid: p2Uid, name: options?.bot ? 'Bot' : 'Bob', frame: 'gold' },
-      questions: sampleQuestions,
-      questionOrder: sampleQuestions.map((q) => q.id),
-      matchType: options?.matchType || 'ranked',
-    });
-
-    // Connect players
-    await (room as any).handlePlayerConnected('p1');
-    await (room as any).handlePlayerConnected(p2Uid);
-
-    // Update roomData engineState to be finished
-    const roomData = store.get('roomData');
-    const baseEngine = deserializeMatchState(roomData.engineState);
-    const finishedEngine: MatchState = {
-      ...baseEngine,
-      phase: 'matchFinished',
-      endedBy: options?.forfeit ? 'forfeit' : 'normal',
-      winnerId: 'p1',
-    };
-    roomData.engineState = serializeMatchState(finishedEngine);
-    store.set('roomData', roomData);
-
-    // Call handleMatchFinished so everything (final message, rewards, rematch state) is initialized properly
-    await (room as any).handleMatchFinished();
-
-    // Clear initial sent messages
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
-
-    return { room, ctx, store, ws1, ws2, getAlarm, fixedNow, env, p2Uid };
-  }
 
   it('1. Normal maç bitişinde final mesajı rematchAvailable: true içerir', async () => {
     const { room, ws1 } = await setupFinishedMatch();
@@ -674,5 +674,59 @@ describe('Matchmaker.createDirectMatch RPC & Energy/Blocks/Deletion Logic', () =
     // In normal ranked, this would be 10000ms. In rematch, it must be 15000ms!
     expect(roomData.schedule.connectTimeoutAtMs).toBe(fixedNow + 15000);
     expect(getAlarm()).toBe(fixedNow + 15000);
+  });
+
+  it('8. validateRematchRequest doğrulama kuralları: durum, oyuncular, bot, bitiş şekli ve tekillik', async () => {
+    // A) Oda henüz başlatılmamış / veri yok
+    const { ctx: emptyCtx } = createMockRoomCtx();
+    const emptyRoom = new MatchRoom(emptyCtx, {} as Env);
+    const resEmpty = await emptyRoom.validateRematchRequest('p1', 'p2');
+    expect(resEmpty).toEqual({ ok: false, error: 'not_found' });
+
+    // B) Henüz bitmemiş maç
+    const { ctx: progCtx } = createMockRoomCtx();
+    const progRoom = new MatchRoom(progCtx, { FAST_TIMERS: 'false' } as Env);
+    await progRoom.initMatch({
+      matchId: 'm_prog',
+      p1: { uid: 'p1', name: 'Alice' },
+      p2: { uid: 'p2', name: 'Bob' },
+      questions: sampleQuestions,
+      questionOrder: sampleQuestions.map((q) => q.id),
+      matchType: 'ranked',
+    });
+    const resProg = await progRoom.validateRematchRequest('p1', 'p2');
+    expect(resProg).toEqual({ ok: false, error: 'not_finished' });
+
+    // C) Terk/hükmen ile bitmiş maç
+    const { room: forfeitRoom } = await setupFinishedMatch({ forfeit: true });
+    const resForfeit = await forfeitRoom.validateRematchRequest('p1', 'p2');
+    expect(resForfeit).toEqual({ ok: false, error: 'not_normal_end' });
+
+    // D) Bot maçı
+    const { room: botRoom } = await setupFinishedMatch({ bot: true });
+    const resBot = await botRoom.validateRematchRequest('p1', 'bot');
+    expect(resBot).toEqual({ ok: false, error: 'bot_match' });
+
+    // E) Maçın oyuncusu olmayan yabancı kullanıcılar
+    const { room: normalRoom } = await setupFinishedMatch({ matchType: 'ranked' });
+    const resStranger = await normalRoom.validateRematchRequest('stranger', 'p2');
+    expect(resStranger).toEqual({ ok: false, error: 'invalid_players' });
+    const resStranger2 = await normalRoom.validateRematchRequest('p1', 'stranger');
+    expect(resStranger2).toEqual({ ok: false, error: 'invalid_players' });
+    const resSelf = await normalRoom.validateRematchRequest('p1', 'p1');
+    expect(resSelf).toEqual({ ok: false, error: 'invalid_players' });
+
+    // F) Geçerli normal rankli maç: ilk çağrı başarılı döner ve türü devralır
+    const resOk = await normalRoom.validateRematchRequest('p1', 'p2');
+    expect(resOk).toEqual({ ok: true, matchType: 'ranked' });
+
+    // G) Aynı maç için ikinci kez istek atılamaz (tekillik kuralı)
+    const resSecond = await normalRoom.validateRematchRequest('p1', 'p2');
+    expect(resSecond).toEqual({ ok: false, error: 'already_requested' });
+
+    // H) Friendly maç türünün devralınması
+    const { room: friendlyRoom } = await setupFinishedMatch({ matchType: 'friendly' });
+    const resFriendly = await friendlyRoom.validateRematchRequest('p2', 'p1');
+    expect(resFriendly).toEqual({ ok: true, matchType: 'friendly' });
   });
 });

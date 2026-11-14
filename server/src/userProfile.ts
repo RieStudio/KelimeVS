@@ -1,6 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validateNickname, isGuestPatternNickname } from './engine/nicknameValidator';
 import {
+  type UserClientMessage,
+  type UserServerMessage,
+  parseUserClientMessage,
+} from './protocol';
+import {
   FRAME_CATALOG,
   getFrameCatalogItem,
   getMinClientBuildForFrame,
@@ -102,6 +107,7 @@ export interface UserProfileData {
   readonly isGuest?: boolean;
   readonly isSystemNickname?: boolean;
   readonly frameMigration?: FrameMigrationResult;
+  readonly allowMatchRequests?: boolean;
 }
 
 export interface MatchRewardResult {
@@ -209,6 +215,7 @@ interface ProfileRow extends Record<string, string | number | null> {
   equipped_frame: string | null;
   energy: number | null;
   energy_updated_at: number | null;
+  allow_match_requests: number | null;
 }
 
 interface DailyCoinsRow extends Record<string, string | number | null> {
@@ -444,6 +451,55 @@ export class UserProfile extends DurableObject<Env> {
       }
     }
 
+    const hasAllowMatchRequests = profileCols.some((c) => c.name === 'allow_match_requests');
+    if (!hasAllowMatchRequests) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN allow_match_requests INTEGER NOT NULL DEFAULT 1'
+      );
+    }
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS incoming_requests (
+        id TEXT PRIMARY KEY,
+        from_uid TEXT NOT NULL,
+        from_nickname TEXT NOT NULL,
+        from_frame TEXT NOT NULL,
+        type TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        match_id TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        status TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS outgoing_requests (
+        id TEXT PRIMARY KEY,
+        to_uid TEXT NOT NULL,
+        to_nickname TEXT NOT NULL,
+        type TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        match_id TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        status TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS match_request_cooldowns (
+        target_uid TEXT PRIMARY KEY,
+        cooldown_until INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS match_request_rate_limits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS user_presence (
+        key TEXT PRIMARY KEY,
+        state TEXT NOT NULL
+      );
+    `);
+
     this.initialized = true;
   }
 
@@ -485,6 +541,11 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM energy_spends;
       DELETE FROM energy_purchases;
       DELETE FROM nickname_changes;
+      DELETE FROM incoming_requests;
+      DELETE FROM outgoing_requests;
+      DELETE FROM match_request_cooldowns;
+      DELETE FROM match_request_rate_limits;
+      DELETE FROM user_presence;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -495,18 +556,74 @@ export class UserProfile extends DurableObject<Env> {
       nowMs
     );
 
-    // 24 saat sonra DO verilerini tamamen temizleyecek alarm kur
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-    await this.ctx.storage.setAlarm(nowMs + twentyFourHoursMs);
+    // Açık tüm WebSocket bağlantılarını 4001, "account_deleted" ile kapat
+    const sockets = this.getWebSocketsSafe();
+    for (const ws of sockets) {
+      try {
+        ws.close(4001, 'account_deleted');
+      } catch {}
+    }
+
+    // 24 saat sonra DO verilerini tamamen temizleyecek alarm kur (multiplexer üzerinden)
+    await this.scheduleNextAlarm(nowMs);
 
     return { ok: true, deleted: true };
   }
 
   /**
-   * 24 saat sonra çalışan alarm: tombstone dahil tüm Durable Object verisini temizler.
+   * Alarm multiplexer:
+   * 1. 24 saat sonra çalışan tombstone temizliği
+   * 2. Süresi dolan (45 sn) bekleyen gelen isteklerin 'expired' yapılması ve taraflara bildirilmesi
+   * 3. Süresi dolan (45 sn) bekleyen giden isteklerin 'expired' yapılması ve taraflara bildirilmesi
    */
   async alarm(): Promise<void> {
-    await this.ctx.storage.deleteAll();
+    const nowMs = Date.now();
+    const tombstone = this.ctx.storage.sql
+      .exec<{ deleted_at: number }>('SELECT deleted_at FROM tombstone LIMIT 1')
+      .toArray();
+    if (tombstone.length > 0) {
+      const tombstoneExpiry = tombstone[0].deleted_at + 24 * 60 * 60 * 1000;
+      if (nowMs >= tombstoneExpiry) {
+        if (typeof this.ctx.storage.deleteAll === 'function') {
+          await this.ctx.storage.deleteAll();
+        }
+        return;
+      }
+    }
+
+    await this.expirePendingIncomingRequests(nowMs);
+    await this.expirePendingOutgoingRequests(nowMs);
+    this.pruneExpiredRecords(nowMs);
+    await this.scheduleNextAlarm(nowMs);
+  }
+
+  /**
+   * Sonuçlanmış ve süresi dolmuş istek, bekleme süresi ve hız sınırı kayıtlarını temizler.
+   * Tabloların sonsuz büyümesini engeller.
+   */
+  pruneExpiredRecords(nowMs = Date.now()): void {
+    // 1. Sonuçlanmış (accepted, declined, cancelled, expired) istekleri 5 dakika sonra sil
+    const fiveMinutesAgo = nowMs - 5 * 60 * 1000;
+    this.ctx.storage.sql.exec(
+      "DELETE FROM incoming_requests WHERE status IN ('accepted', 'declined', 'cancelled', 'expired') AND expires_at < ?",
+      fiveMinutesAgo
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM outgoing_requests WHERE status IN ('accepted', 'declined', 'cancelled', 'expired') AND expires_at < ?",
+      fiveMinutesAgo
+    );
+
+    // 2. Süresi dolmuş bekleme sürelerini (cooldown) temizle
+    this.ctx.storage.sql.exec(
+      'DELETE FROM match_request_cooldowns WHERE cooldown_until <= ?',
+      nowMs
+    );
+
+    // 3. 1 dakikadan eski hız sınırı kayıtlarını temizle
+    this.ctx.storage.sql.exec(
+      'DELETE FROM match_request_rate_limits WHERE created_at <= ?',
+      nowMs - 60_000
+    );
   }
 
   /**
@@ -726,7 +843,7 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
-      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname FROM profiles LIMIT 1'
+      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname, allow_match_requests FROM profiles LIMIT 1'
     );
     const rows = cursor.toArray();
 
@@ -776,6 +893,8 @@ export class UserProfile extends DurableObject<Env> {
         }
       }
 
+      const allowMatchRequests = (row.allow_match_requests as number | undefined) !== 0;
+
       return {
         uid: row.uid,
         nickname: currentNickname,
@@ -790,6 +909,7 @@ export class UserProfile extends DurableObject<Env> {
         equippedFrame: (row.equipped_frame as string) || 'classic',
         isGuest: currentIsGuest === 1,
         isSystemNickname: currentIsSystem === 1,
+        allowMatchRequests,
         ...(frameMigration ? { frameMigration } : {}),
       };
     }
@@ -804,8 +924,8 @@ export class UserProfile extends DurableObject<Env> {
     const initialIsSystem = isGuest === true ? 1 : 0;
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at, is_guest, is_system_nickname)
-       VALUES (?, ?, ?, 0, 0, 0, 0, ?, 'classic', ?, 0, ?, ?)`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at, is_guest, is_system_nickname, allow_match_requests)
+       VALUES (?, ?, ?, 0, 0, 0, 0, ?, 'classic', ?, 0, ?, ?, 1)`,
       effectiveUid,
       initialNickname,
       initialCoins,
@@ -824,6 +944,7 @@ export class UserProfile extends DurableObject<Env> {
       equippedFrame: 'classic',
       isGuest: initialIsGuest === 1,
       isSystemNickname: initialIsSystem === 1,
+      allowMatchRequests: true,
     };
   }
 
@@ -2003,11 +2124,1257 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   /**
+   * Güvenli WebSocket listesi döndürücü (ctx.getWebSockets yoksa veya test mock'larında boş dizi)
+   */
+  getWebSocketsSafe(tag?: string): WebSocket[] {
+    if (typeof this.ctx?.getWebSockets === 'function') {
+      return this.ctx.getWebSockets(tag) as WebSocket[];
+    }
+    return [];
+  }
+
+  isOnline(): boolean {
+    return this.getWebSocketsSafe().length > 0;
+  }
+
+  isBlocked(targetUid: string): boolean {
+    this.ensureSchema();
+    const rows = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        'SELECT id FROM blocked_users WHERE blocked_uid = ? LIMIT 1',
+        targetUid
+      )
+      .toArray();
+    return rows.length > 0;
+  }
+
+  getEffectiveUid(): string {
+    try {
+      const idObj = (this.ctx as any)?.id;
+      if (idObj?.name && typeof idObj.name === 'string') {
+        return idObj.name;
+      }
+    } catch {}
+    const rows = this.ctx.storage.sql
+      .exec<{ uid: string }>('SELECT uid FROM profiles LIMIT 1')
+      .toArray();
+    return rows.length > 0 ? rows[0].uid : 'unknown';
+  }
+
+  async scheduleNextAlarm(nowMs = Date.now()): Promise<void> {
+    if (typeof this.ctx.storage.setAlarm !== 'function') return;
+
+    const dueTimes: number[] = [];
+
+    const tombstone = this.ctx.storage.sql
+      .exec<{ deleted_at: number }>('SELECT deleted_at FROM tombstone LIMIT 1')
+      .toArray();
+    if (tombstone.length > 0) {
+      const tombstoneDue = tombstone[0].deleted_at + 24 * 60 * 60 * 1000;
+      dueTimes.push(tombstoneDue);
+    }
+
+    const incExp = this.ctx.storage.sql
+      .exec<{ min_exp: number | null }>(
+        "SELECT MIN(expires_at) as min_exp FROM incoming_requests WHERE status = 'pending'"
+      )
+      .toArray();
+    if (incExp.length > 0 && typeof incExp[0].min_exp === 'number' && incExp[0].min_exp > 0) {
+      dueTimes.push(incExp[0].min_exp);
+    }
+
+    const outExp = this.ctx.storage.sql
+      .exec<{ min_exp: number | null }>(
+        "SELECT MIN(expires_at) as min_exp FROM outgoing_requests WHERE status = 'pending'"
+      )
+      .toArray();
+    if (outExp.length > 0 && typeof outExp[0].min_exp === 'number' && outExp[0].min_exp > 0) {
+      dueTimes.push(outExp[0].min_exp);
+    }
+
+    if (dueTimes.length === 0) {
+      if (typeof this.ctx.storage.deleteAlarm === 'function') {
+        try {
+          await this.ctx.storage.deleteAlarm();
+        } catch {}
+      }
+      return;
+    }
+
+    const nextAlarm = Math.min(...dueTimes);
+    await this.ctx.storage.setAlarm(nextAlarm);
+  }
+
+  async expirePendingIncomingRequests(nowMs = Date.now()): Promise<void> {
+    const expired = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        from_uid: string;
+      }>(
+        "SELECT id, from_uid FROM incoming_requests WHERE status = 'pending' AND expires_at <= ?",
+        nowMs
+      )
+      .toArray();
+
+    for (const item of expired) {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'expired' WHERE id = ?",
+        item.id
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: item.id, status: 'expired' });
+      if (this.env.USER_PROFILE) {
+        try {
+          const senderStub = this.env.USER_PROFILE.get(
+            this.env.USER_PROFILE.idFromName(item.from_uid)
+          );
+          await senderStub.notifyExpired(item.id, this.getEffectiveUid());
+        } catch {}
+      }
+    }
+  }
+
+  async expirePendingOutgoingRequests(nowMs = Date.now()): Promise<void> {
+    const expired = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        to_uid: string;
+      }>(
+        "SELECT id, to_uid FROM outgoing_requests WHERE status = 'pending' AND expires_at <= ?",
+        nowMs
+      )
+      .toArray();
+
+    for (const item of expired) {
+      this.ctx.storage.sql.exec(
+        "UPDATE outgoing_requests SET status = 'expired' WHERE id = ?",
+        item.id
+      );
+      this.ctx.storage.sql.exec(
+        'INSERT OR REPLACE INTO match_request_cooldowns (target_uid, cooldown_until) VALUES (?, ?)',
+        item.to_uid,
+        nowMs + 45_000
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: item.id, status: 'expired' });
+      if (this.env.USER_PROFILE) {
+        try {
+          const targetStub = this.env.USER_PROFILE.get(
+            this.env.USER_PROFILE.idFromName(item.to_uid)
+          );
+          await targetStub.notifyExpired(item.id, this.getEffectiveUid());
+        } catch {}
+      }
+    }
+  }
+
+  async notifyExpired(requestId: string, _otherUid: string): Promise<void> {
+    this.ensureSchema();
+    const nowMs = Date.now();
+    const out = this.ctx.storage.sql
+      .exec<{ id: string; to_uid: string; status: string }>(
+        'SELECT id, to_uid, status FROM outgoing_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+    if (out.length > 0 && out[0].status === 'pending') {
+      this.ctx.storage.sql.exec(
+        "UPDATE outgoing_requests SET status = 'expired' WHERE id = ?",
+        requestId
+      );
+      this.ctx.storage.sql.exec(
+        'INSERT OR REPLACE INTO match_request_cooldowns (target_uid, cooldown_until) VALUES (?, ?)',
+        out[0].to_uid,
+        nowMs + 45_000
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'expired' });
+    }
+
+    const inc = this.ctx.storage.sql
+      .exec<{ id: string; status: string }>(
+        'SELECT id, status FROM incoming_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+    if (inc.length > 0 && inc[0].status === 'pending') {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'expired' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'expired' });
+    }
+  }
+
+  async notifyDeclined(requestId: string, receiverUid: string): Promise<void> {
+    this.ensureSchema();
+    const now = Date.now();
+    this.ctx.storage.sql.exec(
+      "UPDATE outgoing_requests SET status = 'declined' WHERE id = ?",
+      requestId
+    );
+    this.ctx.storage.sql.exec(
+      'INSERT OR REPLACE INTO match_request_cooldowns (target_uid, cooldown_until) VALUES (?, ?)',
+      receiverUid,
+      now + 45_000
+    );
+    this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'declined' });
+  }
+
+  async notifyCancelled(requestId: string): Promise<void> {
+    this.ensureSchema();
+    const inc = this.ctx.storage.sql
+      .exec<{ id: string; status: string }>(
+        'SELECT id, status FROM incoming_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+    if (inc.length > 0 && inc[0].status === 'pending') {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'cancelled' });
+    }
+  }
+
+  async notifyMatched(params: {
+    matchId: string;
+    opponentName: string;
+    opponentFrame: string;
+    opponentUid: string;
+    isFriendly: boolean;
+  }): Promise<void> {
+    this.ensureSchema();
+    this.broadcastToUser({
+      t: 'matched',
+      matchId: params.matchId,
+      opponentName: params.opponentName,
+      opponentFrame: params.opponentFrame,
+      opponentUid: params.opponentUid,
+      isFriendly: params.isFriendly,
+    });
+  }
+
+  async notifyCrossMatched(params: {
+    matchId: string;
+    opponentName: string;
+    opponentFrame: string;
+    opponentUid: string;
+    isFriendly: boolean;
+    crossRequestId: string;
+  }): Promise<void> {
+    this.ensureSchema();
+    this.ctx.storage.sql.exec(
+      "UPDATE outgoing_requests SET status = 'accepted' WHERE id = ?",
+      params.crossRequestId
+    );
+    this.broadcastToUser({
+      t: 'matched',
+      matchId: params.matchId,
+      opponentName: params.opponentName,
+      opponentFrame: params.opponentFrame,
+      opponentUid: params.opponentUid,
+      isFriendly: params.isFriendly,
+    });
+  }
+
+  async notifyMatchError(
+    requestId: string,
+    code:
+      | 'unavailable'
+      | 'cooldown_active'
+      | 'rate_limited'
+      | 'invalid'
+      | 'no_energy'
+      | 'opponent_no_energy'
+  ): Promise<void> {
+    this.ensureSchema();
+    this.ctx.storage.sql.exec(
+      "UPDATE outgoing_requests SET status = 'cancelled' WHERE id = ?",
+      requestId
+    );
+    this.ctx.storage.sql.exec(
+      "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
+      requestId
+    );
+    this.broadcastToUser({ t: 'match_request_error', code });
+  }
+
+  async updateSettings(settings: {
+    allowMatchRequests?: boolean;
+  }): Promise<{ allowMatchRequests: boolean }> {
+    this.ensureSchema();
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    if (typeof settings.allowMatchRequests === 'boolean') {
+      const val = settings.allowMatchRequests ? 1 : 0;
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET allow_match_requests = ?',
+        val
+      );
+    }
+
+    const rows = this.ctx.storage.sql
+      .exec<{ allow_match_requests: number }>(
+        'SELECT allow_match_requests FROM profiles LIMIT 1'
+      )
+      .toArray();
+    const allow = rows.length > 0 ? rows[0].allow_match_requests !== 0 : true;
+
+    return { allowMatchRequests: allow };
+  }
+
+  async isAvailableForMatchRequest(senderUid: string): Promise<boolean> {
+    this.ensureSchema();
+    if (this.isDeleted()) return false;
+
+    // 1. En az bir aktif soket bağlı olmalı (ön planda olmalı)
+    if (!this.isOnline()) return false;
+
+    // 2. Ayar: allow_match_requests açık olmalı (1)
+    const profile = this.ctx.storage.sql
+      .exec<{ allow_match_requests: number }>(
+        'SELECT allow_match_requests FROM profiles LIMIT 1'
+      )
+      .toArray();
+    if (profile.length > 0 && profile[0].allow_match_requests === 0) {
+      return false;
+    }
+
+    // 3. Durum: 'busy' olmamalı
+    const presence = this.ctx.storage.sql
+      .exec<{ state: string }>(
+        "SELECT state FROM user_presence WHERE key = 'current' LIMIT 1"
+      )
+      .toArray();
+    if (presence.length > 0 && presence[0].state === 'busy') {
+      return false;
+    }
+
+    // 4. Engel: Alıcı göndereni engellemiş mi?
+    if (this.isBlocked(senderUid)) {
+      return false;
+    }
+
+    // 5. Zaten bekleyen bir gelen istek olmamalı
+    const now = Date.now();
+    const activeIncoming = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        "SELECT id FROM incoming_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
+        now
+      )
+      .toArray();
+    if (activeIncoming.length > 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  async handleClientSendMatchRequest(
+    senderUid: string,
+    origin: 'rematch' | 'profile',
+    toUid: string,
+    matchId?: string
+  ): Promise<void> {
+    const now = Date.now();
+
+    // 1. Kendine istek atamaz
+    if (senderUid === toUid) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
+      return;
+    }
+
+    // 2. Hedef zaten bize istek atmış mı? Varsa doğrudan o isteği kabul et (çift tıklama/eşzamanlılık koruması)
+    const pendingIncomingFromTarget = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        "SELECT id FROM incoming_requests WHERE from_uid = ? AND status = 'pending' AND expires_at > ? LIMIT 1",
+        toUid,
+        now
+      )
+      .toArray();
+    if (pendingIncomingFromTarget.length > 0) {
+      await this.handleClientAcceptMatchRequest(senderUid, pendingIncomingFromTarget[0].id);
+      return;
+    }
+
+    // 3. Dakikada en fazla 3 istek hız sınırı
+    this.ctx.storage.sql.exec(
+      'DELETE FROM match_request_rate_limits WHERE created_at <= ?',
+      now - 60_000
+    );
+    const countRow = this.ctx.storage.sql
+      .exec<{ cnt: number }>(
+        'SELECT COUNT(*) as cnt FROM match_request_rate_limits WHERE created_at > ?',
+        now - 60_000
+      )
+      .toArray()[0];
+    if (countRow && countRow.cnt >= 3) {
+      const oldestRow = this.ctx.storage.sql
+        .exec<{ oldest: number }>(
+          'SELECT MIN(created_at) as oldest FROM match_request_rate_limits WHERE created_at > ?',
+          now - 60_000
+        )
+        .toArray()[0];
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil(((oldestRow?.oldest ?? now) + 60_000 - now) / 1000)
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'rate_limited', retryAfterSec });
+      return;
+    }
+
+    // 4. Bekleme süresi (cooldown) kontrolü: toUid için aktif cooldown var mı?
+    const cooldownRow = this.ctx.storage.sql
+      .exec<{ cooldown_until: number }>(
+        'SELECT cooldown_until FROM match_request_cooldowns WHERE target_uid = ? LIMIT 1',
+        toUid
+      )
+      .toArray();
+    if (cooldownRow.length > 0 && cooldownRow[0].cooldown_until > now) {
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil((cooldownRow[0].cooldown_until - now) / 1000)
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'cooldown_active', retryAfterSec });
+      return;
+    }
+
+    // 5. Gönderenin zaten bekleyen bir giden isteği var mı?
+    const activeOut = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        "SELECT id FROM outgoing_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
+        now
+      )
+      .toArray();
+    if (activeOut.length > 0) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    // 6. Gönderen bu kullanıcıyı engellemiş mi?
+    if (this.isBlocked(toUid)) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    // 7. Rematch ise MatchRoom doğrulaması
+    let matchType: 'friendly' | 'ranked' = 'friendly';
+    if (origin === 'rematch') {
+      if (!matchId) {
+        this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
+        return;
+      }
+      if (!this.env.MATCH_ROOM) {
+        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+        return;
+      }
+      try {
+        const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromString(matchId));
+        const val = await roomStub.validateRematchRequest(senderUid, toUid);
+        if (!val.ok) {
+          this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+          return;
+        }
+        matchType = val.matchType ?? 'ranked';
+      } catch {
+        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+        return;
+      }
+    }
+
+    // 8. Gönderenin profil bilgileri
+    const myProfile = await this.getProfile(senderUid);
+    const senderNickname = myProfile.nickname ?? generateGuestNickname(senderUid);
+    const senderFrame = myProfile.equippedFrame ?? 'classic';
+
+    // 9. Alıcı DO'suna ilet
+    if (!this.env.USER_PROFILE) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    try {
+      const targetStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(toUid));
+      const res = await targetStub.receiveMatchRequest({
+        senderUid,
+        senderNickname,
+        senderFrame,
+        type: matchType,
+        origin,
+        matchId,
+      });
+
+      if (!res.ok) {
+        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+        return;
+      }
+
+      if (res.crossAccepted) {
+        // Karşılıklı istek sonucu maç anında kuruldu
+        return;
+      }
+
+      const requestId = res.requestId!;
+      const expiresAt = res.expiresAt!;
+      const toNickname = res.receiverNickname ?? 'Oyuncu';
+
+      this.ctx.storage.sql.exec(
+        'INSERT INTO match_request_rate_limits (created_at) VALUES (?)',
+        now
+      );
+
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO outgoing_requests (id, to_uid, to_nickname, type, origin, match_id, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+        requestId,
+        toUid,
+        toNickname,
+        matchType,
+        origin,
+        matchId ?? null,
+        now,
+        expiresAt
+      );
+
+      await this.scheduleNextAlarm();
+
+      this.broadcastToUser({
+        t: 'match_request_sent',
+        id: requestId,
+        toUid,
+        toNickname,
+        type: matchType,
+        origin,
+        expiresAtMs: expiresAt,
+      });
+    } catch (err) {
+      console.error('sendMatchRequest targetStub error:', err);
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+    }
+  }
+
+  async receiveMatchRequest(params: {
+    senderUid: string;
+    senderNickname: string;
+    senderFrame: string;
+    type: 'friendly' | 'ranked';
+    origin: 'rematch' | 'profile';
+    matchId?: string;
+  }): Promise<{
+    ok: boolean;
+    reason?: string;
+    requestId?: string;
+    expiresAt?: number;
+    receiverNickname?: string;
+    crossAccepted?: boolean;
+  }> {
+    this.ensureSchema();
+    if (this.isDeleted()) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    const now = Date.now();
+    const receiverUid = this.getEffectiveUid();
+
+    // 1. Engelleme kontrolü (karşılıklı engel durumunda cross-request veya yeni istek kabul edilmez)
+    if (this.isBlocked(params.senderUid)) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    // 2. Ayar kontrolü (maç istekleri kapalıysa cross-request veya yeni istek kabul edilmez)
+    const profile = this.ctx.storage.sql
+      .exec<{ allow_match_requests: number }>(
+        'SELECT allow_match_requests FROM profiles LIMIT 1'
+      )
+      .toArray();
+    if (profile.length > 0 && profile[0].allow_match_requests === 0) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    // 3. Karşılıklı istek (cross-request) kontrolü
+    const crossOutgoing = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        type: string;
+        origin: string;
+        match_id: string | null;
+      }>(
+        "SELECT id, type, origin, match_id FROM outgoing_requests WHERE to_uid = ? AND status = 'pending' AND expires_at > ? LIMIT 1",
+        params.senderUid,
+        now
+      )
+      .toArray();
+
+    if (crossOutgoing.length > 0) {
+      const crossReq = crossOutgoing[0];
+      const derivedType =
+        crossReq.type === 'ranked' && params.type === 'ranked'
+          ? 'ranked'
+          : 'friendly';
+
+      this.ctx.storage.sql.exec(
+        "UPDATE outgoing_requests SET status = 'accepted' WHERE id = ?",
+        crossReq.id
+      );
+
+      const myProfile = await this.getProfile(receiverUid);
+      const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+      const myFrame = myProfile.equippedFrame ?? 'classic';
+
+      if (this.env.MATCHMAKER) {
+        const matchmaker = this.env.MATCHMAKER.get(
+          this.env.MATCHMAKER.idFromName('global')
+        );
+        const createRes = await matchmaker.createDirectMatch({
+          p1: {
+            uid: params.senderUid,
+            name: params.senderNickname,
+            frame: params.senderFrame,
+          },
+          p2: {
+            uid: receiverUid,
+            name: myNickname,
+            frame: myFrame,
+          },
+          matchType: derivedType,
+          prevMatchId: params.matchId ?? crossReq.match_id ?? '',
+          proposerUid: params.senderUid,
+        });
+
+        if (createRes.ok) {
+          this.broadcastToUser({
+            t: 'matched',
+            matchId: createRes.matchId,
+            opponentName: params.senderNickname,
+            opponentFrame: params.senderFrame,
+            opponentUid: params.senderUid,
+            isFriendly: createRes.isFriendly,
+          });
+
+          if (this.env.USER_PROFILE) {
+            const senderStub = this.env.USER_PROFILE.get(
+              this.env.USER_PROFILE.idFromName(params.senderUid)
+            );
+            await senderStub.notifyMatched({
+              matchId: createRes.matchId,
+              opponentName: myNickname,
+              opponentFrame: myFrame,
+              opponentUid: receiverUid,
+              isFriendly: createRes.isFriendly,
+            });
+          }
+
+          return { ok: true, crossAccepted: true };
+        } else {
+          const errorCode =
+            createRes.error === 'no_energy' || createRes.error === 'opponent_no_energy'
+              ? createRes.errorTargetUid === receiverUid
+                ? 'no_energy'
+                : 'opponent_no_energy'
+              : 'unavailable';
+          this.broadcastToUser({ t: 'match_request_error', code: errorCode });
+          return { ok: false, reason: 'unavailable' };
+        }
+      }
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    // 2. Normal müsaitlik kontrolü
+    const available = await this.isAvailableForMatchRequest(params.senderUid);
+    if (!available) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    const requestId = crypto.randomUUID();
+    const expiresAt = now + 45_000;
+
+    this.ctx.storage.sql.exec(
+      "INSERT OR REPLACE INTO incoming_requests (id, from_uid, from_nickname, from_frame, type, origin, match_id, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+      requestId,
+      params.senderUid,
+      params.senderNickname,
+      params.senderFrame,
+      params.type,
+      params.origin,
+      params.matchId ?? null,
+      now,
+      expiresAt
+    );
+
+    await this.scheduleNextAlarm();
+
+    this.broadcastToUser({
+      t: 'match_request_received',
+      id: requestId,
+      fromUid: params.senderUid,
+      fromNickname: params.senderNickname,
+      fromFrame: params.senderFrame,
+      type: params.type,
+      origin: params.origin,
+      expiresAtMs: expiresAt,
+    });
+
+    const myProfile = await this.getProfile(receiverUid);
+    const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+
+    return {
+      ok: true,
+      requestId,
+      expiresAt,
+      receiverNickname: myNickname,
+    };
+  }
+
+  async handleClientAcceptMatchRequest(
+    receiverUid: string,
+    requestId: string
+  ): Promise<void> {
+    const now = Date.now();
+    const row = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        from_uid: string;
+        from_nickname: string;
+        from_frame: string;
+        type: 'friendly' | 'ranked';
+        origin: 'rematch' | 'profile';
+        match_id: string | null;
+        expires_at: number;
+        status: string;
+      }>(
+        'SELECT id, from_uid, from_nickname, from_frame, type, origin, match_id, expires_at, status FROM incoming_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+
+    if (row.length === 0) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
+      return;
+    }
+    const inc = row[0];
+
+    if (inc.status !== 'pending') return;
+    if (now >= inc.expires_at) {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'expired' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'expired' });
+      return;
+    }
+
+    // Atomik geçiş: Yalnızca ilk kabul isteği 'accepted' yapabilir, ikinci kabul sessizce çıkar
+    this.ctx.storage.sql.exec(
+      "UPDATE incoming_requests SET status = 'accepted' WHERE id = ? AND status = 'pending'",
+      requestId
+    );
+    const changes = this.ctx.storage.sql.exec<{ c: number }>('SELECT changes() as c').toArray()[0]?.c;
+    if (!changes || changes === 0) {
+      return;
+    }
+
+    if (!this.env.USER_PROFILE) {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    const senderStub = this.env.USER_PROFILE.get(
+      this.env.USER_PROFILE.idFromName(inc.from_uid)
+    );
+    const verifyRes = await senderStub.verifySenderForAccept(requestId, receiverUid);
+    if (!verifyRes.ok) {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'cancelled' });
+      return;
+    }
+
+    const senderInfo = verifyRes.sender!;
+    const myProfile = await this.getProfile(receiverUid);
+    const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+    const myFrame = myProfile.equippedFrame ?? 'classic';
+
+    if (!this.env.MATCHMAKER) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    const matchmaker = this.env.MATCHMAKER.get(
+      this.env.MATCHMAKER.idFromName('global')
+    );
+    const createRes = await matchmaker.createDirectMatch({
+      p1: { uid: senderInfo.uid, name: senderInfo.nickname, frame: senderInfo.frame },
+      p2: { uid: receiverUid, name: myNickname, frame: myFrame },
+      matchType: inc.type,
+      prevMatchId: inc.match_id ?? '',
+      proposerUid: senderInfo.uid,
+    });
+
+    if (createRes.ok) {
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'accepted' WHERE id = ?",
+        requestId
+      );
+
+      this.broadcastToUser({
+        t: 'matched',
+        matchId: createRes.matchId,
+        opponentName: senderInfo.nickname,
+        opponentFrame: senderInfo.frame,
+        opponentUid: senderInfo.uid,
+        isFriendly: createRes.isFriendly,
+      });
+
+      await senderStub.notifyMatched({
+        matchId: createRes.matchId,
+        opponentName: myNickname,
+        opponentFrame: myFrame,
+        opponentUid: receiverUid,
+        isFriendly: createRes.isFriendly,
+      });
+    } else {
+      if (createRes.error === 'no_energy' || createRes.error === 'opponent_no_energy') {
+        const isMyEnergyShortage = createRes.errorTargetUid === receiverUid;
+        const myErrorCode = isMyEnergyShortage ? 'no_energy' : 'opponent_no_energy';
+        const senderErrorCode = isMyEnergyShortage ? 'opponent_no_energy' : 'no_energy';
+
+        this.broadcastToUser({ t: 'match_request_error', code: myErrorCode });
+        await senderStub.notifyMatchError(requestId, senderErrorCode);
+      } else {
+        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+        await senderStub.notifyMatchError(requestId, 'unavailable');
+      }
+    }
+  }
+
+  async verifySenderForAccept(
+    requestId: string,
+    receiverUid: string
+  ): Promise<{
+    ok: boolean;
+    reason?: string;
+    sender?: { uid: string; nickname: string; frame: string };
+  }> {
+    this.ensureSchema();
+    if (this.isDeleted()) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    if (!this.isOnline()) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    if (this.isBlocked(receiverUid)) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    const prof = this.ctx.storage.sql
+      .exec<{ allow_match_requests: number }>(
+        'SELECT allow_match_requests FROM profiles LIMIT 1'
+      )
+      .toArray();
+    if (prof.length > 0 && prof[0].allow_match_requests === 0) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    const presence = this.ctx.storage.sql
+      .exec<{ state: string }>(
+        "SELECT state FROM user_presence WHERE key = 'current' LIMIT 1"
+      )
+      .toArray();
+    if (presence.length > 0 && presence[0].state === 'busy') {
+      this.ctx.storage.sql.exec(
+        "UPDATE outgoing_requests SET status = 'cancelled' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'cancelled' });
+      return { ok: false, reason: 'busy' };
+    }
+
+    const now = Date.now();
+    const row = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        to_uid: string;
+        status: string;
+        expires_at: number;
+      }>(
+        'SELECT id, to_uid, status, expires_at FROM outgoing_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+
+    if (row.length === 0) {
+      return { ok: false, reason: 'cancelled' };
+    }
+
+    const out = row[0];
+    if (out.status !== 'pending' || out.to_uid !== receiverUid || now >= out.expires_at) {
+      return { ok: false, reason: out.status === 'cancelled' ? 'cancelled' : 'unavailable' };
+    }
+
+    this.ctx.storage.sql.exec(
+      "UPDATE outgoing_requests SET status = 'accepted' WHERE id = ?",
+      requestId
+    );
+
+    const senderUid = this.getEffectiveUid();
+    const profile = await this.getProfile(senderUid);
+
+    return {
+      ok: true,
+      sender: {
+        uid: senderUid,
+        nickname: profile.nickname ?? generateGuestNickname(senderUid),
+        frame: profile.equippedFrame ?? 'classic',
+      },
+    };
+  }
+
+  async handleClientDeclineMatchRequest(
+    _receiverUid: string,
+    requestId: string
+  ): Promise<void> {
+    const row = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        from_uid: string;
+        status: string;
+      }>(
+        'SELECT id, from_uid, status FROM incoming_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+
+    if (row.length === 0) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
+      return;
+    }
+    const inc = row[0];
+    if (inc.status !== 'pending') return;
+
+    this.ctx.storage.sql.exec(
+      "UPDATE incoming_requests SET status = 'declined' WHERE id = ?",
+      requestId
+    );
+
+    this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'declined' });
+
+    if (this.env.USER_PROFILE) {
+      try {
+        const senderStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(inc.from_uid)
+        );
+        await senderStub.notifyDeclined(requestId, this.getEffectiveUid());
+      } catch {}
+    }
+  }
+
+  async handleClientCancelMatchRequest(
+    _senderUid: string,
+    requestId: string
+  ): Promise<void> {
+    const row = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        to_uid: string;
+        status: string;
+      }>(
+        'SELECT id, to_uid, status FROM outgoing_requests WHERE id = ? LIMIT 1',
+        requestId
+      )
+      .toArray();
+
+    if (row.length === 0) {
+      this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
+      return;
+    }
+    const out = row[0];
+    if (out.status !== 'pending') return;
+
+    this.ctx.storage.sql.exec(
+      "UPDATE outgoing_requests SET status = 'cancelled' WHERE id = ?",
+      requestId
+    );
+
+    this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'cancelled' });
+
+    if (this.env.USER_PROFILE) {
+      try {
+        const targetStub = this.env.USER_PROFILE.get(
+          this.env.USER_PROFILE.idFromName(out.to_uid)
+        );
+        await targetStub.notifyCancelled(requestId);
+      } catch {}
+    }
+  }
+
+  sendInitialSnapshots(ws: WebSocket, _uid: string): void {
+    const now = Date.now();
+
+    const incoming = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        from_uid: string;
+        from_nickname: string;
+        from_frame: string;
+        type: 'friendly' | 'ranked';
+        origin: 'rematch' | 'profile';
+        expires_at: number;
+      }>(
+        "SELECT id, from_uid, from_nickname, from_frame, type, origin, expires_at FROM incoming_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
+        now
+      )
+      .toArray();
+
+    if (incoming.length > 0) {
+      const inc = incoming[0];
+      const msg: UserServerMessage = {
+        t: 'match_request_received',
+        id: inc.id,
+        fromUid: inc.from_uid,
+        fromNickname: inc.from_nickname,
+        fromFrame: inc.from_frame,
+        type: inc.type,
+        origin: inc.origin,
+        expiresAtMs: inc.expires_at,
+      };
+      try {
+        ws.send(JSON.stringify(msg));
+      } catch {}
+    }
+
+    const outgoing = this.ctx.storage.sql
+      .exec<{
+        id: string;
+        to_uid: string;
+        to_nickname: string;
+        type: 'friendly' | 'ranked';
+        origin: 'rematch' | 'profile';
+        expires_at: number;
+      }>(
+        "SELECT id, to_uid, to_nickname, type, origin, expires_at FROM outgoing_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
+        now
+      )
+      .toArray();
+
+    if (outgoing.length > 0) {
+      const out = outgoing[0];
+      const msg: UserServerMessage = {
+        t: 'match_request_sent',
+        id: out.id,
+        toUid: out.to_uid,
+        toNickname: out.to_nickname,
+        type: out.type,
+        origin: out.origin,
+        expiresAtMs: out.expires_at,
+      };
+      try {
+        ws.send(JSON.stringify(msg));
+      } catch {}
+    }
+  }
+
+  broadcastToUser(msg: UserServerMessage): void {
+    const sockets = this.getWebSocketsSafe();
+    const raw = JSON.stringify(msg);
+    for (const ws of sockets) {
+      try {
+        ws.send(raw);
+      } catch {}
+    }
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    let uid = '';
+    if (typeof this.ctx?.getTags === 'function') {
+      const tags = this.ctx.getTags(ws);
+      uid = tags[0] ?? '';
+    }
+    if (!uid) {
+      uid = this.getEffectiveUid();
+    }
+    if (!uid) return;
+
+    // Hız sınırı: saniyede en fazla 10 mesaj
+    const nowMs = Date.now();
+    const att = (typeof ws.deserializeAttachment === 'function'
+      ? ws.deserializeAttachment()
+      : null) as { count: number; windowStart: number } | null;
+    let newAtt: { count: number; windowStart: number };
+    if (!att || nowMs - att.windowStart >= 1000) {
+      newAtt = { count: 1, windowStart: nowMs };
+    } else {
+      newAtt = { count: att.count + 1, windowStart: att.windowStart };
+    }
+    if (typeof ws.serializeAttachment === 'function') {
+      ws.serializeAttachment(newAtt);
+    }
+    if (newAtt.count > 10) {
+      return;
+    }
+
+    const rawStr =
+      typeof message === 'string' ? message : new TextDecoder().decode(message);
+    const byteLen =
+      typeof message === 'string'
+        ? new TextEncoder().encode(message).length
+        : message.byteLength;
+    if (byteLen > 4096) {
+      try {
+        ws.close(1009, 'message_too_big');
+      } catch {}
+      return;
+    }
+
+    const parsed = parseUserClientMessage(rawStr, byteLen);
+    if (!parsed) return;
+
+    if (parsed.t === 'ping') {
+      try {
+        ws.send(JSON.stringify({ t: 'pong' }));
+      } catch {}
+      return;
+    }
+
+    if (parsed.t === 'presence') {
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO user_presence (key, state) VALUES ('current', ?)",
+        parsed.state
+      );
+      return;
+    }
+
+    if (parsed.t === 'send_match_request') {
+      await this.handleClientSendMatchRequest(
+        uid,
+        parsed.origin,
+        parsed.toUid,
+        parsed.matchId
+      );
+      return;
+    }
+
+    if (parsed.t === 'accept_match_request') {
+      await this.handleClientAcceptMatchRequest(uid, parsed.id);
+      return;
+    }
+
+    if (parsed.t === 'decline_match_request') {
+      await this.handleClientDeclineMatchRequest(uid, parsed.id);
+      return;
+    }
+
+    if (parsed.t === 'cancel_match_request') {
+      await this.handleClientCancelMatchRequest(uid, parsed.id);
+      return;
+    }
+  }
+
+  async webSocketClose(_ws: WebSocket, _code: number, _reason: string): Promise<void> {
+    const remaining = this.getWebSocketsSafe();
+    if (remaining.length === 0) {
+      this.ctx.storage.sql.exec("DELETE FROM user_presence WHERE key = 'current'");
+    }
+  }
+
+  async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
+    try {
+      ws.close(1011, 'internal_error');
+    } catch {}
+  }
+
+  /**
    * HTTP Fetch arayüzü desteği
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const uid = request.headers.get('X-User-Id') ?? undefined;
+
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const callerUid = uid ?? request.headers.get('X-User-Id');
+      if (!callerUid) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+
+      this.ensureSchema();
+      if (this.isDeleted()) {
+        return new Response('Account Deleted', { status: 410 });
+      }
+
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+
+      if (typeof this.ctx.acceptWebSocket === 'function') {
+        this.ctx.acceptWebSocket(server, [callerUid]);
+      }
+
+      if (
+        typeof (this.ctx as any).setWebSocketAutoResponse === 'function' &&
+        typeof (globalThis as any).WebSocketRequestResponsePair !== 'undefined'
+      ) {
+        try {
+          (this.ctx as any).setWebSocketAutoResponse(
+            new (globalThis as any).WebSocketRequestResponsePair(
+              JSON.stringify({ t: 'ping' }),
+              JSON.stringify({ t: 'pong' })
+            )
+          );
+        } catch {}
+      }
+
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO user_presence (key, state) VALUES ('current', 'idle')"
+      );
+
+      this.sendInitialSnapshots(server, callerUid);
+
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    if (
+      request.method === 'PUT' &&
+      (url.pathname === '/settings' || url.pathname === '/me/settings')
+    ) {
+      try {
+        const body = (await request.json()) as { allowMatchRequests?: unknown };
+        if (typeof body?.allowMatchRequests !== 'boolean') {
+          return new Response(
+            JSON.stringify({
+              error: 'bad_request',
+              message: 'allowMatchRequests alanı boolean olmalıdır',
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        const res = await this.updateSettings({
+          allowMatchRequests: body.allowMatchRequests,
+        });
+        return new Response(JSON.stringify({ ok: true, ...res }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: 'internal_error', message: msg }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     if (request.method === 'DELETE' && (url.pathname === '/profile' || url.pathname === '/me')) {
       const res = await this.deleteProfile(uid);

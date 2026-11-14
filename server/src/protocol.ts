@@ -217,6 +217,58 @@ export type MatchRoomServerMessage =
   | ClientRematchErrorMessage
   | ClientMatchedMessage;
 
+export type UserClientMessage =
+  | { readonly t: 'presence'; readonly state: 'idle' | 'busy' }
+  | {
+      readonly t: 'send_match_request';
+      readonly origin: 'rematch' | 'profile';
+      readonly toUid: string;
+      readonly matchId?: string;
+    }
+  | { readonly t: 'accept_match_request'; readonly id: string }
+  | { readonly t: 'decline_match_request'; readonly id: string }
+  | { readonly t: 'cancel_match_request'; readonly id: string }
+  | { readonly t: 'ping' };
+
+export type UserServerMessage =
+  | {
+      readonly t: 'match_request_received';
+      readonly id: string;
+      readonly fromUid: string;
+      readonly fromNickname: string;
+      readonly fromFrame: string;
+      readonly type: 'friendly' | 'ranked';
+      readonly origin: 'rematch' | 'profile';
+      readonly expiresAtMs: number;
+    }
+  | {
+      readonly t: 'match_request_sent';
+      readonly id: string;
+      readonly toUid: string;
+      readonly toNickname: string;
+      readonly type: 'friendly' | 'ranked';
+      readonly origin: 'rematch' | 'profile';
+      readonly expiresAtMs: number;
+    }
+  | {
+      readonly t: 'match_request_status';
+      readonly id: string;
+      readonly status: 'declined' | 'expired' | 'cancelled';
+    }
+  | {
+      readonly t: 'match_request_error';
+      readonly code:
+        | 'unavailable'
+        | 'cooldown_active'
+        | 'rate_limited'
+        | 'invalid'
+        | 'no_energy'
+        | 'opponent_no_energy';
+      readonly retryAfterSec?: number;
+    }
+  | ClientMatchedMessage
+  | { readonly t: 'pong' };
+
 export function sanitizePlayerName(rawName?: unknown): string {
   if (typeof rawName !== 'string') return 'Oyuncu';
   const result = validateNickname(rawName);
@@ -330,4 +382,68 @@ export function parseMatchRoomMessage(
 
   return null;
 }
+
+export function parseUserClientMessage(
+  raw: unknown,
+  byteLength?: number
+): UserClientMessage | null {
+  if (typeof raw !== 'string') return null;
+  const len = byteLength ?? new TextEncoder().encode(raw).length;
+  if (len > 4096) return null; // Maksimum 4 KB mesaj boyutu
+
+  try {
+    const data = JSON.parse(raw);
+    if (typeof data !== 'object' || data === null) return null;
+
+    if (data.t === 'presence') {
+      if (data.state === 'idle' || data.state === 'busy') {
+        return { t: 'presence', state: data.state };
+      }
+      return null;
+    }
+
+    if (data.t === 'send_match_request') {
+      if (typeof data.toUid !== 'string' || !data.toUid.trim()) return null;
+      if (data.origin !== 'rematch' && data.origin !== 'profile') return null;
+      if (data.origin === 'rematch') {
+        if (typeof data.matchId !== 'string' || !data.matchId.trim()) return null;
+        return {
+          t: 'send_match_request',
+          origin: 'rematch',
+          toUid: data.toUid.trim(),
+          matchId: data.matchId.trim(),
+        };
+      }
+      return {
+        t: 'send_match_request',
+        origin: 'profile',
+        toUid: data.toUid.trim(),
+      };
+    }
+
+    if (data.t === 'accept_match_request') {
+      if (typeof data.id !== 'string' || !data.id.trim()) return null;
+      return { t: 'accept_match_request', id: data.id.trim() };
+    }
+
+    if (data.t === 'decline_match_request') {
+      if (typeof data.id !== 'string' || !data.id.trim()) return null;
+      return { t: 'decline_match_request', id: data.id.trim() };
+    }
+
+    if (data.t === 'cancel_match_request') {
+      if (typeof data.id !== 'string' || !data.id.trim()) return null;
+      return { t: 'cancel_match_request', id: data.id.trim() };
+    }
+
+    if (data.t === 'ping') {
+      return { t: 'ping' };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 

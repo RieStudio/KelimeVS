@@ -417,6 +417,67 @@ export default {
       }
     }
 
+    // Kullanıcı Ayarları Güncelleme rotası: PUT /me/settings
+    if (request.method === 'PUT' && pathname === '/me/settings') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let body: { allowMatchRequests?: unknown };
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (typeof body?.allowMatchRequests !== 'boolean') {
+        return new Response(
+          JSON.stringify({
+            error: 'bad_request',
+            message: 'allowMatchRequests alanı boolean olmalıdır',
+          }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        const updated = await profileStub.updateSettings({
+          allowMatchRequests: body.allowMatchRequests,
+        });
+        return new Response(JSON.stringify({ ok: true, ...updated }), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        console.error('PUT /me/settings error:', err);
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
     // Mağaza katalog ve durum rotası: GET /store
     if (request.method === 'GET' && pathname === '/store') {
       const uid = await authenticateRequest(request, env);
@@ -825,6 +886,33 @@ export default {
       const forwardReq = new Request(request.url, request);
       forwardReq.headers.set('X-User-Id', uid);
       return room.fetch(forwardReq);
+    }
+
+    // Kullanıcı Bildirim ve Maç İsteği WebSocket yükseltmesi: /ws/user
+    if (pathname === '/ws/user') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket Upgrade', { status: 400 });
+      }
+
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+
+      if (env.USER_PROFILE) {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        const forwardReq = new Request(request.url, request);
+        forwardReq.headers.set('X-User-Id', uid);
+        return profileStub.fetch(forwardReq);
+      }
+
+      return new Response('Service Unavailable', { status: 503 });
     }
 
     // Oyuncu Bildirme rotası: POST /matches/:matchId/report

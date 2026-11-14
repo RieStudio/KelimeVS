@@ -119,6 +119,7 @@ interface StoredRoomData {
   readonly pendingEnergyRefundUids?: readonly string[];
   readonly energyRefundRetryCount?: number;
   readonly rematch?: StoredRematchData;
+  readonly rematchRequestCreated?: boolean;
 }
 
 export function migrateStoredRoomData(raw: unknown): StoredRoomData | null {
@@ -282,6 +283,67 @@ export class MatchRoom extends DurableObject<Env> {
         reportedNickname: opponent.name,
         answers,
       },
+    };
+  }
+
+  /**
+   * Yeni "Maç İsteği" sistemi için rövanş uygunluğunu doğrular.
+   * Maçın bitmiş, normal bitmiş (terk/kopma/void değil), gerçek oyuncularla oynanmış olduğunu
+   * ve daha önce bu maç için rövanş isteği oluşturulmadığını doğrular.
+   */
+  async validateRematchRequest(senderUid: string, receiverUid: string): Promise<{
+    readonly ok: boolean;
+    readonly error?: string;
+    readonly matchType?: 'ranked' | 'friendly';
+  }> {
+    if (!this.data) {
+      return { ok: false, error: 'not_found' };
+    }
+
+    if (this.data.status !== 'finished') {
+      return { ok: false, error: 'not_finished' };
+    }
+
+    if (!this.data.engineState) {
+      return { ok: false, error: 'no_engine_state' };
+    }
+
+    const state = deserializeMatchState(this.data.engineState);
+    if (state.endedBy !== 'normal') {
+      return { ok: false, error: 'not_normal_end' };
+    }
+
+    const isBot =
+      this.data.p1.uid === 'bot' ||
+      this.data.p1.uid.startsWith('bot_') ||
+      this.data.p2.uid === 'bot' ||
+      this.data.p2.uid.startsWith('bot_');
+    if (isBot) {
+      return { ok: false, error: 'bot_match' };
+    }
+
+    const players = [this.data.p1.uid, this.data.p2.uid];
+    if (
+      !players.includes(senderUid) ||
+      !players.includes(receiverUid) ||
+      senderUid === receiverUid
+    ) {
+      return { ok: false, error: 'invalid_players' };
+    }
+
+    if (this.data.rematchRequestCreated) {
+      return { ok: false, error: 'already_requested' };
+    }
+
+    this.data = {
+      ...this.data,
+      rematchRequestCreated: true,
+    };
+    await this.persist();
+
+    return {
+      ok: true,
+      matchType: this.data.matchType ?? 'ranked',
     };
   }
 

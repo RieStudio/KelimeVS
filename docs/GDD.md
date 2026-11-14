@@ -252,6 +252,25 @@ Maç tamamlandıktan sonra maç sonu ekranında yer alan eski "Tekrar Oyna" buto
 - **Enerji Tüketimi ve Atomik Koruma:** Rankli rövanş başlatılırken her iki oyuncudan da 1 enerji kesilir. Teklif edenin enerjisi yoksa teklif reddedilir. Kabul anında kabul edenin enerjisi yetersiz çıkarsa teklif edenden kesilen enerji derhal iade edilir (`refundEnergyWithRetry`) ve maç başlatılmaz.
 - **Bot Maçları:** Bot maçları istemci üzerinde çalıştığından sunucuya rövanş isteği gönderilmez; istemci tarafında rastgele 5-10 sn bekleme sonrası ret veya nadiren (%10-15) 45 sn sessiz kalarak süre aşımı simüle edilir.
 
+### 8.4 Maç İsteği ve Gelen Kutusu Sistemi
+
+Hem maç sonu ekranındaki "Rövanş" hem de kullanıcı profilinden gönderilen "Maç İsteği" aynı merkezi istek altyapısını (`/ws/user` kanalı) paylaşır.
+
+- **Uygulama İçi Bildirim ve Ön Plan İlkesi:** Maç istekleri yalnızca uygulama ön plandayken (kullanıcının `/ws/user` soketi bağlıyken) ekranın üst kısmından inen bir bildirim bandı ("<Oyuncu> seninle maç istiyor") şeklinde iletilir. Bu aşamada arka plan push/FCM bildirimi yoktur; alıcı çevrimdışıysa gönderene derhal "unavailable" iletilir.
+- **İstek Ömrü ve Ekran Bağımsızlığı:** Teklif ömrü 45 saniyedir. Gönderen oyuncu istek attıktan sonra başka ekranlara geçse dahi (ana sayfa, mağaza, profil, sıralama vb.) istek 45 sn boyunca sunucuda geçerliliğini korur. Kabul geldiğinde gönderen nerede olursa olsun eşleşme ekranına yönlendirilir.
+- **Maç Türü Mirası:**
+  - Profilden gönderilen tüm istekler her zaman **Dostluk (Friendly)** maçıdır (enerji harcanmaz, jeton, lig puanı veya sıralama istatistiği etkilenmez).
+  - Maç sonu rövanş istekleri bitmiş maçın türünü (**Ranked** veya **Friendly**) aynen devralır.
+- **Kullanıcı Ayarları ("Maç isteklerini kapat"):** Ayarlar menüsüne "Maç isteklerini kapat" anahtarı eklenir (`profiles.allow_match_requests`, varsayılan: açık). Kapatıldığında oyuncuya dışarıdan hiçbir maç isteği ulaşmaz.
+- **Engelleme Kuralları:** Engelli kullanıcılar birbirlerine istek gönderemez ve alamaz.
+- **Bekleme Süresi (Cooldown):** Bir istek reddedildiğinde veya 45 sn dolup süre aşımına uğradığında, gönderenin aynı kişiye tekrar istek gönderebilmesi için 45 saniye beklemesi gerekir (`cooldown_active`).
+- **Hız Sınırı (Rate Limit):** Spam önleme amacıyla gönderen kullanıcı dakikada en fazla 3 istek gönderebilir (`rate_limited`).
+- **Tek Aktif İstek Kısıtı:** Bir kullanıcının aynı anda en fazla 1 aktif giden ve 1 aktif gelen isteği olabilir.
+- **Karşılıklı Eşzamanlı İstek (Cross-Request):** İki oyuncu birbirine aynı anda maç/rövanş isteği gönderirse, sunucu alıcı DO'sunda bekleyen ters yönlü isteği fark eder ve beklemeden otomatik kabul sayarak maçı anında kurar.
+- **Gizlilik Koruması (Privacy):** Alıcının çevrimdışı olması, meşgul olması (başka maçta olması), ayarı kapatmış olması, engelli olması veya hesabının silinmiş olması gönderene asla ifşa edilmez. Tüm bu durumlarda gönderen yeknesak `unavailable` yanıtı alır.
+- **Misafir Kullanıcı Desteği:** Misafir kullanıcılar (`M-####`) maç isteği gönderebilir ve alabilir.
+- **Alarm Multiplexing:** Cloudflare Workers tek alarm kısıtlamasına uygun olarak 45 sn TTL zaman aşımları ile tombstone silme alarmı en yakın vadeye göre multiplexed olarak yönetilir.
+
 ## 9. Güvenlik ilkeleri
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.

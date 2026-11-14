@@ -549,6 +549,176 @@ Maç normal olarak sonuçlandıktan sonra (`status === 'finished'`), mevcut canl
 
 ---
 
+### 3.3. Kullanıcı Bildirim ve Maç İsteği Protokolü (`/ws/user`)
+
+Uygulama ön plandayken her kullanıcı kendi `UserProfile` Durable Object'ine bir WebSocket bağlantısı (`/ws/user`) açar. Hem kullanıcı profilinden gönderilen "Maç İsteği" hem de maç sonu ekranındaki "Rövanş" özelliği bu tek bildirim ve istek kanalını paylaşır.
+
+#### Bağlantı ve Kimlik Doğrulama
+- **URL:** `/ws/user`
+- **Başlık (Handshake):** `Authorization: Bearer <firebase-id-token>` (Geliştirme modunda: `?token=dev:<uid>`)
+- **Silinmiş Hesap:** Kullanıcı hesabı silinmişse bağlantı isteği HTTP `410 Gone` döner.
+- **Çoklu Cihaz:** Aynı kullanıcının birden fazla açık soketi varsa tüm gelen/giden bildirimler tüm soketlere yayınlanır (broadcast).
+- **Snapshot Kurtarma:** Soket bağlandığında kullanıcının varsa aktif bekleyen gelen veya giden isteği hemen gönderilir.
+
+#### İstemci -> Sunucu Mesajları
+
+1. **Durum Bildirimi (`presence`):**
+```json
+{
+  "t": "presence",
+  "state": "idle" | "busy"
+}
+```
+- Kullanıcı maç ekranındayken veya meşgulken `busy`, maç bittiğinde veya menüdeyken `idle` gönderir.
+
+2. **Maç İsteği Gönderme (`send_match_request`):**
+```json
+{
+  "t": "send_match_request",
+  "origin": "rematch" | "profile",
+  "toUid": "user_target_123",
+  "matchId": "m_previous_match_id"
+}
+```
+- `origin`: `"profile"` (kullanıcı profilinden gönderilen dostluk maçı) veya `"rematch"` (maç sonu ekranından gönderilen rövanş).
+- `matchId`: Yalnızca `origin === "rematch"` ise zorunludur; bitmiş maçın doğrulanması için kullanılır.
+
+3. **İsteği Kabul Etme (`accept_match_request`):**
+```json
+{
+  "t": "accept_match_request",
+  "id": "req_uuid_123"
+}
+```
+
+4. **İsteği Reddetme (`decline_match_request`):**
+```json
+{
+  "t": "decline_match_request",
+  "id": "req_uuid_123"
+}
+```
+
+5. **İsteği İptal Etme (`cancel_match_request`):**
+```json
+{
+  "t": "cancel_match_request",
+  "id": "req_uuid_123"
+}
+```
+
+6. **Ping (`ping`):**
+```json
+{
+  "t": "ping"
+}
+```
+
+#### Sunucu -> İstemci Mesajları
+
+1. **İstek Alındı (`match_request_received` - Alıcıya):**
+```json
+{
+  "t": "match_request_received",
+  "id": "req_uuid_123",
+  "fromUid": "user_sender_456",
+  "fromNickname": "Ahmet",
+  "fromFrame": "emerald",
+  "type": "friendly" | "ranked",
+  "origin": "rematch" | "profile",
+  "expiresAtMs": 1728518445000
+}
+```
+
+2. **İstek Gönderildi Onayı (`match_request_sent` - Gönderene):**
+```json
+{
+  "t": "match_request_sent",
+  "id": "req_uuid_123",
+  "toUid": "user_target_123",
+  "toNickname": "Mehmet",
+  "type": "friendly" | "ranked",
+  "origin": "rematch" | "profile",
+  "expiresAtMs": 1728518445000
+}
+```
+
+3. **İstek Durumu Güncellemesi (`match_request_status`):**
+```json
+{
+  "t": "match_request_status",
+  "id": "req_uuid_123",
+  "status": "declined" | "expired" | "cancelled"
+}
+```
+
+4. **İstek Hatası (`match_request_error`):**
+```json
+{
+  "t": "match_request_error",
+  "code": "unavailable" | "cooldown_active" | "rate_limited" | "invalid" | "no_energy" | "opponent_no_energy",
+  "retryAfterSec": 35
+}
+```
+- `unavailable`: Hedef oyuncu çevrimdışı, meşgul, maç isteklerini kapatmış, engelli veya hesabı silinmiş (gizlilik koruması nedeniyle detay verilmez).
+- `cooldown_active`: Reddetme veya süre aşımı sonrası 45 saniyelik bekleme süresi dolmamış (`retryAfterSec` döner).
+- `rate_limited`: Dakikada en fazla 3 istek kotası aşıldı (`retryAfterSec` döner).
+- `invalid`: Kendine istek atma veya geçersiz parametreler.
+- `no_energy`: Rankli rövanşta kullanıcının enerjisi yetersiz.
+- `opponent_no_energy`: Rankli rövanşta rakibin enerjisi yetersiz.
+
+5. **Eşleşme Tamamlandı (`matched`):**
+```json
+{
+  "t": "matched",
+  "matchId": "m_new_match_uuid",
+  "opponentName": "Mehmet",
+  "opponentFrame": "classic",
+  "opponentUid": "user_target_123",
+  "isFriendly": true
+}
+```
+- İstek kabul edildiğinde (veya eşzamanlı karşılıklı istekte) yeni maç kurulur ve her iki tarafa iletilir. İki oyuncu da `/ws/match/:matchId` odasına bağlanır.
+
+6. **Pong (`pong`):**
+```json
+{
+  "t": "pong"
+}
+```
+
+#### HTTP Ayar Uç Noktası: `PUT /me/settings`
+Kullanıcının maç isteklerini açıp kapatmasını sağlar (varsayılan: açık / true):
+```http
+PUT /me/settings
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "allowMatchRequests": false
+}
+```
+**Yanıt (200 OK):**
+```json
+{
+  "ok": true,
+  "allowMatchRequests": false
+}
+```
+
+#### Kurallar ve Mimari İlkeler
+- **İstek Ömrü (TTL):** 45 saniyedir (`expiresAtMs = now + 45000`). Gönderen uygulamada ekran değiştirse dahi istek arka planda canlı kalır.
+- **Bekleme Süresi (Cooldown):** Bir istek reddedildiğinde veya 45 sn dolduğunda, gönderenin aynı kişiye tekrar istek gönderebilmesi için 45 sn beklemesi gerekir (`cooldown_active`). İptal edilen isteklerde cooldown uygulanmaz.
+- **Hız Sınırı (Rate Limit):** Kullanıcı dakikada en fazla 3 istek gönderebilir (`rate_limited`).
+- **Eşzamanlı İstek Sınırı:** Bir kullanıcının aynı anda en fazla 1 bekleyen giden ve 1 bekleyen gelen isteği olabilir.
+- **Karşılıklı Eşzamanlı İstek (Cross-Request):** İki oyuncu aynı anda birbirine istek gönderirse sunucu bunu fark eder ve beklemeden otomatik kabul sayıp maçı kurar.
+- **Gizlilik Kuralı:** Alıcının çevrimdışı olması, meşgul olması, ayarı kapatmış olması, engelli olması veya silinmiş olması gönderene hiçbir şekilde ayırt ettirilmez; yeknesak `unavailable` iletilir.
+- **Tür Mirası:** Profilden gönderilen tüm istekler DOSTLUK (`friendly`) maçıdır. Maç sonu rövanş istekleri bitmiş maçın türünü (`ranked` veya `friendly`) aynen korur.
+- **Alarm Multiplexing:** Cloudflare Workers tek alarm kısıtına uygun olarak tombstone silme alarmı ile istek zaman aşımı alarmları en yakın zamana göre (`scheduleNextAlarm`) birlikte yönetilir.
+- **Hesap Silme:** `deleteProfile` çağrıldığında kullanıcının tüm açık WebSocket'leri `4001, "account_deleted"` koduyla sonlandırılır.
+
+---
+
 ## 4. Deneme Görünürlük ve Gizlilik Kuralları (Attempt Visibility)
 
 - **Tekrarlanan Cevaplar (`repeated` / `alreadySaid`):**
