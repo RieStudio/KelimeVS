@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -42,6 +43,18 @@ class FakeBlockedUsersApiClient implements BlockedUsersApiClient {
       const ReportUserSuccess();
 }
 
+Finder findSvgAsset(String assetName) {
+  return find.byWidgetPredicate((widget) {
+    if (widget is SvgPicture) {
+      final loader = widget.bytesLoader;
+      if (loader is SvgAssetLoader) {
+        return loader.assetName == assetName;
+      }
+    }
+    return false;
+  });
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -56,7 +69,7 @@ void main() {
     );
   }
 
-  testWidgets('1. Engel listesi boşken boş durum kartı gösterilir ve ortak EmptyStateCard dekorasyonunu kullanır', (tester) async {
+  testWidgets('1. Engel listesi boşken boş durum kartı ve ikonu gösterilir, ortak EmptyStateCard dekorasyonunu kullanır', (tester) async {
     final client = FakeBlockedUsersApiClient(usersToReturn: []);
     await tester.pumpWidget(buildTestScreen(client));
     await tester.pumpAndSettle();
@@ -67,6 +80,28 @@ void main() {
 
     final emptyCardFinder = find.byType(EmptyStateCard);
     expect(emptyCardFinder, findsOneWidget);
+
+    // Boş durum kalkan ikonu kontrolü
+    final iconFinder = findSvgAsset(BlockedUsersScreen.emptyIconAsset);
+    expect(iconFinder, findsOneWidget);
+
+    final svgWidget = tester.widget<SvgPicture>(iconFinder);
+    expect(svgWidget.width, BlockedUsersScreen.emptyIconSize);
+    expect(svgWidget.height, BlockedUsersScreen.emptyIconSize);
+    expect(svgWidget.colorFilter, isNull);
+
+    // İkonun dekoratif olup ExcludeSemantics ile sarmalandığı doğrulanır
+    final excludedAncestor = find.ancestor(
+      of: iconFinder,
+      matching: find.byType(ExcludeSemantics),
+    );
+    expect(excludedAncestor, findsOneWidget);
+
+    // İkonun başlığın üstünde yer aldığı ve aralarında boşluk olduğu doğrulanır
+    final iconRect = tester.getRect(iconFinder);
+    final titleRect = tester.getRect(find.text(AppStrings.emptyBlockedUsers));
+    expect(iconRect.bottom, lessThan(titleRect.top));
+    expect(titleRect.top - iconRect.bottom, closeTo(AppDimens.space16, 0.5));
 
     final container = tester.widget<Container>(
       find.descendant(of: emptyCardFinder, matching: find.byType(Container)).first,
@@ -79,7 +114,7 @@ void main() {
     expect(decoration.boxShadow, AppDimens.shadowQuestionCard);
   });
 
-  testWidgets('2. Engellenen kullanıcılar listelenir', (tester) async {
+  testWidgets('2. Engellenen kullanıcılar listelenir ve boş durum ikonu gösterilmez', (tester) async {
     final users = [
       const BlockedUser(id: 'b1', nickname: 'Ali', blockedAt: 1729000000000),
       const BlockedUser(id: 'b2', nickname: 'Veli', blockedAt: 1729100000000),
@@ -91,6 +126,10 @@ void main() {
     expect(find.text('Ali'), findsOneWidget);
     expect(find.text('Veli'), findsOneWidget);
     expect(find.widgetWithText(SecondaryButton, AppStrings.unblockAction), findsNWidgets(2));
+
+    // Liste doluyken boş durum ikonu ve kartı bulunmaz
+    expect(findSvgAsset(BlockedUsersScreen.emptyIconAsset), findsNothing);
+    expect(find.byType(EmptyStateCard), findsNothing);
   });
 
   testWidgets('3. Kaldır butonuna basıldığında unblockUser çağrılır ve SnackBar gösterilir', (tester) async {

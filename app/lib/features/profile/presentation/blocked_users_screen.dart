@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_guard.dart';
@@ -15,6 +16,9 @@ import '../domain/blocked_user_model.dart';
 
 class BlockedUsersScreen extends ConsumerWidget {
   const BlockedUsersScreen({super.key});
+
+  static const String emptyIconAsset = 'assets/icons/blocked_empty.svg';
+  static const double emptyIconSize = 88.0;
 
   String _formatDate(int timestampMs) {
     if (timestampMs <= 0) return '';
@@ -93,6 +97,15 @@ class BlockedUsersScreen extends ConsumerWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              ExcludeSemantics(
+                                child: SvgPicture.asset(
+                                  emptyIconAsset,
+                                  width: emptyIconSize,
+                                  height: emptyIconSize,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              const SizedBox(height: AppDimens.space16),
                               Text(
                                 AppStrings.emptyBlockedUsers,
                                 style: AppTextStyles.cardTitle.copyWith(
