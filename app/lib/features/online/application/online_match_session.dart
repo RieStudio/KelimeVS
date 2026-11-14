@@ -1280,6 +1280,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     _cancelAllTimers();
     _rematchLeaveSent = false;
     _rematchSecondsRemaining = 45;
+    _rematchGraceTicks = 0;
     _wasReconnecting = false;
     _opponentEverDisconnected = false;
     _hasReceivedFinal = false;

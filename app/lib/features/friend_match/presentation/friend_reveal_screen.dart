@@ -15,14 +15,17 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
+import '../../online/domain/models/online_messages.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/domain/energy_state.dart';
 
-/// Arkadaş düellosunda ilk tur başlamadan önce gösterilen eşleşme ekranı.
+/// Arkadaş düellosunda ve rövanş (rematch) eşleşmelerinde ilk tur başlamadan önce gösterilen eşleşme ekranı.
 ///
-/// Host ve Join her iki taraf da "matched" yanıtını aldığında bu ekrana geçer.
+/// Arkadaş maçı (Host/Join) veya rövanş kabulü sonrasında "matched" yanıtı alındığında bu ekrana geçilir.
 /// 3.5 saniye boyunca rakibin avatarı, adı ve dolan ilerleme çubuğu gösterilir;
 /// süre dolunca [MatchScreen]'e geçilir ve [OnlineMatchSession.startOnlineMatch]
 /// tam bu geçiş anında tetiklenir.
+/// [isFriendly] parametresi maçın türünü (arkadaş maçı veya rankli maç rövanşı) belirler.
 class FriendMatchRevealScreen extends ConsumerStatefulWidget {
   final String matchId;
   final String opponentName;
@@ -30,6 +33,7 @@ class FriendMatchRevealScreen extends ConsumerStatefulWidget {
   final String? opponentUid;
   final bool isHost;
   final Duration? revealDuration;
+  final bool isFriendly;
 
   const FriendMatchRevealScreen({
     super.key,
@@ -39,6 +43,7 @@ class FriendMatchRevealScreen extends ConsumerStatefulWidget {
     this.opponentUid,
     this.isHost = true,
     this.revealDuration,
+    this.isFriendly = true,
   });
 
   @override
@@ -107,7 +112,7 @@ class _FriendMatchRevealScreenState
             opponentName: safeOpponent,
             opponentUid: widget.opponentUid,
             opponentFrame: widget.opponentFrame,
-            isFriendly: true,
+            isFriendly: widget.isFriendly,
           ),
     );
   }
@@ -341,4 +346,56 @@ class _FriendMatchRevealScreenState
       ),
     );
   }
+}
+
+/// Rövanş kabul edildiğinde yeni maçın eşleşme (reveal) ekranına geçiş yardımcısı.
+///
+/// [MatchEndView]'in yerine [FriendMatchRevealScreen] açar (`pushReplacement`),
+/// böylece oyuncu geri tuşuyla maç sonu ekranına dönemez.
+/// Rankli rövanşlarda (`!matched.isFriendly`) sunucudan gelen enerji bilgisini günceller
+/// ve profili sunucuyla senkronize eder. Arkadaş maçı rövanşında enerjiye dokunmaz.
+void openRematchReveal(
+  BuildContext context,
+  WidgetRef ref,
+  MatchedServerMessage matched, {
+  Duration? revealDuration,
+}) {
+  if (!context.mounted) return;
+
+  // Rankli rövanşta sunucudan gelen enerji bilgisini güncelle / sunucuyla senkronize et
+  if (!matched.isFriendly) {
+    if (matched.energy != null) {
+      final currentEnergy = ref.read(profileProvider).energy;
+      final updatedEnergy = (currentEnergy ??
+              EnergyState(
+                enabled: true,
+                current: matched.energy!.current,
+                max: matched.energy!.max,
+              ))
+          .copyWith(
+        enabled: true,
+        current: matched.energy!.current,
+        max: matched.energy!.max,
+        nextEnergyAtMs: matched.energy!.nextEnergyAtMs,
+      );
+      ref
+          .read(profileProvider.notifier)
+          .updateEnergy(updatedEnergy, matched.serverNowMs);
+    }
+    unawaited(ref.read(profileProvider.notifier).syncWithServer());
+  }
+
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute(
+      builder: (_) => FriendMatchRevealScreen(
+        matchId: matched.matchId,
+        opponentName: matched.opponentName,
+        opponentFrame: matched.opponentFrame,
+        opponentUid: matched.opponentUid,
+        isHost: true,
+        isFriendly: matched.isFriendly,
+        revealDuration: revealDuration,
+      ),
+    ),
+  );
 }
