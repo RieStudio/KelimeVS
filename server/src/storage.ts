@@ -208,8 +208,9 @@ export function buildFinalMessage(params: {
   readonly opponentFrame?: string;
   readonly coinsAwarded?: number;
   readonly coins?: number;
+  readonly rematchAvailable?: boolean;
 }): ClientFinalMessage {
-  const { state, playerUid, opponentUid, opponentName, opponentFrame, coinsAwarded, coins } = params;
+  const { state, playerUid, opponentUid, opponentName, opponentFrame, coinsAwarded, coins, rematchAvailable } = params;
 
   const rounds: ClientRoundRecord[] = state.roundHistory.map((r) => ({
     questionId: r.questionId,
@@ -243,6 +244,7 @@ export function buildFinalMessage(params: {
     ...(!isBot && opponentUid ? { opponentUid } : {}),
     ...(coinsAwarded !== undefined ? { coinsAwarded } : {}),
     ...(coins !== undefined ? { coins } : {}),
+    ...(rematchAvailable !== undefined ? { rematchAvailable } : {}),
   };
 }
 

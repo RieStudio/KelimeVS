@@ -240,6 +240,18 @@ Maç içi güçlendiriciler oyuncunun zor anlarda taktiksel avantaj elde etmesin
   - **Eski İstemci Uyumluluğu:** `opponent_powerup` mesajı gönderilmez (eski istemcilerin +5 sn sanmasını önlemek için); rakip cevabı normal doğru cevap balonu olarak görür.
   - **Ekonomi Dengesi:** Galibiyet ödülü +30 jetondur. Güçlendiriciyi kullanan oyuncu maçı kazansa bile net -20 jeton zarardadır (+30 - 50 = -20). Dolayısıyla istismar edilemez, ekonomideki fazla jetonları eriten deflasyonist bir mekanizmadır.
 
+### 8.3 Rövanş (Rematch) Sistemi
+
+Maç tamamlandıktan sonra maç sonu ekranında yer alan eski "Tekrar Oyna" butonunun yerini "Rövanş" butonu alır. Aynı iki oyuncu mevcut oturum soketi üzerinden lobiye dönmeden derhal yeni bir maça başlayabilir.
+
+- **Maç Türü Mirası:** Rövanş, biten maçın türünü AYNEN devralır. Rankli (online hızlı) maçın rövanşı rankli (enerji tüketir, jeton kazandırır, lig puanını etkiler, haftalık 20 maçlık lige etki tavanına dahildir); arkadaş (friendly) maçının rövanşı ise arkadaş maçı (enerji harcamaz, lig/jeton ödülü vermez) olur.
+- **Teklif Ömrü ve Tek Döngü Kuralı:** Teklifin ömrü 45 saniyedir. Her maç sonu ekranında yalnızca BİR rövanş döngüsü yaşanabilir. Teklif reddedildiğinde, 45 sn dolduğunda veya rakip ayrıldığında buton o ekranda kilitlenir (spam yapılamaz). Ancak rövanş maçı bittikten sonra açılan yeni maç sonu ekranında yeni bir teklif hakkı doğar; yani ardışık zincirleme rövanş serbesttir.
+- **Rövanş Uygunluk Koşulları:** Yalnızca maç NORMAL olarak tamamlandıysa (`endedBy: 'normal'`) ve iki taraf da gerçek oyuncuysa rövanş aktiftir (`rematchAvailable: true`). Terk, bağlantı kopması sonucu hükmen bitiş veya beraberlik tavanı/karşılıklı kopma ile iptal (`voided`) edilen maçlarda rövanş butonu devre dışı/gizlidir.
+- **Çift Teklif (Simultaneous Offer):** Her iki oyuncunun da aynı anda birbirine teklif göndermesi durumunda sistem yarış durumunu otomatik kabul (auto-accept) sayar ve yeni maçı başlatır.
+- **Bağlantı Toleransı (Connect Timeout):** Rövanş ile oluşturulan yeni maç odalarında oyuncuların eşleşme ekranını görüp bağlanabilmesi için bağlantı zaman aşımı (`connectTimeout`) rankli veya dostluk maçı fark etmeksizin **15 saniyedir**.
+- **Enerji Tüketimi ve Atomik Koruma:** Rankli rövanş başlatılırken her iki oyuncudan da 1 enerji kesilir. Teklif edenin enerjisi yoksa teklif reddedilir. Kabul anında kabul edenin enerjisi yetersiz çıkarsa teklif edenden kesilen enerji derhal iade edilir (`refundEnergyWithRetry`) ve maç başlatılmaz.
+- **Bot Maçları:** Bot maçları istemci üzerinde çalıştığından sunucuya rövanş isteği gönderilmez; istemci tarafında rastgele 5-10 sn bekleme sonrası ret veya nadiren (%10-15) 45 sn sessiz kalarak süre aşımı simüle edilir.
+
 ## 9. Güvenlik ilkeleri
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.

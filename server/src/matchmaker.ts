@@ -32,6 +32,34 @@ export interface QueueEntry {
   readonly blockedUids?: readonly string[];
 }
 
+export interface CreateDirectMatchParams {
+  readonly p1: { uid: string; name: string; frame?: string };
+  readonly p2: { uid: string; name: string; frame?: string };
+  readonly matchType: 'ranked' | 'friendly';
+  readonly prevMatchId: string;
+  readonly proposerUid: string;
+}
+
+export type CreateDirectMatchResult =
+  | {
+      readonly ok: true;
+      readonly matchId: string;
+      readonly p1: { uid: string; name: string; frame?: string };
+      readonly p2: { uid: string; name: string; frame?: string };
+      readonly matchType: 'ranked' | 'friendly';
+      readonly isFriendly: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly error:
+        | 'no_energy'
+        | 'opponent_no_energy'
+        | 'blocked'
+        | 'account_deleted'
+        | 'unavailable';
+      readonly errorTargetUid?: string;
+    };
+
 export function selectAndShuffleEightQuestions(questions: readonly Question[]): Question[] {
   const arr = [...questions];
   if (arr.length <= 1) return arr;
@@ -703,6 +731,120 @@ export class Matchmaker extends DurableObject<Env> {
     if (changed) {
       await this.persistFriendRooms();
     }
+  }
+
+  /**
+   * Rövanş ve doğrudan eşleşmeler için aynı iki oyuncuyla yeni bir MatchRoom başlatır.
+   */
+  async createDirectMatch(params: CreateDirectMatchParams): Promise<CreateDirectMatchResult> {
+    const { p1, p2, matchType, proposerUid } = params;
+
+    // 1. Silinmiş hesap kontrolü
+    if ((await this.isAccountDeleted(p1.uid)) || (await this.isAccountDeleted(p2.uid))) {
+      return { ok: false, error: 'account_deleted' };
+    }
+
+    // 2. Karşılıklı engel kontrolü
+    let p1Blocked: string[] = [];
+    let p2Blocked: string[] = [];
+    try {
+      if (this.env.USER_PROFILE) {
+        const p1Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p1.uid));
+        p1Blocked = await p1Stub.getBlockedUids();
+        const p2Stub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(p2.uid));
+        p2Blocked = await p2Stub.getBlockedUids();
+      }
+    } catch {
+      // profil hatası durumunda devam et
+    }
+
+    if (p1Blocked.includes(p2.uid) || p2Blocked.includes(p1.uid)) {
+      return { ok: false, error: 'blocked' };
+    }
+
+    const matchId = crypto.randomUUID();
+    const energyChargedUids: string[] = [];
+    const energyCost = getEnergyCostPerMatch(this.env);
+
+    // 3. Ranked ise enerji kesintisi
+    if (matchType === 'ranked') {
+      const effectiveProposerUid = proposerUid || p1.uid;
+      const acceptorUid = effectiveProposerUid === p1.uid ? p2.uid : p1.uid;
+      let proposerEnergySpent = false;
+
+      // Önce teklif eden oyuncudan enerji kesilir
+      if (isEnergyEnabledForUser(this.env, effectiveProposerUid) && this.env.USER_PROFILE) {
+        const propStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(effectiveProposerUid));
+        const res = await propStub.spendEnergy({ matchId, amount: energyCost, uid: effectiveProposerUid });
+        if (!res.success) {
+          return { ok: false, error: 'no_energy', errorTargetUid: effectiveProposerUid };
+        }
+        proposerEnergySpent = true;
+        energyChargedUids.push(effectiveProposerUid);
+      }
+
+      // Sonra kabul eden oyuncudan enerji kesilir
+      if (isEnergyEnabledForUser(this.env, acceptorUid) && this.env.USER_PROFILE) {
+        const accStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(acceptorUid));
+        const res = await accStub.spendEnergy({ matchId, amount: energyCost, uid: acceptorUid });
+        if (!res.success) {
+          // Kabul edenin enerjisi yetersiz -> teklif edene enerjisi iade edilir
+          if (proposerEnergySpent) {
+            await this.refundEnergyWithRetry(effectiveProposerUid, matchId, energyCost);
+          }
+          return { ok: false, error: 'opponent_no_energy', errorTargetUid: acceptorUid };
+        }
+        energyChargedUids.push(acceptorUid);
+      }
+    }
+
+    // 4. Soru havuzu
+    let allQuestions: Question[];
+    try {
+      allQuestions = await this.contentProvider.getQuestions();
+    } catch {
+      allQuestions = [];
+    }
+
+    if (!allQuestions || allQuestions.length < 8) {
+      for (const uid of energyChargedUids) {
+        await this.refundEnergyWithRetry(uid, matchId, energyCost);
+      }
+      return { ok: false, error: 'unavailable' };
+    }
+
+    const selectedQuestions = selectAndShuffleEightQuestions(allQuestions);
+    const questionOrder = selectedQuestions.map((q) => q.id);
+
+    // 5. MatchRoom başlatma
+    const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
+    try {
+      await roomStub.initMatch({
+        matchId,
+        p1: { uid: p1.uid, name: p1.name, frame: p1.frame || 'classic' },
+        p2: { uid: p2.uid, name: p2.name, frame: p2.frame || 'classic' },
+        questions: selectedQuestions,
+        questionOrder,
+        matchType,
+        energyChargedUids,
+        isRematch: true,
+      });
+    } catch (initErr) {
+      console.error('createDirectMatch roomStub.initMatch failed:', initErr);
+      for (const uid of energyChargedUids) {
+        await this.refundEnergyWithRetry(uid, matchId, energyCost);
+      }
+      return { ok: false, error: 'unavailable' };
+    }
+
+    return {
+      ok: true,
+      matchId,
+      p1,
+      p2,
+      matchType,
+      isFriendly: matchType === 'friendly',
+    };
   }
 
   private async pruneExpiredFriendRooms(): Promise<void> {

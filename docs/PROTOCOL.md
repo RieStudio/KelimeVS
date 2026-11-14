@@ -347,10 +347,12 @@ Maç sonuçlandığında her iki oyuncuya gönderilir. Maç detay ekranı ve ge�
   "opponentFrame": "classic",
   "opponentUid": "user_xyz789",
   "winnerIsMe": true,
-  "endedBy": "normal" | "forfeit"
+  "endedBy": "normal" | "forfeit",
+  "rematchAvailable": true
 }
 ```
 - `opponentUid`: Rakip oyuncunun kullanıcı kimliği (String). Gerçek oyuncu maçlarında döner; bot maçlarında bu alan hiç gönderilmez (omitted).
+- `rematchAvailable`: Opsiyonel (boolean). Maç NORMAL yolla bittiyse (`endedBy: 'normal'`) ve her iki taraf da gerçek oyuncuysa `true` döner. Hükmen/terk/kopma/iptal veya bot maçlarında `false` döner (veya eski sürümlerde hiç gönderilmez). İstemci bu bayrağa bakarak maç sonu ekranında "Rövanş" butonunun aktif olup olmayacağını belirler.
 
 #### İptal Edilen Maç (`voided`)
 Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton verilmez, lig/istatistik kaydı yapılmaz ve maça enerji harcamış tüm oyunculara enerjileri iade edilir:
@@ -436,6 +438,114 @@ Rakip oyuncu `extra_time` güçlendiricisini kullandığında bilgi amaçlı ile
 ```
 *(Not: `give_answer` güçlendiricisi kullanıldığında `opponent_powerup` mesajı GÖNDERİLMEZ; eski istemcilerin bunu "+5 sn ek süre" olarak algılamasını önlemek için cevap doğrudan `state.attempts` listesine eklenir ve sıra rakibe geçer).*
 ```
+
+---
+
+### 3.2. Rövanş (Rematch) Protokolü
+
+Maç normal olarak sonuçlandıktan sonra (`status === 'finished'`), mevcut canlı maç odası WebSocket bağlantısı üzerinden aynı iki oyuncu birbirine rövanş teklif edebilir.
+
+#### İstemci -> Sunucu Mesajları
+
+1. **Rövanş Teklifi Gönderme (`rematch_offer`):**
+```json
+{
+  "t": "rematch_offer"
+}
+```
+- Yalnızca maç normal bittiyse (`endedBy: "normal"`, bot maçı değilse) ve rövanş durumu `idle` (veya rakip teklif etmişse) kabul edilir.
+- Aksi halde sunucu `{ "t": "rematch_error", "code": "not_available" }` döner.
+
+2. **Rövanş Teklifini Kabul Etme (`rematch_accept`):**
+```json
+{
+  "t": "rematch_accept"
+}
+```
+- Teklifi alan oyuncu kabul ettiğinde yeni maç oluşturma akışı tetiklenir. Teklif eden kendi teklifini kabul edemez.
+
+3. **Rövanş Teklifini Reddetme (`rematch_decline`):**
+```json
+{
+  "t": "rematch_decline"
+}
+```
+- Teklifi alan oyuncu reddettiğinde her iki tarafa `{ "t": "rematch_status", "status": "declined" }` gider ve oda terminal `declined` durumuna geçer.
+
+4. **Maç Sonu Ekranından Ayrılma (`rematch_leave`):**
+```json
+{
+  "t": "rematch_leave"
+}
+```
+- Oyuncu maç sonu ekranından ayrıldığında (veya WebSocket bağlantısı kapandığında) odada kalan rakibe `{ "t": "rematch_status", "status": "opponent_left" }` gider.
+
+#### Sunucu -> İstemci Mesajları
+
+1. **Rövanş Teklif Edildi (`rematch_offered`):**
+```json
+{
+  "t": "rematch_offered",
+  "byUid": "user_abc123",
+  "expiresAtMs": 1728518445000
+}
+```
+- Teklifi alan tarafa ve teklif edenin onay görmesi için her iki oyuncuya gönderilir (`byUid` ile kimin teklif ettiği anlaşılır).
+- Teklif geçerlilik süresi 45 saniyedir (`expiresAtMs = nowMs + 45000`).
+
+2. **Rövanş Durumu (`rematch_status`):**
+```json
+{
+  "t": "rematch_status",
+  "status": "declined" | "expired" | "opponent_left" | "closed"
+}
+```
+- `declined`: Rakip teklifi reddetti.
+- `expired`: 45 saniyelik teklif süresi doldu (Durable Object alarmı tetikler).
+- `opponent_left`: Rakip maç sonu ekranından ayrıldı veya bağlantısını kapattı.
+- `closed`: Rövanş döngüsü kapandı.
+
+3. **Rövanş Hatası (`rematch_error`):**
+```json
+{
+  "t": "rematch_error",
+  "code": "no_energy" | "opponent_no_energy" | "blocked" | "account_deleted" | "not_available" | "unavailable"
+}
+```
+- `no_energy`: İşlemi yapan oyuncunun enerjisi yetersiz.
+- `opponent_no_energy`: Rakip oyuncunun enerjisi yetersiz (enerjisi olan oyuncuya bildirilir; harcanmış enerjisi iade edilir).
+- `blocked`: Taraflar arasında karşılıklı engelleme mevcut.
+- `account_deleted`: Taraflardan birinin hesabı silinmiş.
+- `not_available`: Maç rövanşa uygun değil veya rövanş süreci kapanmış.
+- `unavailable`: Sistem/içerik geçici olarak kullanılamıyor.
+
+4. **Yeni Eşleşme Bildirimi (`matched`):**
+```json
+{
+  "t": "matched",
+  "matchId": "m_new_match_uuid",
+  "opponentName": "Mehmet",
+  "opponentFrame": "classic",
+  "opponentUid": "user_xyz789",
+  "isFriendly": false
+}
+```
+- Teklif kabul edildiğinde (veya çift teklif anında) Matchmaker tarafından yeni bir `MatchRoom` kurulur ve her iki oyuncuya yeni maç kimliğiyle gönderilir.
+- Ardından mevcut eski maç odası WebSocket'leri `code: 1000, reason: "rematch_started"` ile kapatılır.
+- İstemciler yeni maç odasına (`/ws/match/:matchId`) bağlanır.
+
+#### Rövanş Kuralları ve Durum Makinesi
+- **Durum Geçişleri:** `idle` -> `offered` -> `accepted` | `declined` | `expired` | `closed`.
+- **Tek Döngü Garantisi:** Bir maç odasından en fazla 1 kez yeni rövanş maçı türetilebilir. Terminal duruma (`declined`, `expired`, `closed`) ulaşıldıktan sonra yeni teklif gönderilemez (`not_available`).
+- **Çift Teklif Yarış Durumu (Dual Offer):** Biri teklif etmişken (`offered`), karşı taraf da `rematch_offer` gönderirse sunucu bunu otomatik `rematch_accept` olarak değerlendirir ve yeni maçı başlatır.
+- **Süre ve Alarm Yönetimi:** Cloudflare Durable Object tek-alarm kuralına uygun olarak `schedule.rematchTimeoutAtMs` minimum alarm algoritmasında yönetilir; 10 dakikalık oda temizlik (`cleanupAtMs`) alarmını bozmaz.
+- **Rövanş Bağlantı Süresi (Connect Timeout):** Rövanş ile oluşturulan yeni odada (`isRematch: true`), maç türü ne olursa olsun (ranked veya friendly) bağlantı zaman aşımı **15 saniyedir** (`FRIENDLY_CONNECT_TIMEOUT_MS`). Bu sayede 3.5 saniyelik eşleşme/hazırlık ekranı süresince ranked maçlarda 10 sn'lik normal sürenin yetersiz kalma riski önlenir.
+- **Enerji ve Bakiye Atomikliği:**
+  - Ranked rövanşta her iki oyuncudan da 1 enerji harcanır.
+  - Önce teklif eden oyuncudan enerji düşülür. Başarısız olursa derhal `no_energy` döner.
+  - Kabul eden oyuncunun enerjisi yetersizse, teklif edenden düşülen enerji `refundEnergyWithRetry` ile derhal iade edilir; teklif edene `opponent_no_energy`, kabul edene `no_energy` hatası iletilir.
+  - Arkadaş maçlarında enerji harcanmaz.
+- **Yeniden Bağlanma Anlık Görüntüsü (Snapshot):** Bitmiş bir odaya yeniden bağlanan oyuncuya güncel rövanş durumu (`rematch_offered` veya `rematch_status`) derhal gönderilir.
 
 ---
 

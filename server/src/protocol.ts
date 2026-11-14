@@ -69,7 +69,11 @@ export type MatchRoomClientMessage =
   | { readonly t: 'submit'; readonly text: string }
   | { readonly t: 'leave' }
   | { readonly t: 'sync' }
-  | { readonly t: 'use_powerup'; readonly type: 'extra_time' | 'give_answer' };
+  | { readonly t: 'use_powerup'; readonly type: 'extra_time' | 'give_answer' }
+  | { readonly t: 'rematch_offer' }
+  | { readonly t: 'rematch_accept' }
+  | { readonly t: 'rematch_decline' }
+  | { readonly t: 'rematch_leave' };
 
 export interface ClientAttempt {
   readonly mine: boolean;
@@ -134,6 +138,7 @@ export interface ClientFinalMessage {
   readonly opponentUid?: string;
   readonly coinsAwarded?: number;
   readonly coins?: number;
+  readonly rematchAvailable?: boolean;
 }
 
 export interface ClientFeedbackMessage {
@@ -164,13 +169,53 @@ export interface ClientOpponentPowerupMessage {
   readonly seconds: number;
 }
 
+export interface ClientRematchOfferedMessage {
+  readonly t: 'rematch_offered';
+  readonly byUid: string;
+  readonly expiresAtMs: number;
+}
+
+export interface ClientRematchStatusMessage {
+  readonly t: 'rematch_status';
+  readonly status: 'declined' | 'expired' | 'opponent_left' | 'closed';
+}
+
+export interface ClientRematchErrorMessage {
+  readonly t: 'rematch_error';
+  readonly code:
+    | 'no_energy'
+    | 'opponent_no_energy'
+    | 'blocked'
+    | 'account_deleted'
+    | 'not_available'
+    | 'unavailable';
+}
+
+export interface ClientMatchedMessage {
+  readonly t: 'matched';
+  readonly matchId: string;
+  readonly opponentName: string;
+  readonly opponentFrame?: string;
+  readonly opponentUid?: string;
+  readonly isFriendly?: boolean;
+  readonly serverNowMs?: number;
+  readonly firstQuestion?: {
+    readonly id: string;
+    readonly text: string;
+  };
+}
+
 export type MatchRoomServerMessage =
   | ClientStateMessage
   | ClientFinalMessage
   | ClientFeedbackMessage
   | ClientVoidedMessage
   | ClientPowerupAckMessage
-  | ClientOpponentPowerupMessage;
+  | ClientOpponentPowerupMessage
+  | ClientRematchOfferedMessage
+  | ClientRematchStatusMessage
+  | ClientRematchErrorMessage
+  | ClientMatchedMessage;
 
 export function sanitizePlayerName(rawName?: unknown): string {
   if (typeof rawName !== 'string') return 'Oyuncu';
@@ -266,6 +311,18 @@ export function parseMatchRoomMessage(
         return { t: 'use_powerup', type: 'give_answer' };
       }
       return null;
+    }
+    if (data.t === 'rematch_offer') {
+      return { t: 'rematch_offer' };
+    }
+    if (data.t === 'rematch_accept') {
+      return { t: 'rematch_accept' };
+    }
+    if (data.t === 'rematch_decline') {
+      return { t: 'rematch_decline' };
+    }
+    if (data.t === 'rematch_leave') {
+      return { t: 'rematch_leave' };
     }
   } catch {
     return null;
