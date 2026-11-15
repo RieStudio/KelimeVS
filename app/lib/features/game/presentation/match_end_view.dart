@@ -358,8 +358,25 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                   const MatchEndRematchError(MatchRequestErrorCode.opponentNoEnergy);
             });
           } else if (error.code == MatchRequestErrorCode.unavailable) {
+            // Alıcı o an müsait değilse tek rövanş hakkı yanmaz, tekrar denenebilir
+            _hasSentOrAcceptedRematch = false;
             setState(() {
               _terminalState = const MatchEndRematchUnavailableReason();
+            });
+          } else if (error.code == MatchRequestErrorCode.cooldownActive) {
+            _hasSentOrAcceptedRematch = false;
+            setState(() {
+              _terminalState = MatchEndRematchError(
+                MatchRequestErrorCode.cooldownActive,
+                retryAfterSec: error.retryAfterSec,
+              );
+            });
+          } else if (error.code == MatchRequestErrorCode.rateLimited) {
+            _hasSentOrAcceptedRematch = false;
+            setState(() {
+              _terminalState = const MatchEndRematchError(
+                MatchRequestErrorCode.rateLimited,
+              );
             });
           } else {
             setState(() {
@@ -561,6 +578,9 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
                             if (_isOnline) {
                               if (opponentUid == null || matchId == null) return;
+                              setState(() {
+                                _terminalState = null;
+                              });
                               _hasSentOrAcceptedRematch = true;
                               _awaitingResponseForSend = true;
                               ref
@@ -805,9 +825,14 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
         case MatchRequestErrorCode.opponentNoEnergy:
           infoText = AppStrings.rematchOpponentNoEnergy;
           infoColor = AppColors.dangerText;
-        case MatchRequestErrorCode.unavailable:
         case MatchRequestErrorCode.cooldownActive:
+          final sec = rematchState.retryAfterSec ?? 45;
+          infoText = AppStrings.matchRequestCooldownToast(sec);
+          infoColor = AppColors.muted;
         case MatchRequestErrorCode.rateLimited:
+          infoText = AppStrings.matchRequestRateLimitedToast;
+          infoColor = AppColors.muted;
+        case MatchRequestErrorCode.unavailable:
         case MatchRequestErrorCode.invalid:
           infoText = AppStrings.rematchUnavailable;
           infoColor = AppColors.muted;
@@ -817,6 +842,11 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       infoText = null;
       infoColor = AppColors.muted;
     }
+
+    final bool canRetry = rematchState is MatchEndRematchUnavailableReason ||
+        (rematchState is MatchEndRematchError &&
+            (rematchState.code == MatchRequestErrorCode.cooldownActive ||
+                rematchState.code == MatchRequestErrorCode.rateLimited));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -839,11 +869,18 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
           ),
           const SizedBox(height: AppDimens.space8),
         ],
-        PrimaryButton(
-          key: const Key('match_end_home_button'),
-          text: AppStrings.homeAction,
-          onPressed: onGoHome,
-        ),
+        if (canRetry)
+          PrimaryButton(
+            key: const Key('match_end_rematch_retry_button'),
+            text: AppStrings.rematchAction,
+            onPressed: onOfferRematch,
+          )
+        else
+          PrimaryButton(
+            key: const Key('match_end_home_button'),
+            text: AppStrings.homeAction,
+            onPressed: onGoHome,
+          ),
       ],
     );
   }

@@ -563,7 +563,17 @@ void main() {
       final textFinder = find.text(AppStrings.rematchUnavailable);
       expect(textFinder, findsOneWidget);
       expect(find.text('Rakip şu an müsait değil'), findsOneWidget);
-      expect(find.byKey(const Key('match_end_home_button')), findsOneWidget);
+      // Alıcı müsait olmadığında hak yanmaz, "Rövanş" (tekrar dene) butonu aktif kalır
+      final retryBtnFinder = find.byKey(const Key('match_end_rematch_retry_button'));
+      expect(retryBtnFinder, findsOneWidget);
+
+      // Tekrar dene butonuna tıklandığında yeniden istek gönderilir
+      fakeClient.sentMessages.clear();
+      await tester.tap(retryBtnFinder);
+      await tester.pump();
+
+      expect(fakeClient.sentMessages, hasLength(1));
+      expect(fakeClient.sentMessages[0].toJson()['t'], 'send_match_request');
     });
 
     testWidgets('10. İnsan rakip: opponentNoEnergy geldiğinde "Rakibin enerjisi yetersiz" kırmızı görünür', (tester) async {
@@ -634,6 +644,69 @@ void main() {
 
       expect(find.text('Rakip ayrıldı'), findsNothing);
       expect(find.textContaining('ayrıldı'), findsNothing);
+    });
+
+    testWidgets('12. İnsan rakip: cooldown_active ve rate_limited geldiğinde doğru mesaj ve aktif Rövanş butonu görünür', (tester) async {
+      final uiState = createMatchUiState();
+      final fakeClient = FakeUserInboxClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          activeMatchSessionModeProvider
+              .overrideWith(() => FakeSessionModeNotifier(MatchSessionMode.online)),
+          activeMatchUiStateProvider.overrideWithValue(uiState),
+          profileProvider.overrideWith(() => FakeProfileNotifier(
+            const ProfileState(
+              energy: EnergyState(enabled: true, current: 3, max: 5),
+            ),
+          )),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(matchRequestsProvider.notifier);
+      notifier.attachClient(fakeClient);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(body: MatchEndView()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('match_end_rematch_button')));
+      await tester.pump();
+
+      // Cooldown hatası
+      notifier.state = reduceMatchRequestMessage(
+        container.read(matchRequestsProvider),
+        UserInboxRequestErrorMessage(
+          code: MatchRequestErrorCode.cooldownActive,
+          retryAfterSec: 25,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(AppStrings.matchRequestCooldownToast(25)), findsOneWidget);
+      expect(find.byKey(const Key('match_end_rematch_retry_button')), findsOneWidget);
+
+      // Rate limit hatası
+      await tester.tap(find.byKey(const Key('match_end_rematch_retry_button')));
+      await tester.pump();
+
+      notifier.state = reduceMatchRequestMessage(
+        container.read(matchRequestsProvider),
+        UserInboxRequestErrorMessage(
+          code: MatchRequestErrorCode.rateLimited,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(AppStrings.matchRequestRateLimitedToast), findsOneWidget);
+      expect(find.byKey(const Key('match_end_rematch_retry_button')), findsOneWidget);
     });
   });
 }

@@ -95,12 +95,14 @@ class MatchEndRematchUnavailableReason extends MatchEndRematchState {
   String toString() => 'MatchEndRematchUnavailableReason()';
 }
 
-/// Enerji yetersizliği vb. hata durumu (terminal).
+/// Enerji yetersizliği veya hız sınırı vb. hata durumu.
 class MatchEndRematchError extends MatchEndRematchState {
   final MatchRequestErrorCode code;
+  final int? retryAfterSec;
 
-  const MatchEndRematchError(this.code);
+  const MatchEndRematchError(this.code, {this.retryAfterSec});
 
   @override
-  String toString() => 'MatchEndRematchError(code: $code)';
+  String toString() =>
+      'MatchEndRematchError(code: $code, retryAfterSec: $retryAfterSec)';
 }
