@@ -24,6 +24,8 @@ void main() {
 
     test('MatchRequestErrorCode string parsing and wire representation', () {
       expect(MatchRequestErrorCode.fromString('unavailable'), MatchRequestErrorCode.unavailable);
+      expect(MatchRequestErrorCode.fromString('offline'), MatchRequestErrorCode.offline);
+      expect(MatchRequestErrorCode.fromString('requests_disabled'), MatchRequestErrorCode.requestsDisabled);
       expect(MatchRequestErrorCode.fromString('cooldown_active'), MatchRequestErrorCode.cooldownActive);
       expect(MatchRequestErrorCode.fromString('rate_limited'), MatchRequestErrorCode.rateLimited);
       expect(MatchRequestErrorCode.fromString('no_energy'), MatchRequestErrorCode.noEnergy);
@@ -32,6 +34,8 @@ void main() {
       expect(MatchRequestErrorCode.fromString('unknown_future_error'), MatchRequestErrorCode.invalid);
 
       expect(MatchRequestErrorCode.unavailable.toWireString(), 'unavailable');
+      expect(MatchRequestErrorCode.offline.toWireString(), 'offline');
+      expect(MatchRequestErrorCode.requestsDisabled.toWireString(), 'requests_disabled');
       expect(MatchRequestErrorCode.cooldownActive.toWireString(), 'cooldown_active');
       expect(MatchRequestErrorCode.rateLimited.toWireString(), 'rate_limited');
       expect(MatchRequestErrorCode.noEnergy.toWireString(), 'no_energy');
@@ -69,8 +73,12 @@ void main() {
 
       // Alım anında cihaz saatinden bağımsız olarak 45 saniyedir
       expect(req.calculateRemainingSeconds(elapsedMsOverride: 0), 45);
+      expect(req.calculateRemainingMs(elapsedMsOverride: 0), 45000);
+      expect(req.calculateRemainingFraction(elapsedMsOverride: 0), 1.0);
       // 10 sn monotonik süre geçince 35 sn
       expect(req.calculateRemainingSeconds(elapsedMsOverride: 10000), 35);
+      expect(req.calculateRemainingMs(elapsedMsOverride: 10000), 35000);
+      expect(req.calculateRemainingFraction(elapsedMsOverride: 10000), closeTo(35000 / 45000.0, 0.0001));
     });
 
     test('canlı istek: cihaz saati 5 dk geri olsa bile kalan süre ~45 sn başlar', () {

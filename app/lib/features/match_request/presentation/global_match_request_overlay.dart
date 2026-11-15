@@ -170,6 +170,20 @@ class _GlobalMatchRequestOverlayState
         }
         break;
 
+      case MatchRequestErrorCode.offline:
+        _showToast(
+          AppStrings.matchRequestOfflineToast,
+          isDanger: false,
+        );
+        break;
+
+      case MatchRequestErrorCode.requestsDisabled:
+        _showToast(
+          AppStrings.matchRequestDisabledToast,
+          isDanger: false,
+        );
+        break;
+
       case MatchRequestErrorCode.unavailable:
         if (wasAccepting) {
           _showToast(

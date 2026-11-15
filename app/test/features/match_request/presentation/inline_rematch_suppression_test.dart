@@ -295,7 +295,9 @@ void main() {
 
       // Kullanıcı sol üst Kapat ikonuna basarak ana sayfaya dönsün
       await tester.tap(find.bySemanticsLabel(AppStrings.close));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
 
       // MatchEndView dispose oldu; kayıt sıfırlandı!
       expect(container.read(inlineHandledRematchOpponentUidProvider), isNull);

@@ -234,7 +234,9 @@ export type UserServerMessage =
         | 'rate_limited'
         | 'invalid'
         | 'no_energy'
-        | 'opponent_no_energy';
+        | 'opponent_no_energy'
+        | 'offline'
+        | 'requests_disabled';
       readonly retryAfterSec?: number;
     }
   | ClientMatchedMessage

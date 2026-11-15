@@ -88,7 +88,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(IncomingMatchRequestBanner), findsOneWidget);
       expect(find.text(AppStrings.matchRequestTitleProfile('Ahmet')), findsOneWidget);
@@ -172,7 +173,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(IncomingMatchRequestBanner), findsOneWidget);
       expect(find.byType(OutgoingMatchRequestChip), findsOneWidget);
@@ -456,6 +458,74 @@ void main() {
       expect(find.text(AppStrings.matchRequestCooldownToast(25)), findsOneWidget);
     });
 
+    testWidgets('offline hatasında doğru tost mesajı gösterilir', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          profileProvider.overrideWith(() => TestProfileNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
+            builder: (context, child) =>
+                GlobalMatchRequestOverlay(child: child ?? const SizedBox.shrink()),
+            home: const Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      container.read(matchRequestsProvider.notifier).state =
+          const MatchRequestsState(
+        lastError: MatchRequestErrorInfo(
+          code: MatchRequestErrorCode.offline,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(AppStrings.matchRequestOfflineToast), findsOneWidget);
+    });
+
+    testWidgets('requestsDisabled hatasında doğru tost mesajı gösterilir', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          profileProvider.overrideWith(() => TestProfileNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
+            builder: (context, child) =>
+                GlobalMatchRequestOverlay(child: child ?? const SizedBox.shrink()),
+            home: const Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      container.read(matchRequestsProvider.notifier).state =
+          const MatchRequestsState(
+        lastError: MatchRequestErrorInfo(
+          code: MatchRequestErrorCode.requestsDisabled,
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(AppStrings.matchRequestDisabledToast), findsOneWidget);
+    });
+
     testWidgets('matched olayı geldiğinde FriendMatchRevealScreen açılır ve dialogları kapatır',
         (tester) async {
       final matchedController = StreamController<MatchedEvent>.broadcast();
@@ -664,7 +734,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // 1. Material(transparency) atası doğrulaması
       final bannerFinder = find.byType(IncomingMatchRequestBanner);
@@ -754,7 +825,8 @@ void main() {
 
       container.read(matchRequestsProvider.notifier).state =
           MatchRequestsState(incoming: inReq);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(IncomingMatchRequestBanner), findsOneWidget);
 

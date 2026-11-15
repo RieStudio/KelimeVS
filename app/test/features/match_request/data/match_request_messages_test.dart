@@ -130,6 +130,16 @@ void main() {
       expect(msg1.code, MatchRequestErrorCode.unavailable);
       expect(msg1.retryAfterSec, isNull);
 
+      final jsonOffline = '{"t":"match_request_error","code":"offline"}';
+      final msgOffline = parseUserInboxServerMessage(jsonOffline) as UserInboxRequestErrorMessage;
+      expect(msgOffline.code, MatchRequestErrorCode.offline);
+      expect(msgOffline.retryAfterSec, isNull);
+
+      final jsonDisabled = '{"t":"match_request_error","code":"requests_disabled"}';
+      final msgDisabled = parseUserInboxServerMessage(jsonDisabled) as UserInboxRequestErrorMessage;
+      expect(msgDisabled.code, MatchRequestErrorCode.requestsDisabled);
+      expect(msgDisabled.retryAfterSec, isNull);
+
       final json2 = '{"t":"match_request_error","code":"cooldown_active","retryAfterSec":35}';
       final msg2 = parseUserInboxServerMessage(json2) as UserInboxRequestErrorMessage;
       expect(msg2.code, MatchRequestErrorCode.cooldownActive);

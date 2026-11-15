@@ -548,16 +548,26 @@ Uygulama ön plandayken her kullanıcı kendi `UserProfile` Durable Object'ine b
 ```json
 {
   "t": "match_request_error",
-  "code": "unavailable" | "cooldown_active" | "rate_limited" | "invalid" | "no_energy" | "opponent_no_energy",
+  "code": "unavailable" | "offline" | "requests_disabled" | "cooldown_active" | "rate_limited" | "invalid" | "no_energy" | "opponent_no_energy",
   "retryAfterSec": 35
 }
 ```
-- `unavailable`: Hedef oyuncu çevrimdışı, meşgul, maç isteklerini kapatmış, engelli veya hesabı silinmiş (gizlilik koruması nedeniyle detay verilmez).
+- `unavailable`: Hedef oyuncu o an meşgul (oyunda veya başka bir gelen isteği bekliyor).
+- `offline`: Hedef oyuncu çevrimdışı (açık soketi yok), hesabı silinmiş veya taraflardan biri diğerini engellemiş (gizlilik koruması: engelleme asla ifşa edilmez, çevrimdışı gibi döner).
+- `requests_disabled`: Hedef oyuncu maç isteklerini kapatmış (`allow_match_requests == 0`). Gizlilik koruması: bu kontrol alıcının çevrimiçi olup olmamasından ÖNCE yapılır, böylece ayarı kapalı olan oyuncunun online durumu dışarı sızdırılmaz.
 - `cooldown_active`: Reddetme veya süre aşımı sonrası 45 saniyelik bekleme süresi dolmamış (`retryAfterSec` döner).
 - `rate_limited`: Dakikada en fazla 3 istek kotası aşıldı (`retryAfterSec` döner).
 - `invalid`: Kendine istek atma veya geçersiz parametreler.
 - `no_energy`: Rankli rövanşta kullanıcının enerjisi yetersiz.
 - `opponent_no_energy`: Rankli rövanşta rakibin enerjisi yetersiz.
+
+**Sunucu Doğrulama Sırası (Strict 6 Adım):**
+1. Kendine istek -> `invalid`
+2. Engelleme (karşılıklı) veya silinmiş hesap -> `offline` (engelleme asla sızdırılmaz)
+3. Alıcının maç istekleri kapalı (`allow_match_requests == 0`) -> `requests_disabled` (online kontrolünden önce değerlendirilir; online varlığı sızdırılmaz)
+4. Alıcı çevrimdışı (açık soketi yok) -> `offline`
+5. Alıcı meşgul (`busy` veya bekleyen gelen istek) -> `unavailable`
+6. Gönderenin kendi cooldown (`cooldown_active`), rate limit (`rate_limited`) veya bekleyen giden istek (`unavailable`) kontrolleri.
 
 5. **Eşleşme Tamamlandı (`matched`):**
 ```json

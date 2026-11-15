@@ -357,11 +357,13 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
               _terminalState =
                   const MatchEndRematchError(MatchRequestErrorCode.opponentNoEnergy);
             });
-          } else if (error.code == MatchRequestErrorCode.unavailable) {
-            // Alıcı o an müsait değilse tek rövanş hakkı yanmaz, tekrar denenebilir
+          } else if (error.code == MatchRequestErrorCode.unavailable ||
+              error.code == MatchRequestErrorCode.offline ||
+              error.code == MatchRequestErrorCode.requestsDisabled) {
+            // Alıcı o an müsait değilse / offline / istekleri kapalıysa tek rövanş hakkı yanmaz, tekrar denenebilir
             _hasSentOrAcceptedRematch = false;
             setState(() {
-              _terminalState = const MatchEndRematchUnavailableReason();
+              _terminalState = MatchEndRematchError(error.code);
             });
           } else if (error.code == MatchRequestErrorCode.cooldownActive) {
             _hasSentOrAcceptedRematch = false;
@@ -832,6 +834,12 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
         case MatchRequestErrorCode.rateLimited:
           infoText = AppStrings.matchRequestRateLimitedToast;
           infoColor = AppColors.muted;
+        case MatchRequestErrorCode.offline:
+          infoText = AppStrings.rematchOffline;
+          infoColor = AppColors.muted;
+        case MatchRequestErrorCode.requestsDisabled:
+          infoText = AppStrings.rematchRequestsDisabled;
+          infoColor = AppColors.muted;
         case MatchRequestErrorCode.unavailable:
         case MatchRequestErrorCode.invalid:
           infoText = AppStrings.rematchUnavailable;
@@ -845,7 +853,10 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
     final bool canRetry = rematchState is MatchEndRematchUnavailableReason ||
         (rematchState is MatchEndRematchError &&
-            (rematchState.code == MatchRequestErrorCode.cooldownActive ||
+            (rematchState.code == MatchRequestErrorCode.offline ||
+                rematchState.code == MatchRequestErrorCode.requestsDisabled ||
+                rematchState.code == MatchRequestErrorCode.unavailable ||
+                rematchState.code == MatchRequestErrorCode.cooldownActive ||
                 rematchState.code == MatchRequestErrorCode.rateLimited));
 
     return Column(

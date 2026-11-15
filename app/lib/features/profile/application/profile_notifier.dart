@@ -99,6 +99,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
   bool _isSyncing = false;
   Completer<void>? _currentSyncCompleter;
 
+  bool _lastConfirmedAllowMatchRequests = true;
+  bool? _pendingAllowMatchRequests;
+  bool _isUpdatingAllowMatchRequests = false;
+  Completer<bool>? _settingsCompleter;
+
   @visibleForTesting
   void simulateSyncStateForTesting({
     required bool isSyncing,
@@ -193,6 +198,8 @@ class ProfileNotifier extends Notifier<ProfileState> {
         await repo.setEquippedFrame(remote.equippedFrame);
         await repo.setStats(remote.uid, remote.stats);
         if (!ref.mounted) return false;
+        final isTogglingSettings =
+            _isUpdatingAllowMatchRequests || _pendingAllowMatchRequests != null;
         state = state.copyWith(
           coins: remote.coins,
           equippedFrame: remote.equippedFrame,
@@ -200,11 +207,16 @@ class ProfileNotifier extends Notifier<ProfileState> {
           serverNowMs: remote.serverNowMs,
           stats: remote.stats,
           isGuest: remote.isGuest,
-          allowMatchRequests: remote.allowMatchRequests,
+          allowMatchRequests: isTogglingSettings
+              ? state.allowMatchRequests
+              : remote.allowMatchRequests,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
           isLoaded: true,
         );
+        if (!isTogglingSettings) {
+          _lastConfirmedAllowMatchRequests = remote.allowMatchRequests;
+        }
 
         // 2. Takma ad senkronizasyonu (Kural 2)
         final localNick = state.nickname ?? await repo.getNickname();
@@ -312,6 +324,10 @@ class ProfileNotifier extends Notifier<ProfileState> {
   ///       böylece mevcut hesabın takma adının üzerine yazılamaz).
   Future<void> loadProfileForSwitchedAccount() async {
     await _awaitCurrentSync();
+
+    _lastConfirmedAllowMatchRequests = true;
+    _pendingAllowMatchRequests = null;
+    _isUpdatingAllowMatchRequests = false;
 
     state = state.copyWith(
       isLoaded: false,
@@ -492,19 +508,59 @@ class ProfileNotifier extends Notifier<ProfileState> {
     }
   }
 
-  /// Kullanıcının maç isteklerini açıp kapatmasını sağlar (iyimer güncelleme + hata durumunda geri alma).
+  /// Kullanıcının maç isteklerini açıp kapatmasını sağlar (iyimser güncelleme + tek uçuşlu ardışık kuyruk + hata durumunda geri alma).
   Future<bool> updateAllowMatchRequests(bool allow) async {
-    final previous = state.allowMatchRequests;
+    _pendingAllowMatchRequests = allow;
     state = state.copyWith(allowMatchRequests: allow);
 
-    final apiClient = ref.read(profileApiClientProvider);
-    final success = await apiClient.updateAllowMatchRequests(allow);
-
-    if (!success && ref.mounted) {
-      state = state.copyWith(allowMatchRequests: previous);
-      return false;
+    if (_isUpdatingAllowMatchRequests) {
+      final existingCompleter = _settingsCompleter;
+      if (existingCompleter != null) {
+        return existingCompleter.future;
+      }
     }
-    return success;
+
+    _isUpdatingAllowMatchRequests = true;
+    final completer = Completer<bool>();
+    _settingsCompleter = completer;
+    bool lastSuccess = true;
+
+    try {
+      while (_pendingAllowMatchRequests != null) {
+        final target = _pendingAllowMatchRequests!;
+        _pendingAllowMatchRequests = null;
+
+        final apiClient = ref.read(profileApiClientProvider);
+        final success = await apiClient.updateAllowMatchRequests(target);
+
+        if (success) {
+          _lastConfirmedAllowMatchRequests = target;
+          lastSuccess = true;
+        } else {
+          lastSuccess = false;
+          // Yeni bir bekleyen istek kuyruğa eklenmediyse, onaylanmış son sunucu değerine geri dön
+          if (_pendingAllowMatchRequests == null && ref.mounted) {
+            state = state.copyWith(allowMatchRequests: _lastConfirmedAllowMatchRequests);
+          }
+        }
+      }
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[ProfileNotifier] updateAllowMatchRequests error: $e\n$st');
+      }
+      lastSuccess = false;
+      if (_pendingAllowMatchRequests == null && ref.mounted) {
+        state = state.copyWith(allowMatchRequests: _lastConfirmedAllowMatchRequests);
+      }
+    } finally {
+      _isUpdatingAllowMatchRequests = false;
+      _settingsCompleter = null;
+      if (!completer.isCompleted) {
+        completer.complete(lastSuccess);
+      }
+    }
+
+    return lastSuccess;
   }
 }
 

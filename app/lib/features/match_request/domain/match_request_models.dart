@@ -25,6 +25,8 @@ enum MatchRequestOrigin {
 /// Maç isteği hata kodları. Bilinmeyen kod gelirse [invalid] olarak ayrıştırılır.
 enum MatchRequestErrorCode {
   unavailable,
+  offline,
+  requestsDisabled,
   cooldownActive,
   rateLimited,
   invalid,
@@ -35,6 +37,10 @@ enum MatchRequestErrorCode {
     switch (raw) {
       case 'unavailable':
         return MatchRequestErrorCode.unavailable;
+      case 'offline':
+        return MatchRequestErrorCode.offline;
+      case 'requests_disabled':
+        return MatchRequestErrorCode.requestsDisabled;
       case 'cooldown_active':
         return MatchRequestErrorCode.cooldownActive;
       case 'rate_limited':
@@ -53,6 +59,10 @@ enum MatchRequestErrorCode {
     switch (this) {
       case MatchRequestErrorCode.unavailable:
         return 'unavailable';
+      case MatchRequestErrorCode.offline:
+        return 'offline';
+      case MatchRequestErrorCode.requestsDisabled:
+        return 'requests_disabled';
       case MatchRequestErrorCode.cooldownActive:
         return 'cooldown_active';
       case MatchRequestErrorCode.rateLimited:
@@ -209,6 +219,27 @@ class IncomingMatchRequest {
     return sec.clamp(0, 45);
   }
 
+  /// Kalan süreyi milisaniye cinsinden [0, 45000] aralığında döndürür.
+  int calculateRemainingMs({int? elapsedMsOverride}) {
+    final int elapsed;
+    if (elapsedMsOverride != null) {
+      elapsed = elapsedMsOverride;
+    } else if (_elapsedMsProvider != null) {
+      elapsed = _elapsedMsProvider();
+    } else {
+      elapsed = _stopwatch.elapsedMilliseconds;
+    }
+
+    final remainingMs = initialRemainingMs - elapsed;
+    return remainingMs.clamp(0, 45000);
+  }
+
+  /// Kalan sürenin [0.0, 1.0] kesrini döndürür (1.0 = tam süre, 0.0 = süre bitti).
+  double calculateRemainingFraction({int? elapsedMsOverride}) {
+    final remainingMs = calculateRemainingMs(elapsedMsOverride: elapsedMsOverride);
+    return (remainingMs / 45000.0).clamp(0.0, 1.0);
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -332,6 +363,27 @@ class OutgoingMatchRequest {
     final remainingMs = initialRemainingMs - elapsed;
     final sec = (remainingMs / 1000).ceil();
     return sec.clamp(0, 45);
+  }
+
+  /// Kalan süreyi milisaniye cinsinden [0, 45000] aralığında döndürür.
+  int calculateRemainingMs({int? elapsedMsOverride}) {
+    final int elapsed;
+    if (elapsedMsOverride != null) {
+      elapsed = elapsedMsOverride;
+    } else if (_elapsedMsProvider != null) {
+      elapsed = _elapsedMsProvider();
+    } else {
+      elapsed = _stopwatch.elapsedMilliseconds;
+    }
+
+    final remainingMs = initialRemainingMs - elapsed;
+    return remainingMs.clamp(0, 45000);
+  }
+
+  /// Kalan sürenin [0.0, 1.0] kesrini döndürür (1.0 = tam süre, 0.0 = süre bitti).
+  double calculateRemainingFraction({int? elapsedMsOverride}) {
+    final remainingMs = calculateRemainingMs(elapsedMsOverride: elapsedMsOverride);
+    return (remainingMs / 45000.0).clamp(0.0, 1.0);
   }
 
   @override

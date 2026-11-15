@@ -71,6 +71,8 @@ abstract final class AppStrings {
   static const String rematchNoEnergy = 'Enerjin yetersiz';
   static const String rematchOpponentNoEnergy = 'Rakibin enerjisi yetersiz';
   static const String rematchUnavailable = 'Rakip şu an müsait değil';
+  static const String rematchOffline = 'Rakip şu an online değil';
+  static const String rematchRequestsDisabled = 'Rakip maç isteklerini kapatmış';
 
   // Ayarlar - Maç İstekleri
   static const String settingsSectionMatchRequests = 'Maç İstekleri';
@@ -94,6 +96,9 @@ abstract final class AppStrings {
   static const String matchRequestDeclinedToast = 'İstek reddedildi';
   static const String matchRequestExpiredToast = 'İstek yanıtsız kaldı';
   static const String matchRequestUnavailableToast = 'Oyuncu şu an müsait değil';
+  static const String matchRequestOfflineToast = 'Oyuncu şu an online değil';
+  static const String matchRequestDisabledToast =
+      'Bu oyuncu maç isteklerini kapatmış';
   static const String matchRequestUnavailableForAcceptToast =
       'İstek artık geçerli değil';
   static String matchRequestCooldownToast(int seconds) =>

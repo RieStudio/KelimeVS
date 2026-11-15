@@ -270,7 +270,12 @@ Hem maç sonu ekranındaki "Rövanş" hem de kullanıcı profilinden gönderilen
 - **Hız Sınırı (Rate Limit):** Spam önleme amacıyla gönderen kullanıcı dakikada en fazla 3 istek gönderebilir (`rate_limited`).
 - **Tek Aktif İstek Kısıtı:** Bir kullanıcının aynı anda en fazla 1 aktif giden ve 1 aktif gelen isteği olabilir.
 - **Karşılıklı Eşzamanlı İstek (Cross-Request):** İki oyuncu birbirine aynı anda maç/rövanş isteği gönderirse, sunucu alıcı DO'sunda bekleyen ters yönlü isteği fark eder ve beklemeden otomatik kabul sayarak maçı anında kurar.
-- **Gizlilik Koruması (Privacy):** Alıcının çevrimdışı olması, meşgul olması (başka maçta olması), ayarı kapatmış olması, engelli olması veya hesabının silinmiş olması gönderene asla ifşa edilmez. Tüm bu durumlarda gönderen yeknesak `unavailable` yanıtı alır.
+- **Gizlilik Koruması (Privacy) ve Hata Durumları:**
+  - Engelli olma veya silinmiş hesap durumunda gönderene asla engelleme ifşa edilmez; yeknesak `offline` ("Oyuncu şu an online değil") yanıtı döner.
+  - Alıcının maç istekleri kapalıysa (`allow_match_requests == 0`), bu kontrol alıcının çevrimiçi olup olmamasından önce yapılır; gönderene `requests_disabled` ("Bu oyuncu maç isteklerini kapatmış") döner ve alıcının online durumu sızdırılmaz.
+  - Alıcının açık soketi yoksa `offline` döner.
+  - Alıcı başka maçtaysa veya bekleyen gelen isteği varsa `unavailable` ("Oyuncu şu an müsait değil") döner.
+  - Gönderen bu üç durumda (`offline`, `requests_disabled`, `unavailable`) maç sonu ekranında rövanş hakkını kaybetmez ve "Rövanş" butonuyla tekrar deneyebilir.
 - **Misafir Kullanıcı Desteği:** Misafir kullanıcılar (`M-####`) maç isteği gönderebilir ve alabilir.
 - **Alarm Multiplexing:** Cloudflare Workers tek alarm kısıtlamasına uygun olarak 45 sn TTL zaman aşımları ile tombstone silme alarmı en yakın vadeye göre multiplexed olarak yönetilir.
 - **İstemci Global Katmanı (GlobalMatchRequestOverlay):** `MaterialApp.builder` içinde Navigator üstünde yer alan Stack ile yönetilir.

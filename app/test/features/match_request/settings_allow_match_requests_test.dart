@@ -117,11 +117,17 @@ class CapturingSettingsResponse extends Stream<List<int>> implements HttpClientR
 class FakeSettingsProfileApiClient implements ProfileApiClient {
   bool shouldSucceed = true;
   bool? lastAllowPassed;
+  final List<bool> callLog = [];
+  Future<bool> Function(bool allow)? onUpdate;
   UserProfileModel? mockProfile;
 
   @override
   Future<bool> updateAllowMatchRequests(bool allow) async {
     lastAllowPassed = allow;
+    callLog.add(allow);
+    if (onUpdate != null) {
+      return onUpdate!(allow);
+    }
     return shouldSucceed;
   }
 
@@ -228,6 +234,79 @@ void main() {
       expect(fakeApiClient.lastAllowPassed, isFalse);
       // Rollback: Tekrar true olmalı
       expect(container.read(profileProvider).allowMatchRequests, isTrue);
+    });
+
+    test('Hızlı switch geçişi (off -> on): tek uçuşlu ardışık kuyruk son durumu garanti eder', () async {
+      final completer1 = Completer<bool>();
+      final completer2 = Completer<bool>();
+      int callCount = 0;
+
+      fakeApiClient.onUpdate = (allow) {
+        callCount++;
+        if (callCount == 1) {
+          return completer1.future;
+        } else {
+          return completer2.future;
+        }
+      };
+
+      final notifier = container.read(profileProvider.notifier);
+
+      // 1. Kullanıcı switch'i kapatır (false)
+      final future1 = notifier.updateAllowMatchRequests(false);
+      expect(container.read(profileProvider).allowMatchRequests, isFalse);
+      expect(fakeApiClient.callLog, [false]);
+
+      // 2. İlk istek henüz sunucudayken kullanıcı switch'i tekrar açar (true)
+      final future2 = notifier.updateAllowMatchRequests(true);
+      expect(container.read(profileProvider).allowMatchRequests, isTrue);
+      // İkinci istek henüz çağrılmadı (ardışık kuyruk bekliyor)
+      expect(fakeApiClient.callLog, [false]);
+
+      // 3. İlk istek tamamlanır
+      completer1.complete(true);
+      await Future<void>.delayed(Duration.zero);
+
+      // İkinci istek kuyruktan çekilip gönderilmiş olmalı
+      expect(fakeApiClient.callLog, [false, true]);
+
+      // 4. İkinci istek tamamlanır
+      completer2.complete(true);
+      final res1 = await future1;
+      final res2 = await future2;
+
+      expect(res1, isTrue);
+      expect(res2, isTrue);
+      expect(container.read(profileProvider).allowMatchRequests, isTrue);
+    });
+
+    test('syncWithServer uçuşta olan switch ayarını ezmez', () async {
+      final completer = Completer<bool>();
+      fakeApiClient.onUpdate = (allow) => completer.future;
+      fakeApiClient.mockProfile = const UserProfileModel(
+        uid: 'u_1',
+        nickname: 'User',
+        coins: 100,
+        equippedFrame: 'classic',
+        isGuest: false,
+        allowMatchRequests: true, // Sunucudaki eski değer hala true
+      );
+
+      final notifier = container.read(profileProvider.notifier);
+
+      // Kullanıcı ayarı kapatır (false)
+      final future = notifier.updateAllowMatchRequests(false);
+      expect(container.read(profileProvider).allowMatchRequests, isFalse);
+
+      // Bu sırada sunucuyla senkronizasyon çalışır
+      await notifier.syncWithServer();
+
+      // Senkronizasyon in-flight ayarı ezmemeli, state hala false kalmalı
+      expect(container.read(profileProvider).allowMatchRequests, isFalse);
+
+      completer.complete(true);
+      await future;
+      expect(container.read(profileProvider).allowMatchRequests, isFalse);
     });
   });
 

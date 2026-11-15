@@ -338,7 +338,7 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
     );
 
     expect(u1Socket.sent).toEqual([
-      { t: 'match_request_error', code: 'unavailable' },
+      { t: 'match_request_error', code: 'offline' },
     ]);
   });
 
@@ -782,7 +782,7 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
       JSON.stringify({ t: 'send_match_request', origin: 'profile', toUid: 'u1' })
     );
 
-    expect(u2Socket.sent).toContainEqual({ t: 'match_request_error', code: 'unavailable' });
+    expect(u2Socket.sent).toContainEqual({ t: 'match_request_error', code: 'requests_disabled' });
   });
 
   it('13. Engelleme (Block) kuralları: Karşılıklı hiçbir yönde istek gitmez', async () => {
@@ -815,14 +815,14 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
       u1Socket as any,
       JSON.stringify({ t: 'send_match_request', origin: 'profile', toUid: 'u2' })
     );
-    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'unavailable' });
+    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'offline' });
 
     // u2 -> u1 istek atmayı dener: unavailable
     await u2Entry.profile.webSocketMessage(
       u2Socket as any,
       JSON.stringify({ t: 'send_match_request', origin: 'profile', toUid: 'u1' })
     );
-    expect(u2Socket.sent).toContainEqual({ t: 'match_request_error', code: 'unavailable' });
+    expect(u2Socket.sent).toContainEqual({ t: 'match_request_error', code: 'offline' });
   });
 
   it('14. Hesap silme: deleteProfile tüm açık soketleri 4001, "account_deleted" koduyla kapatır', async () => {
@@ -1369,7 +1369,7 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
       u1Socket as any,
       JSON.stringify({ t: 'send_match_request', origin: 'profile', toUid: 'u2' })
     );
-    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'unavailable' });
+    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'requests_disabled' });
     expect(u1Socket.sent.find((m) => m.t === 'matched')).toBeUndefined();
 
     // B) Engelleme durumu: u2 ayarları açsın ama u2, u1'i engellesin
@@ -1381,7 +1381,7 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
       u1Socket as any,
       JSON.stringify({ t: 'send_match_request', origin: 'profile', toUid: 'u2' })
     );
-    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'unavailable' });
+    expect(u1Socket.sent).toContainEqual({ t: 'match_request_error', code: 'offline' });
     expect(u1Socket.sent.find((m) => m.t === 'matched')).toBeUndefined();
   });
 

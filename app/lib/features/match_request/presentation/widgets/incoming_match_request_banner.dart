@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -36,28 +37,98 @@ class IncomingMatchRequestBanner extends StatefulWidget {
 }
 
 class _IncomingMatchRequestBannerState
-    extends State<IncomingMatchRequestBanner> {
-  Timer? _ticker;
-  double _progress = 1.0;
+    extends State<IncomingMatchRequestBanner>
+    with SingleTickerProviderStateMixin {
+  static const double progressWarningThresholdSec = 15.0;
+  static const double progressDangerThresholdSec = 5.0;
 
-  @override
-  void initState() {
-    super.initState();
-    _updateProgress();
-    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (mounted) {
-        _updateProgress();
-      }
-    });
+  Ticker? _ticker;
+  Timer? _steppedTimer;
+  double _progress = 1.0;
+  Color _barColor = AppColors.primary;
+  bool _animationsDisabled = false;
+
+  /// Kalan süreye göre çubuk rengini hesaplar.
+  /// 15 sn'ye kadar yeşil (primary), 15 sn - 5 sn arası kırmızıya yumuşak lerp, son 5 sn tam kırmızı (danger).
+  /// [disableAnimations] true ise lerp yerine tek adımda eşik geçişi yapılır.
+  static Color calculateBarColor(double remainingSeconds, {bool disableAnimations = false}) {
+    if (disableAnimations) {
+      return remainingSeconds <= progressDangerThresholdSec
+          ? AppColors.danger
+          : AppColors.primary;
+    }
+    if (remainingSeconds >= progressWarningThresholdSec) {
+      return AppColors.primary;
+    }
+    if (remainingSeconds <= progressDangerThresholdSec) {
+      return AppColors.danger;
+    }
+    final t = (progressWarningThresholdSec - remainingSeconds) /
+        (progressWarningThresholdSec - progressDangerThresholdSec);
+    return Color.lerp(AppColors.primary, AppColors.danger, t.clamp(0.0, 1.0)) ??
+        AppColors.danger;
   }
 
-  void _updateProgress() {
-    final remainingSec = widget.request.calculateRemainingSeconds();
-    final fraction = (remainingSec / 45.0).clamp(0.0, 1.0);
-    if (fraction != _progress) {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disableAnimations = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (_ticker == null && _steppedTimer == null) {
+      _animationsDisabled = disableAnimations;
+      _setupTimerOrTicker();
+    } else if (_animationsDisabled != disableAnimations) {
+      _animationsDisabled = disableAnimations;
+      _setupTimerOrTicker();
+    }
+  }
+
+  void _setupTimerOrTicker() {
+    _ticker?.dispose();
+    _ticker = null;
+    _steppedTimer?.cancel();
+    _steppedTimer = null;
+
+    _updateProgress(disableAnimations: _animationsDisabled);
+
+    if (_animationsDisabled) {
+      _steppedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          _updateProgress(disableAnimations: true);
+        }
+      });
+    } else {
+      _ticker = createTicker((_) {
+        if (mounted) {
+          _updateProgress(disableAnimations: false);
+        }
+      });
+      _ticker?.start();
+    }
+  }
+
+  void _updateProgress({bool disableAnimations = false}) {
+    final remainingMs = widget.request.calculateRemainingMs();
+    final remainingSec = remainingMs / 1000.0;
+    final double fraction;
+    if (disableAnimations) {
+      final sec = widget.request.calculateRemainingSeconds();
+      fraction = (sec / 45.0).clamp(0.0, 1.0);
+    } else {
+      fraction = widget.request.calculateRemainingFraction();
+    }
+
+    final color = calculateBarColor(remainingSec, disableAnimations: disableAnimations);
+
+    if (fraction != _progress || color != _barColor) {
       setState(() {
         _progress = fraction;
+        _barColor = color;
       });
+    }
+
+    if (remainingMs <= 0) {
+      _ticker?.stop();
+      _steppedTimer?.cancel();
     }
   }
 
@@ -65,13 +136,16 @@ class _IncomingMatchRequestBannerState
   void didUpdateWidget(covariant IncomingMatchRequestBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.request.id != widget.request.id) {
-      _updateProgress();
+      _setupTimerOrTicker();
     }
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    _ticker?.dispose();
+    _ticker = null;
+    _steppedTimer?.cancel();
+    _steppedTimer = null;
     super.dispose();
   }
 
@@ -163,9 +237,7 @@ class _IncomingMatchRequestBannerState
                 child: LinearProgressIndicator(
                   value: _progress,
                   backgroundColor: AppColors.surface,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.primary,
-                  ),
+                  valueColor: AlwaysStoppedAnimation<Color>(_barColor),
                 ),
               ),
             ),

@@ -394,6 +394,10 @@ class HttpProfileApiClient implements ProfileApiClient {
       if (response.statusCode == 200) {
         try {
           final map = response.decodeJsonMap();
+          if (map['ok'] == false) return false;
+          if (map.containsKey('allowMatchRequests')) {
+            return map['allowMatchRequests'] == allow;
+          }
           return map['ok'] == true;
         } catch (_) {
           return false;

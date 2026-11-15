@@ -2400,10 +2400,18 @@ export class UserProfile extends DurableObject<Env> {
 
   async updateSettings(settings: {
     allowMatchRequests?: boolean;
+    uid?: string;
   }): Promise<{ allowMatchRequests: boolean }> {
     this.ensureSchema();
     if (this.isDeleted()) {
       throw new Error('account_deleted');
+    }
+
+    const existing = this.ctx.storage.sql
+      .exec<{ uid: string }>('SELECT uid FROM profiles LIMIT 1')
+      .toArray();
+    if (existing.length === 0) {
+      await this.getProfile(settings.uid);
     }
 
     if (typeof settings.allowMatchRequests === 'boolean') {
@@ -2424,16 +2432,49 @@ export class UserProfile extends DurableObject<Env> {
     return { allowMatchRequests: allow };
   }
 
+  async isMatchRequestsAllowed(): Promise<boolean> {
+    this.ensureSchema();
+    const profile = this.ctx.storage.sql
+      .exec<{ allow_match_requests: number }>(
+        'SELECT allow_match_requests FROM profiles LIMIT 1'
+      )
+      .toArray();
+    return profile.length > 0 ? profile[0].allow_match_requests !== 0 : true;
+  }
+
+  async isBusy(): Promise<boolean> {
+    this.ensureSchema();
+    const presence = this.ctx.storage.sql
+      .exec<{ state: string }>(
+        "SELECT state FROM user_presence WHERE key = 'current' LIMIT 1"
+      )
+      .toArray();
+    return presence.length > 0 && presence[0].state === 'busy';
+  }
+
+  async hasPendingIncoming(nowMs = Date.now()): Promise<boolean> {
+    this.ensureSchema();
+    const rows = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        "SELECT id FROM incoming_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
+        nowMs
+      )
+      .toArray();
+    return rows.length > 0;
+  }
+
   async checkMatchRequestAvailability(
     senderUid: string
   ): Promise<{ ok: boolean; reason?: string }> {
     this.ensureSchema();
     if (this.isDeleted()) return { ok: false, reason: 'account_deleted' };
 
-    // 1. En az bir aktif soket bağlı olmalı (ön planda olmalı)
-    if (!this.isOnline()) return { ok: false, reason: 'offline' };
+    // 1. Engel: Alıcı göndereni engellemiş mi?
+    if (this.isBlocked(senderUid)) {
+      return { ok: false, reason: 'blocked' };
+    }
 
-    // 2. Ayar: allow_match_requests açık olmalı (1)
+    // 2. Ayar: allow_match_requests açık olmalı (1) - Çevrimiçi durumunu sızdırmamak için offline'dan önce kontrol edilir
     const profile = this.ctx.storage.sql
       .exec<{ allow_match_requests: number }>(
         'SELECT allow_match_requests FROM profiles LIMIT 1'
@@ -2443,7 +2484,10 @@ export class UserProfile extends DurableObject<Env> {
       return { ok: false, reason: 'settings_off' };
     }
 
-    // 3. Durum: 'busy' olmamalı
+    // 3. En az bir aktif soket bağlı olmalı (ön planda olmalı)
+    if (!this.isOnline()) return { ok: false, reason: 'offline' };
+
+    // 4. Durum: 'busy' olmamalı
     const presence = this.ctx.storage.sql
       .exec<{ state: string }>(
         "SELECT state FROM user_presence WHERE key = 'current' LIMIT 1"
@@ -2451,11 +2495,6 @@ export class UserProfile extends DurableObject<Env> {
       .toArray();
     if (presence.length > 0 && presence[0].state === 'busy') {
       return { ok: false, reason: 'busy' };
-    }
-
-    // 4. Engel: Alıcı göndereni engellemiş mi?
-    if (this.isBlocked(senderUid)) {
-      return { ok: false, reason: 'blocked' };
     }
 
     // 5. Zaten bekleyen bir gelen istek olmamalı
@@ -2485,7 +2524,7 @@ export class UserProfile extends DurableObject<Env> {
   ): Promise<void> {
     const now = Date.now();
 
-    // 1. Kendine istek atamaz
+    // 1. Kendine istek -> invalid
     if (senderUid === toUid) {
       console.warn(
         JSON.stringify({
@@ -2499,20 +2538,135 @@ export class UserProfile extends DurableObject<Env> {
       return;
     }
 
-    // 2. Hedef zaten bize istek atmış mı? Varsa doğrudan o isteği kabul et (çift tıklama/eşzamanlılık koruması)
-    const pendingIncomingFromTarget = this.ctx.storage.sql
-      .exec<{ id: string }>(
-        "SELECT id FROM incoming_requests WHERE from_uid = ? AND status = 'pending' AND expires_at > ? LIMIT 1",
-        toUid,
-        now
-      )
-      .toArray();
-    if (pendingIncomingFromTarget.length > 0) {
-      await this.handleClientAcceptMatchRequest(senderUid, pendingIncomingFromTarget[0].id);
+    if (!this.env.USER_PROFILE) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'user_profile_binding_missing',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
       return;
     }
 
-    // 3. Dakikada en fazla 3 istek hız sınırı
+    const targetStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(toUid));
+
+    // 2. Gönderen veya alıcı birbirini engellemiş VEYA alıcı hesabı silinmiş -> "offline"
+    // (engel asla sızmasın; engelli gönderen, alıcı çevrimiçi olsa bile aynen çevrimdışı kullanıcı gibi görür)
+    if (await targetStub.isDeleted()) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'account_deleted',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'offline' });
+      return;
+    }
+
+    if (this.isBlocked(toUid) || (await targetStub.isBlocked(senderUid))) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'blocked',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'offline' });
+      return;
+    }
+
+    // 3. Alıcının allow_match_requests kapalı -> "requests_disabled"
+    // (çevrimdışı kontrolünden ÖNCE: ayar çevrimiçi durumunu sızdırmasın)
+    const isTargetAllowed = await targetStub.isMatchRequestsAllowed();
+    if (!isTargetAllowed) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'settings_off',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'requests_disabled' });
+      return;
+    }
+
+    // 4. Alıcının açık soketi yok -> "offline"
+    const isTargetOnline = await targetStub.isOnline();
+    if (!isTargetOnline) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'offline',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'offline' });
+      return;
+    }
+
+    // 5. Alıcı busy veya zaten bekleyen gelen isteği var -> "unavailable"
+    const isTargetBusy = await targetStub.isBusy();
+    if (isTargetBusy) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'busy',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    const targetHasPendingIncoming = await targetStub.hasPendingIncoming(now);
+    if (targetHasPendingIncoming) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'incoming_pending',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
+
+    // 6. Gönderenin cooldown'u / rate limit'i / bekleyen giden isteği (mevcut sıra ve kodlar korunur)
+    // 6a) Cooldown
+    const cooldownRow = this.ctx.storage.sql
+      .exec<{ cooldown_until: number }>(
+        'SELECT cooldown_until FROM match_request_cooldowns WHERE target_uid = ? LIMIT 1',
+        toUid
+      )
+      .toArray();
+    if (cooldownRow.length > 0 && cooldownRow[0].cooldown_until > now) {
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil((cooldownRow[0].cooldown_until - now) / 1000)
+      );
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'cooldown',
+          origin,
+          matchId,
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'cooldown_active', retryAfterSec });
+      return;
+    }
+
+    // 6b) Rate limit (dakikada en fazla 3 istek)
     this.ctx.storage.sql.exec(
       'DELETE FROM match_request_rate_limits WHERE created_at <= ?',
       now - 60_000
@@ -2546,31 +2700,7 @@ export class UserProfile extends DurableObject<Env> {
       return;
     }
 
-    // 4. Bekleme süresi (cooldown) kontrolü: toUid için aktif cooldown var mı?
-    const cooldownRow = this.ctx.storage.sql
-      .exec<{ cooldown_until: number }>(
-        'SELECT cooldown_until FROM match_request_cooldowns WHERE target_uid = ? LIMIT 1',
-        toUid
-      )
-      .toArray();
-    if (cooldownRow.length > 0 && cooldownRow[0].cooldown_until > now) {
-      const retryAfterSec = Math.max(
-        1,
-        Math.ceil((cooldownRow[0].cooldown_until - now) / 1000)
-      );
-      console.warn(
-        JSON.stringify({
-          event: 'match_request_rejected',
-          reason: 'cooldown',
-          origin,
-          matchId,
-        })
-      );
-      this.broadcastToUser({ t: 'match_request_error', code: 'cooldown_active', retryAfterSec });
-      return;
-    }
-
-    // 5. Gönderenin zaten bekleyen bir giden isteği var mı?
+    // 6c) Gönderenin bekleyen giden isteği
     const activeOut = this.ctx.storage.sql
       .exec<{ id: string }>(
         "SELECT id FROM outgoing_requests WHERE status = 'pending' AND expires_at > ? LIMIT 1",
@@ -2590,21 +2720,20 @@ export class UserProfile extends DurableObject<Env> {
       return;
     }
 
-    // 6. Gönderen bu kullanıcıyı engellemiş mi?
-    if (this.isBlocked(toUid)) {
-      console.warn(
-        JSON.stringify({
-          event: 'match_request_rejected',
-          reason: 'blocked',
-          origin,
-          matchId,
-        })
-      );
-      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+    // 7. Karşılıklı istek (hedef zaten bize istek atmış mı? Varsa doğrudan o isteği kabul et)
+    const pendingIncomingFromTarget = this.ctx.storage.sql
+      .exec<{ id: string }>(
+        "SELECT id FROM incoming_requests WHERE from_uid = ? AND status = 'pending' AND expires_at > ? LIMIT 1",
+        toUid,
+        now
+      )
+      .toArray();
+    if (pendingIncomingFromTarget.length > 0) {
+      await this.handleClientAcceptMatchRequest(senderUid, pendingIncomingFromTarget[0].id);
       return;
     }
 
-    // 7. Rematch ise MatchRoom doğrulaması
+    // 8. Rematch ise MatchRoom doğrulaması
     let matchType: 'friendly' | 'ranked' = 'friendly';
     if (origin === 'rematch') {
       if (!matchId) {
@@ -2654,27 +2783,13 @@ export class UserProfile extends DurableObject<Env> {
       }
     }
 
-    // 8. Gönderenin profil bilgileri
+    // 9. Gönderenin profil bilgileri
     const myProfile = await this.getProfile(senderUid);
     const senderNickname = myProfile.nickname ?? generateGuestNickname(senderUid);
     const senderFrame = myProfile.equippedFrame ?? 'classic';
 
-    // 9. Alıcı DO'suna ilet
-    if (!this.env.USER_PROFILE) {
-      console.warn(
-        JSON.stringify({
-          event: 'match_request_rejected',
-          reason: 'user_profile_binding_missing',
-          origin,
-          matchId,
-        })
-      );
-      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
-      return;
-    }
-
+    // 10. Alıcı DO'suna ilet
     try {
-      const targetStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(toUid));
       const res = await targetStub.receiveMatchRequest({
         senderUid,
         senderNickname,
@@ -2693,7 +2808,17 @@ export class UserProfile extends DurableObject<Env> {
             matchId,
           })
         );
-        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+        let errorCode: 'offline' | 'requests_disabled' | 'unavailable' = 'unavailable';
+        if (
+          res.reason === 'account_deleted' ||
+          res.reason === 'blocked' ||
+          res.reason === 'offline'
+        ) {
+          errorCode = 'offline';
+        } else if (res.reason === 'settings_off') {
+          errorCode = 'requests_disabled';
+        }
+        this.broadcastToUser({ t: 'match_request_error', code: errorCode });
         return;
       }
 

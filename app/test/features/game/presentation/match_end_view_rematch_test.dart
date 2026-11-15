@@ -716,5 +716,67 @@ void main() {
       expect(find.text(AppStrings.matchRequestRateLimitedToast), findsOneWidget);
       expect(find.byKey(const Key('match_end_rematch_retry_button')), findsOneWidget);
     });
+
+    testWidgets('13. İnsan rakip: offline ve requestsDisabled geldiğinde doğru mesaj ve aktif Rövanş retry butonu görünür', (tester) async {
+      final uiState = createMatchUiState();
+      final fakeClient = FakeUserInboxClient();
+
+      final container = ProviderContainer(
+        overrides: [
+          activeMatchSessionModeProvider
+              .overrideWith(() => FakeSessionModeNotifier(MatchSessionMode.online)),
+          activeMatchUiStateProvider.overrideWithValue(uiState),
+          profileProvider.overrideWith(() => FakeProfileNotifier(
+            const ProfileState(
+              energy: EnergyState(enabled: true, current: 3, max: 5),
+            ),
+          )),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(matchRequestsProvider.notifier);
+      notifier.attachClient(fakeClient);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(body: MatchEndView()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('match_end_rematch_button')));
+      await tester.pump();
+
+      // Offline hatası
+      notifier.state = reduceMatchRequestMessage(
+        container.read(matchRequestsProvider),
+        const UserInboxRequestErrorMessage(
+          code: MatchRequestErrorCode.offline,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(AppStrings.rematchOffline), findsOneWidget);
+      expect(find.byKey(const Key('match_end_rematch_retry_button')), findsOneWidget);
+
+      // requestsDisabled hatası
+      await tester.tap(find.byKey(const Key('match_end_rematch_retry_button')));
+      await tester.pump();
+
+      notifier.state = reduceMatchRequestMessage(
+        container.read(matchRequestsProvider),
+        const UserInboxRequestErrorMessage(
+          code: MatchRequestErrorCode.requestsDisabled,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(AppStrings.rematchRequestsDisabled), findsOneWidget);
+      expect(find.byKey(const Key('match_end_rematch_retry_button')), findsOneWidget);
+    });
   });
 }
