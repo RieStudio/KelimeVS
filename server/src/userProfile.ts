@@ -2424,12 +2424,14 @@ export class UserProfile extends DurableObject<Env> {
     return { allowMatchRequests: allow };
   }
 
-  async isAvailableForMatchRequest(senderUid: string): Promise<boolean> {
+  async checkMatchRequestAvailability(
+    senderUid: string
+  ): Promise<{ ok: boolean; reason?: string }> {
     this.ensureSchema();
-    if (this.isDeleted()) return false;
+    if (this.isDeleted()) return { ok: false, reason: 'account_deleted' };
 
     // 1. En az bir aktif soket bağlı olmalı (ön planda olmalı)
-    if (!this.isOnline()) return false;
+    if (!this.isOnline()) return { ok: false, reason: 'offline' };
 
     // 2. Ayar: allow_match_requests açık olmalı (1)
     const profile = this.ctx.storage.sql
@@ -2438,7 +2440,7 @@ export class UserProfile extends DurableObject<Env> {
       )
       .toArray();
     if (profile.length > 0 && profile[0].allow_match_requests === 0) {
-      return false;
+      return { ok: false, reason: 'settings_off' };
     }
 
     // 3. Durum: 'busy' olmamalı
@@ -2448,12 +2450,12 @@ export class UserProfile extends DurableObject<Env> {
       )
       .toArray();
     if (presence.length > 0 && presence[0].state === 'busy') {
-      return false;
+      return { ok: false, reason: 'busy' };
     }
 
     // 4. Engel: Alıcı göndereni engellemiş mi?
     if (this.isBlocked(senderUid)) {
-      return false;
+      return { ok: false, reason: 'blocked' };
     }
 
     // 5. Zaten bekleyen bir gelen istek olmamalı
@@ -2465,10 +2467,14 @@ export class UserProfile extends DurableObject<Env> {
       )
       .toArray();
     if (activeIncoming.length > 0) {
-      return false;
+      return { ok: false, reason: 'incoming_pending' };
     }
 
-    return true;
+    return { ok: true };
+  }
+
+  async isAvailableForMatchRequest(senderUid: string): Promise<boolean> {
+    return (await this.checkMatchRequestAvailability(senderUid)).ok;
   }
 
   async handleClientSendMatchRequest(
@@ -2481,6 +2487,14 @@ export class UserProfile extends DurableObject<Env> {
 
     // 1. Kendine istek atamaz
     if (senderUid === toUid) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'self',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'invalid' });
       return;
     }
@@ -2520,6 +2534,14 @@ export class UserProfile extends DurableObject<Env> {
         1,
         Math.ceil(((oldestRow?.oldest ?? now) + 60_000 - now) / 1000)
       );
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'rate_limited',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'rate_limited', retryAfterSec });
       return;
     }
@@ -2536,6 +2558,14 @@ export class UserProfile extends DurableObject<Env> {
         1,
         Math.ceil((cooldownRow[0].cooldown_until - now) / 1000)
       );
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'cooldown',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'cooldown_active', retryAfterSec });
       return;
     }
@@ -2548,12 +2578,28 @@ export class UserProfile extends DurableObject<Env> {
       )
       .toArray();
     if (activeOut.length > 0) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'outgoing_pending',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
       return;
     }
 
     // 6. Gönderen bu kullanıcıyı engellemiş mi?
     if (this.isBlocked(toUid)) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'blocked',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
       return;
     }
@@ -2566,18 +2612,43 @@ export class UserProfile extends DurableObject<Env> {
         return;
       }
       if (!this.env.MATCH_ROOM) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_rejected',
+            reason: 'room_binding_missing',
+            origin,
+            matchId,
+          })
+        );
         this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
         return;
       }
       try {
-        const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromString(matchId));
+        const roomStub = this.env.MATCH_ROOM.get(this.env.MATCH_ROOM.idFromName(matchId));
         const val = await roomStub.validateRematchRequest(senderUid, toUid);
         if (!val.ok) {
+          console.warn(
+            JSON.stringify({
+              event: 'match_request_rejected',
+              reason: val.error ?? 'room_validation_failed',
+              origin,
+              matchId,
+            })
+          );
           this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
           return;
         }
         matchType = val.matchType ?? 'ranked';
-      } catch {
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_rejected',
+            reason: 'room_exception',
+            origin,
+            matchId,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        );
         this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
         return;
       }
@@ -2590,6 +2661,14 @@ export class UserProfile extends DurableObject<Env> {
 
     // 9. Alıcı DO'suna ilet
     if (!this.env.USER_PROFILE) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'user_profile_binding_missing',
+          origin,
+          matchId,
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
       return;
     }
@@ -2606,13 +2685,59 @@ export class UserProfile extends DurableObject<Env> {
       });
 
       if (!res.ok) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_rejected',
+            reason: res.reason ?? 'target_rejected',
+            origin,
+            matchId,
+          })
+        );
         this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
         return;
       }
 
       if (res.crossAccepted) {
         // Karşılıklı istek sonucu maç anında kuruldu
+        if (origin === 'rematch' && matchId && this.env.MATCH_ROOM) {
+          try {
+            const roomStub = this.env.MATCH_ROOM.get(
+              this.env.MATCH_ROOM.idFromName(matchId)
+            );
+            await roomStub.markRematchRequestCreated();
+          } catch (e) {
+            console.warn(
+              JSON.stringify({
+                event: 'mark_rematch_request_created_failed',
+                reason: 'mark_rematch_exception',
+                matchId,
+                origin,
+                err: e instanceof Error ? e.message : String(e),
+              })
+            );
+          }
+        }
         return;
+      }
+
+      // İstek alıcıya başarıyla iletildi -> Artık bu maç için rövanş hakkı işaretlenir
+      if (origin === 'rematch' && matchId && this.env.MATCH_ROOM) {
+        try {
+          const roomStub = this.env.MATCH_ROOM.get(
+            this.env.MATCH_ROOM.idFromName(matchId)
+          );
+          await roomStub.markRematchRequestCreated();
+        } catch (e) {
+          console.warn(
+            JSON.stringify({
+              event: 'mark_rematch_request_created_failed',
+              reason: 'mark_rematch_exception',
+              matchId,
+              origin,
+              err: e instanceof Error ? e.message : String(e),
+            })
+          );
+        }
       }
 
       const requestId = res.requestId!;
@@ -2648,7 +2773,15 @@ export class UserProfile extends DurableObject<Env> {
         expiresAtMs: expiresAt,
       });
     } catch (err) {
-      console.error('sendMatchRequest targetStub error:', err);
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_rejected',
+          reason: 'target_exception',
+          origin,
+          matchId,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      );
       this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
     }
   }
@@ -2670,7 +2803,7 @@ export class UserProfile extends DurableObject<Env> {
   }> {
     this.ensureSchema();
     if (this.isDeleted()) {
-      return { ok: false, reason: 'unavailable' };
+      return { ok: false, reason: 'account_deleted' };
     }
 
     const now = Date.now();
@@ -2678,7 +2811,7 @@ export class UserProfile extends DurableObject<Env> {
 
     // 1. Engelleme kontrolü (karşılıklı engel durumunda cross-request veya yeni istek kabul edilmez)
     if (this.isBlocked(params.senderUid)) {
-      return { ok: false, reason: 'unavailable' };
+      return { ok: false, reason: 'blocked' };
     }
 
     // 2. Ayar kontrolü (maç istekleri kapalıysa cross-request veya yeni istek kabul edilmez)
@@ -2688,7 +2821,7 @@ export class UserProfile extends DurableObject<Env> {
       )
       .toArray();
     if (profile.length > 0 && profile[0].allow_match_requests === 0) {
-      return { ok: false, reason: 'unavailable' };
+      return { ok: false, reason: 'settings_off' };
     }
 
     // 3. Karşılıklı istek (cross-request) kontrolü
@@ -2779,10 +2912,10 @@ export class UserProfile extends DurableObject<Env> {
       return { ok: false, reason: 'unavailable' };
     }
 
-    // 2. Normal müsaitlik kontrolü
-    const available = await this.isAvailableForMatchRequest(params.senderUid);
-    if (!available) {
-      return { ok: false, reason: 'unavailable' };
+    // 4. Normal müsaitlik kontrolü
+    const avail = await this.checkMatchRequestAvailability(params.senderUid);
+    if (!avail.ok) {
+      return { ok: false, reason: avail.reason ?? 'unavailable' };
     }
 
     const requestId = crypto.randomUUID();
@@ -2885,7 +3018,26 @@ export class UserProfile extends DurableObject<Env> {
     const senderStub = this.env.USER_PROFILE.get(
       this.env.USER_PROFILE.idFromName(inc.from_uid)
     );
-    const verifyRes = await senderStub.verifySenderForAccept(requestId, receiverUid);
+    let verifyRes;
+    try {
+      verifyRes = await senderStub.verifySenderForAccept(requestId, receiverUid);
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_accept_failed',
+          reason: 'sender_exception',
+          requestId,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      );
+      this.ctx.storage.sql.exec(
+        "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
+        requestId
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      this.broadcastToUser({ t: 'match_request_status', id: requestId, status: 'cancelled' });
+      return;
+    }
     if (!verifyRes.ok) {
       this.ctx.storage.sql.exec(
         "UPDATE incoming_requests SET status = 'cancelled' WHERE id = ?",
@@ -2909,13 +3061,27 @@ export class UserProfile extends DurableObject<Env> {
     const matchmaker = this.env.MATCHMAKER.get(
       this.env.MATCHMAKER.idFromName('global')
     );
-    const createRes = await matchmaker.createDirectMatch({
-      p1: { uid: senderInfo.uid, name: senderInfo.nickname, frame: senderInfo.frame },
-      p2: { uid: receiverUid, name: myNickname, frame: myFrame },
-      matchType: inc.type,
-      prevMatchId: inc.match_id ?? '',
-      proposerUid: senderInfo.uid,
-    });
+    let createRes;
+    try {
+      createRes = await matchmaker.createDirectMatch({
+        p1: { uid: senderInfo.uid, name: senderInfo.nickname, frame: senderInfo.frame },
+        p2: { uid: receiverUid, name: myNickname, frame: myFrame },
+        matchType: inc.type,
+        prevMatchId: inc.match_id ?? '',
+        proposerUid: senderInfo.uid,
+      });
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: 'match_request_accept_failed',
+          reason: 'matchmaker_exception',
+          requestId,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      );
+      this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      return;
+    }
 
     if (createRes.ok) {
       this.ctx.storage.sql.exec(
@@ -2932,13 +3098,24 @@ export class UserProfile extends DurableObject<Env> {
         isFriendly: createRes.isFriendly,
       });
 
-      await senderStub.notifyMatched({
-        matchId: createRes.matchId,
-        opponentName: myNickname,
-        opponentFrame: myFrame,
-        opponentUid: receiverUid,
-        isFriendly: createRes.isFriendly,
-      });
+      try {
+        await senderStub.notifyMatched({
+          matchId: createRes.matchId,
+          opponentName: myNickname,
+          opponentFrame: myFrame,
+          opponentUid: receiverUid,
+          isFriendly: createRes.isFriendly,
+        });
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_notify_failed',
+            reason: 'notify_matched_exception',
+            requestId,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
     } else {
       if (createRes.error === 'no_energy' || createRes.error === 'opponent_no_energy') {
         const isMyEnergyShortage = createRes.errorTargetUid === receiverUid;
@@ -2946,10 +3123,32 @@ export class UserProfile extends DurableObject<Env> {
         const senderErrorCode = isMyEnergyShortage ? 'opponent_no_energy' : 'no_energy';
 
         this.broadcastToUser({ t: 'match_request_error', code: myErrorCode });
-        await senderStub.notifyMatchError(requestId, senderErrorCode);
+        try {
+          await senderStub.notifyMatchError(requestId, senderErrorCode);
+        } catch (err) {
+          console.warn(
+            JSON.stringify({
+              event: 'match_request_notify_failed',
+              reason: 'notify_match_error_exception',
+              requestId,
+              err: err instanceof Error ? err.message : String(err),
+            })
+          );
+        }
       } else {
         this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
-        await senderStub.notifyMatchError(requestId, 'unavailable');
+        try {
+          await senderStub.notifyMatchError(requestId, 'unavailable');
+        } catch (err) {
+          console.warn(
+            JSON.stringify({
+              event: 'match_request_notify_failed',
+              reason: 'notify_match_error_exception',
+              requestId,
+              err: err instanceof Error ? err.message : String(err),
+            })
+          );
+        }
       }
     }
   }
@@ -3073,7 +3272,16 @@ export class UserProfile extends DurableObject<Env> {
           this.env.USER_PROFILE.idFromName(inc.from_uid)
         );
         await senderStub.notifyDeclined(requestId, this.getEffectiveUid());
-      } catch {}
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_notify_failed',
+            reason: 'notify_declined_exception',
+            requestId,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
     }
   }
 
@@ -3112,7 +3320,16 @@ export class UserProfile extends DurableObject<Env> {
           this.env.USER_PROFILE.idFromName(out.to_uid)
         );
         await targetStub.notifyCancelled(requestId);
-      } catch {}
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            event: 'match_request_notify_failed',
+            reason: 'notify_cancelled_exception',
+            requestId,
+            err: err instanceof Error ? err.message : String(err),
+          })
+        );
+      }
     }
   }
 

@@ -14,6 +14,7 @@ vi.mock('cloudflare:workers', () => ({
 
 import { UserProfile } from '../src/userProfile';
 import worker, { type Env } from '../src/index';
+import { mockIdFromString } from './testHelpers';
 
 function createMockSocket(tag: string, sent: any[] = []) {
   let attachment: any = null;
@@ -215,7 +216,8 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
           }) as any,
       } as any,
       MATCH_ROOM: {
-        idFromString: (_id: string) => ({ name: _id }) as any,
+        idFromString: mockIdFromString as any,
+        idFromName: (_name: string) => ({ name: _name }) as any,
         get: (_id: any) =>
           ({
             validateRematchRequest: async (senderUid: string, receiverUid: string) => {
@@ -224,6 +226,7 @@ describe('Maç İsteği (Match Request) & /ws/user Sistemi', () => {
               }
               return rematchValidationResult;
             },
+            markRematchRequestCreated: async () => {},
           }) as any,
       } as any,
       START_COINS: '100',

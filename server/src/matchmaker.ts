@@ -802,7 +802,15 @@ export class Matchmaker extends DurableObject<Env> {
     let allQuestions: Question[];
     try {
       allQuestions = await this.contentProvider.getQuestions();
-    } catch {
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          event: 'create_direct_match_failed',
+          reason: 'content_provider_exception',
+          matchId,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      );
       allQuestions = [];
     }
 

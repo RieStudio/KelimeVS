@@ -55,6 +55,7 @@ function createMockRoomCtx() {
   const store = new Map<string, any>();
   const sockets: any[] = [];
   let alarmTime: number | null = null;
+  let pendingInit: Promise<void> | null = null;
 
   return {
     ctx: {
@@ -79,7 +80,8 @@ function createMockRoomCtx() {
         },
       },
       blockConcurrencyWhile(fn: () => Promise<void>) {
-        return fn();
+        pendingInit = fn();
+        return pendingInit;
       },
       getWebSockets(tag?: string) {
         if (!tag) return sockets;
@@ -96,6 +98,9 @@ function createMockRoomCtx() {
     store,
     sockets,
     getAlarm: () => alarmTime,
+    waitForInit: async () => {
+      if (pendingInit) await pendingInit;
+    },
   };
 }
 
@@ -183,7 +188,7 @@ async function setupFinishedMatch(options?: {
   return { room, ctx, store, ws1, ws2, getAlarm, fixedNow, env, p2Uid };
 }
 
-describe('MatchRoom Rematch State Machine & Lifecycle', () => {
+describe('MatchRoom Rematch Availability & Graceful Legacy Degradation', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -212,214 +217,84 @@ describe('MatchRoom Rematch State Machine & Lifecycle', () => {
     expect(finalMsg.rematchAvailable).toBe(false);
   });
 
-  it('3. Bitmemiş maçta veya hükmen bitmiş maçta rematch_offer teklif edilirse not_available döner', async () => {
-    const { room, ws1 } = await setupFinishedMatch({ forfeit: true });
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    expect(ws1.sent).toContainEqual({ t: 'rematch_error', code: 'not_available' });
-  });
-
-  it('4. Başarılı teklif: p1 teklif eder, her iki tarafa rematch_offered gider ve alarm kurulur', async () => {
-    const { room, ws1, ws2, getAlarm, fixedNow } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-
-    const expectedOffer = {
-      t: 'rematch_offered',
-      byUid: 'p1',
-      expiresAtMs: fixedNow + 45000,
-    };
-    expect(ws1.sent).toContainEqual(expectedOffer);
-    expect(ws2.sent).toContainEqual(expectedOffer);
-
-    // Alarm is set to 45s from now
-    expect(getAlarm()).toBe(fixedNow + 45000);
-  });
-
-  it('5. Teklif eden oyuncu kendi teklifini kabul edemez', async () => {
-    const { room, ws1 } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
+  it('3. Bot rakiple biten maçta final mesajı rematchAvailable: false içerir', async () => {
+    const { room, ws1 } = await setupFinishedMatch({ bot: true });
     ws1.sent.length = 0;
+    (room as any).broadcastFinal();
 
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_accept' }));
-    // Accepted message or matched should not be sent
-    expect(ws1.sent.find((m) => m.t === 'matched')).toBeUndefined();
+    const finalMsg = ws1.sent.find((m) => m.t === 'final');
+    expect(finalMsg).toBeDefined();
+    expect(finalMsg.rematchAvailable).toBe(false);
   });
 
-  it('6. Rakip teklifi kabul eder: yeni maç oluşturulur, iki tarafa matched gider ve soketler 1000 ile kapatılır', async () => {
+  it('4. Kaldırılan eski rövanş mesajları (rematch_offer, rematch_accept, rematch_decline, rematch_leave) bilinmeyen mesaj olarak sessizce yok sayılır, soket kapanmaz ve çökmez', async () => {
     const { room, ws1, ws2 } = await setupFinishedMatch();
 
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
+    const oldMessages = [
+      { t: 'rematch_offer' },
+      { t: 'rematch_accept' },
+      { t: 'rematch_decline' },
+      { t: 'rematch_leave' },
+    ];
 
-    await room.webSocketMessage(ws2 as any, JSON.stringify({ t: 'rematch_accept' }));
+    for (const msg of oldMessages) {
+      ws1.sent.length = 0;
+      ws2.sent.length = 0;
 
-    // Both should receive matched message
-    const matchedP1 = ws1.sent.find((m) => m.t === 'matched');
-    const matchedP2 = ws2.sent.find((m) => m.t === 'matched');
+      await expect(
+        room.webSocketMessage(ws1 as any, JSON.stringify(msg))
+      ).resolves.not.toThrow();
 
-    expect(matchedP1).toBeDefined();
-    expect(matchedP1.matchId).toBe('new-match-456');
-    expect(matchedP1.opponentUid).toBe('p2');
-    expect(matchedP1.isFriendly).toBe(false);
-
-    expect(matchedP2).toBeDefined();
-    expect(matchedP2.matchId).toBe('new-match-456');
-    expect(matchedP2.opponentUid).toBe('p1');
-    expect(matchedP2.isFriendly).toBe(false);
-
-    // Sockets should be closed with code 1000 and "rematch_started"
-    expect(ws1.isClosed).toBe(true);
-    expect(ws1.closeCode).toBe(1000);
-    expect(ws1.closeReason).toBe('rematch_started');
-
-    expect(ws2.isClosed).toBe(true);
-    expect(ws2.closeCode).toBe(1000);
-    expect(ws2.closeReason).toBe('rematch_started');
+      expect(ws1.isClosed).toBe(false);
+      expect(ws2.isClosed).toBe(false);
+      expect(ws1.sent.length).toBe(0);
+      expect(ws2.sent.length).toBe(0);
+    }
   });
 
-  it('7. Çift teklif (aynı anda teklif etme) otomatik kabul sayılır', async () => {
-    const { room, ws1, ws2 } = await setupFinishedMatch();
+  it('5. Depoda eski rövanş alanları (rematch nesnesi ve rematchTimeoutAtMs) ile kalmış veri yüklendiğinde ve alarm tetiklendiğinde hata vermez', async () => {
+    const fixedNow = 1_700_000_000_000;
+    vi.setSystemTime(fixedNow);
 
-    // p1 offers
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
-
-    // p2 also offers before accepting
-    await room.webSocketMessage(ws2 as any, JSON.stringify({ t: 'rematch_offer' }));
-
-    // Should automatically trigger match creation
-    expect(ws1.sent.find((m) => m.t === 'matched')).toBeDefined();
-    expect(ws2.sent.find((m) => m.t === 'matched')).toBeDefined();
-    expect(ws1.isClosed).toBe(true);
-    expect(ws2.isClosed).toBe(true);
-  });
-
-  it('8. Teklif reddedilirse (rematch_decline): iki tarafa declined gider, sonraki teklifler not_available olur', async () => {
-    const { room, ws1, ws2 } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
-
-    await room.webSocketMessage(ws2 as any, JSON.stringify({ t: 'rematch_decline' }));
-
-    expect(ws1.sent).toContainEqual({ t: 'rematch_status', status: 'declined' });
-    expect(ws2.sent).toContainEqual({ t: 'rematch_status', status: 'declined' });
-
-    // Subsequent offer is rejected
-    ws1.sent.length = 0;
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    expect(ws1.sent).toContainEqual({ t: 'rematch_error', code: 'not_available' });
-  });
-
-  it('9. Süre aşımı (45 sn): alarm çalar, iki tarafa expired gider ve sonraki teklifler reddedilir', async () => {
-    const { room, ws1, ws2, fixedNow } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
-
-    // Advance time past 45s
-    vi.setSystemTime(fixedNow + 45001);
-    await room.alarm();
-
-    expect(ws1.sent).toContainEqual({ t: 'rematch_status', status: 'expired' });
-    expect(ws2.sent).toContainEqual({ t: 'rematch_status', status: 'expired' });
-
-    // Offer after expired is rejected
-    ws1.sent.length = 0;
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    expect(ws1.sent).toContainEqual({ t: 'rematch_error', code: 'not_available' });
-  });
-
-  it('10. Rakip ayrıldığında (webSocketClose veya rematch_leave) opponent_left gider', async () => {
-    const { room, ws1, ws2 } = await setupFinishedMatch();
-
-    // ws2 closes their connection
-    await room.webSocketClose(ws2 as any, 1000, 'leaving');
-
-    expect(ws1.sent).toContainEqual({ t: 'rematch_status', status: 'opponent_left' });
-
-    // p1 tries to offer after opponent left (terminal state closed)
-    ws1.sent.length = 0;
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    expect(ws1.sent).toContainEqual({ t: 'rematch_error', code: 'not_available' });
-  });
-
-  it('11. Bitmiş odaya bağlanan oyuncu aktif teklifin anlık görüntüsünü (snapshot) alır', async () => {
-    const { room, ctx, ws1, fixedNow } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-
-    // Reconnecting p2
-    const ws2Reconnected = createMockSocket('p2');
-    ctx.getWebSockets = ((tag?: string) => {
-      if (tag === 'p1') return [ws1];
-      if (tag === 'p2') return [ws2Reconnected];
-      return [ws1, ws2Reconnected];
-    }) as any;
-
-    await (room as any).handlePlayerConnected('p2');
-
-    expect(ws2Reconnected.sent).toContainEqual({
-      t: 'rematch_offered',
-      byUid: 'p1',
-      expiresAtMs: fixedNow + 45000,
-    });
-  });
-
-  it('12. Bitmiş odaya bağlanan oyuncu terminal durumdaysa rematch_status snapshot alır', async () => {
-    const { room, ctx, ws1, ws2 } = await setupFinishedMatch();
-
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    await room.webSocketMessage(ws2 as any, JSON.stringify({ t: 'rematch_decline' }));
-
-    const ws1Reconnected = createMockSocket('p1');
-    ctx.getWebSockets = ((tag?: string) => {
-      if (tag === 'p1') return [ws1Reconnected];
-      return [];
-    }) as any;
-
-    await (room as any).handlePlayerConnected('p1');
-    expect(ws1Reconnected.sent).toContainEqual({
-      t: 'rematch_status',
-      status: 'declined',
-    });
-  });
-
-  it('13. Kabul sırasında Matchmaker hata dönerse (örn: opponent_no_energy) doğru hata kodu iletilir', async () => {
-    const { room, ws1, ws2 } = await setupFinishedMatch({
-      envOverrides: {
-        MATCHMAKER: {
-          idFromName: (name: string) => ({ toString: () => name } as any),
-          get: () => ({
-            createDirectMatch: vi.fn(async () => ({
-              ok: false,
-              error: 'opponent_no_energy',
-              errorTargetUid: 'p2',
-            })),
-          }),
-        } as any,
+    const { ctx, store, getAlarm, waitForInit } = createMockRoomCtx();
+    const legacyRoomData = {
+      matchId: 'legacy-room-999',
+      p1: { uid: 'p1', name: 'Alice', frame: 'classic' },
+      p2: { uid: 'p2', name: 'Bob', frame: 'gold' },
+      questions: sampleQuestions,
+      questionOrder: sampleQuestions.map((q) => q.id),
+      status: 'finished',
+      finishedAtMs: fixedNow - 5000,
+      rematch: {
+        state: 'offered',
+        offeredByUid: 'p1',
+        expiresAtMs: fixedNow + 40000,
       },
-    });
+      schedule: {
+        rematchTimeoutAtMs: fixedNow + 40000,
+        cleanupAtMs: fixedNow + 600000,
+      },
+    };
+    store.set('roomData', legacyRoomData);
 
-    await room.webSocketMessage(ws1 as any, JSON.stringify({ t: 'rematch_offer' }));
-    ws1.sent.length = 0;
-    ws2.sent.length = 0;
+    const env = { FAST_TIMERS: 'false' } as Env;
+    const room = new MatchRoom(ctx, env);
+    await waitForInit();
 
-    await room.webSocketMessage(ws2 as any, JSON.stringify({ t: 'rematch_accept' }));
+    // migrateStoredRoomData eski rematch alanını ve rematchTimeoutAtMs'i güvenle ayıklar
+    const loadedData = store.get('roomData');
+    expect((room as any).data).toBeDefined();
+    expect((room as any).data.rematch).toBeUndefined();
+    expect((room as any).data.schedule.rematchTimeoutAtMs).toBeUndefined();
+    expect((room as any).data.schedule.cleanupAtMs).toBe(fixedNow + 600000);
 
-    expect(ws1.sent).toContainEqual({
-      t: 'rematch_error',
-      code: 'opponent_no_energy',
-    });
-    expect(ws2.sent).toContainEqual({
-      t: 'rematch_error',
-      code: 'no_energy',
-    });
+    // Alarm tetiklendiğinde (örneğin eski rematchTimeoutAtMs vadesi dolduğunda)
+    vi.setSystemTime(fixedNow + 40000);
+    await expect(room.alarm()).resolves.not.toThrow();
+
+    // Oda çökmez, durum bozulmaz ve sonraki alarm temizlik alarmına (cleanupAtMs) ayarlanır
+    expect((room as any).data.status).toBe('finished');
+    expect(getAlarm()).toBe(fixedNow + 600000);
   });
 });
 
@@ -719,6 +594,9 @@ describe('Matchmaker.createDirectMatch RPC & Energy/Blocks/Deletion Logic', () =
     // F) Geçerli normal rankli maç: ilk çağrı başarılı döner ve türü devralır
     const resOk = await normalRoom.validateRematchRequest('p1', 'p2');
     expect(resOk).toEqual({ ok: true, matchType: 'ranked' });
+
+    // İstek başarıyla iletildikten sonra oda işaretlenir
+    await normalRoom.markRematchRequestCreated();
 
     // G) Aynı maç için ikinci kez istek atılamaz (tekillik kuralı)
     const resSecond = await normalRoom.validateRematchRequest('p1', 'p2');

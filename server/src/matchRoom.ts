@@ -9,9 +9,6 @@ import {
   parseMatchRoomMessage,
   type ClientFeedbackMessage,
   type ClientVoidedMessage,
-  type ClientRematchOfferedMessage,
-  type ClientRematchStatusMessage,
-  type ClientRematchErrorMessage,
   type ClientMatchedMessage,
 } from './protocol';
 import {
@@ -41,21 +38,6 @@ interface PlayerInfo {
   readonly uid: string;
   readonly name: string;
   readonly frame?: string;
-}
-
-export type RematchState =
-  | 'idle'
-  | 'offered'
-  | 'accepted'
-  | 'declined'
-  | 'expired'
-  | 'closed';
-
-export interface StoredRematchData {
-  readonly state: RematchState;
-  readonly offeredByUid?: string;
-  readonly expiresAtMs?: number;
-  readonly matchedMatchId?: string;
 }
 
 export interface MatchRoomInitParams {
@@ -118,7 +100,6 @@ interface StoredRoomData {
   readonly energyChargedUids?: readonly string[];
   readonly pendingEnergyRefundUids?: readonly string[];
   readonly energyRefundRetryCount?: number;
-  readonly rematch?: StoredRematchData;
   readonly rematchRequestCreated?: boolean;
 }
 
@@ -143,9 +124,16 @@ export function migrateStoredRoomData(raw: unknown): StoredRoomData | null {
     pendingEnergyRefundUids = [legacy.pendingEnergyRefundUid];
   }
 
+  let schedule = legacy.schedule;
+  if (schedule && 'rematchTimeoutAtMs' in schedule) {
+    const { rematchTimeoutAtMs: _ignored, ...cleanSchedule } = schedule as any;
+    schedule = cleanSchedule;
+  }
+
   const {
     disconnectedUid: _legacyDisconnectedUid,
     pendingEnergyRefundUid: _legacyPendingEnergyRefundUid,
+    rematch: _legacyRematch,
     ...rest
   } = legacy;
 
@@ -153,6 +141,7 @@ export function migrateStoredRoomData(raw: unknown): StoredRoomData | null {
     ...rest,
     disconnectedUids,
     pendingEnergyRefundUids,
+    ...(schedule ? { schedule } : {}),
   } as unknown as StoredRoomData;
 }
 
@@ -335,16 +324,23 @@ export class MatchRoom extends DurableObject<Env> {
       return { ok: false, error: 'already_requested' };
     }
 
+    return {
+      ok: true,
+      matchType: this.data.matchType ?? 'ranked',
+    };
+  }
+
+  /**
+   * Rövanş isteği alıcıya başarıyla iletildikten sonra odayı işaretler.
+   * Bu sayede alıcı çevrimdışı/meşgulken ilk istek reddedilirse tek rövanş hakkı yanmaz.
+   */
+  async markRematchRequestCreated(): Promise<void> {
+    if (!this.data) return;
     this.data = {
       ...this.data,
       rematchRequestCreated: true,
     };
     await this.persist();
-
-    return {
-      ok: true,
-      matchType: this.data.matchType ?? 'ranked',
-    };
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -433,23 +429,6 @@ export class MatchRoom extends DurableObject<Env> {
 
     if (parsed.t === 'sync') {
       this.sendStateToPlayer(uid);
-      return;
-    }
-
-    if (parsed.t === 'rematch_offer') {
-      await this.handleRematchOffer(uid);
-      return;
-    }
-    if (parsed.t === 'rematch_accept') {
-      await this.handleRematchAccept(uid);
-      return;
-    }
-    if (parsed.t === 'rematch_decline') {
-      await this.handleRematchDecline(uid);
-      return;
-    }
-    if (parsed.t === 'rematch_leave') {
-      await this.handleRematchLeave(uid);
       return;
     }
 
@@ -610,31 +589,6 @@ export class MatchRoom extends DurableObject<Env> {
       await this.persist();
       await this.updateAlarm();
       this.broadcastState();
-    } else if (this.data.status === 'finished') {
-      if (
-        this.data.rematch &&
-        (this.data.rematch.state === 'idle' || this.data.rematch.state === 'offered')
-      ) {
-        const opponentUid = uid === this.data.p1.uid ? this.data.p2.uid : this.data.p1.uid;
-        this.data = {
-          ...this.data,
-          rematch: {
-            state: 'closed',
-          },
-          schedule: {
-            ...this.data.schedule,
-            rematchTimeoutAtMs: undefined,
-          },
-        };
-        await this.persist();
-        await this.updateAlarm();
-
-        const statusMsg: ClientRematchStatusMessage = {
-          t: 'rematch_status',
-          status: 'opponent_left',
-        };
-        this.sendToUid(opponentUid, JSON.stringify(statusMsg));
-      }
     }
   }
 
@@ -881,8 +835,6 @@ export class MatchRoom extends DurableObject<Env> {
         await this.processPendingRefunds();
       } else if (action === 'energyRefundRetry') {
         await this.processPendingEnergyRefund();
-      } else if (action === 'rematchTimeout') {
-        await this.handleRematchTimeout();
       } else if (action === 'cleanup') {
         await this.ctx.storage.deleteAll();
         this.data = null;
@@ -1018,30 +970,6 @@ export class MatchRoom extends DurableObject<Env> {
     } else if (this.data.status === 'finished') {
       this.sendStateToPlayer(uid);
       this.sendFinalToPlayer(uid);
-      if (this.data.rematch) {
-        const nowMs = Date.now();
-        if (
-          this.data.rematch.state === 'offered' &&
-          this.data.rematch.expiresAtMs &&
-          this.data.rematch.expiresAtMs > nowMs
-        ) {
-          const offeredMsg: ClientRematchOfferedMessage = {
-            t: 'rematch_offered',
-            byUid: this.data.rematch.offeredByUid ?? this.data.p1.uid,
-            expiresAtMs: this.data.rematch.expiresAtMs,
-          };
-          this.sendToUid(uid, JSON.stringify(offeredMsg));
-        } else if (this.data.rematch.state === 'declined') {
-          const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'declined' };
-          this.sendToUid(uid, JSON.stringify(statusMsg));
-        } else if (this.data.rematch.state === 'expired') {
-          const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'expired' };
-          this.sendToUid(uid, JSON.stringify(statusMsg));
-        } else if (this.data.rematch.state === 'closed') {
-          const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'opponent_left' };
-          this.sendToUid(uid, JSON.stringify(statusMsg));
-        }
-      }
     } else if (this.data.status === 'voided') {
       const voidedMsg: ClientVoidedMessage = {
         t: 'voided',
@@ -1098,13 +1026,10 @@ export class MatchRoom extends DurableObject<Env> {
       p2Uid === 'bot' ||
       p2Uid.startsWith('bot_');
 
-    const canRematch = state?.endedBy === 'normal' && !isBot;
-
     this.data = {
       ...this.data,
       status: 'finished',
       finishedAtMs: nowMs,
-      rematch: canRematch ? { state: 'idle' } : { state: 'closed' },
       schedule: {
         cleanupAtMs: nowMs + this.durations.cleanupMs,
       },
@@ -2165,276 +2090,6 @@ export class MatchRoom extends DurableObject<Env> {
         // yoksay
       }
     }
-  }
-
-  private async handleRematchOffer(uid: string): Promise<void> {
-    if (!this.data) return;
-
-    if (uid !== this.data.p1.uid && uid !== this.data.p2.uid) {
-      return;
-    }
-
-    const state = this.data.engineState ? deserializeMatchState(this.data.engineState) : null;
-    const isBot =
-      this.data.p1.uid === 'bot' ||
-      this.data.p1.uid.startsWith('bot_') ||
-      this.data.p2.uid === 'bot' ||
-      this.data.p2.uid.startsWith('bot_');
-
-    if (this.data.status !== 'finished' || state?.endedBy !== 'normal' || isBot) {
-      const err: ClientRematchErrorMessage = { t: 'rematch_error', code: 'not_available' };
-      this.sendToUid(uid, JSON.stringify(err));
-      return;
-    }
-
-    const rematch = this.data.rematch ?? { state: 'idle' };
-    const nowMs = Date.now();
-    const opponentUid = uid === this.data.p1.uid ? this.data.p2.uid : this.data.p1.uid;
-
-    if (rematch.state === 'idle') {
-      const oppSockets = this.ctx.getWebSockets(opponentUid);
-      if (oppSockets.length === 0) {
-        const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'opponent_left' };
-        this.sendToUid(uid, JSON.stringify(statusMsg));
-        this.data = {
-          ...this.data,
-          rematch: { state: 'closed' },
-        };
-        await this.persist();
-        return;
-      }
-
-      const expiresAtMs = nowMs + this.durations.rematchOfferMs;
-      this.data = {
-        ...this.data,
-        rematch: {
-          state: 'offered',
-          offeredByUid: uid,
-          expiresAtMs,
-        },
-        schedule: {
-          ...this.data.schedule,
-          rematchTimeoutAtMs: expiresAtMs,
-        },
-      };
-
-      await this.persist();
-      await this.updateAlarm();
-
-      const offeredMsg: ClientRematchOfferedMessage = {
-        t: 'rematch_offered',
-        byUid: uid,
-        expiresAtMs,
-      };
-      this.broadcastAll(JSON.stringify(offeredMsg));
-      return;
-    }
-
-    if (rematch.state === 'offered') {
-      if (rematch.offeredByUid === uid) {
-        // Aynı oyuncu mükerrer teklif attı -> yok say
-        return;
-      }
-
-      // Karşı taraf teklif etmişken bu oyuncu da teklif gönderdi -> ÇİFT TEKLİF / OTOMATİK KABUL!
-      await this.executeRematchAccept(uid, rematch.offeredByUid ?? opponentUid);
-      return;
-    }
-
-    // Terminal durumlar (accepted, declined, expired, closed) -> not_available
-    const err: ClientRematchErrorMessage = { t: 'rematch_error', code: 'not_available' };
-    this.sendToUid(uid, JSON.stringify(err));
-  }
-
-  private async handleRematchAccept(uid: string): Promise<void> {
-    if (!this.data) return;
-
-    if (uid !== this.data.p1.uid && uid !== this.data.p2.uid) {
-      return;
-    }
-
-    const rematch = this.data.rematch;
-    if (!rematch || rematch.state !== 'offered') {
-      if (rematch?.state === 'accepted') {
-        // Mükerrer kabul -> yok say
-        return;
-      }
-      const err: ClientRematchErrorMessage = { t: 'rematch_error', code: 'not_available' };
-      this.sendToUid(uid, JSON.stringify(err));
-      return;
-    }
-
-    if (uid === rematch.offeredByUid) {
-      // Teklif eden taraf kendi teklifini kabul edemez
-      return;
-    }
-
-    const nowMs = Date.now();
-    if (rematch.expiresAtMs !== undefined && nowMs >= rematch.expiresAtMs) {
-      await this.handleRematchTimeout();
-      return;
-    }
-
-    await this.executeRematchAccept(uid, rematch.offeredByUid!);
-  }
-
-  private async executeRematchAccept(acceptorUid: string, proposerUid: string): Promise<void> {
-    if (!this.data) return;
-
-    // DO tek iş parçacıklı: Tek bir yeni maç türetilmesini garanti altına almak için
-    // durumu derhal senkron olarak 'accepted' yap!
-    this.data = {
-      ...this.data,
-      rematch: {
-        state: 'accepted',
-        offeredByUid: proposerUid,
-      },
-      schedule: {
-        ...this.data.schedule,
-        rematchTimeoutAtMs: undefined,
-      },
-    };
-    await this.persist();
-    await this.updateAlarm();
-
-    const matchmaker = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName('global'));
-    const result = await matchmaker.createDirectMatch({
-      p1: this.data.p1,
-      p2: this.data.p2,
-      matchType: this.data.matchType ?? 'ranked',
-      prevMatchId: this.data.matchId,
-      proposerUid,
-    });
-
-    if (!result.ok) {
-      if (result.error === 'no_energy' || result.error === 'opponent_no_energy') {
-        const errorTargetUid = result.errorTargetUid;
-        const otherUid = errorTargetUid === this.data.p1.uid ? this.data.p2.uid : this.data.p1.uid;
-
-        if (errorTargetUid) {
-          const noEnergyMsg: ClientRematchErrorMessage = { t: 'rematch_error', code: 'no_energy' };
-          const oppNoEnergyMsg: ClientRematchErrorMessage = { t: 'rematch_error', code: 'opponent_no_energy' };
-          this.sendToUid(errorTargetUid, JSON.stringify(noEnergyMsg));
-          this.sendToUid(otherUid, JSON.stringify(oppNoEnergyMsg));
-        } else {
-          const err: ClientRematchErrorMessage = { t: 'rematch_error', code: 'no_energy' };
-          this.broadcastAll(JSON.stringify(err));
-        }
-      } else {
-        const err: ClientRematchErrorMessage = { t: 'rematch_error', code: result.error };
-        this.broadcastAll(JSON.stringify(err));
-      }
-
-      this.data = {
-        ...this.data,
-        rematch: {
-          state: 'closed',
-        },
-      };
-      await this.persist();
-      return;
-    }
-
-    const newMatchId = result.matchId;
-    const isFriendly = result.matchType === 'friendly';
-
-    const p1Matched: ClientMatchedMessage = {
-      t: 'matched',
-      matchId: newMatchId,
-      opponentName: this.data.p2.name,
-      opponentFrame: this.data.p2.frame || 'classic',
-      opponentUid: this.data.p2.uid,
-      isFriendly,
-    };
-    const p2Matched: ClientMatchedMessage = {
-      t: 'matched',
-      matchId: newMatchId,
-      opponentName: this.data.p1.name,
-      opponentFrame: this.data.p1.frame || 'classic',
-      opponentUid: this.data.p1.uid,
-      isFriendly,
-    };
-
-    this.sendToUid(this.data.p1.uid, JSON.stringify(p1Matched));
-    this.sendToUid(this.data.p2.uid, JSON.stringify(p2Matched));
-
-    this.data = {
-      ...this.data,
-      rematch: {
-        state: 'accepted',
-        matchedMatchId: newMatchId,
-        offeredByUid: proposerUid,
-      },
-    };
-    await this.persist();
-
-    this.closeAllSockets(1000, 'rematch_started');
-  }
-
-  private async handleRematchDecline(uid: string): Promise<void> {
-    if (!this.data) return;
-    const rematch = this.data.rematch;
-    if (!rematch || rematch.state !== 'offered') return;
-
-    this.data = {
-      ...this.data,
-      rematch: {
-        state: 'declined',
-      },
-      schedule: {
-        ...this.data.schedule,
-        rematchTimeoutAtMs: undefined,
-      },
-    };
-    await this.persist();
-    await this.updateAlarm();
-
-    const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'declined' };
-    this.broadcastAll(JSON.stringify(statusMsg));
-  }
-
-  private async handleRematchLeave(uid: string): Promise<void> {
-    if (!this.data) return;
-    if (this.data.status !== 'finished') return;
-
-    const opponentUid = uid === this.data.p1.uid ? this.data.p2.uid : this.data.p1.uid;
-
-    this.data = {
-      ...this.data,
-      rematch: {
-        state: 'closed',
-      },
-      schedule: {
-        ...this.data.schedule,
-        rematchTimeoutAtMs: undefined,
-      },
-    };
-    await this.persist();
-    await this.updateAlarm();
-
-    const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'opponent_left' };
-    this.sendToUid(opponentUid, JSON.stringify(statusMsg));
-  }
-
-  private async handleRematchTimeout(): Promise<void> {
-    if (!this.data) return;
-    if (this.data.rematch?.state !== 'offered') return;
-
-    this.data = {
-      ...this.data,
-      rematch: {
-        state: 'expired',
-      },
-      schedule: {
-        ...this.data.schedule,
-        rematchTimeoutAtMs: undefined,
-      },
-    };
-    await this.persist();
-    await this.updateAlarm();
-
-    const statusMsg: ClientRematchStatusMessage = { t: 'rematch_status', status: 'expired' };
-    this.broadcastAll(JSON.stringify(statusMsg));
   }
 
   private async persist(): Promise<void> {

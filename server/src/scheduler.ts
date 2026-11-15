@@ -10,7 +10,6 @@ export interface TimersSchedule {
   readonly leaderboardRetryAtMs?: number;
   readonly refundRetryAtMs?: number;
   readonly energyRefundRetryAtMs?: number;
-  readonly rematchTimeoutAtMs?: number;
 }
 
 export type DueActionType =
@@ -22,8 +21,7 @@ export type DueActionType =
   | 'rewardRetry'
   | 'leaderboardRetry'
   | 'refundRetry'
-  | 'energyRefundRetry'
-  | 'rematchTimeout';
+  | 'energyRefundRetry';
 
 export const FRIENDLY_CONNECT_TIMEOUT_MS = 15000;
 
@@ -34,7 +32,6 @@ export interface RoomDurations {
   readonly connectTimeoutMs: number;
   readonly friendlyConnectTimeoutMs: number;
   readonly cleanupMs: number;
-  readonly rematchOfferMs: number;
 }
 
 export function getRoomDurations(isFastTimers: boolean): RoomDurations {
@@ -46,7 +43,6 @@ export function getRoomDurations(isFastTimers: boolean): RoomDurations {
       connectTimeoutMs: 3000,
       friendlyConnectTimeoutMs: 4500,
       cleanupMs: 600000,
-      rematchOfferMs: 3000,
     };
   }
   return {
@@ -56,7 +52,6 @@ export function getRoomDurations(isFastTimers: boolean): RoomDurations {
     connectTimeoutMs: 10000,
     friendlyConnectTimeoutMs: FRIENDLY_CONNECT_TIMEOUT_MS,
     cleanupMs: 600000,
-    rematchOfferMs: 45000,
   };
 }
 
@@ -74,7 +69,6 @@ export function computeNextAlarm(schedule: TimersSchedule): number | null {
   if (schedule.leaderboardRetryAtMs !== undefined) times.push(schedule.leaderboardRetryAtMs);
   if (schedule.refundRetryAtMs !== undefined) times.push(schedule.refundRetryAtMs);
   if (schedule.energyRefundRetryAtMs !== undefined) times.push(schedule.energyRefundRetryAtMs);
-  if (schedule.rematchTimeoutAtMs !== undefined) times.push(schedule.rematchTimeoutAtMs);
 
   if (times.length === 0) return null;
   return Math.min(...times);
@@ -92,6 +86,11 @@ export function processDueTimers(
 } {
   const dueActions: DueActionType[] = [];
   let remaining: TimersSchedule = { ...schedule };
+
+  if ('rematchTimeoutAtMs' in remaining) {
+    const { rematchTimeoutAtMs: _ignored, ...rest } = remaining as any;
+    remaining = rest;
+  }
 
   if (schedule.connectTimeoutAtMs !== undefined && nowMs >= schedule.connectTimeoutAtMs) {
     dueActions.push('connectTimeout');
@@ -138,12 +137,6 @@ export function processDueTimers(
   if (schedule.energyRefundRetryAtMs !== undefined && nowMs >= schedule.energyRefundRetryAtMs) {
     dueActions.push('energyRefundRetry');
     const { energyRefundRetryAtMs, ...rest } = remaining;
-    remaining = rest;
-  }
-
-  if (schedule.rematchTimeoutAtMs !== undefined && nowMs >= schedule.rematchTimeoutAtMs) {
-    dueActions.push('rematchTimeout');
-    const { rematchTimeoutAtMs, ...rest } = remaining;
     remaining = rest;
   }
 
