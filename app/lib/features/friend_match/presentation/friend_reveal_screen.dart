@@ -15,6 +15,7 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/match_session.dart';
 import '../../game/presentation/match_screen.dart';
+import '../../match_request/application/presence_controller.dart';
 import '../../online/domain/models/online_messages.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/domain/energy_state.dart';
@@ -57,10 +58,13 @@ class _FriendMatchRevealScreenState
   late final DateTime _startTime;
   Timer? _revealTimer;
   bool _hasNavigated = false;
+  late final PresenceController _presenceController;
 
   @override
   void initState() {
     super.initState();
+    _presenceController = ref.read(presenceControllerProvider.notifier);
+    _presenceController.acquireBusy('friend_reveal');
     WidgetsBinding.instance.addObserver(this);
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -119,6 +123,7 @@ class _FriendMatchRevealScreenState
 
   @override
   void dispose() {
+    _presenceController.releaseBusy('friend_reveal');
     _suppressionNotifier.unsuppress();
     WidgetsBinding.instance.removeObserver(this);
     _revealTimer?.cancel();

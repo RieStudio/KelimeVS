@@ -131,6 +131,8 @@ class FakeProfileApiClient implements ProfileApiClient {
       ProfileUpdateSuccess(nickname);
   @override
   Future<bool> deleteProfile() async => true;
+  @override
+  Future<bool> updateAllowMatchRequests(bool allow) async => true;
 }
 
 class FakeProfileRepository implements ProfileRepository {

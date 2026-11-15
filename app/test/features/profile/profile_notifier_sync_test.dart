@@ -104,6 +104,9 @@ class FakeProfileApiClient implements ProfileApiClient {
 
   @override
   Future<bool> deleteProfile() async => true;
+
+  @override
+  Future<bool> updateAllowMatchRequests(bool allow) async => true;
 }
 
 void main() {

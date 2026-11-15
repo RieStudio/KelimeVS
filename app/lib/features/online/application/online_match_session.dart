@@ -25,6 +25,7 @@ import '../data/online_match_client.dart';
 import '../domain/models/online_match_state.dart';
 import '../domain/models/online_messages.dart';
 import '../../leaderboard/application/leaderboard_providers.dart';
+import '../../match_request/application/presence_controller.dart';
 import '../../store/application/store_notifier.dart';
 
 /// Sunucudan gelen `final` mesajını yerel [MatchHistoryEntry] ve [RoundRecord]
@@ -248,6 +249,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
 
     try {
       ref.read(activeMatchSessionModeProvider.notifier).setMode(MatchSessionMode.online);
+    } catch (_) {}
+    try {
+      ref.read(presenceControllerProvider.notifier).acquireBusy('online_match');
     } catch (_) {}
 
     if (!_isObserverRegistered) {
@@ -608,6 +612,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   }
 
   void _handleFinal(FinalServerMessage finalMsg) {
+    try {
+      ref.read(presenceControllerProvider.notifier).releaseBusy('online_match');
+    } catch (_) {}
     _leaveTimeoutTimer?.cancel();
     _leaveTimeoutTimer = null;
     _cancelTickTimer();
@@ -750,6 +757,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   }
 
   void _handleVoided() {
+    try {
+      ref.read(presenceControllerProvider.notifier).releaseBusy('online_match');
+    } catch (_) {}
     _cancelAllTimers();
     final client = _client;
     _client = null;
@@ -1281,6 +1291,9 @@ class OnlineMatchSession extends Notifier<MatchUiState>
   }
 
   void _cleanupSession() {
+    try {
+      ref.read(presenceControllerProvider.notifier).releaseBusy('online_match');
+    } catch (_) {}
     _cancelAllTimers();
     _rematchLeaveSent = false;
     _rematchSecondsRemaining = 45;

@@ -22,6 +22,7 @@ import 'features/game/application/match_providers.dart';
 import 'features/home/presentation/home_screen.dart';
 import 'features/leaderboard/application/leaderboard_providers.dart';
 import 'features/leaderboard/presentation/leaderboard_screen.dart';
+import 'features/match_request/application/match_requests_providers.dart';
 import 'features/profile/application/profile_notifier.dart';
 import 'features/profile/presentation/onboarding_nickname_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
@@ -122,6 +123,7 @@ class _MainShellState extends ConsumerState<MainShell>
   StreamSubscription<User?>? _authSubscription;
   bool _hasVisitedLeaderboard = false;
   bool _hasInitialOnline = false;
+  UserInboxLifecycleCoordinator? _userInboxCoordinator;
 
   @override
   void initState() {
@@ -130,6 +132,8 @@ class _MainShellState extends ConsumerState<MainShell>
     _initAuth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reconcilePendingMatches();
+      _userInboxCoordinator = ref.read(userInboxLifecycleCoordinatorProvider);
+      _userInboxCoordinator?.start();
       if (mounted) {
         VisualFrameRegistry.precacheFrames(context);
       }
@@ -178,6 +182,7 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _userInboxCoordinator?.dispose();
     _authSubscription?.cancel();
     super.dispose();
   }

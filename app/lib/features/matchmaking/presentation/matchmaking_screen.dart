@@ -26,6 +26,7 @@ import '../../game/application/match_session.dart';
 import '../../game/domain/bot/bot_opponent_names.dart';
 import '../../game/domain/models.dart';
 import '../../game/presentation/match_screen.dart';
+import '../../match_request/application/presence_controller.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/domain/energy_state.dart';
@@ -92,11 +93,14 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   int _activeDotIndex = 0;
   late final BannerSuppressionNotifier _suppressionNotifier;
   late final String _tipText;
+  late final PresenceController _presenceController;
   Stopwatch? _searchStopwatch;
 
   @override
   void initState() {
     super.initState();
+    _presenceController = ref.read(presenceControllerProvider.notifier);
+    _presenceController.acquireBusy('matchmaking');
     _transitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -402,6 +406,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
 
   @override
   void dispose() {
+    _presenceController.releaseBusy('matchmaking');
     _transitionController.dispose();
     _suppressionNotifier.unsuppress();
     _cancelAllTimers();

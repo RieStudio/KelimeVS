@@ -13,6 +13,7 @@ import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
+import '../../match_request/application/presence_controller.dart';
 import 'friend_reveal_screen.dart';
 
 /// "Koda Katıl" ekranı: Arkadaşının paylaştığı 6 haneli kodu girmesini sağlar.
@@ -37,10 +38,13 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
   String? _errorMessage;
   bool _isMatched = false;
   late final BannerSuppressionNotifier _suppressionNotifier;
+  late final PresenceController _presenceController;
 
   @override
   void initState() {
     super.initState();
+    _presenceController = ref.read(presenceControllerProvider.notifier);
+    _presenceController.acquireBusy('friend_join');
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -141,6 +145,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
 
   @override
   void dispose() {
+    _presenceController.releaseBusy('friend_join');
     _suppressionNotifier.unsuppress();
     _subscription?.cancel();
     _controller.dispose();

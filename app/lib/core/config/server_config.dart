@@ -59,6 +59,12 @@ abstract final class ServerConfig {
   /// Liderlik tablosu yolu.
   static const String leaderboardPath = '/leaderboard';
 
+  /// Kullanıcı ayarları yolu.
+  static const String settingsPath = '/me/settings';
+
+  /// Kullanıcı bildirim ve maç isteği WebSocket yolu.
+  static const String userWsPath = '/ws/user';
+
   /// Eşleştirme WebSocket yolu.
   static const String matchmakingWsPath = '/ws/matchmaking';
 
@@ -92,8 +98,14 @@ abstract final class ServerConfig {
   /// Tam Liderlik Tablosu HTTP URL'si.
   static String get leaderboardUrl => joinUrl(serverUrl, leaderboardPath);
 
+  /// Tam Kullanıcı Ayarları HTTP URL'si.
+  static String get settingsUrl => joinUrl(serverUrl, settingsPath);
+
   /// Tam Eşleştirme WebSocket URL'si.
   static String get matchmakingWsUrl => joinUrl(wsUrl, matchmakingWsPath);
+
+  /// Tam Kullanıcı Bildirim ve Maç İsteği WebSocket URL'si.
+  static String get userWsUrl => joinUrl(wsUrl, userWsPath);
 
   /// Tam Maç WebSocket URL'si.
   static String matchWsUrl(String matchId) =>

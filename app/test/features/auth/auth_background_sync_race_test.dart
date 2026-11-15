@@ -114,6 +114,9 @@ class FakeRaceProfileApiClient implements ProfileApiClient {
 
   @override
   Future<bool> deleteProfile() async => true;
+
+  @override
+  Future<bool> updateAllowMatchRequests(bool allow) async => true;
 }
 
 Future<void> waitForPendingRequests(FakeRaceProfileApiClient client, int targetCount) async {

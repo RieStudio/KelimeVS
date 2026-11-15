@@ -15,6 +15,7 @@ import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/friend_match_client.dart';
+import '../../match_request/application/presence_controller.dart';
 import 'friend_reveal_screen.dart';
 
 /// "Oda Kur" ekranı: 6 haneli kodu üretir, gösterir, paylaşım menüsünü açar
@@ -45,10 +46,13 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
   String? _errorMessage;
   bool _isMatched = false;
   late final BannerSuppressionNotifier _suppressionNotifier;
+  late final PresenceController _presenceController;
 
   @override
   void initState() {
     super.initState();
+    _presenceController = ref.read(presenceControllerProvider.notifier);
+    _presenceController.acquireBusy('friend_host');
     WidgetsBinding.instance.addObserver(this);
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -241,6 +245,7 @@ class _FriendHostScreenState extends ConsumerState<FriendHostScreen>
 
   @override
   void dispose() {
+    _presenceController.releaseBusy('friend_host');
     _suppressionNotifier.unsuppress();
     WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();

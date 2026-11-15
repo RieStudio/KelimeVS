@@ -23,6 +23,7 @@ class ProfileState {
   final UserStats stats;
   final FrameMigrationInfo? pendingMigrationNotice;
   final bool isGuest;
+  final bool allowMatchRequests;
 
   const ProfileState({
     this.nickname,
@@ -36,6 +37,7 @@ class ProfileState {
     this.stats = const UserStats(),
     this.pendingMigrationNotice,
     this.isGuest = false,
+    this.allowMatchRequests = true,
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -55,6 +57,7 @@ class ProfileState {
     FrameMigrationInfo? pendingMigrationNotice,
     bool clearMigrationNotice = false,
     bool? isGuest,
+    bool? allowMatchRequests,
   }) {
     return ProfileState(
       nickname: clearNickname ? null : (nickname ?? this.nickname),
@@ -70,6 +73,7 @@ class ProfileState {
           ? null
           : (pendingMigrationNotice ?? this.pendingMigrationNotice),
       isGuest: isGuest ?? this.isGuest,
+      allowMatchRequests: allowMatchRequests ?? this.allowMatchRequests,
     );
   }
 }
@@ -196,6 +200,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           serverNowMs: remote.serverNowMs,
           stats: remote.stats,
           isGuest: remote.isGuest,
+          allowMatchRequests: remote.allowMatchRequests,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
           isLoaded: true,
@@ -485,6 +490,21 @@ class ProfileNotifier extends Notifier<ProfileState> {
     if (state.pendingMigrationNotice != null) {
       state = state.copyWith(clearMigrationNotice: true);
     }
+  }
+
+  /// Kullanıcının maç isteklerini açıp kapatmasını sağlar (iyimer güncelleme + hata durumunda geri alma).
+  Future<bool> updateAllowMatchRequests(bool allow) async {
+    final previous = state.allowMatchRequests;
+    state = state.copyWith(allowMatchRequests: allow);
+
+    final apiClient = ref.read(profileApiClientProvider);
+    final success = await apiClient.updateAllowMatchRequests(allow);
+
+    if (!success && ref.mounted) {
+      state = state.copyWith(allowMatchRequests: previous);
+      return false;
+    }
+    return success;
   }
 }
 

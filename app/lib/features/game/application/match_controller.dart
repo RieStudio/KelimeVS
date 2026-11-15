@@ -24,6 +24,7 @@ import '../domain/match/match_state.dart';
 import '../domain/history/match_history_entry.dart';
 import '../domain/models.dart';
 import '../domain/text_filter.dart';
+import '../../match_request/application/presence_controller.dart';
 import '../../profile/application/profile_notifier.dart';
 import 'match_history_provider.dart';
 import 'match_providers.dart';
@@ -356,6 +357,9 @@ class MatchController extends Notifier<MatchUiState>
     final clock = _clock;
 
     _botMatchId = generateBotMatchId();
+    try {
+      ref.read(presenceControllerProvider.notifier).acquireBusy('bot_match');
+    } catch (_) {}
 
     state = state.copyWith(
       isPaused: false,
@@ -1149,11 +1153,17 @@ class MatchController extends Notifier<MatchUiState>
   @override
   void dispose() {
     _isDisposed = true;
+    try {
+      ref.read(presenceControllerProvider.notifier).releaseBusy('bot_match');
+    } catch (_) {}
     _cancelAllTimers();
     _unregisterLifecycleObserver();
   }
 
   void _commitFinishedMatch() {
+    try {
+      ref.read(presenceControllerProvider.notifier).releaseBusy('bot_match');
+    } catch (_) {}
     final finishedState = _pendingFinishedMatchState;
     final finishedSummary = _pendingSummary;
     _cancelAllTimers();

@@ -127,6 +127,7 @@ class UserProfileModel {
   final int? serverNowMs;
   final FrameMigrationInfo? frameMigration;
   final bool isGuest;
+  final bool allowMatchRequests;
 
   const UserProfileModel({
     required this.uid,
@@ -139,6 +140,7 @@ class UserProfileModel {
     this.serverNowMs,
     this.frameMigration,
     this.isGuest = false,
+    this.allowMatchRequests = true,
   });
 
   int get played => stats.played;
@@ -165,6 +167,10 @@ class UserProfileModel {
           ? FrameMigrationInfo.fromJson(migrationJson)
           : null,
       isGuest: _parseBool(json['isGuest'] ?? json['is_guest']),
+      allowMatchRequests: _parseBool(
+        json['allowMatchRequests'] ?? json['allow_match_requests'],
+        defaultValue: true,
+      ),
     );
   }
 }
@@ -201,6 +207,7 @@ abstract interface class ProfileApiClient {
   Future<UserProfileModel?> getProfile();
   Future<ProfileUpdateResult> updateNickname(String nickname);
   Future<bool> deleteProfile();
+  Future<bool> updateAllowMatchRequests(bool allow);
 }
 
 class HttpProfileApiClient implements ProfileApiClient {
@@ -367,5 +374,40 @@ class HttpProfileApiClient implements ProfileApiClient {
       'Hesap silinemedi (HTTP ${response.statusCode}: ${response.body})',
       uri: uri,
     );
+  }
+
+  @override
+  Future<bool> updateAllowMatchRequests(bool allow) async {
+    final uri = Uri.parse(ServerConfig.settingsUrl);
+
+    try {
+      final response = await AuthHttpExecutor.execute(
+        authTokenProvider: authTokenProvider,
+        uri: uri,
+        method: 'PUT',
+        clientFactory: clientFactory,
+        jsonBody: {'allowMatchRequests': allow},
+      );
+
+      if (response == null) return false;
+
+      if (response.statusCode == 200) {
+        try {
+          final map = response.decodeJsonMap();
+          return map['ok'] == true;
+        } catch (_) {
+          return false;
+        }
+      } else if (response.statusCode == 410) {
+        onAccountDeleted?.call();
+        return false;
+      }
+      return false;
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[HttpProfileApiClient] updateAllowMatchRequests exception: $e\n$st');
+      }
+      return false;
+    }
   }
 }

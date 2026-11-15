@@ -114,6 +114,9 @@ class FakeWelcomeProfileApiClient implements ProfileApiClient {
 
   @override
   Future<bool> deleteProfile() async => true;
+
+  @override
+  Future<bool> updateAllowMatchRequests(bool allow) async => true;
 }
 
 class _TestNetworkNotifier extends NetworkStatusNotifier {

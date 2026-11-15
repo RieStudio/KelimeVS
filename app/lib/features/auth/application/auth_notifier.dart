@@ -8,6 +8,9 @@ import '../../game/application/match_history_provider.dart';
 import '../../game/application/match_providers.dart';
 import '../../game/application/objection_provider.dart';
 import '../../leaderboard/application/leaderboard_providers.dart';
+import '../../match_request/application/match_requests_notifier.dart';
+import '../../match_request/application/match_requests_providers.dart';
+import '../../match_request/application/presence_controller.dart';
 import '../../profile/application/blocked_users_notifier.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/data/profile_api_client.dart';
@@ -214,6 +217,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
       ref.invalidate(leaderboardNotifierProvider);
       ref.invalidate(storeNotifierProvider);
       ref.invalidate(onlineMatchSessionProvider);
+      ref.invalidate(presenceControllerProvider);
+      ref.invalidate(matchRequestsProvider);
+      ref.invalidate(userInboxClientProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).loadProfileForSwitchedAccount();
       final synced = await ref
@@ -250,6 +256,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
       ref.invalidate(leaderboardNotifierProvider);
       ref.invalidate(storeNotifierProvider);
       ref.invalidate(onlineMatchSessionProvider);
+      ref.invalidate(presenceControllerProvider);
+      ref.invalidate(matchRequestsProvider);
+      ref.invalidate(userInboxClientProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).clearNickname();
 
@@ -353,6 +362,9 @@ class AuthNotifier extends Notifier<AuthUiState> {
       ref.invalidate(leaderboardNotifierProvider);
       ref.invalidate(storeNotifierProvider);
       ref.invalidate(onlineMatchSessionProvider);
+      ref.invalidate(presenceControllerProvider);
+      ref.invalidate(matchRequestsProvider);
+      ref.invalidate(userInboxClientProvider);
       await ref.read(objectionRepositoryProvider).clear();
       await ref.read(profileProvider.notifier).clearNickname();
 
