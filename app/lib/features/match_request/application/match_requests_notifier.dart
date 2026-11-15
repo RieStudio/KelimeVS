@@ -154,6 +154,18 @@ class MatchRequestsNotifier extends Notifier<MatchRequestsState> {
     );
   }
 
+  /// Maç sonu ekranından kullanıcıya rövanş isteği gönderir.
+  Future<bool> sendRematchRequest({
+    required String toUid,
+    required String matchId,
+  }) {
+    return sendRequest(
+      origin: MatchRequestOrigin.rematch,
+      toUid: toUid,
+      matchId: matchId,
+    );
+  }
+
   /// Gelen bir maç isteğini kabul eder.
   Future<bool> accept(String id) async {
     final client = _client;

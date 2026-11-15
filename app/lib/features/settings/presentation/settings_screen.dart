@@ -13,6 +13,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../gallery/component_gallery.dart';
+import '../../profile/application/profile_notifier.dart';
 import 'licenses_screen.dart';
 
 /// Provider for retrieving application package information asynchronously.
@@ -55,6 +56,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final versionAsync = ref.watch(packageInfoProvider);
+    final allowMatchRequests =
+        ref.watch(profileProvider.select((p) => p.allowMatchRequests));
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -100,6 +103,46 @@ class SettingsScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // 0. Oyun / Maç İstekleri Grubu
+                    const Text(
+                      AppStrings.settingsSectionMatchRequests,
+                      style: AppTextStyles.sectionLabel,
+                    ),
+                    const SizedBox(height: AppDimens.space8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: AppDimens.borderRadiusListCard,
+                        border: Border.all(
+                          color: AppColors.mint,
+                          width: AppDimens.borderThin,
+                        ),
+                      ),
+                      child: _SettingsSwitchTile(
+                        key: const Key('settings_match_requests_tile'),
+                        icon: Icons.sports_esports_outlined,
+                        title: AppStrings.settingsAllowMatchRequestsTitle,
+                        subtitle: AppStrings.settingsAllowMatchRequestsSubtitle,
+                        value: allowMatchRequests,
+                        onChanged: (newValue) async {
+                          final ok = await ref
+                              .read(profileProvider.notifier)
+                              .updateAllowMatchRequests(newValue);
+                          if (!ok && context.mounted) {
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(AppStrings.settingsUpdateError),
+                                backgroundColor: AppColors.danger,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: AppDimens.space24),
+
                     // 1. Yasal ve Bilgilendirme Grubu
                     const Text(
                       AppStrings.settingsSectionLegal,
@@ -382,6 +425,87 @@ class _SettingsTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsSwitchTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.space16,
+        vertical: AppDimens.space12,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.ink,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              icon,
+              size: 20,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(width: AppDimens.space12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.playerName.copyWith(
+                    fontSize: 15,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: AppDimens.space4),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.secondaryText.copyWith(
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppDimens.space8),
+          Switch(
+            key: const Key('settings_allow_match_requests_switch'),
+            value: value,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.mint,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }

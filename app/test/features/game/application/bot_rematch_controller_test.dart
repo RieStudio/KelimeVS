@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/features/game/application/bot_rematch_controller.dart';
-import 'package:app/features/online/domain/models/rematch_state.dart';
+import 'package:app/features/game/application/match_end_rematch_state.dart';
 
 class ControlledRandom implements math.Random {
   final double doubleVal;
@@ -25,12 +25,12 @@ void main() {
   group('BotRematchController Tests', () {
     test('1. Normal bitişte durum idle, anormal bitişte unavailable başlar', () {
       final normalCtrl = BotRematchController(isNormalEnd: true);
-      expect(normalCtrl.state, equals(RematchState.idle));
-      expect(normalCtrl.state.canOffer, isTrue);
+      expect(normalCtrl.state, isA<MatchEndRematchIdle>());
+      expect(normalCtrl.isTerminal, isFalse);
 
       final nonNormalCtrl = BotRematchController(isNormalEnd: false);
-      expect(nonNormalCtrl.state, equals(RematchState.unavailable));
-      expect(nonNormalCtrl.state.canOffer, isFalse);
+      expect(nonNormalCtrl.state, isA<MatchEndRematchUnavailable>());
+      expect(nonNormalCtrl.isTerminal, isTrue);
     });
 
     testWidgets('2. Bot %85 ihtimalle 5-10 sn arasında teklifi reddeder (declined)', (tester) async {
@@ -39,23 +39,23 @@ void main() {
       final controller = BotRematchController(isNormalEnd: true, random: rand);
       addTearDown(controller.dispose);
 
-      final states = <RematchState>[];
+      final states = <MatchEndRematchState>[];
       controller.addListener(() => states.add(controller.state));
 
       final ok = controller.offerRematch();
       expect(ok, isTrue);
-      expect(controller.state, isA<RematchPendingSent>());
-      expect((controller.state as RematchPendingSent).secondsRemaining, 45);
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
+      expect((controller.state as MatchEndRematchPendingSent).secondsRemaining, 45);
 
       // 6 saniye ilerlet (henüz 7 saniye dolmadı)
       await tester.pump(const Duration(seconds: 6));
-      expect(controller.state, isA<RematchPendingSent>());
-      expect((controller.state as RematchPendingSent).secondsRemaining, 39);
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
+      expect((controller.state as MatchEndRematchPendingSent).secondsRemaining, 39);
 
       // 1 saniye daha ilerlet (toplam 7 saniye) -> bot reddetti
       await tester.pump(const Duration(seconds: 1));
-      expect(controller.state, equals(RematchState.declined));
-      expect(controller.state.isTerminal, isTrue);
+      expect(controller.state, isA<MatchEndRematchDeclined>());
+      expect(controller.isTerminal, isTrue);
     });
 
     testWidgets('3. Sessiz bot (%15 ihtimalle) 45 sn sonra expired durumuna geçer', (tester) async {
@@ -65,17 +65,17 @@ void main() {
       addTearDown(controller.dispose);
 
       controller.offerRematch();
-      expect(controller.state, isA<RematchPendingSent>());
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
 
       // 10 saniye sonra hala pendingSent
       await tester.pump(const Duration(seconds: 10));
-      expect(controller.state, isA<RematchPendingSent>());
-      expect((controller.state as RematchPendingSent).secondsRemaining, 35);
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
+      expect((controller.state as MatchEndRematchPendingSent).secondsRemaining, 35);
 
       // 35 saniye daha ilerlet (toplam 45 saniye)
       await tester.pump(const Duration(seconds: 35));
-      expect(controller.state, equals(RematchState.expired));
-      expect(controller.state.isTerminal, isTrue);
+      expect(controller.state, isA<MatchEndRematchExpired>());
+      expect(controller.isTerminal, isTrue);
     });
 
     testWidgets('4. Dispose çağrıldığında zamanlayıcılar iptal edilir ve hata oluşmaz', (tester) async {
@@ -83,7 +83,7 @@ void main() {
       final controller = BotRematchController(isNormalEnd: true, random: rand);
 
       controller.offerRematch();
-      expect(controller.state, isA<RematchPendingSent>());
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
 
       // 2 saniye sonra ekran kapandı (dispose)
       await tester.pump(const Duration(seconds: 2));
@@ -91,6 +91,19 @@ void main() {
 
       // Süre ilerletildiğinde hiçbir dinleyici tetiklenmez veya hata vermez
       await tester.pump(const Duration(seconds: 10));
+    });
+
+    testWidgets('5. cancelRematch çağrıldığında zamanlayıcılar iptal edilir ve unavailable durumuna geçer', (tester) async {
+      final rand = ControlledRandom(doubleVal: 0.5, intVal: 4);
+      final controller = BotRematchController(isNormalEnd: true, random: rand);
+      addTearDown(controller.dispose);
+
+      controller.offerRematch();
+      expect(controller.state, isA<MatchEndRematchPendingSent>());
+
+      controller.cancelRematch();
+      expect(controller.state, isA<MatchEndRematchUnavailable>());
+      expect(controller.isTerminal, isTrue);
     });
   });
 }

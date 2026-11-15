@@ -150,6 +150,13 @@ MatchRequestsState reduceMatchRequestMessage(
         );
       }
 
+      final origin = isIncoming
+          ? current.incoming?.origin
+          : (isOutgoing ? current.outgoing?.origin : null);
+      final opponentUid = isIncoming
+          ? current.incoming?.fromUid
+          : (isOutgoing ? current.outgoing?.toUid : null);
+
       return current.copyWith(
         clearIncoming: isIncoming,
         clearOutgoing: isOutgoing,
@@ -157,6 +164,8 @@ MatchRequestsState reduceMatchRequestMessage(
           id: msg.id,
           status: msg.status,
           isOutgoing: isOutgoing,
+          origin: origin,
+          opponentUid: opponentUid,
         ),
       );
 

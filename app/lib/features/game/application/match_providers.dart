@@ -9,7 +9,6 @@ import '../../online/application/online_match_session.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../online/data/online_match_client.dart';
-import '../../online/domain/models/rematch_state.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/local_question_repository.dart';
 import '../data/powerup_api_client.dart';
@@ -93,10 +92,6 @@ final activeMatchUiStateProvider = Provider<MatchUiState>((ref) {
     return ref.watch(onlineMatchSessionProvider);
   }
   return ref.watch(matchControllerProvider);
-});
-
-final rematchStateProvider = Provider<RematchState>((ref) {
-  return ref.watch(activeMatchUiStateProvider).rematchState;
 });
 
 final activeMatchSessionProvider = Provider<MatchSession>((ref) {

@@ -200,3 +200,33 @@ final matchRequestToastProvider =
     NotifierProvider<MatchRequestToastNotifier, MatchRequestToastState?>(
   MatchRequestToastNotifier.new,
 );
+
+/// MatchEndView gibi satır içi ekranların, global banner/çip/toast gösterilmesini
+/// bastırmak için kaydettiği rakip UID'sini yöneten Notifier.
+class InlineHandledRematchNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setUid(String? uid) {
+    if (ref.mounted) {
+      state = uid;
+    }
+  }
+
+  void clear() {
+    try {
+      if (ref.mounted) {
+        state = null;
+      }
+    } catch (_) {}
+  }
+}
+
+/// MatchEndView gibi satır içi ekranların, global banner/çip/toast gösterilmesini
+/// bastırmak için kaydettiği rakip UID'si.
+/// Null ise hiçbir rakip satır içi işlenmiyor demektir.
+final inlineHandledRematchOpponentUidProvider =
+    NotifierProvider<InlineHandledRematchNotifier, String?>(
+  InlineHandledRematchNotifier.new,
+);
+

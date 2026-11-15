@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,24 +15,26 @@ import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/match_result_icon.dart';
 import '../../../core/widgets/secondary_button.dart';
-import '../../friend_match/presentation/friend_reveal_screen.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
-import '../../online/application/online_match_session.dart';
-import '../../online/domain/models/rematch_state.dart';
+import '../../match_request/application/match_requests_notifier.dart';
+import '../../match_request/application/match_requests_providers.dart';
+import '../../match_request/domain/match_request_models.dart';
+import '../../match_request/domain/match_request_reducer.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
 import '../application/bot_rematch_controller.dart';
+import '../application/match_end_rematch_state.dart';
 import '../application/match_history_provider.dart';
 import '../application/match_providers.dart';
 import '../application/match_session.dart';
 import '../domain/history/match_history_entry.dart';
 
-/// DESIGN.md Bölüm 7: 5) Maç Sonucu Ekranı
+/// DESIGN.md Bölüm 7: 5) Maç Sonu Ekranı
 ///
-/// Sol üstte kapat (ana ekrana; şimdilik galeriye döner).
+/// Sol üstte kapat (ana ekrana döner).
 /// Ortada MatchResultIcon (kazandın: match_win.svg, kaybettin: match_lose.svg), başlık,
 /// terk notu (varsa), skor ("Sen 2 – 1 Rakip"), jeton ödülü kartı.
-/// Altta "Tekrar Oyna" (ana buton) ve "Maç Detayı" (ikincil buton).
+/// Altta Rövanş eylem alanı ve "Maç Detayı" (ikincil buton).
 class MatchEndView extends ConsumerStatefulWidget {
   const MatchEndView({super.key});
 
@@ -42,14 +46,23 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
-  OnlineMatchSession? _onlineSession;
+
   BotRematchController? _botRematchController;
+  InlineHandledRematchNotifier? _inlineHandledNotifier;
   bool _isOnline = false;
-  bool _hasHandledMatched = false;
-  RematchState _lastRematchState = RematchState.unavailable;
+  String? _registeredOpponentUid;
+
+  // Çevrim içi maç sonu durum yönetimi
+  MatchEndRematchState? _terminalState;
+  bool _hasSentOrAcceptedRematch = false;
+  bool _isStarting = false;
+  bool _awaitingResponseForSend = false;
+  String? _lastActiveRequestId;
+  Timer? _countdownTicker;
 
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
-  static String _sanitizeOpponentName(String? raw) => OpponentNameSanitizer.sanitize(raw);
+  static String _sanitizeOpponentName(String? raw) =>
+      OpponentNameSanitizer.sanitize(raw);
 
   @override
   void initState() {
@@ -68,14 +81,27 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _isOnline = ref.read(activeMatchSessionModeProvider) == MatchSessionMode.online;
-    _onlineSession = _isOnline ? ref.read(onlineMatchSessionProvider.notifier) : null;
+    _isOnline =
+        ref.read(activeMatchSessionModeProvider) == MatchSessionMode.online;
+
     if (_isOnline) {
-      _lastRematchState = ref.read(rematchStateProvider);
-    }
-    if (!_isOnline && _botRematchController == null) {
+      _inlineHandledNotifier =
+          ref.read(inlineHandledRematchOpponentUidProvider.notifier);
       final uiState = ref.read(activeMatchUiStateProvider);
-      final isNormal = (uiState.lastSavedMatch?.endReason ?? MatchEndReason.normal) == MatchEndReason.normal;
+      final oppUid = uiState.lastSavedMatch?.opponentUid;
+      if (oppUid != null && oppUid.isNotEmpty && _registeredOpponentUid != oppUid) {
+        _registeredOpponentUid = oppUid;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _inlineHandledNotifier?.setUid(oppUid);
+          }
+        });
+      }
+    } else if (_botRematchController == null) {
+      final uiState = ref.read(activeMatchUiStateProvider);
+      final isNormal =
+          (uiState.lastSavedMatch?.endReason ?? MatchEndReason.normal) ==
+              MatchEndReason.normal;
       _botRematchController = BotRematchController(isNormalEnd: isNormal);
       _botRematchController!.addListener(_onBotRematchChanged);
     }
@@ -88,21 +114,32 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   @override
   void dispose() {
     _animController.dispose();
-    _leaveRematchIfOnline();
+    _countdownTicker?.cancel();
+    _countdownTicker = null;
+    // Satır içi kayıt sızıntısını önlemek için kesinlikle sıfırla
+    if (_registeredOpponentUid != null) {
+      final notifier = _inlineHandledNotifier;
+      Future.microtask(() => notifier?.clear());
+      _registeredOpponentUid = null;
+    }
     _botRematchController?.removeListener(_onBotRematchChanged);
     _botRematchController?.dispose();
     _botRematchController = null;
     super.dispose();
   }
 
-  void _leaveRematchIfOnline() {
-    if (_hasHandledMatched) return;
-    if (!_isOnline) return;
-    if (_lastRematchState is RematchMatched ||
-        _lastRematchState is RematchStarting) {
-      return;
-    }
-    _onlineSession?.leaveRematch();
+  void _startCountdownTickerIfNeeded() {
+    if (_countdownTicker != null) return;
+    _countdownTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  void _stopCountdownTicker() {
+    _countdownTicker?.cancel();
+    _countdownTicker = null;
   }
 
   void _showEnergyDepletedSheet() {
@@ -130,6 +167,68 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       return false;
     }
     return true;
+  }
+
+  MatchEndRematchState _resolveRematchState({
+    required bool isEligible,
+    required String? opponentUid,
+    required MatchRequestsState requestsState,
+  }) {
+    if (!_isOnline) {
+      return _botRematchController?.state ??
+          const MatchEndRematchUnavailable();
+    }
+
+    if (!isEligible || opponentUid == null || opponentUid.isEmpty) {
+      _stopCountdownTicker();
+      return const MatchEndRematchUnavailable();
+    }
+
+    if (_isStarting) {
+      _stopCountdownTicker();
+      return const MatchEndRematchStarting();
+    }
+
+    if (_terminalState != null) {
+      _stopCountdownTicker();
+      return _terminalState!;
+    }
+
+    // 1. Bu rakipten gelen bir rövanş isteği var mı?
+    final incoming = requestsState.incoming;
+    if (incoming != null &&
+        incoming.origin == MatchRequestOrigin.rematch &&
+        incoming.fromUid == opponentUid) {
+      _startCountdownTickerIfNeeded();
+      _lastActiveRequestId = incoming.id;
+      return MatchEndRematchPendingReceived(
+        secondsRemaining: incoming.calculateRemainingSeconds(),
+        requestId: incoming.id,
+      );
+    }
+
+    // 2. Bu rakibe gönderilmiş bekleyen bir rövanş isteği var mı?
+    final outgoing = requestsState.outgoing;
+    if (outgoing != null &&
+        outgoing.origin == MatchRequestOrigin.rematch &&
+        outgoing.toUid == opponentUid) {
+      _startCountdownTickerIfNeeded();
+      _lastActiveRequestId = outgoing.id;
+      return MatchEndRematchPendingSent(
+        secondsRemaining: outgoing.calculateRemainingSeconds(),
+        requestId: outgoing.id,
+      );
+    }
+
+    _stopCountdownTicker();
+
+    // 3. Teklif önceden gönderildi/kabul edildiyse ve artık aktif istek yoksa
+    // maç başına tek istek kuralı gereği rövanş butonu tekrar aktif olmaz.
+    if (_hasSentOrAcceptedRematch) {
+      return const MatchEndRematchUnavailable();
+    }
+
+    return const MatchEndRematchIdle();
   }
 
   @override
@@ -218,31 +317,70 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final bool isFriendly = uiState.isFriendly ||
         (uiState.lastSavedMatch?.isFriendly ?? false);
 
-    ref.listen<RematchState>(rematchStateProvider, (previous, next) {
-      _lastRematchState = next;
-      if (_isOnline && next is RematchMatched && !_hasHandledMatched) {
-        _hasHandledMatched = true;
-        openRematchReveal(context, ref, next.matchedMessage);
+    // Çevrim içi maç istekleri durum dinleyicisi
+    final requestsState = ref.watch(matchRequestsProvider);
+
+    ref.listen<MatchRequestsState>(matchRequestsProvider, (previous, current) {
+      if (!_isOnline) return;
+
+      final endStatus = current.lastEndStatus;
+      if (endStatus != null && endStatus != previous?.lastEndStatus) {
+        if (_lastActiveRequestId != null && endStatus.id == _lastActiveRequestId) {
+          if (endStatus.status == MatchRequestEndStatus.declined) {
+            setState(() {
+              _terminalState = const MatchEndRematchDeclined();
+            });
+          } else if (endStatus.status == MatchRequestEndStatus.expired) {
+            setState(() {
+              _terminalState = const MatchEndRematchExpired();
+            });
+          } else if (endStatus.status == MatchRequestEndStatus.cancelled) {
+            setState(() {
+              _terminalState = const MatchEndRematchUnavailable();
+            });
+          }
+        }
+      }
+
+      final error = current.lastError;
+      if (error != null && error != previous?.lastError) {
+        if (_awaitingResponseForSend) {
+          _awaitingResponseForSend = false;
+          if (error.code == MatchRequestErrorCode.noEnergy) {
+            _showEnergyDepletedSheet();
+            setState(() {
+              _terminalState =
+                  const MatchEndRematchError(MatchRequestErrorCode.noEnergy);
+            });
+          } else if (error.code == MatchRequestErrorCode.opponentNoEnergy) {
+            setState(() {
+              _terminalState =
+                  const MatchEndRematchError(MatchRequestErrorCode.opponentNoEnergy);
+            });
+          } else if (error.code == MatchRequestErrorCode.unavailable) {
+            setState(() {
+              _terminalState = const MatchEndRematchUnavailableReason();
+            });
+          } else {
+            setState(() {
+              _terminalState = MatchEndRematchError(error.code);
+            });
+          }
+        }
       }
     });
 
-    if (_isOnline && !_hasHandledMatched) {
-      final currentRematch = ref.read(rematchStateProvider);
-      _lastRematchState = currentRematch;
-      if (currentRematch is RematchMatched) {
-        _hasHandledMatched = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            openRematchReveal(context, ref, currentRematch.matchedMessage);
-          }
-        });
-      }
-    }
+    final opponentUid = lastMatch?.opponentUid;
+    final matchId = lastMatch?.matchId;
+    final isEligible = uiState.rematchAvailable &&
+        opponentUid != null &&
+        opponentUid.trim().isNotEmpty;
 
-    final RematchState rematchState = _isOnline
-        ? ref.watch(rematchStateProvider)
-        : (_botRematchController?.state ?? RematchState.unavailable);
-    _lastRematchState = rematchState;
+    final rematchState = _resolveRematchState(
+      isEligible: isEligible,
+      opponentUid: opponentUid,
+      requestsState: requestsState,
+    );
 
     final Widget content = Container(
       color: AppColors.surface,
@@ -262,228 +400,276 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                     ),
                     child: Column(
                       children: [
-              // 1. Üst Çubuk (Sol üstte Kapat ikonu)
-              Row(
-                children: [
-                  AppIconButton(
-                    icon: AppIcons.close,
-                    semanticLabel: AppStrings.close,
-                    onTap: () {
-                      _leaveRematchIfOnline();
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
-                  ),
-                  const Spacer(),
-                ],
-              ),
-
-              const Spacer(flex: 3),
-
-              // 2. Maç Sonu SVG İkonu (116 dp)
-              MatchResultIcon(
-                variant: resultVariant,
-              ),
-
-              const SizedBox(height: AppDimens.space12),
-
-              // 3. Başlık ("Kazandın!" / "Kaybettin")
-              Semantics(
-                header: true,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    style: titleStyle,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-
-              // 4. Terk / Bağlantı Notu (varsa)
-              if (endNote != null) ...[
-                const SizedBox(height: AppDimens.space6),
-                Text(
-                  endNote,
-                  style: AppTextStyles.secondaryText.copyWith(
-                    color: endNoteColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-
-              const SizedBox(height: AppDimens.space16),
-
-              // 5. Skor ("Sen 2 – 1 Rakip" / "Sen 2 – 1 <RakipAdı>")
-              Semantics(
-                label: 'Skor: Sen $myScore, $opponentDisplayName $opponentScore',
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        AppStrings.you,
-                        style: AppTextStyles.questionText.copyWith(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
+                        // 1. Üst Çubuk (Sol üstte Kapat ikonu)
+                        Row(
+                          children: [
+                            AppIconButton(
+                              icon: AppIcons.close,
+                              semanticLabel: AppStrings.close,
+                              onTap: () {
+                                Navigator.of(context)
+                                    .popUntil((route) => route.isFirst);
+                              },
+                            ),
+                            const Spacer(),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-                      Text(
-                        '$myScore${AppStrings.scoreDash}$opponentScore',
-                        style: AppTextStyles.scoreSmall.copyWith(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
+
+                        const Spacer(flex: 3),
+
+                        // 2. Maç Sonu SVG İkonu (116 dp)
+                        MatchResultIcon(
+                          variant: resultVariant,
                         ),
-                      ),
-                      const SizedBox(width: AppDimens.space8),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * 0.35,
-                        ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            opponentDisplayName,
-                            maxLines: 1,
-                            style: AppTextStyles.questionText.copyWith(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
+
+                        const SizedBox(height: AppDimens.space12),
+
+                        // 3. Başlık ("Kazandın!" / "Kaybettin")
+                        Semantics(
+                          header: true,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              style: titleStyle,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
-              // 6. Jeton Ödülü Kartı (Yalnızca normal maçlarda ve coinsAwarded varsa)
-              if (!isFriendly && coinsAwarded != null) ...[
-                const SizedBox(height: AppDimens.space20),
-                Semantics(
-                  container: true,
-                  label: 'Jeton ödülü: $coinsAwarded',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimens.space20,
-                      vertical: AppDimens.space8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusFull,
-                      border: Border.all(
-                        color: AppColors.mint,
-                        width: AppDimens.borderThin,
-                      ),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Jeton Simgesi (CoinIcon)
-                          const CoinIcon(size: 32),
-                          const SizedBox(width: AppDimens.space10),
+                        // 4. Terk / Bağlantı Notu (varsa)
+                        if (endNote != null) ...[
+                          const SizedBox(height: AppDimens.space6),
                           Text(
-                            AppStrings.coinReward(coinsAwarded),
-                            style: AppTextStyles.questionText.copyWith(
-                              fontSize: 20,
+                            endNote,
+                            style: AppTextStyles.secondaryText.copyWith(
+                              color: endNoteColor,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+
+                        const SizedBox(height: AppDimens.space16),
+
+                        // 5. Skor ("Sen 2 – 1 Rakip" / "Sen 2 – 1 <RakipAdı>")
+                        Semantics(
+                          label:
+                              'Skor: Sen $myScore, $opponentDisplayName $opponentScore',
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  AppStrings.you,
+                                  style: AppTextStyles.questionText.copyWith(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: AppDimens.space8),
+                                Text(
+                                  '$myScore${AppStrings.scoreDash}$opponentScore',
+                                  style: AppTextStyles.scoreSmall.copyWith(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: AppDimens.space8),
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        MediaQuery.sizeOf(context).width * 0.35,
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      opponentDisplayName,
+                                      maxLines: 1,
+                                      style: AppTextStyles.questionText.copyWith(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // 6. Jeton Ödülü Kartı (Yalnızca normal maçlarda ve coinsAwarded varsa)
+                        if (!isFriendly && coinsAwarded != null) ...[
+                          const SizedBox(height: AppDimens.space20),
+                          Semantics(
+                            container: true,
+                            label: 'Jeton ödülü: $coinsAwarded',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppDimens.space20,
+                                vertical: AppDimens.space8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: AppDimens.borderRadiusFull,
+                                border: Border.all(
+                                  color: AppColors.mint,
+                                  width: AppDimens.borderThin,
+                                ),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CoinIcon(size: 32),
+                                    const SizedBox(width: AppDimens.space10),
+                                    Text(
+                                      AppStrings.coinReward(coinsAwarded),
+                                      style: AppTextStyles.questionText.copyWith(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.ink,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ],
-                      ),
+
+                        const Spacer(flex: 4),
+
+                        // 7. Eylem Alanı (Rövanş / Bekleme / Kabul-Red / Ana Sayfa)
+                        _buildRematchActionArea(
+                          rematchState: rematchState,
+                          opponentDisplayName: opponentDisplayName,
+                          onOfferRematch: () {
+                            if (_isOnline &&
+                                !ensureNetworkConnected(context, ref)) {
+                              return;
+                            }
+                            if (!_ensureEnergyAvailable(isFriendly)) return;
+
+                            if (_isOnline) {
+                              if (opponentUid == null || matchId == null) return;
+                              _hasSentOrAcceptedRematch = true;
+                              _awaitingResponseForSend = true;
+                              ref
+                                  .read(matchRequestsProvider.notifier)
+                                  .sendRematchRequest(
+                                    toUid: opponentUid,
+                                    matchId: matchId,
+                                  );
+                            } else {
+                              _botRematchController?.offerRematch();
+                            }
+                          },
+                          onCancelRematch: (requestId) {
+                            if (_isOnline) {
+                              if (requestId != null) {
+                                ref
+                                    .read(matchRequestsProvider.notifier)
+                                    .cancel(requestId);
+                              }
+                              setState(() {
+                                _terminalState =
+                                    const MatchEndRematchUnavailable();
+                              });
+                            } else {
+                              _botRematchController?.cancelRematch();
+                            }
+                          },
+                          onAcceptRematch: (requestId) {
+                            if (_isOnline &&
+                                !ensureNetworkConnected(context, ref)) {
+                              return;
+                            }
+                            if (!_ensureEnergyAvailable(isFriendly)) return;
+
+                            if (_isOnline) {
+                              setState(() {
+                                _isStarting = true;
+                                _hasSentOrAcceptedRematch = true;
+                              });
+                              ref
+                                  .read(matchRequestsProvider.notifier)
+                                  .accept(requestId);
+                            }
+                          },
+                          onDeclineRematch: (requestId) {
+                            if (_isOnline) {
+                              setState(() {
+                                _terminalState =
+                                    const MatchEndRematchDeclined();
+                              });
+                              ref
+                                  .read(matchRequestsProvider.notifier)
+                                  .decline(requestId);
+                            } else {
+                              _botRematchController?.declineRematch();
+                            }
+                          },
+                          onGoHome: () {
+                            Navigator.of(context)
+                                .popUntil((route) => route.isFirst);
+                          },
+                        ),
+
+                        const SizedBox(height: AppDimens.space12),
+
+                        SecondaryButton(
+                          text: AppStrings.matchDetail,
+                          onPressed: () async {
+                            final last = ref
+                                .read(activeMatchUiStateProvider)
+                                .lastSavedMatch;
+                            if (last != null) {
+                              if (context.mounted) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        MatchDetailScreen(match: last),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            // Fallback: geçmişten en son maçı al
+                            final recent = await ref
+                                .read(matchHistoryRepositoryProvider)
+                                .loadRecent();
+                            if (recent.isNotEmpty && context.mounted) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      MatchDetailScreen(match: recent.first),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+
+                        const SizedBox(height: AppDimens.space12),
+                      ],
                     ),
                   ),
                 ),
-              ],
-
-              const Spacer(flex: 4),
-
-              // 7. Eylem Alanı (Rövanş / Bekleme / Kabul-Red / Ana Sayfa)
-              _buildRematchActionArea(
-                rematchState: rematchState,
-                opponentDisplayName: opponentDisplayName,
-                onOfferRematch: () {
-                  if (_isOnline && !ensureNetworkConnected(context, ref)) return;
-                  if (!_ensureEnergyAvailable(isFriendly)) return;
-                  if (_isOnline) {
-                    _onlineSession?.offerRematch();
-                  } else {
-                    _botRematchController?.offerRematch();
-                  }
-                },
-                onAcceptRematch: () {
-                  if (_isOnline && !ensureNetworkConnected(context, ref)) return;
-                  if (!_ensureEnergyAvailable(isFriendly)) return;
-                  if (_isOnline) {
-                    _onlineSession?.acceptRematch();
-                  }
-                },
-                onDeclineRematch: () {
-                  if (_isOnline) {
-                    _onlineSession?.declineRematch();
-                  } else {
-                    _botRematchController?.declineRematch();
-                  }
-                },
-                onGoHome: () {
-                  _leaveRematchIfOnline();
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
               ),
-
-              const SizedBox(height: AppDimens.space12),
-
-              SecondaryButton(
-                text: AppStrings.matchDetail,
-                onPressed: () async {
-                  final lastMatch =
-                      ref.read(activeMatchUiStateProvider).lastSavedMatch;
-                  if (lastMatch != null) {
-                    if (context.mounted) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => MatchDetailScreen(match: lastMatch),
-                        ),
-                      );
-                    }
-                    return;
-                  }
-
-                  // Fallback: geçmişten en son maçı al
-                  final recent =
-                      await ref.read(matchHistoryRepositoryProvider).loadRecent();
-                  if (recent.isNotEmpty && context.mounted) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => MatchDetailScreen(match: recent.first),
-                      ),
-                    );
-                  }
-                },
-              ),
-
-              const SizedBox(height: AppDimens.space12),
-            ],
-          ),
+            );
+          },
         ),
       ),
-    ),
-  );
-},
-),
-),
-);
+    );
 
     final disableAnimations = MediaQuery.of(context).disableAnimations;
     final body = disableAnimations
@@ -495,24 +681,20 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          _leaveRematchIfOnline();
-        }
-      },
       child: body,
     );
   }
 
   Widget _buildRematchActionArea({
-    required RematchState rematchState,
+    required MatchEndRematchState rematchState,
     required String opponentDisplayName,
     required VoidCallback onOfferRematch,
-    required VoidCallback onAcceptRematch,
-    required VoidCallback onDeclineRematch,
+    required void Function(String? requestId) onCancelRematch,
+    required void Function(String requestId) onAcceptRematch,
+    required void Function(String requestId) onDeclineRematch,
     required VoidCallback onGoHome,
   }) {
-    if (rematchState is RematchIdle) {
+    if (rematchState is MatchEndRematchIdle) {
       return PrimaryButton(
         key: const Key('match_end_rematch_button'),
         text: AppStrings.rematchAction,
@@ -520,15 +702,37 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       );
     }
 
-    if (rematchState is RematchPendingSent) {
-      return PrimaryButton(
-        key: const Key('match_end_rematch_waiting_button'),
-        text: AppStrings.rematchWaiting(rematchState.secondsRemaining),
-        onPressed: null,
+    if (rematchState is MatchEndRematchPendingSent) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            container: true,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                key: const Key('match_end_rematch_waiting_text'),
+                AppStrings.rematchWaiting(rematchState.secondsRemaining),
+                style: AppTextStyles.secondaryText.copyWith(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppDimens.space8),
+          SecondaryButton(
+            key: const Key('match_end_rematch_cancel_button'),
+            text: AppStrings.matchRequestCancel,
+            onPressed: () => onCancelRematch(rematchState.requestId),
+          ),
+        ],
       );
     }
 
-    if (rematchState is RematchPendingReceived) {
+    if (rematchState is MatchEndRematchPendingReceived) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -554,7 +758,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 child: SecondaryButton(
                   key: const Key('match_end_rematch_decline_button'),
                   text: AppStrings.rematchDecline,
-                  onPressed: onDeclineRematch,
+                  onPressed: () => onDeclineRematch(rematchState.requestId),
                 ),
               ),
               const SizedBox(width: AppDimens.space12),
@@ -562,7 +766,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                 child: PrimaryButton(
                   key: const Key('match_end_rematch_accept_button'),
                   text: AppStrings.rematchAccept(rematchState.secondsRemaining),
-                  onPressed: onAcceptRematch,
+                  onPressed: () => onAcceptRematch(rematchState.requestId),
                 ),
               ),
             ],
@@ -571,7 +775,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       );
     }
 
-    if (rematchState is RematchStarting || rematchState is RematchMatched) {
+    if (rematchState is MatchEndRematchStarting) {
       return const PrimaryButton(
         key: Key('match_end_rematch_starting_button'),
         text: AppStrings.rematchStarting,
@@ -583,34 +787,33 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final String? infoText;
     final Color infoColor;
 
-    if (rematchState is RematchDeclined) {
+    if (rematchState is MatchEndRematchDeclined) {
       infoText = AppStrings.rematchDeclined;
-      infoColor = AppColors.muted;
-    } else if (rematchState is RematchExpired) {
+      // "Rövanş reddedildi" metni KIRMIZI (AppColors.dangerText)
+      infoColor = AppColors.dangerText;
+    } else if (rematchState is MatchEndRematchExpired) {
       infoText = AppStrings.rematchExpired;
       infoColor = AppColors.muted;
-    } else if (rematchState is RematchOpponentLeft) {
-      infoText = AppStrings.rematchOpponentLeft;
-      infoColor = AppColors.muted;
-    } else if (rematchState is RematchClosed) {
+    } else if (rematchState is MatchEndRematchUnavailableReason) {
       infoText = AppStrings.rematchUnavailable;
       infoColor = AppColors.muted;
-    } else if (rematchState is RematchError) {
-      infoColor = AppColors.dangerText;
+    } else if (rematchState is MatchEndRematchError) {
       switch (rematchState.code) {
-        case RematchErrorCode.noEnergy:
+        case MatchRequestErrorCode.noEnergy:
           infoText = AppStrings.rematchNoEnergy;
-        case RematchErrorCode.opponentNoEnergy:
+          infoColor = AppColors.dangerText;
+        case MatchRequestErrorCode.opponentNoEnergy:
           infoText = AppStrings.rematchOpponentNoEnergy;
-        case RematchErrorCode.blocked:
-        case RematchErrorCode.accountDeleted:
-        case RematchErrorCode.notAvailable:
-        case RematchErrorCode.unavailable:
-        case RematchErrorCode.unknown:
+          infoColor = AppColors.dangerText;
+        case MatchRequestErrorCode.unavailable:
+        case MatchRequestErrorCode.cooldownActive:
+        case MatchRequestErrorCode.rateLimited:
+        case MatchRequestErrorCode.invalid:
           infoText = AppStrings.rematchUnavailable;
+          infoColor = AppColors.muted;
       }
     } else {
-      // RematchUnavailable: üstte bilgi metni gösterilmez, sadece Ana Sayfa
+      // MatchEndRematchUnavailable: üstte bilgi metni gösterilmez, sadece Ana Sayfa
       infoText = null;
       infoColor = AppColors.muted;
     }
@@ -645,4 +848,3 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     );
   }
 }
-

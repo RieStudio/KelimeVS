@@ -58,7 +58,7 @@ abstract final class AppStrings {
 
   // Rövanş (Rematch)
   static const String rematchAction = 'Rövanş';
-  static String rematchWaiting(int n) => 'Rövanş bekleniyor ($n)';
+  static String rematchWaiting(int n) => 'Rövanş bekleniyor · $n sn';
   static const String rematchStarting = 'Rövanş başlıyor...';
   static String rematchOfferedBy(String? name) {
     final sanitized = (name != null && name.trim().isNotEmpty) ? name.trim() : opponent;
@@ -68,10 +68,16 @@ abstract final class AppStrings {
   static const String rematchDecline = 'Reddet';
   static const String rematchDeclined = 'Rövanş reddedildi';
   static const String rematchExpired = 'Süre doldu';
-  static const String rematchOpponentLeft = 'Rakip ayrıldı';
   static const String rematchNoEnergy = 'Enerjin yetersiz';
   static const String rematchOpponentNoEnergy = 'Rakibin enerjisi yetersiz';
-  static const String rematchUnavailable = 'Rövanş şu anda mümkün değil';
+  static const String rematchUnavailable = 'Rakip şu an müsait değil';
+
+  // Ayarlar - Maç İstekleri
+  static const String settingsSectionMatchRequests = 'Maç İstekleri';
+  static const String settingsAllowMatchRequestsTitle = 'Maç isteklerine izin ver';
+  static const String settingsAllowMatchRequestsSubtitle =
+      'Kapalıyken oyuncular sana maç ve rövanş isteği gönderemez.';
+  static const String settingsUpdateError = 'Ayar güncellenemedi';
 
   // Maç İsteği (Match Request)
   static String matchRequestTitleProfile(String name) =>

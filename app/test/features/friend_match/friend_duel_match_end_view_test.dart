@@ -13,7 +13,6 @@ import 'package:app/features/game/domain/match/match_config.dart';
 import 'package:app/features/game/domain/match/match_state.dart';
 import 'package:app/features/game/domain/models.dart';
 import 'package:app/features/game/presentation/match_end_view.dart';
-import 'package:app/features/online/domain/models/rematch_state.dart';
 
 class FakeSessionModeNotifier extends ActiveMatchSessionModeNotifier {
   final MatchSessionMode mode;
@@ -86,10 +85,12 @@ void main() {
         isFriendly: true,
         opponentName: 'Mehmet',
         coinsAwarded: 0,
+        rematchAvailable: true,
         lastSavedMatch: const MatchHistoryEntry(
           id: 'friend_match_1',
           matchId: 'friend_match_1',
           opponentName: 'Mehmet',
+          opponentUid: 'user_mehmet',
           finishedAtMs: 12345678,
           myScore: 2,
           opponentScore: 1,
@@ -107,7 +108,6 @@ void main() {
             activeMatchSessionModeProvider
                 .overrideWith(() => FakeSessionModeNotifier(MatchSessionMode.online)),
             activeMatchUiStateProvider.overrideWithValue(uiState),
-            rematchStateProvider.overrideWithValue(RematchState.idle),
           ],
           child: const MaterialApp(
             home: Scaffold(

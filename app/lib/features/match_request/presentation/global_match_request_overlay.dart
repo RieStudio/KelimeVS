@@ -120,7 +120,12 @@ class _GlobalMatchRequestOverlayState
   }
 
   void _handleEndStatus(MatchRequestEndStatusInfo endStatus) {
-    if (endStatus.isOutgoing) {
+    final inlineUid = ref.read(inlineHandledRematchOpponentUidProvider);
+    final isInlineHandled = inlineUid != null &&
+        endStatus.origin == MatchRequestOrigin.rematch &&
+        endStatus.opponentUid == inlineUid;
+
+    if (!isInlineHandled && endStatus.isOutgoing) {
       if (endStatus.status == MatchRequestEndStatus.declined) {
         _showToast(AppStrings.matchRequestDeclinedToast, isDanger: true);
       } else if (endStatus.status == MatchRequestEndStatus.expired) {
@@ -133,6 +138,14 @@ class _GlobalMatchRequestOverlayState
   }
 
   void _handleError(MatchRequestErrorInfo error) {
+    final inlineUid = ref.read(inlineHandledRematchOpponentUidProvider);
+    if (inlineUid != null) {
+      // Satır içi ekran aktifken global hata bildirimi bastırılır (ekran kendi gösterir)
+      _isAccepting = false;
+      ref.read(matchRequestsProvider.notifier).clearLastError();
+      return;
+    }
+
     final wasAccepting = _isAccepting;
     _isAccepting = false;
 
@@ -246,6 +259,7 @@ class _GlobalMatchRequestOverlayState
     final requestsState = ref.watch(matchRequestsProvider);
     final presenceState = ref.watch(presenceControllerProvider);
     final hasNickname = ref.watch(profileProvider.select((p) => p.hasNickname));
+    final inlineHandledUid = ref.watch(inlineHandledRematchOpponentUidProvider);
 
     // Bastırma kuralı: Kullanıcı meşgulken (maçta, kuyrukta, odada vs.) veya onboarding'de banner/çip gösterilmez.
     final isSuppressed = presenceState == UserPresenceState.busy || !hasNickname;
@@ -253,8 +267,16 @@ class _GlobalMatchRequestOverlayState
     final incoming = requestsState.incoming;
     final outgoing = requestsState.outgoing;
 
-    final showIncoming = !isSuppressed && incoming != null;
-    final showOutgoing = !isSuppressed && outgoing != null;
+    // Satır içi kayıtlı rövanş isteklerinde global banner/çip gösterilmez.
+    final isInlineIncoming = inlineHandledUid != null &&
+        incoming?.origin == MatchRequestOrigin.rematch &&
+        incoming?.fromUid == inlineHandledUid;
+    final isInlineOutgoing = inlineHandledUid != null &&
+        outgoing?.origin == MatchRequestOrigin.rematch &&
+        outgoing?.toUid == inlineHandledUid;
+
+    final showIncoming = !isSuppressed && !isInlineIncoming && incoming != null;
+    final showOutgoing = !isSuppressed && !isInlineOutgoing && outgoing != null;
     final showToast = _currentToast != null;
 
     final disableAnimations = MediaQuery.of(context).disableAnimations;

@@ -363,11 +363,15 @@ class MatchRequestEndStatusInfo {
   final String id;
   final MatchRequestEndStatus status;
   final bool isOutgoing;
+  final MatchRequestOrigin? origin;
+  final String? opponentUid;
 
   const MatchRequestEndStatusInfo({
     required this.id,
     required this.status,
     required this.isOutgoing,
+    this.origin,
+    this.opponentUid,
   });
 
   @override
@@ -377,10 +381,17 @@ class MatchRequestEndStatusInfo {
           runtimeType == other.runtimeType &&
           id == other.id &&
           status == other.status &&
-          isOutgoing == other.isOutgoing;
+          isOutgoing == other.isOutgoing &&
+          origin == other.origin &&
+          opponentUid == other.opponentUid;
 
   @override
-  int get hashCode => id.hashCode ^ status.hashCode ^ isOutgoing.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      status.hashCode ^
+      isOutgoing.hashCode ^
+      origin.hashCode ^
+      opponentUid.hashCode;
 }
 
 /// İstek hata bilgisi.

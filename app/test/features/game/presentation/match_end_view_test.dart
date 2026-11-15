@@ -247,7 +247,11 @@ void main() {
     await tester.tap(rematchBtn);
     await tester.pump();
 
-    expect(find.widgetWithText(PrimaryButton, AppStrings.rematchWaiting(45)), findsOneWidget);
+    expect(find.text(AppStrings.rematchWaiting(45)), findsOneWidget);
+    expect(
+      find.widgetWithText(SecondaryButton, AppStrings.matchRequestCancel),
+      findsOneWidget,
+    );
   });
 
   testWidgets('6. "Maç Detayı" butonu ekranda ikincil buton olarak bulunur', (tester) async {

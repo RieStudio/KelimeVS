@@ -3,18 +3,18 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
-import '../../online/domain/models/rematch_state.dart';
+import 'match_end_rematch_state.dart';
 
 /// Bot maçlarında tamamen istemci tarafında rövanş akışını simüle eden durum denetleyicisi.
 ///
 /// Sunucuya hiçbir ağ isteği göndermez.
-/// - Maç normal bittiyse başlangıç durumu [RematchState.idle]'dır; aksi halde [RematchState.unavailable].
-/// - [offerRematch] çağrıldığında 45 sn yerel sayaçla [RematchState.pendingSent] başlar.
-/// - ~%85 olasılıkla 5–10 sn arası rastgele bir beklemeden sonra [RematchState.declined] üretir.
-/// - ~%15 olasılıkla bot sessiz kalır ve 45 sn süre dolunca [RematchState.expired] durumuna geçer.
+/// - Maç normal bittiyse başlangıç durumu [MatchEndRematchIdle]'dır; aksi halde [MatchEndRematchUnavailable].
+/// - [offerRematch] çağrıldığında 45 sn yerel sayaçla [MatchEndRematchPendingSent] başlar.
+/// - ~%85 olasılıkla 5–10 sn arası rastgele bir beklemeden sonra [MatchEndRematchDeclined] üretir.
+/// - ~%15 olasılıkla bot sessiz kalır ve 45 sn süre dolunca [MatchEndRematchExpired] durumuna geçer.
 class BotRematchController extends ChangeNotifier {
   final math.Random _random;
-  RematchState _state;
+  MatchEndRematchState _state;
   Timer? _countdownTimer;
   Timer? _botDecisionTimer;
   int _secondsRemaining = 45;
@@ -23,30 +23,37 @@ class BotRematchController extends ChangeNotifier {
     bool isNormalEnd = true,
     math.Random? random,
   })  : _random = random ?? math.Random(),
-        _state = isNormalEnd ? RematchState.idle : RematchState.unavailable;
+        _state = isNormalEnd
+            ? const MatchEndRematchIdle()
+            : const MatchEndRematchUnavailable();
 
-  RematchState get state => _state;
+  MatchEndRematchState get state => _state;
   int get secondsRemaining => _secondsRemaining;
+
+  bool get isTerminal =>
+      _state is MatchEndRematchDeclined ||
+      _state is MatchEndRematchExpired ||
+      _state is MatchEndRematchUnavailable;
 
   /// Oyuncu tarafından "Rövanş" teklifi gönderilmesi.
   bool offerRematch() {
-    if (_state is! RematchIdle) return false;
+    if (_state is! MatchEndRematchIdle) return false;
 
     _secondsRemaining = 45;
-    _state = RematchState.pendingSent(secondsRemaining: _secondsRemaining);
+    _state = MatchEndRematchPendingSent(secondsRemaining: _secondsRemaining);
     notifyListeners();
 
     // 45 saniyelik yerel sayaç
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsRemaining > 1) {
         _secondsRemaining--;
-        _state = RematchState.pendingSent(secondsRemaining: _secondsRemaining);
+        _state = MatchEndRematchPendingSent(secondsRemaining: _secondsRemaining);
         notifyListeners();
       } else {
         _secondsRemaining = 0;
         _cancelTimers();
-        if (!_state.isTerminal) {
-          _state = RematchState.expired;
+        if (!isTerminal) {
+          _state = const MatchEndRematchExpired();
           notifyListeners();
         }
       }
@@ -59,7 +66,7 @@ class BotRematchController extends ChangeNotifier {
       final delaySeconds = 5 + _random.nextInt(6);
       _botDecisionTimer = Timer(Duration(seconds: delaySeconds), () {
         _cancelTimers();
-        _state = RematchState.declined;
+        _state = const MatchEndRematchDeclined();
         notifyListeners();
       });
     }
@@ -67,13 +74,18 @@ class BotRematchController extends ChangeNotifier {
     return true;
   }
 
-  /// Bot maçında oyuncu tekliften vazgeçerse veya olası reddetme işlemi için.
-  void declineRematch() {
+  /// Bot maçında oyuncu tekliften vazgeçerse veya iptal ederse.
+  void cancelRematch() {
     _cancelTimers();
-    if (!_state.isTerminal) {
-      _state = RematchState.declined;
+    if (!isTerminal) {
+      _state = const MatchEndRematchUnavailable();
       notifyListeners();
     }
+  }
+
+  /// Geriye dönük uyumluluk / olası reddetme işlemi için.
+  void declineRematch() {
+    cancelRematch();
   }
 
   void _cancelTimers() {

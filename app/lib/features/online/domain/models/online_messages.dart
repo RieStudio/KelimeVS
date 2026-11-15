@@ -3,9 +3,6 @@
 import 'dart:convert';
 
 import 'online_match_state.dart';
-import 'rematch_state.dart';
-
-export 'rematch_state.dart';
 
 /// Maç sonundaki tur dökümü (final mesajında gelir).
 class OnlineRoundRecord {
@@ -287,75 +284,6 @@ class OpponentPowerupServerMessage extends ServerMessage {
       'OpponentPowerupServerMessage(powerupType: $powerupType, seconds: $seconds)';
 }
 
-/// Rövanş teklif edildi bildirimi (`rematch_offered`).
-class RematchOfferedServerMessage extends ServerMessage {
-  final String byUid;
-  final int expiresAtMs;
-
-  const RematchOfferedServerMessage({
-    required this.byUid,
-    required this.expiresAtMs,
-  });
-
-  @override
-  String toString() =>
-      'RematchOfferedServerMessage(byUid: $byUid, expiresAtMs: $expiresAtMs)';
-}
-
-/// Rövanş durum tipleri.
-enum RematchStatusType {
-  declined,
-  expired,
-  opponentLeft,
-  closed,
-  unknown;
-
-  static RematchStatusType fromWire(String? value) {
-    switch (value) {
-      case 'declined':
-        return RematchStatusType.declined;
-      case 'expired':
-        return RematchStatusType.expired;
-      case 'opponent_left':
-        return RematchStatusType.opponentLeft;
-      case 'closed':
-        return RematchStatusType.closed;
-      default:
-        return RematchStatusType.unknown;
-    }
-  }
-}
-
-/// Rövanş durum bildirimi (`rematch_status`).
-class RematchStatusServerMessage extends ServerMessage {
-  final RematchStatusType status;
-  final String? rawStatus;
-
-  const RematchStatusServerMessage({
-    required this.status,
-    this.rawStatus,
-  });
-
-  @override
-  String toString() =>
-      'RematchStatusServerMessage(status: $status, rawStatus: $rawStatus)';
-}
-
-/// Rövanş hata bildirimi (`rematch_error`).
-class RematchErrorServerMessage extends ServerMessage {
-  final RematchErrorCode code;
-  final String? rawCode;
-
-  const RematchErrorServerMessage({
-    required this.code,
-    this.rawCode,
-  });
-
-  @override
-  String toString() =>
-      'RematchErrorServerMessage(code: $code, rawCode: $rawCode)';
-}
-
 /// Sunucudan gelen ham metin veya JSON nesnesini güçlü tipli [ServerMessage] sınıfına dönüştürür.
 ///
 /// Hata fırlatmaz; bozuk veya beklenmeyen verilerde [UnknownServerMessage] döndürür.
@@ -473,25 +401,6 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
       case 'voided':
         final reason = json['reason'] as String? ?? 'opponent_absent';
         return VoidedServerMessage(reason: reason);
-      case 'rematch_offered':
-        final byUid = json['byUid'] as String? ?? '';
-        final expiresAtMs = (json['expiresAtMs'] as num?)?.toInt() ?? 0;
-        return RematchOfferedServerMessage(
-          byUid: byUid,
-          expiresAtMs: expiresAtMs,
-        );
-      case 'rematch_status':
-        final rawStatus = json['status'] as String?;
-        return RematchStatusServerMessage(
-          status: RematchStatusType.fromWire(rawStatus),
-          rawStatus: rawStatus,
-        );
-      case 'rematch_error':
-        final rawCode = json['code'] as String?;
-        return RematchErrorServerMessage(
-          code: RematchErrorCode.fromWire(rawCode),
-          rawCode: rawCode,
-        );
       case 'powerup_ack':
         return PowerupAckServerMessage(
           powerupType: json['powerupType'] as String? ?? 'extra_time',
@@ -595,24 +504,4 @@ String createCancelRoomMessage({String? code}) {
 /// Güçlendirici kullanma istemci mesajı (`use_powerup`).
 String createUsePowerupMessage(String type) {
   return jsonEncode({'t': 'use_powerup', 'type': type});
-}
-
-/// Rövanş teklif etme istemci mesajı (`rematch_offer`).
-String createRematchOfferMessage() {
-  return jsonEncode({'t': 'rematch_offer'});
-}
-
-/// Rövanş kabul istemci mesajı (`rematch_accept`).
-String createRematchAcceptMessage() {
-  return jsonEncode({'t': 'rematch_accept'});
-}
-
-/// Rövanş ret istemci mesajı (`rematch_decline`).
-String createRematchDeclineMessage() {
-  return jsonEncode({'t': 'rematch_decline'});
-}
-
-/// Maç sonu ekranından ayrılma istemci mesajı (`rematch_leave`).
-String createRematchLeaveMessage() {
-  return jsonEncode({'t': 'rematch_leave'});
 }
