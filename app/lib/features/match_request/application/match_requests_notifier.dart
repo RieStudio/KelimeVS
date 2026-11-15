@@ -146,6 +146,14 @@ class MatchRequestsNotifier extends Notifier<MatchRequestsState> {
     return true;
   }
 
+  /// Profil ekranından kullanıcıya dostluk maçı isteği gönderir.
+  Future<bool> sendProfileRequest({required String toUid}) {
+    return sendRequest(
+      origin: MatchRequestOrigin.profile,
+      toUid: toUid,
+    );
+  }
+
   /// Gelen bir maç isteğini kabul eder.
   Future<bool> accept(String id) async {
     final client = _client;

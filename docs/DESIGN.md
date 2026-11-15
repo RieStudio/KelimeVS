@@ -171,6 +171,27 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 4. **Ağ Gerektiren Eylemler:** Ağ bağlantısı yokken Hızlı Maç, Arkadaşınla Oyna (Oda Kur/Katıl), Mağaza satın alma/kuşanma, Enerji paketi alma, Hesap silme ve Engelleme gibi eylemler başlatılmaz; kullanıcıya kayan SnackBar ile `noInternetActionError` ("Bu işlem için internet bağlantısı gerekiyor.") gösterilir. Hızlı Maç internetsizken gizlice bot maçına düşürmez (yalnızca online eşleşme zaman aşımı/circuit breaker durumunda bot fallback çalışır).
 5. **Sunucu Sağlık Kontrolü (`GET /health`):** Cihaz Wi-Fi/hücresel ağa bağlıyken internet çıkışı olup olmadığını (captive portal vb.) doğrulamak için sunucunun `/health` uç noktasına hafif bir probe atılır. Sürekli polling yapılmaz; yalnızca ağ geçişlerinde, kullanıcı tekrar dene butonuna bastığında ve uygulama ön plana geldiğinde (`resumed`) 5 sn throttle ile kontrol edilir. Bağlantı veya zaman aşımı hatası haricinde HTTP yanıtı (404 dahil) gelirse cihaz çevrimiçi kabul edilir.
 
+### 6c) Global Maç İsteği Katmanı ve Bildirim Bileşenleri (GlobalMatchRequestOverlay)
+`MaterialApp.builder` içinde `Navigator`'ın üstünde bir `Stack` olarak yer alır. Boş alanlarda altındaki sayfalara dokunmayı engellemez (`IgnorePointer(ignoring: true)` üzerinde yer alan kart ve çipler kendi dokunmalarını alır).
+1. **Gelen İstek Bildirim Bandı (`IncomingMatchRequestBanner`):**
+   - **Giriş Animasyonu ve Konum:** Ekranın üstünden (SafeArea altına) 250 ms `easeOutCubic` eğrisiyle kayarak iner (`MediaQuery.disableAnimations` açıkken animasyonsuz doğrudan belirir).
+   - **Tasarım Dili:** Neo-brutalist kart stili (`card` beyaz zemin, 2 px `ink` kenarlık, `0 3px 0 ink` sert gölge, 16 px yuvarlatılmış köşe, `space12` iç boşluk).
+   - **Görsel İçerik:** Sol tarafta rakibin avatarı ve kuşandığı çerçeve (`PlayerAvatar.opponent`, `VisualFrameRegistry` desteği). Ortada Fredoka 16/700 başlık ("<Ad> seninle rövanş istiyor" [origin: rematch] veya "<Ad> seninle maç yapmak istiyor" [origin: profile]) ve altında Nunito 13/700 ikincil açıklama ("Dostluk maçı" [friendly] veya "Dereceli maç · 1 enerji" [ranked]). Asla bot rozeti, etiketi veya ibaresi yer almaz.
+   - **Geri Sayım Çubuğu:** Kartın hemen altında 45 saniyeden geriye doğru kesintisiz azalan 4 dp pürüzsüz geri sayım çubuğu (`SmoothProgressBar`: mint zemin, primary dolgu).
+   - **Eylemler:** Sağ tarafta (dar ekranlarda altta) iki neo-brutalist buton: "Kabul Et" (`PrimaryButton`: yeşil dolgu, basılınca beyaz spinner, işlem sırasında kilitli) ve "Reddet" (`SecondaryButton`: beyaz zemin, 2 px ink kenarlık).
+2. **Giden İstek Kompakt Çipi (`OutgoingMatchRequestChip`):**
+   - **Tasarım Dili:** Üstte güvenli alanda ortalanmış kompakt hap çip (40 dp yükseklik, `card` zemin, 2 px `ink` kenarlık, `0 2px 0 ink` sert gölge, tam yuvarlak köşe).
+   - **Görsel İçerik:** Fredoka/Nunito 13/700 metin: `"<Ad> yanıtı bekleniyor · NN sn"`. Sağında küçük kırmızı "İptal" butonu (`dangerText`, dokunma alanı 36×36 dp).
+   - **İstiflenme:** Hem gelen hem giden istek aynı anda varsa, giden istek çipi gelen bandın 8 dp altında dikey olarak istiflenir.
+3. **Geri Bildirim Tostları (`MatchRequestToastWidget`):**
+   - **Karakter:** SnackBar yerine ekranın üstünden inen 3.2 saniye ömürlü tek seferlik neo-brutalist tost kutucuğu.
+   - **Stiller:** Tehlike / Olumsuz (`dangerSurface` zemin, `dangerSoft` kenarlık, `dangerDark` metin, hata ikonu) ve Nötr (`card` zemin, `ink` kenarlık, bilgi ikonu).
+   - **Mesajlar:** Reddedildiğinde *"İstek reddedildi"*, süre dolduğunda *"İstek yanıtsız kaldı"*, engelli/çevrimdışı/meşgulde *"Oyuncu şu an müsait değil"*, cooldown devredeyken *"Tekrar istek göndermek için {n} sn bekle"*, spam sınırında *"Çok fazla istek gönderdin, biraz bekle"*, bağlantı yokken *"Bağlantı kuruluyor, tekrar dene"*, enerjisiz kabulde `EnergyDepletedBottomSheet` açılır.
+4. **Bastırma ve Erişilebilirlik Kuralları:**
+   - **Meşguliyet Bastırması (`PresenceController.busy`):** Oyuncu aktif maçtayken (`in_match`), eşleşme ekranındayken (`friend_reveal`), kuyruktayken (`matchmaking`) veya oda ekranlarındayken gelen ve giden istek görsel bileşenleri otomatik olarak gizlenir/bastırılır.
+   - **Onboarding Koruması:** Kullanıcı henüz takma ad seçmemişken (`!profile.hasNickname`) istek bileşenleri gösterilmez.
+   - **Erişilebilirlik:** `Semantics(liveRegion: true)` ile yeni istek geldiğinde ekran okuyucuya anons edilir.
+
 ## 7. Ekranlar
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
@@ -263,9 +284,14 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
   3. **Kazanma:** `${stats.winRateDisplay}` (örn. `%65` veya maç yoksa `—`)
   *(Mağlubiyet kartı, e-posta, bağlı hesap bilgileri, jeton/bakiye ve ad değiştirme alanları herkese açık profilde yer almaz).*
 - **Butonlar ve Eylemler:**
-  - *Engellenmemiş durum (`!isBlocked`):* İstatistiklerin altında `SecondaryButton` ("Engelle") butonu yer alır.
-    - "Engelle" eylemine basıldığında onay diyalogu açılır (`AppConfirmDialog`: "Vazgeç" / "Engelle", "Bu oyuncuyu engellemek istediğinden emin misin?"). Onaylanınca `PublicProfileService.blockUser(uid)` çağrılır, başarılı olunca sayfa anında engelli duruma güncellenir ve "Oyuncu engellendi" SnackBar'ı gösterilir.
-  - *Engellenmiş durum (`isBlocked`):* İstatistiklerin hemen altında dikkat çekici bir uyarı kartı yer alır: *"ENGELLENDİ · Seninle eşleşmeyecek"* (`dangerSurface` zemin, `dangerSoft` kenarlık, `dangerDark` etiket metni). Altında doğrudan `SecondaryButton` ("Engeli Kaldır") butonu bulunur.
+  - *Engellenmemiş durum (`!isBlocked`):*
+    - **Maç İsteği Gönder Butonu (`PrimaryButton`):** Kullanıcı başkasının profilindeyken (`!isSelf`) istatistik kartlarının hemen altında tam genişlikli buton olarak yer alır:
+      - Normal durum: "Maç İsteği Gönder" (`AppStrings.matchRequestSendAction`). Dokunulduğunda soket bağlıysa anında istek iletilir; bağlı değilse "Bağlantı kuruluyor..." tostu gösterilir.
+      - Bu oyuncuya bekleyen istek varken: Pasifleşir ("İstek Bekleniyor", `matchRequestWaitingAction`) ve hemen altında "İptal" (`SecondaryButton`) butonu belirir.
+      - Başka bir oyuncuya bekleyen istek varken: Tıklandığında "Zaten bekleyen bir maç isteğin var" SnackBar'ı çıkarılır.
+    - **Engelle Butonu (`SecondaryButton`):** Maç isteği butonunun altında `SecondaryButton` ("Engelle") yer alır.
+      - "Engelle" eylemine basıldığında onay diyalogu açılır (`AppConfirmDialog`: "Vazgeç" / "Engelle", "Bu oyuncuyu engellemek istediğinden emin misin?"). Onaylanınca `PublicProfileService.blockUser(uid)` çağrılır, başarılı olunca sayfa anında engelli duruma güncellenir ve "Oyuncu engellendi" SnackBar'ı gösterilir.
+  - *Engellenmiş durum (`isBlocked`):* İstatistiklerin hemen altında dikkat çekici bir uyarı kartı yer alır: *"ENGELLENDİ · Seninle eşleşmeyecek"* (`dangerSurface` zemin, `dangerSoft` kenarlık, `dangerDark` etiket metni). "Maç İsteği Gönder" butonu gösterilmez. Altında doğrudan `SecondaryButton` ("Engeli Kaldır") butonu bulunur.
     - "Engeli Kaldır" eylemi onay sormadan doğrudan `PublicProfileService.unblockUser(uid)` çağrısı yapar; başarılı olunca sayfa engellenmemiş duruma döner ve "Engel kaldırıldı" SnackBar'ı çıkar.
 - **Hata ve Durum Yönetimi:**
   - *Yükleniyor:* Ortada standart dairesel yükleme göstergesi.

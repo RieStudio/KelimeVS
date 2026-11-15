@@ -63,6 +63,7 @@ class PresenceController extends Notifier<UserPresenceState> {
   }
 
   void _updateState() {
+    if (_isDisposed) return;
     final newState =
         _busyTokens.isNotEmpty ? UserPresenceState.busy : UserPresenceState.idle;
     if (state != newState) {

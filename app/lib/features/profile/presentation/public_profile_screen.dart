@@ -12,6 +12,9 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/stat_card.dart';
+import '../../match_request/application/match_requests_notifier.dart';
+import '../../match_request/application/match_requests_providers.dart';
+import '../../match_request/domain/match_request_models.dart';
 import '../application/public_profile_provider.dart';
 import '../domain/public_profile_model.dart';
 
@@ -198,6 +201,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     }
 
     final profileAsync = ref.watch(publicProfileProvider(widget.uid));
+    final matchRequests = ref.watch(matchRequestsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -470,6 +474,62 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                             ),
                           ),
                         ] else ...[
+                          // Maç İsteği Alanı
+                          if (matchRequests.outgoing != null &&
+                              matchRequests.outgoing!.toUid == widget.uid) ...[
+                            // Bu kullanıcıya bekleyen bir istek var
+                            const PrimaryButton(
+                              text: AppStrings.matchRequestWaitingAction,
+                              onPressed: null,
+                            ),
+                            const SizedBox(height: AppDimens.space8),
+                            SecondaryButton.danger(
+                              text: AppStrings.matchRequestCancel,
+                              onPressed: () {
+                                ref
+                                    .read(matchRequestsProvider.notifier)
+                                    .cancel(matchRequests.outgoing!.id);
+                              },
+                            ),
+                          ] else ...[
+                            // Bekleyen istek yok veya başka birine istek var
+                            PrimaryButton(
+                              text: AppStrings.matchRequestSendAction,
+                              onPressed: _isBusy
+                                  ? null
+                                  : () async {
+                                      if (matchRequests.outgoing != null) {
+                                        _showSnackBar(
+                                          AppStrings
+                                              .matchRequestAlreadyPendingToast,
+                                        );
+                                        return;
+                                      }
+                                      if (!ensureNetworkConnected(
+                                          context, ref)) {
+                                        return;
+                                      }
+                                      if (matchRequests.connectionState !=
+                                          UserInboxConnectionState.connected) {
+                                        ref
+                                            .read(matchRequestToastProvider
+                                                .notifier)
+                                            .showToast(
+                                              AppStrings
+                                                  .matchRequestConnectingToast,
+                                            );
+                                        return;
+                                      }
+                                      await ref
+                                          .read(matchRequestsProvider.notifier)
+                                          .sendProfileRequest(
+                                            toUid: widget.uid,
+                                          );
+                                    },
+                            ),
+                          ],
+                          const SizedBox(height: AppDimens.space12),
+
                           // Engelle Butonu
                           Semantics(
                             button: true,

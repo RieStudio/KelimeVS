@@ -23,6 +23,7 @@ import 'features/home/presentation/home_screen.dart';
 import 'features/leaderboard/application/leaderboard_providers.dart';
 import 'features/leaderboard/presentation/leaderboard_screen.dart';
 import 'features/match_request/application/match_requests_providers.dart';
+import 'features/match_request/presentation/global_match_request_overlay.dart';
 import 'features/profile/application/profile_notifier.dart';
 import 'features/profile/presentation/onboarding_nickname_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
@@ -62,32 +63,34 @@ class KelimeVSApp extends ConsumerWidget {
       title: 'KelimeVS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      navigatorKey: rootNavigatorKey,
       builder: (context, child) {
-        if (!showBanner) {
-          return child ?? const SizedBox.shrink();
+        Widget appWidget = child ?? const SizedBox.shrink();
+
+        if (showBanner) {
+          appWidget = Scaffold(
+            resizeToAvoidBottomInset: false,
+            backgroundColor: AppColors.surface,
+            body: Column(
+              children: [
+                GlobalOfflineBanner(
+                  isChecking: networkState.status == NetworkStatus.checking,
+                  onRetry: () =>
+                      ref.read(networkStatusProvider.notifier).refresh(),
+                ),
+                Expanded(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: appWidget,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
-        // DESIGN.md 6b: Şerit içeriğin üstüne binmez, içeriği aşağı iter ve butonları kapatmaz
-        return Scaffold(
-          resizeToAvoidBottomInset: false,
-          backgroundColor: AppColors.surface,
-          body: Column(
-            children: [
-              GlobalOfflineBanner(
-                isChecking: networkState.status == NetworkStatus.checking,
-                onRetry: () =>
-                    ref.read(networkStatusProvider.notifier).refresh(),
-              ),
-              Expanded(
-                child: MediaQuery.removePadding(
-                  context: context,
-                  removeTop: true,
-                  child: child ?? const SizedBox.shrink(),
-                ),
-              ),
-            ],
-          ),
-        );
+        return GlobalMatchRequestOverlay(child: appWidget);
       },
       home: SplashGate(
         child: MainShell(initialAuthError: authError),

@@ -270,6 +270,11 @@ Hem maç sonu ekranındaki "Rövanş" hem de kullanıcı profilinden gönderilen
 - **Gizlilik Koruması (Privacy):** Alıcının çevrimdışı olması, meşgul olması (başka maçta olması), ayarı kapatmış olması, engelli olması veya hesabının silinmiş olması gönderene asla ifşa edilmez. Tüm bu durumlarda gönderen yeknesak `unavailable` yanıtı alır.
 - **Misafir Kullanıcı Desteği:** Misafir kullanıcılar (`M-####`) maç isteği gönderebilir ve alabilir.
 - **Alarm Multiplexing:** Cloudflare Workers tek alarm kısıtlamasına uygun olarak 45 sn TTL zaman aşımları ile tombstone silme alarmı en yakın vadeye göre multiplexed olarak yönetilir.
+- **İstemci Global Katmanı (GlobalMatchRequestOverlay):** `MaterialApp.builder` içinde Navigator üstünde yer alan Stack ile yönetilir.
+  - *Gelen İstek Bandı:* 45 sn doğrusal azalan geri sayım çubuğu, rakip avatarı + çerçevesi, kabul/ret eylemleri. Kullanıcı meşgulken (`PresenceController.busy`) veya henüz takma ad seçmemişken bastırılır.
+  - *Giden İstek Çipi:* Kompakt üst hap çip ("<Ad> yanıtı bekleniyor · NN sn" + "İptal").
+  - *Geri Bildirim Tostları:* İstek reddedildiğinde veya süresi dolduğunda tek seferlik tostlar gösterilir; iptallerde sessiz kalınır.
+  - *Eşleşme ve Geçiş:* `matched` olayı geldiğinde açık sanal klavye ve diyaloglar kapatılır, stale maç ekranları temizlenerek `FriendMatchRevealScreen`'e geçilir. Bot rozeti veya ayrımı asla yapılmaz.
 
 ## 9. Güvenlik ilkeleri
 

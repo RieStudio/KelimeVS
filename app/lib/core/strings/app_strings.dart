@@ -73,6 +73,37 @@ abstract final class AppStrings {
   static const String rematchOpponentNoEnergy = 'Rakibin enerjisi yetersiz';
   static const String rematchUnavailable = 'Rövanş şu anda mümkün değil';
 
+  // Maç İsteği (Match Request)
+  static String matchRequestTitleProfile(String name) =>
+      '$name seninle maç yapmak istiyor';
+  static String matchRequestTitleRematch(String name) =>
+      '$name seninle rövanş istiyor';
+  static const String matchRequestSubtitleFriendly = 'Dostluk maçı';
+  static const String matchRequestSubtitleRanked = 'Dereceli maç · 1 enerji';
+  static const String matchRequestAccept = 'Kabul Et';
+  static const String matchRequestDecline = 'Reddet';
+  static String matchRequestOutgoingChip(String name, int seconds) =>
+      '$name yanıtı bekleniyor · $seconds sn';
+  static const String matchRequestCancel = 'İptal';
+  static const String matchRequestDeclinedToast = 'İstek reddedildi';
+  static const String matchRequestExpiredToast = 'İstek yanıtsız kaldı';
+  static const String matchRequestUnavailableToast = 'Oyuncu şu an müsait değil';
+  static const String matchRequestUnavailableForAcceptToast =
+      'İstek artık geçerli değil';
+  static String matchRequestCooldownToast(int seconds) =>
+      'Tekrar istek göndermek için $seconds sn bekle';
+  static const String matchRequestRateLimitedToast =
+      'Çok fazla istek gönderdin, biraz bekle';
+  static const String matchRequestInvalidToast = 'İstek gönderilemedi';
+  static const String matchRequestOpponentNoEnergyToast =
+      'Rakibin enerjisi yetersiz';
+  static const String matchRequestConnectingToast =
+      'Bağlantı kuruluyor, tekrar dene';
+  static const String matchRequestAlreadyPendingToast =
+      'Zaten bekleyen bir maç isteğin var';
+  static const String matchRequestSendAction = 'Maç İsteği Gönder';
+  static const String matchRequestWaitingAction = 'İstek Bekleniyor';
+
   // Eşleşme
   static const String searchingOpponent = 'Rakip aranıyor…';
   static const String opponentFound = 'Rakip bulundu!';

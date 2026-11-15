@@ -8,6 +8,7 @@ import '../../online/data/auth_token_provider.dart';
 import '../../online/data/websocket_connector.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/user_inbox_client.dart';
+import '../domain/match_request_models.dart';
 import 'match_requests_notifier.dart';
 import 'presence_controller.dart';
 
@@ -146,3 +147,56 @@ final userInboxLifecycleCoordinatorProvider =
   });
   return coordinator;
 });
+
+/// Eşleşme tamamlandı akışı (Global UI navigasyonu için).
+final matchedEventsProvider = StreamProvider<MatchedEvent>((ref) {
+  return ref.watch(matchRequestsProvider.notifier).matchedEvents;
+});
+
+/// Maç isteği geri bildirim (toast) durumu.
+class MatchRequestToastState {
+  final String message;
+  final bool isDanger;
+  final int timestamp;
+
+  const MatchRequestToastState({
+    required this.message,
+    this.isDanger = false,
+    required this.timestamp,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MatchRequestToastState &&
+          runtimeType == other.runtimeType &&
+          message == other.message &&
+          isDanger == other.isDanger &&
+          timestamp == other.timestamp;
+
+  @override
+  int get hashCode => message.hashCode ^ isDanger.hashCode ^ timestamp.hashCode;
+}
+
+/// Maç isteği geri bildirimlerini (toast) yöneten Notifier.
+class MatchRequestToastNotifier extends Notifier<MatchRequestToastState?> {
+  @override
+  MatchRequestToastState? build() => null;
+
+  void showToast(String message, {bool isDanger = false}) {
+    state = MatchRequestToastState(
+      message: message,
+      isDanger: isDanger,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
+final matchRequestToastProvider =
+    NotifierProvider<MatchRequestToastNotifier, MatchRequestToastState?>(
+  MatchRequestToastNotifier.new,
+);
