@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
@@ -263,6 +264,13 @@ void main() {
       expect(find.textContaining('Rövanş bekleniyor'), findsOneWidget);
       expect(find.byKey(const Key('match_end_rematch_cancel_button')), findsOneWidget);
       expect(find.text(AppStrings.matchRequestCancel), findsOneWidget);
+
+      final cancelButton = tester.widget<SecondaryButton>(
+        find.byKey(const Key('match_end_rematch_cancel_button')),
+      );
+      expect(cancelButton.textColor, AppColors.dangerText);
+      expect(cancelButton.borderColor, AppColors.danger);
+      expect(cancelButton.backgroundColor, AppColors.card);
 
       // İptal butonuna tıkla
       await tester.tap(find.byKey(const Key('match_end_rematch_cancel_button')));

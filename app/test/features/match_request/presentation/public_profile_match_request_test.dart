@@ -1,4 +1,6 @@
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/theme/app_colors.dart';
+import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/match_request/application/match_requests_notifier.dart';
 import 'package:app/features/match_request/application/match_requests_providers.dart';
@@ -177,6 +179,13 @@ void main() {
 
         expect(find.text(AppStrings.matchRequestWaitingAction), findsOneWidget);
         expect(find.text(AppStrings.matchRequestCancel), findsOneWidget);
+
+        final cancelButton = tester.widget<SecondaryButton>(
+          find.widgetWithText(SecondaryButton, AppStrings.matchRequestCancel),
+        );
+        expect(cancelButton.textColor, AppColors.dangerText);
+        expect(cancelButton.borderColor, AppColors.danger);
+        expect(cancelButton.backgroundColor, AppColors.card);
 
         // İptal butonuna basıldığında sokete iptal mesajı gitmeli
         await tester.tap(find.text(AppStrings.matchRequestCancel));

@@ -18,8 +18,8 @@ class MatchRequestToastWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDanger ? AppColors.dangerSurface : AppColors.card;
-    final borderColor = isDanger ? AppColors.dangerSoft : AppColors.ink;
+    final bgColor = AppColors.card;
+    final borderColor = isDanger ? AppColors.danger : AppColors.ink;
     final textColor = isDanger ? AppColors.dangerText : AppColors.ink;
     final iconColor = isDanger ? AppColors.dangerText : AppColors.ink;
 
@@ -65,6 +65,7 @@ class MatchRequestToastWidget extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: isDanger ? FontWeight.w800 : FontWeight.w700,
                     color: textColor,
+                    decoration: TextDecoration.none,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

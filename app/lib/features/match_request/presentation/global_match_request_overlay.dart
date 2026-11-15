@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/strings/app_strings.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
 import '../../friend_match/presentation/friend_reveal_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
@@ -294,14 +296,22 @@ class _GlobalMatchRequestOverlayState
           top: 0,
           left: 0,
           right: 0,
-          child: SafeArea(
-            top: true,
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Material(
+            type: MaterialType.transparency,
+            child: DefaultTextStyle(
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                decoration: TextDecoration.none,
+                color: AppColors.ink,
+              ),
+              child: SafeArea(
+                top: true,
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Gelen İstek Bildirim Bandı
                   AnimatedSwitcher(
@@ -443,7 +453,9 @@ class _GlobalMatchRequestOverlayState
             ),
           ),
         ),
-      ],
-    );
+      ),
+    ),
+  ],
+);
   }
 }

@@ -619,5 +619,149 @@ void main() {
       expect(find.byType(IncomingMatchRequestBanner), findsOneWidget);
       expect(find.text(AppStrings.matchRequestTitleProfile('Kemal')), findsOneWidget);
     });
+
+    testWidgets(
+        'bildirim bandı ve çipte metinler sarı çift alt çizgi içermez (decoration: none) ve Material(transparency) atasına sahiptir',
+        (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          profileProvider.overrideWith(() => TestProfileNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final inReq = IncomingMatchRequest(
+        id: 'in_yellow_test',
+        fromUid: 'u_1',
+        fromNickname: 'Elif',
+        fromFrame: 'classic',
+        type: MatchRequestType.friendly,
+        origin: MatchRequestOrigin.profile,
+        expiresAtMs: DateTime.now().millisecondsSinceEpoch + 45000,
+      );
+
+      final outReq = OutgoingMatchRequest(
+        id: 'out_yellow_test',
+        toUid: 'u_2',
+        toNickname: 'Oğuz',
+        type: MatchRequestType.friendly,
+        origin: MatchRequestOrigin.profile,
+        expiresAtMs: DateTime.now().millisecondsSinceEpoch + 45000,
+        initialRemainingMs: 45000,
+      );
+
+      container.read(matchRequestsProvider.notifier).state =
+          MatchRequestsState(incoming: inReq, outgoing: outReq);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
+            builder: (context, child) =>
+                GlobalMatchRequestOverlay(child: child ?? const SizedBox.shrink()),
+            home: const Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Material(transparency) atası doğrulaması
+      final bannerFinder = find.byType(IncomingMatchRequestBanner);
+      expect(bannerFinder, findsOneWidget);
+
+      final materialAncestorFinder = find.ancestor(
+        of: bannerFinder,
+        matching: find.byType(Material),
+      );
+      expect(materialAncestorFinder, findsWidgets);
+
+      final materialWidget = tester.widget<Material>(materialAncestorFinder.first);
+      expect(materialWidget.type, MaterialType.transparency);
+
+      // 2. DefaultTextStyle atası doğrulaması
+      final defaultTextStyleFinder = find.ancestor(
+        of: bannerFinder,
+        matching: find.byType(DefaultTextStyle),
+      );
+      expect(defaultTextStyleFinder, findsWidgets);
+      final defaultTextStyleWidget =
+          tester.widget<DefaultTextStyle>(defaultTextStyleFinder.first);
+      expect(defaultTextStyleWidget.style.decoration, TextDecoration.none);
+
+      // 3. Banner ve çip içindeki tüm Text widget'larının style.decoration kontrolü (asla underline veya null değil)
+      final textWidgets = tester.widgetList<Text>(find.descendant(
+        of: find.byType(GlobalMatchRequestOverlay),
+        matching: find.byType(Text),
+      ));
+
+      for (final text in textWidgets) {
+        // Effective decoration TextDecoration.none olmalıdır; TextDecoration.underline (sarı çift alt çizgi) kesinlikle olamaz
+        expect(text.style?.decoration, isNot(TextDecoration.underline));
+        if (text.style?.decoration != null) {
+          expect(text.style?.decoration, TextDecoration.none);
+        }
+      }
+    });
+
+    testWidgets(
+        'dokunma geçirgenliği: overlay boş alanlarda alt sayfadaki butonlara dokunmayı engellemez',
+        (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          profileProvider.overrideWith(() => TestProfileNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      int backgroundTapCount = 0;
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            navigatorKey: rootNavigatorKey,
+            builder: (context, child) =>
+                GlobalMatchRequestOverlay(child: child ?? const SizedBox.shrink()),
+            home: Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => backgroundTapCount++,
+                  child: const Text('Alt Sayfa Butonu'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Durum 1: İstek yokken alt sayfadaki butona tıklama
+      await tester.tap(find.text('Alt Sayfa Butonu'));
+      await tester.pump();
+      expect(backgroundTapCount, 1);
+
+      // Durum 2: Üstte bildirim bandı varken boş alandaki (ortadaki) butona tıklama
+      final inReq = IncomingMatchRequest(
+        id: 'in_pass_through',
+        fromUid: 'u_1',
+        fromNickname: 'Zeynep',
+        fromFrame: 'classic',
+        type: MatchRequestType.friendly,
+        origin: MatchRequestOrigin.profile,
+        expiresAtMs: DateTime.now().millisecondsSinceEpoch + 45000,
+      );
+
+      container.read(matchRequestsProvider.notifier).state =
+          MatchRequestsState(incoming: inReq);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(IncomingMatchRequestBanner), findsOneWidget);
+
+      // Alt sayfadaki ortalı buton tıklanabilir olmaya devam etmeli
+      await tester.tap(find.text('Alt Sayfa Butonu'));
+      await tester.pump();
+      expect(backgroundTapCount, 2);
+    });
   });
 }

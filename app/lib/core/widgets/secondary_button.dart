@@ -4,7 +4,8 @@ import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
 
 /// DESIGN.md Bölüm 6: SecondaryButton
-/// Zemin: card, Yazı: ink, Kenarlık: 3 ink, Yükseklik: 54-60, Gölge: 0 4px 0 ink.
+/// Standart: Zemin: card, Yazı: ink, Kenarlık: 3 ink, Yükseklik: 54-60, Gölge: 0 4px 0 ink.
+/// Tehlike (danger): Zemin: card (beyaz), Yazı: dangerText, Kenarlık: danger, Gölge: 0 4px 0 dangerDark.
 /// Dokunma alanı en az 48x48.
 class SecondaryButton extends StatefulWidget {
   final String text;
@@ -37,7 +38,7 @@ class SecondaryButton extends StatefulWidget {
     this.width,
     this.height = AppDimens.secondaryButtonHeight,
     this.horizontalPadding,
-  })  : backgroundColor = AppColors.dangerSoft,
+  })  : backgroundColor = AppColors.card,
         textColor = AppColors.dangerText,
         borderColor = AppColors.danger,
         boxShadow = const [

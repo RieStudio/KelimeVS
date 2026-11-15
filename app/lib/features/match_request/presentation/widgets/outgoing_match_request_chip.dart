@@ -105,6 +105,7 @@ class _OutgoingMatchRequestChipState extends State<OutgoingMatchRequestChip> {
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.ink,
+                  decoration: TextDecoration.none,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -123,10 +124,10 @@ class _OutgoingMatchRequestChipState extends State<OutgoingMatchRequestChip> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.dangerSurface,
+                    color: AppColors.card,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: AppColors.dangerSoft,
+                      color: AppColors.danger,
                       width: 1.5,
                     ),
                   ),
@@ -137,6 +138,7 @@ class _OutgoingMatchRequestChipState extends State<OutgoingMatchRequestChip> {
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: AppColors.dangerText,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),

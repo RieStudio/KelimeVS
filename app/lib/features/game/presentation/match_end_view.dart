@@ -743,7 +743,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
             ),
           ),
           const SizedBox(height: AppDimens.space8),
-          SecondaryButton(
+          SecondaryButton.danger(
             key: const Key('match_end_rematch_cancel_button'),
             text: AppStrings.matchRequestCancel,
             onPressed: () => onCancelRematch(rematchState.requestId),
