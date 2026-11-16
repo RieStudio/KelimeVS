@@ -589,6 +589,8 @@ export class UserProfile extends DurableObject<Env> {
         }
         return;
       }
+      await this.scheduleNextAlarm(nowMs);
+      return;
     }
 
     await this.expirePendingIncomingRequests(nowMs);
@@ -638,6 +640,10 @@ export class UserProfile extends DurableObject<Env> {
     uid?: string,
     clientBuild = 0
   ): Promise<FrameMigrationResult | null> {
+    if (this.isDeleted()) {
+      return null;
+    }
+
     const minRetiredBuild = parseInt(
       this.env.RETIRED_FRAMES_BUILD ?? String(DEFAULT_RETIRED_FRAMES_BUILD),
       10
@@ -2522,6 +2528,14 @@ export class UserProfile extends DurableObject<Env> {
     toUid: string,
     matchId?: string
   ): Promise<void> {
+    this.ensureSchema();
+    if (this.isDeleted()) {
+      try {
+        this.broadcastToUser({ t: 'match_request_error', code: 'unavailable' });
+      } catch {}
+      return;
+    }
+
     const now = Date.now();
 
     // 1. Kendine istek -> invalid
@@ -3535,6 +3549,14 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    this.ensureSchema();
+    if (this.isDeleted()) {
+      try {
+        ws.close(4001, 'account_deleted');
+      } catch {}
+      return;
+    }
+
     let uid = '';
     if (typeof this.ctx?.getTags === 'function') {
       const tags = this.ctx.getTags(ws);

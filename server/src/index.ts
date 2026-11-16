@@ -247,6 +247,15 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            {
+              status: 410,
+              headers: jsonHeaders,
+            }
+          );
+        }
         const result = await profileStub.setNickname(nickname, uid, Date.now(), auth.isGuest);
 
         // Leaderboard tablosundaki eski takma adı da güncelle
@@ -367,6 +376,12 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
         const res = await profileStub.equipFrame(frameId, uid, clientBuild);
         if (!res.success) {
           if (res.error === 'item_retired') {
@@ -555,6 +570,12 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
         const res = await profileStub.purchaseItem(body.itemId.trim(), uid, clientBuild);
         if (!res.success) {
           if (res.error === 'item_retired') {
@@ -641,6 +662,12 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
         const res = await profileStub.purchaseEnergy({ pack: body.pack, uid });
         if (!res.success) {
           if (res.error === 'energy_disabled') {
@@ -738,6 +765,12 @@ export default {
 
       try {
         const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'account_deleted' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
         const res = await profileStub.spendCoins({
           matchId: body.matchId,
           powerup: body.powerup,
@@ -1201,6 +1234,14 @@ export default {
       }
 
       try {
+        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        if (await callerProfileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
         const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
         const pubResult = await targetProfileStub.getPublicProfile();
 
@@ -1283,6 +1324,14 @@ export default {
       }
 
       try {
+        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        if (await callerProfileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
         const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
         const pubResult = await targetProfileStub.getPublicProfile();
 
@@ -1300,7 +1349,6 @@ export default {
           );
         }
 
-        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
         const blockRes = await callerProfileStub.blockUser({
           blockedUid: targetUid,
           blockedNickname: pubResult.profile.nickname,
@@ -1363,6 +1411,12 @@ export default {
 
       try {
         const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        if (await callerProfileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
         const res = await callerProfileStub.unblockUserByUid(targetUid);
         return new Response(JSON.stringify(res), {
           status: 200,
@@ -1435,6 +1489,14 @@ export default {
       }
 
       try {
+        const callerProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(callerUid));
+        if (await callerProfileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
         const targetProfileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(targetUid));
         const pubResult = await targetProfileStub.getPublicProfile();
 
