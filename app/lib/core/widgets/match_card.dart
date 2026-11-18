@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/bot_frame_resolver.dart';
+import '../utils/display_name_resolver.dart';
 import '../../features/game/domain/history/match_history_entry.dart';
 import 'player_avatar.dart';
 import 'result_badge.dart';
@@ -30,9 +31,15 @@ class MatchCard extends StatelessWidget {
     final isWon = entry.result == MatchResult.win;
     final borderColor = isWon ? AppColors.mint : AppColors.dangerSoft;
 
-    final displayName = entry.opponentName.trim().isNotEmpty
-        ? entry.opponentName.trim()
-        : AppStrings.opponent;
+    final resolved = DisplayNameResolver.resolve(
+      nickname: entry.opponentName,
+      uid: entry.opponentUid,
+    );
+    final displayName = resolved == AppStrings.defaultPlayerName &&
+            entry.opponentName.trim().isEmpty &&
+            (entry.opponentUid == null || entry.opponentUid!.trim().isEmpty)
+        ? AppStrings.opponent
+        : resolved;
 
     return Semantics(
       button: true,

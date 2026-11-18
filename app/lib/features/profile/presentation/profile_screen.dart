@@ -8,6 +8,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/display_name_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -16,6 +17,7 @@ import '../../../core/widgets/stat_card.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
+import '../application/public_profile_provider.dart';
 import '../data/profile_api_client.dart';
 import '../domain/nickname_validator.dart';
 import 'blocked_users_screen.dart';
@@ -384,11 +386,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     final authState = ref.watch(authNotifierProvider);
+    final currentUid = ref.watch(currentUserIdProvider);
 
-    final nickname =
-        (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
-        ? profile.nickname!.trim()
-        : AppStrings.defaultPlayerName;
+    final nickname = DisplayNameResolver.resolve(
+      nickname: profile.nickname,
+      uid: currentUid,
+      isGuest: profile.isGuest,
+    );
 
     final canPop = Navigator.of(context).canPop();
 

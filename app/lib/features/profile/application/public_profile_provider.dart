@@ -55,8 +55,12 @@ final publicProfileServiceProvider = Provider<PublicProfileService>((ref) {
 });
 
 final currentUserIdProvider = Provider<String?>((ref) {
-  final repo = ref.watch(authRepositoryProvider);
-  return repo.currentUser?.uid;
+  try {
+    final repo = ref.watch(authRepositoryProvider);
+    return repo.currentUser?.uid;
+  } catch (_) {
+    return null;
+  }
 });
 
 final isCurrentUserProvider = Provider.family<bool, String?>((ref, uid) {

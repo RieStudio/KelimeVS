@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/bot_frame_resolver.dart';
+import '../../../../core/utils/display_name_resolver.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../profile/application/public_profile_provider.dart';
 import '../../profile/presentation/public_profile_screen.dart';
@@ -351,9 +352,16 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
           // Sağ: Rakip avatarı ve adı
           Builder(
             builder: (context) {
-              final oppDisplayName = widget.match.opponentName.trim().isNotEmpty
-                  ? widget.match.opponentName.trim()
-                  : AppStrings.opponent;
+              final resolved = DisplayNameResolver.resolve(
+                nickname: widget.match.opponentName,
+                uid: widget.match.opponentUid,
+              );
+              final oppDisplayName = resolved == AppStrings.defaultPlayerName &&
+                      widget.match.opponentName.trim().isEmpty &&
+                      (widget.match.opponentUid == null ||
+                          widget.match.opponentUid!.trim().isEmpty)
+                  ? AppStrings.opponent
+                  : resolved;
               final oppUid = widget.match.opponentUid;
               final isBot = widget.match.botlaOynandi;
               final isSelf = oppUid != null &&

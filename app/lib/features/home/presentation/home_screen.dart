@@ -9,6 +9,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/display_name_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/coin_pill.dart';
 import '../../../core/widgets/kelime_vs_logo.dart';
@@ -24,6 +25,7 @@ import '../../game/application/match_history_provider.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../matchmaking/presentation/matchmaking_screen.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/application/public_profile_provider.dart';
 import '../../store/application/store_notifier.dart';
 import '../../store/domain/models/store_item.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
@@ -65,10 +67,12 @@ class HomeScreen extends ConsumerWidget {
     ref.watch(networkStatusProvider);
     final historyAsync = ref.watch(matchHistoryProvider);
     final profile = ref.watch(profileProvider);
-    final nickname =
-        (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
-        ? profile.nickname!.trim()
-        : AppStrings.defaultPlayerName;
+    final currentUid = ref.watch(currentUserIdProvider);
+    final nickname = DisplayNameResolver.resolve(
+      nickname: profile.nickname,
+      uid: currentUid,
+      isGuest: profile.isGuest,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,

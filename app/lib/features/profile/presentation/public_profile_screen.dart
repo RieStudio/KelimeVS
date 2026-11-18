@@ -7,6 +7,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/display_name_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -303,9 +304,11 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             );
           },
           data: (profile) {
-            final nickname = profile.nickname.trim().isNotEmpty
-                ? profile.nickname.trim()
-                : AppStrings.defaultPlayerName;
+            final nickname = DisplayNameResolver.resolve(
+              nickname: profile.nickname,
+              uid: profile.uid,
+              isGuest: profile.isGuest,
+            );
 
             final isBlocked = _localBlockedState ?? profile.isBlocked;
 

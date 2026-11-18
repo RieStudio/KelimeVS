@@ -26,6 +26,7 @@ import {
   type SerializedMatchState,
 } from './storage';
 import type { MatchRewardOutcome, SpendCoinsResult } from './userProfile';
+import { resolveDisplayName } from './displayName';
 import type { Env } from './index';
 import {
   getExtraTimeConfig,
@@ -269,7 +270,10 @@ export class MatchRoom extends DurableObject<Env> {
       context: {
         reporterUid: callerUid,
         reportedUid: opponent.uid,
-        reportedNickname: opponent.name,
+        reportedNickname: resolveDisplayName({
+          nickname: opponent.name,
+          uid: opponent.uid,
+        }),
         answers,
       },
     };
@@ -1143,9 +1147,17 @@ export class MatchRoom extends DurableObject<Env> {
     const winnerUid = this.data.leaderboardWinnerUid;
     const loserUid = this.data.leaderboardLoserUid;
     const winnerNick =
-      winnerUid === p1Uid ? p1Nick : winnerUid === p2Uid ? p2Nick : undefined;
+      winnerUid === p1Uid
+        ? resolveDisplayName({ nickname: p1Nick, uid: p1Uid })
+        : winnerUid === p2Uid
+          ? resolveDisplayName({ nickname: p2Nick, uid: p2Uid })
+          : undefined;
     const loserNick =
-      loserUid === p1Uid ? p1Nick : loserUid === p2Uid ? p2Nick : undefined;
+      loserUid === p1Uid
+        ? resolveDisplayName({ nickname: p1Nick, uid: p1Uid })
+        : loserUid === p2Uid
+          ? resolveDisplayName({ nickname: p2Nick, uid: p2Uid })
+          : undefined;
 
     const newRewards: Record<string, { coinsAwarded: number; coins: number }> = {};
     if (p1Reward) newRewards[p1Uid] = p1Reward;
@@ -1217,7 +1229,11 @@ export class MatchRoom extends DurableObject<Env> {
         const pWinner = await this.env.USER_PROFILE.get(
           this.env.USER_PROFILE.idFromName(this.data.leaderboardWinnerUid)
         ).getProfile(this.data.leaderboardWinnerUid);
-        winnerNick = pWinner.nickname;
+        winnerNick = resolveDisplayName({
+          nickname: pWinner.nickname,
+          uid: this.data.leaderboardWinnerUid,
+          isGuest: pWinner.isGuest,
+        });
       } catch (err) {
         if (err instanceof Error && err.message.includes('account_deleted')) {
           deletedUids.push(this.data.leaderboardWinnerUid);
@@ -1228,7 +1244,11 @@ export class MatchRoom extends DurableObject<Env> {
         const pLoser = await this.env.USER_PROFILE.get(
           this.env.USER_PROFILE.idFromName(this.data.leaderboardLoserUid)
         ).getProfile(this.data.leaderboardLoserUid);
-        loserNick = pLoser.nickname;
+        loserNick = resolveDisplayName({
+          nickname: pLoser.nickname,
+          uid: this.data.leaderboardLoserUid,
+          isGuest: pLoser.isGuest,
+        });
       } catch (err) {
         if (err instanceof Error && err.message.includes('account_deleted')) {
           deletedUids.push(this.data.leaderboardLoserUid);

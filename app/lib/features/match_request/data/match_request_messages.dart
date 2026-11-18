@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/utils/display_name_resolver.dart';
 import '../domain/match_request_models.dart';
 
 /// İstemciden /ws/user kanalına gönderilen temel mesaj sınıfı.
@@ -259,10 +260,15 @@ UserInboxServerMessage? parseUserInboxServerMessage(
         return null;
       }
 
+      final resolvedFrom = DisplayNameResolver.resolve(
+        nickname: fromNickname is String ? fromNickname : null,
+        uid: fromUid,
+      );
+
       return UserInboxRequestReceivedMessage(
         id: id,
         fromUid: fromUid,
-        fromNickname: fromNickname is String ? fromNickname : 'Oyuncu',
+        fromNickname: resolvedFrom,
         fromFrame: fromFrame is String ? fromFrame : 'classic',
         type: MatchRequestType.fromString(typeRaw?.toString() ?? 'friendly'),
         origin: MatchRequestOrigin.fromString(originRaw?.toString() ?? 'profile'),
@@ -282,10 +288,15 @@ UserInboxServerMessage? parseUserInboxServerMessage(
         return null;
       }
 
+      final resolvedTo = DisplayNameResolver.resolve(
+        nickname: toNickname is String ? toNickname : null,
+        uid: toUid,
+      );
+
       return UserInboxRequestSentMessage(
         id: id,
         toUid: toUid,
-        toNickname: toNickname is String ? toNickname : 'Oyuncu',
+        toNickname: resolvedTo,
         type: MatchRequestType.fromString(typeRaw?.toString() ?? 'friendly'),
         origin: MatchRequestOrigin.fromString(originRaw?.toString() ?? 'profile'),
         expiresAtMs: expiresAt.toInt(),

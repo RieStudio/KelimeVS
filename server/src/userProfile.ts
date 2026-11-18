@@ -1,5 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { validateNickname, isGuestPatternNickname } from './engine/nicknameValidator';
+import { generateGuestNickname, resolveDisplayName } from './displayName';
+export { generateGuestNickname, resolveDisplayName };
 import {
   type UserClientMessage,
   type UserServerMessage,
@@ -259,18 +261,6 @@ export interface BlockedUserItem {
   readonly blockedAt: number;
 }
 
-/**
- * Misafir kullanıcılar için deterministik "M-####" formatında takma ad üretir.
- * 1000 ile 9999 arasında 4 haneli bir sayı üretir; "M-0000" gibi uç durumlar oluşmaz.
- */
-export function generateGuestNickname(uid: string): string {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i++) {
-    hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
-  }
-  const num = 1000 + (hash % 9000);
-  return `M-${num}`;
-}
 
 export class UserProfile extends DurableObject<Env> {
   private initialized = false;
@@ -799,10 +789,11 @@ export class UserProfile extends DurableObject<Env> {
 
     const row = rows[0];
     const isGuest = (row.is_guest as number | undefined) === 1;
-    let nickname = row.nickname?.trim();
-    if (!nickname) {
-      nickname = isGuest ? generateGuestNickname(row.uid) : 'Oyuncu';
-    }
+    const nickname = resolveDisplayName({
+      nickname: row.nickname,
+      uid: row.uid,
+      isGuest,
+    });
 
     const played = Math.max(0, row.played ?? 0);
     const won = Math.max(0, row.won ?? 0);
@@ -1414,12 +1405,15 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const rows = this.ctx.storage.sql.exec<BlockedUserRow>(
-      'SELECT id, blocked_nickname, blocked_at FROM blocked_users ORDER BY blocked_at DESC'
+      'SELECT id, blocked_uid, blocked_nickname, blocked_at FROM blocked_users ORDER BY blocked_at DESC'
     ).toArray();
 
     return rows.map((r) => ({
       id: r.id,
-      nickname: r.blocked_nickname,
+      nickname: resolveDisplayName({
+        nickname: r.blocked_nickname,
+        uid: r.blocked_uid,
+      }),
       blockedAt: Number(r.blocked_at),
     }));
   }
@@ -2799,7 +2793,11 @@ export class UserProfile extends DurableObject<Env> {
 
     // 9. Gönderenin profil bilgileri
     const myProfile = await this.getProfile(senderUid);
-    const senderNickname = myProfile.nickname ?? generateGuestNickname(senderUid);
+    const senderNickname = resolveDisplayName({
+      nickname: myProfile.nickname,
+      uid: senderUid,
+      isGuest: myProfile.isGuest,
+    });
     const senderFrame = myProfile.equippedFrame ?? 'classic';
 
     // 10. Alıcı DO'suna ilet
@@ -2881,7 +2879,10 @@ export class UserProfile extends DurableObject<Env> {
 
       const requestId = res.requestId!;
       const expiresAt = res.expiresAt!;
-      const toNickname = res.receiverNickname ?? 'Oyuncu';
+      const toNickname = resolveDisplayName({
+        nickname: res.receiverNickname,
+        uid: toUid,
+      });
 
       this.ctx.storage.sql.exec(
         'INSERT INTO match_request_rate_limits (created_at) VALUES (?)',
@@ -2990,7 +2991,11 @@ export class UserProfile extends DurableObject<Env> {
       );
 
       const myProfile = await this.getProfile(receiverUid);
-      const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+      const myNickname = resolveDisplayName({
+        nickname: myProfile.nickname,
+        uid: receiverUid,
+        isGuest: myProfile.isGuest,
+      });
       const myFrame = myProfile.equippedFrame ?? 'classic';
 
       if (this.env.MATCHMAKER) {
@@ -3087,7 +3092,11 @@ export class UserProfile extends DurableObject<Env> {
     });
 
     const myProfile = await this.getProfile(receiverUid);
-    const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+    const myNickname = resolveDisplayName({
+      nickname: myProfile.nickname,
+      uid: receiverUid,
+      isGuest: myProfile.isGuest,
+    });
 
     return {
       ok: true,
@@ -3189,7 +3198,11 @@ export class UserProfile extends DurableObject<Env> {
 
     const senderInfo = verifyRes.sender!;
     const myProfile = await this.getProfile(receiverUid);
-    const myNickname = myProfile.nickname ?? generateGuestNickname(receiverUid);
+    const myNickname = resolveDisplayName({
+      nickname: myProfile.nickname,
+      uid: receiverUid,
+      isGuest: myProfile.isGuest,
+    });
     const myFrame = myProfile.equippedFrame ?? 'classic';
 
     if (!this.env.MATCHMAKER) {
@@ -3370,7 +3383,11 @@ export class UserProfile extends DurableObject<Env> {
       ok: true,
       sender: {
         uid: senderUid,
-        nickname: profile.nickname ?? generateGuestNickname(senderUid),
+        nickname: resolveDisplayName({
+          nickname: profile.nickname,
+          uid: senderUid,
+          isGuest: profile.isGuest,
+        }),
         frame: profile.equippedFrame ?? 'classic',
       },
     };

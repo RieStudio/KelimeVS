@@ -10,6 +10,7 @@ import {
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild, getNicknameCooldownMessage } from './userProfile';
+import { resolveDisplayName } from './displayName';
 import { Leaderboard, type LeaderboardSeedEntry } from './leaderboard';
 import { ReportStore } from './reportStore';
 
@@ -1034,7 +1035,10 @@ export default {
         reportedUid: matchCtx.context.reportedUid,
         matchId,
         reason: body.reason,
-        reportedNickname: matchCtx.context.reportedNickname,
+        reportedNickname: resolveDisplayName({
+          nickname: matchCtx.context.reportedNickname,
+          uid: matchCtx.context.reportedUid,
+        }),
         answers: matchCtx.context.answers,
       });
 
@@ -1112,7 +1116,10 @@ export default {
       const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
       const blockRes = await profileStub.blockUser({
         blockedUid: matchCtx.context.reportedUid,
-        blockedNickname: matchCtx.context.reportedNickname,
+        blockedNickname: resolveDisplayName({
+          nickname: matchCtx.context.reportedNickname,
+          uid: matchCtx.context.reportedUid,
+        }),
         uid,
       });
 
@@ -1351,7 +1358,11 @@ export default {
 
         const blockRes = await callerProfileStub.blockUser({
           blockedUid: targetUid,
-          blockedNickname: pubResult.profile.nickname,
+          blockedNickname: resolveDisplayName({
+            nickname: pubResult.profile.nickname,
+            uid: targetUid,
+            isGuest: pubResult.profile.isGuest,
+          }),
           uid: callerUid,
         });
 
@@ -1520,7 +1531,11 @@ export default {
           reportedUid: targetUid,
           matchId: `profile_${targetUid}`,
           reason: body.reason,
-          reportedNickname: pubResult.profile.nickname,
+          reportedNickname: resolveDisplayName({
+            nickname: pubResult.profile.nickname,
+            uid: targetUid,
+            isGuest: pubResult.profile.isGuest,
+          }),
           answers: [],
         });
 

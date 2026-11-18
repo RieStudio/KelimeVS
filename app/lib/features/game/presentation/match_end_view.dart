@@ -61,8 +61,8 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   Timer? _countdownTicker;
 
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
-  static String _sanitizeOpponentName(String? raw) =>
-      OpponentNameSanitizer.sanitize(raw);
+  static String _sanitizeOpponentName(String? raw, {String? opponentUid}) =>
+      OpponentNameSanitizer.sanitize(raw, opponentUid: opponentUid);
 
   @override
   void initState() {
@@ -297,7 +297,9 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     final rawOpponentName = (lastMatch?.opponentName.trim().isNotEmpty ?? false)
         ? lastMatch!.opponentName
         : uiState.opponentName;
-    final opponentDisplayName = _sanitizeOpponentName(rawOpponentName);
+    final opponentUid = lastMatch?.opponentUid;
+    final opponentDisplayName =
+        _sanitizeOpponentName(rawOpponentName, opponentUid: opponentUid);
 
     final MatchResultVariant resultVariant;
     final String title;
@@ -389,7 +391,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       }
     });
 
-    final opponentUid = lastMatch?.opponentUid;
     final matchId = lastMatch?.matchId;
     final isEligible = uiState.rematchAvailable &&
         opponentUid != null &&

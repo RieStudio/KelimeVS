@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/bot_frame_resolver.dart';
+import '../../../core/utils/display_name_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/app_progress_bar.dart';
 import '../../../core/widgets/avatar_frame_registry.dart';
@@ -29,6 +30,7 @@ import '../../game/presentation/match_screen.dart';
 import '../../match_request/application/presence_controller.dart';
 import '../../online/data/matchmaking_client.dart';
 import '../../profile/application/profile_notifier.dart';
+import '../../profile/application/public_profile_provider.dart';
 import '../../profile/domain/energy_state.dart';
 import '../domain/match_tip_selector.dart';
 
@@ -254,10 +256,13 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
       }
     });
 
-    final myNickname = ref.read(profileProvider).nickname?.trim();
-    final nameToSend = (myNickname != null && myNickname.isNotEmpty)
-        ? myNickname
-        : AppStrings.defaultPlayerName;
+    final myProfile = ref.read(profileProvider);
+    final myUid = ref.read(currentUserIdProvider);
+    final nameToSend = DisplayNameResolver.resolve(
+      nickname: myProfile.nickname,
+      uid: myUid,
+      isGuest: myProfile.isGuest,
+    );
 
     unawaited(client.start(nameToSend));
   }
@@ -426,10 +431,13 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.of(context).disableAnimations;
 
-    final myNickname = ref.watch(profileProvider).nickname?.trim();
-    final myDisplayName = (myNickname != null && myNickname.isNotEmpty)
-        ? myNickname
-        : AppStrings.defaultPlayerName;
+    final myProfile = ref.watch(profileProvider);
+    final myUid = ref.watch(currentUserIdProvider);
+    final myDisplayName = DisplayNameResolver.resolve(
+      nickname: myProfile.nickname,
+      uid: myUid,
+      isGuest: myProfile.isGuest,
+    );
     final selfName = _isOpponentFound ? AppStrings.you : myDisplayName;
 
     // İlk soru kategori metni: Online maçta sunucudan gelmişse, bot maçında yerel seçimden
@@ -669,9 +677,9 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                                                 maxOverflow +
                                                 AppDimens.matchmakingNameGap;
 
-                                        final myInitial = (myNickname != null &&
-                                                myNickname.isNotEmpty)
-                                            ? myNickname
+                                        final myInitial = (myProfile.nickname != null &&
+                                                myProfile.nickname!.trim().isNotEmpty)
+                                            ? myProfile.nickname!.trim()
                                             : 'S';
 
                                         return FittedBox(

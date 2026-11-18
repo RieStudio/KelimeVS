@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './index';
 import { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry } from './weekInfo';
+import { resolveDisplayName } from './displayName';
 
 export { getIstanbulWeekInfo, type IstanbulWeekInfo, type LeaderboardSeedEntry };
 
@@ -187,7 +188,12 @@ export class Leaderboard extends DurableObject<Env> {
     }
 
     // 3. Kazananı güncelle (silinmemişse, sınır aşılmadıysa ve takma adı varsa)
-    const winnerNick = params.winnerNickname?.trim();
+    const winnerNick = params.winnerNickname?.trim()
+      ? resolveDisplayName({
+          nickname: params.winnerNickname,
+          uid: params.winnerUid,
+        })
+      : undefined;
     const winnerFrame = params.winnerFrame?.trim() || 'classic';
     if (winnerNick && !isCapped && !isWinnerDeleted) {
       this.ctx.storage.sql.exec(
@@ -207,7 +213,12 @@ export class Leaderboard extends DurableObject<Env> {
     }
 
     // 4. Kaybedeni güncelle (silinmemişse ve takma adı varsa mağlubiyet sayacı eşitlik sırası için artar)
-    const loserNick = params.loserNickname?.trim();
+    const loserNick = params.loserNickname?.trim()
+      ? resolveDisplayName({
+          nickname: params.loserNickname,
+          uid: params.loserUid,
+        })
+      : undefined;
     if (loserNick && !isLoserDeleted) {
       this.ctx.storage.sql.exec(
         `INSERT INTO week_wins (week_key, uid, nickname, wins, losses, reached_at)
@@ -426,7 +437,10 @@ export class Leaderboard extends DurableObject<Env> {
     const top: LeaderboardEntry[] = topRows.map((r) => ({
       rank: Number(r.rank),
       uid: String(r.uid),
-      nickname: String(r.nickname),
+      nickname: resolveDisplayName({
+        nickname: r.nickname,
+        uid: r.uid,
+      }),
       wins: Number(r.wins),
       isMe: callerUid ? r.uid === callerUid : false,
       frame: r.frame || 'classic',

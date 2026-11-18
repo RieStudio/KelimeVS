@@ -13,6 +13,7 @@ import {
   generateFriendCode,
   sanitizePlayerName,
 } from './protocol';
+import { resolveDisplayName } from './displayName';
 import { isEnergyEnabledForUser, getEnergyCostPerMatch, getEnergyMax } from './energy';
 import type { Env } from './index';
 
@@ -829,8 +830,8 @@ export class Matchmaker extends DurableObject<Env> {
     try {
       await roomStub.initMatch({
         matchId,
-        p1: { uid: p1.uid, name: p1.name, frame: p1.frame || 'classic' },
-        p2: { uid: p2.uid, name: p2.name, frame: p2.frame || 'classic' },
+        p1: { uid: p1.uid, name: resolveDisplayName({ nickname: p1.name, uid: p1.uid }), frame: p1.frame || 'classic' },
+        p2: { uid: p2.uid, name: resolveDisplayName({ nickname: p2.name, uid: p2.uid }), frame: p2.frame || 'classic' },
         questions: selectedQuestions,
         questionOrder,
         matchType,
@@ -1075,15 +1076,23 @@ export class Matchmaker extends DurableObject<Env> {
         );
         const profile = await profileStub.getProfile(uid);
         if (profile) {
-          const name = profile.nickname
-            ? sanitizePlayerName(profile.nickname)
-            : sanitizePlayerName(fallbackName);
+          const name = resolveDisplayName({
+            nickname: profile.nickname,
+            uid,
+            isGuest: profile.isGuest,
+          });
           const frame = profile.equippedFrame || 'classic';
           return { name, frame };
         }
       }
     } catch {}
-    return { name: sanitizePlayerName(fallbackName), frame: 'classic' };
+    return {
+      name: resolveDisplayName({
+        nickname: fallbackName,
+        uid,
+      }),
+      frame: 'classic',
+    };
   }
 
   private async getPlayerNickname(uid: string, fallbackName?: string): Promise<string> {

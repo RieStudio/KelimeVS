@@ -8,6 +8,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/display_name_resolver.dart';
 import '../../../core/widgets/app_icon_button.dart';
 import '../../../core/widgets/empty_state_card.dart';
 import '../../../core/widgets/player_avatar.dart';
@@ -378,6 +379,10 @@ class _LeaderboardItemCard extends ConsumerWidget {
     final isMe = entry.isMe ||
         (hasUid && ref.watch(isCurrentUserProvider(entry.uid!)));
     final isTappable = isMe || hasUid;
+    final entryNickname = DisplayNameResolver.resolve(
+      nickname: entry.nickname,
+      uid: entry.uid,
+    );
 
     final card = Container(
       padding: const EdgeInsets.symmetric(
@@ -401,13 +406,13 @@ class _LeaderboardItemCard extends ConsumerWidget {
           // Oyuncu Avatarı
           isMe
               ? PlayerAvatar.selfHome(
-                  name: entry.nickname,
+                  name: entryNickname,
                   frame: entry.frame,
                   size: AppDimens.avatarMatch,
                   borderWidth: AppDimens.borderThin,
                 )
               : PlayerAvatar.opponent(
-                  name: entry.nickname,
+                  name: entryNickname,
                   frame: entry.frame,
                   size: AppDimens.avatarMatch,
                   borderWidth: AppDimens.borderThin,
@@ -418,7 +423,7 @@ class _LeaderboardItemCard extends ConsumerWidget {
           // Takma Ad (SEN rozeti kaldırıldı, kart zemini vurgu rengindedir)
           Expanded(
             child: Text(
-              entry.nickname,
+              entryNickname,
               style: AppTextStyles.playerName.copyWith(
                 fontWeight: FontWeight.w800,
                 color: AppColors.ink,
@@ -704,9 +709,12 @@ class _StickyMeBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
-    final myNickname = (profile.nickname != null && profile.nickname!.trim().isNotEmpty)
-        ? profile.nickname!.trim()
-        : AppStrings.defaultPlayerName;
+    final currentUid = ref.watch(currentUserIdProvider);
+    final myNickname = DisplayNameResolver.resolve(
+      nickname: profile.nickname,
+      uid: currentUid,
+      isGuest: profile.isGuest,
+    );
     final myFrame = profile.equippedFrame;
 
     final barContent = Container(
