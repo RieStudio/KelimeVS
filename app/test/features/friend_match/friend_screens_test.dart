@@ -409,6 +409,43 @@ void main() {
           tester.widget<Container>(createContainer).decoration as BoxDecoration;
       expect(dec.boxShadow, isNotEmpty);
     });
+
+    testWidgets(
+        '1j. Arkadaşla düello kartına hızlı dokunulduğunda (tester.tap) basma efekti ilk karede görünür ve rota geçişi öncesi basılı kalır',
+        (tester) async {
+      await tester.pumpWidget(_buildBottomSheetHostApp());
+      await tester.tap(find.text('Aç'));
+      await tester.pumpAndSettle();
+
+      final createRoomFinder =
+          find.byKey(const ValueKey('friend_duel_action_create_room'));
+      expect(createRoomFinder, findsOneWidget);
+
+      final createContainer = find.descendant(
+        of: createRoomFinder,
+        matching: find.byType(Container),
+      ).first;
+      final initialTop = tester.getTopLeft(createContainer).dy;
+
+      // Hızlı dokun (tap down & up aynı karede)
+      await tester.tap(createRoomFinder);
+      await tester.pump();
+
+      // Listener sayesinde anında basılı görünüm başlar
+      final state = tester.state<AppPressableState>(createRoomFinder);
+      expect(state.isPressed, isTrue);
+
+      // actionDelay (70 ms) öncesinde buton hala ekranda basılıdır ve modal henüz kapanmamıştır
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(state.isPressed, isTrue);
+      expect(tester.getTopLeft(createContainer).dy, greaterThan(initialTop));
+      expect(find.byType(FriendDuelBottomSheet), findsOneWidget);
+
+      // actionDelay sonrasında modal kapanır ve FriendHostScreen açılır
+      await tester.pumpAndSettle();
+      expect(find.byType(FriendDuelBottomSheet), findsNothing);
+      expect(find.byType(FriendHostScreen), findsOneWidget);
+    });
   });
 
   group('FriendHostScreen Widget Tests', () {

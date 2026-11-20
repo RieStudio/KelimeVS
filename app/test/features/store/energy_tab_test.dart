@@ -3,8 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/core/widgets/app_pressable.dart';
 import 'package:app/features/profile/domain/energy_state.dart';
+import 'package:app/features/store/application/store_notifier.dart';
+import 'package:app/features/store/data/store_api_client.dart';
+import 'package:app/features/store/domain/models/store_item.dart';
 import 'package:app/features/store/presentation/widgets/energy_tab_view.dart';
+
+class _MockStoreNotifier extends StoreNotifier {
+  @override
+  StoreState build() => const StoreState(isLoading: false);
+
+  @override
+  Future<StorePurchaseEnergyResult> purchaseEnergy(String packId) async {
+    return const StorePurchaseEnergySuccess(
+      coins: 80,
+      energy: 3,
+      max: 5,
+      nextEnergyAtMs: null,
+      serverNowMs: 0,
+      pack: 'one',
+    );
+  }
+}
 
 void main() {
   group('EnergyTabView Widget Tests', () {
@@ -98,7 +119,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: [
+            storeNotifierProvider.overrideWith(() => _MockStoreNotifier()),
+          ],
           child: MaterialApp(
             home: Scaffold(
               body: EnergyTabView(
@@ -242,7 +266,10 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
+          overrides: [
+            storeNotifierProvider.overrideWith(() => _MockStoreNotifier()),
+          ],
           child: MaterialApp(
             home: Scaffold(
               body: EnergyTabView(
@@ -275,6 +302,63 @@ void main() {
       await tester.pump();
 
       expect(find.text(AppStrings.energyAlreadyFull), findsOneWidget);
+    });
+
+    testWidgets('hızlı dokunuşta (tester.tap) enerji butonunda basma efekti ilk karelerde görünür ve en az 110 ms korunur',
+        (tester) async {
+      const energy = EnergyState(
+        enabled: true,
+        current: 2,
+        max: 5,
+        packs: [
+          EnergyPack(id: 'one', cost: 20, energy: 1),
+          EnergyPack(id: 'full', cost: 80, energy: 5),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            storeNotifierProvider.overrideWith(() => _MockStoreNotifier()),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: EnergyTabView(
+                energy: energy,
+                userCoins: 100,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final buyOneFinder = find.byKey(const ValueKey('buy_energy_pack_one'));
+      final buyOneContainer = find.descendant(
+        of: buyOneFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(buyOneContainer).dy;
+
+      // Hızlı dokun (tap down ve up aynı anda)
+      await tester.tap(buyOneFinder);
+      await tester.pump();
+
+      // Listener sayesinde hemen basılı duruma geçer
+      final state = tester.state<AppPressableState>(buyOneFinder);
+      expect(state.isPressed, isTrue);
+
+      // 90 ms animasyon sonunda tam basılı kayma
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(tester.getTopLeft(buyOneContainer).dy, closeTo(initialTop + 2.0, 0.01));
+      expect(state.isPressed, isTrue);
+
+      // 110 ms minPressedDuration dolduğunda (toplam 120 ms) bırakılır
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(state.isPressed, isFalse);
+
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(buyOneContainer).dy, closeTo(initialTop, 0.01));
     });
   });
 }
