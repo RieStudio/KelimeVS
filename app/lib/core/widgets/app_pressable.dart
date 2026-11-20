@@ -168,21 +168,26 @@ class AppPressableState extends State<AppPressable> {
     final isEffectivePressed =
         _isPressed && widget.enablePressAnimation && widget.onTap != null;
 
-    Widget content = TweenAnimationBuilder<double>(
-      duration: widget.duration,
-      curve: widget.curve,
-      tween: Tween<double>(
-        begin: 0.0,
-        end: isEffectivePressed ? widget.pressOffset : 0.0,
-      ),
-      builder: (context, offset, child) {
-        return Transform.translate(
-          offset: Offset(0, offset),
-          child: child,
-        );
-      },
-      child: widget.builder(context, isEffectivePressed),
-    );
+    Widget content;
+    if (widget.pressOffset == 0.0) {
+      content = widget.builder(context, isEffectivePressed);
+    } else {
+      content = TweenAnimationBuilder<double>(
+        duration: widget.duration,
+        curve: widget.curve,
+        tween: Tween<double>(
+          begin: 0.0,
+          end: isEffectivePressed ? widget.pressOffset : 0.0,
+        ),
+        builder: (context, offset, child) {
+          return Transform.translate(
+            offset: Offset(0, offset),
+            child: child,
+          );
+        },
+        child: widget.builder(context, isEffectivePressed),
+      );
+    }
 
     if (widget.ensureMinTouchTarget) {
       content = ConstrainedBox(

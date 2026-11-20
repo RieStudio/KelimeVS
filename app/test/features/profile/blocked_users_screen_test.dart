@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -41,6 +42,21 @@ class FakeBlockedUsersApiClient implements BlockedUsersApiClient {
     required String reason,
   }) async =>
       const ReportUserSuccess();
+}
+
+class DelayedUnblockApiClient extends FakeBlockedUsersApiClient {
+  final Completer<bool> completer = Completer<bool>();
+
+  DelayedUnblockApiClient({super.usersToReturn});
+
+  @override
+  Future<bool> unblockUser(String id) async {
+    unblockCalled = true;
+    unblockedId = id;
+    final res = await completer.future;
+    usersToReturn = usersToReturn.where((u) => u.id != id).toList();
+    return res;
+  }
 }
 
 Finder findSvgAsset(String assetName) {
@@ -319,5 +335,46 @@ void main() {
 
     await gesture.up();
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('8. Kaldır butonuna (ListView içindeki SecondaryButton) hızlı dokunulduğunda (tester.tap) basma efekti ilk karede görünür ve unblock bir kez tetiklenir', (tester) async {
+    final users = [
+      const BlockedUser(id: 'b2', nickname: 'Mehmet', blockedAt: 1729000000000),
+    ];
+    final client = DelayedUnblockApiClient(usersToReturn: users);
+    await tester.pumpWidget(buildTestScreen(client));
+    await tester.pumpAndSettle();
+
+    final buttonFinder = find.widgetWithText(SecondaryButton, AppStrings.unblockAction);
+    expect(buttonFinder, findsOneWidget);
+
+    final innerContainerFinder = find.descendant(
+      of: buttonFinder,
+      matching: find.byType(Container),
+    ).first;
+
+    final initialTop = tester.getTopLeft(innerContainerFinder).dy;
+    var dec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(dec.boxShadow, isNotEmpty);
+
+    // ListView içinde hızlı dokun (tap down & up aynı anda)
+    await tester.tap(buttonFinder);
+    await tester.pump();
+
+    // Listener sayesinde ListView jest gecikmesine takılmadan ilk karede gölge kalkar
+    dec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(dec.boxShadow, isEmpty);
+
+    // 90 ms sonra aşağı kayma (3 px) gerçekleşir
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(tester.getTopLeft(innerContainerFinder).dy, closeTo(initialTop + 3.0, 0.01));
+
+    // Async unblock işlemini tamamla ve sayfanın yerleşmesine izin ver
+    client.completer.complete(true);
+    await tester.pumpAndSettle();
+
+    expect(client.unblockCalled, isTrue);
+    expect(client.unblockedId, 'b2');
+    expect(find.text('Mehmet'), findsNothing);
   });
 }

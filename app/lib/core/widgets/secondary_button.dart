@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'app_pressable.dart';
 
 /// DESIGN.md Bölüm 6: SecondaryButton
 /// Standart: Zemin: card, Yazı: ink, Kenarlık: 3 ink, Yükseklik: 54-60, Gölge: 0 4px 0 ink.
 /// Tehlike (danger): Zemin: card (beyaz), Yazı: dangerText, Kenarlık: danger, Gölge: 0 4px 0 dangerDark.
 /// Dokunma alanı en az 48x48.
-class SecondaryButton extends StatefulWidget {
+class SecondaryButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
   final double? width;
@@ -50,100 +51,76 @@ class SecondaryButton extends StatefulWidget {
         ];
 
   @override
-  State<SecondaryButton> createState() => _SecondaryButtonState();
-}
-
-class _SecondaryButtonState extends State<SecondaryButton> {
-  bool _isPressed = false;
-
-  void _handleTapDown(TapDownDetails details) {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = true);
-    }
-  }
-
-  void _handleTapUp(TapUpDetails details) {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
-    }
-  }
-
-  void _handleTapCancel() {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     const pressOffset = AppDimens.secondaryButtonPressOffset;
 
     return Semantics(
       button: true,
-      enabled: widget.onPressed != null,
-      label: widget.text,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: _handleTapDown,
-        onTapUp: _handleTapUp,
-        onTapCancel: _handleTapCancel,
-        onTap: widget.onPressed,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: AppDimens.minTouchTarget,
-            minHeight: AppDimens.minTouchTarget,
-          ),
-          child: SizedBox(
-            width: widget.width ?? double.infinity,
-            height: widget.height + pressOffset,
-            child: Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 90),
-                  curve: Curves.easeOut,
-                  top: _isPressed ? pressOffset : 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: widget.height,
-                    decoration: BoxDecoration(
-                      color: widget.backgroundColor ?? AppColors.card,
-                      borderRadius: AppDimens.borderRadiusButton,
-                      border: Border.all(
-                        color: widget.borderColor ?? AppColors.ink,
-                        width: AppDimens.borderThick,
+      enabled: onPressed != null,
+      label: text,
+      child: AppPressable(
+        onTap: onPressed,
+        actionDelay: Duration.zero,
+        pressOffset: 0,
+        ensureMinTouchTarget: false,
+        builder: (context, isPressed) {
+          return ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: AppDimens.minTouchTarget,
+              minHeight: AppDimens.minTouchTarget,
+            ),
+            child: SizedBox(
+              width: width ?? double.infinity,
+              height: height + pressOffset,
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 90),
+                    curve: Curves.easeOut,
+                    top: isPressed ? pressOffset : 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: height,
+                      decoration: BoxDecoration(
+                        color: backgroundColor ?? AppColors.card,
+                        borderRadius: AppDimens.borderRadiusButton,
+                        border: Border.all(
+                          color: borderColor ?? AppColors.ink,
+                          width: AppDimens.borderThick,
+                        ),
+                        boxShadow: isPressed
+                            ? const []
+                            : (boxShadow ?? AppDimens.shadowSecondaryButton),
                       ),
-                      boxShadow: _isPressed
-                          ? const []
-                          : (widget.boxShadow ?? AppDimens.shadowSecondaryButton),
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: widget.horizontalPadding ??
-                              (widget.width != null && widget.width! < 100
-                                  ? AppDimens.space6
-                                  : AppDimens.space16),
-                        ),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                          widget.text,
-                          style: AppTextStyles.secondaryButton.copyWith(
-                            color: widget.textColor ?? AppColors.ink,
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding ??
+                                (width != null && width! < 100
+                                    ? AppDimens.space6
+                                    : AppDimens.space16),
                           ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                        ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              text,
+                              style: AppTextStyles.secondaryButton.copyWith(
+                                color: textColor ?? AppColors.ink,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

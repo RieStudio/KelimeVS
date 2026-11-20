@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'app_pressable.dart';
 
 /// DESIGN.md Bölüm 6: PrimaryButton
 /// Zemin: primary, Yazı: beyaz, Fredoka 22 (Büyük varyantta 28 ve alt yazı 13).
 /// Köşe: 20-22, Gölge: 0 5px 0 ink.
 /// Basılınca gölge kaybolup buton 4-5 px aşağı iner (80-100 ms).
-class PrimaryButton extends StatefulWidget {
+class PrimaryButton extends StatelessWidget {
   final String text;
   final String? subtitle;
   final VoidCallback? onPressed;
@@ -28,33 +29,8 @@ class PrimaryButton extends StatefulWidget {
   });
 
   @override
-  State<PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<PrimaryButton> {
-  bool _isPressed = false;
-
-  void _handleTapDown(TapDownDetails details) {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = true);
-    }
-  }
-
-  void _handleTapUp(TapUpDetails details) {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
-    }
-  }
-
-  void _handleTapCancel() {
-    if (widget.onPressed != null) {
-      setState(() => _isPressed = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final height = widget.isLarge
+    final height = isLarge
         ? AppDimens.primaryButtonLargeHeight
         : AppDimens.primaryButtonHeight;
 
@@ -62,98 +38,99 @@ class _PrimaryButtonState extends State<PrimaryButton> {
 
     return Semantics(
       button: true,
-      enabled: widget.onPressed != null,
-      label: widget.subtitle != null
-          ? '${widget.text}, ${widget.subtitle}'
-          : widget.text,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: _handleTapDown,
-        onTapUp: _handleTapUp,
-        onTapCancel: _handleTapCancel,
-        onTap: widget.onPressed,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: AppDimens.minTouchTarget,
-            minHeight: AppDimens.minTouchTarget,
-          ),
-          child: SizedBox(
-            width: widget.width ?? double.infinity,
-            height: height + pressOffset,
-            child: Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 90),
-                  curve: Curves.easeOut,
-                  top: _isPressed ? pressOffset : 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: height,
-                    decoration: BoxDecoration(
-                      color: widget.backgroundColor ?? AppColors.primary,
-                      borderRadius: widget.isLarge
-                          ? AppDimens.borderRadiusButtonLarge
-                          : AppDimens.borderRadiusButton,
-                      boxShadow: _isPressed
-                          ? const []
-                          : (widget.shadowColor != null
-                              ? [
-                                  BoxShadow(
-                                    color: widget.shadowColor!,
-                                    offset: const Offset(0, 5),
-                                    blurRadius: 0,
+      enabled: onPressed != null,
+      label: subtitle != null
+          ? '$text, $subtitle'
+          : text,
+      child: AppPressable(
+        onTap: onPressed,
+        actionDelay: Duration.zero,
+        pressOffset: 0,
+        ensureMinTouchTarget: false,
+        builder: (context, isPressed) {
+          return ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: AppDimens.minTouchTarget,
+              minHeight: AppDimens.minTouchTarget,
+            ),
+            child: SizedBox(
+              width: width ?? double.infinity,
+              height: height + pressOffset,
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 90),
+                    curve: Curves.easeOut,
+                    top: isPressed ? pressOffset : 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: height,
+                      decoration: BoxDecoration(
+                        color: backgroundColor ?? AppColors.primary,
+                        borderRadius: isLarge
+                            ? AppDimens.borderRadiusButtonLarge
+                            : AppDimens.borderRadiusButton,
+                        boxShadow: isPressed
+                            ? const []
+                            : (shadowColor != null
+                                ? [
+                                    BoxShadow(
+                                      color: shadowColor!,
+                                      offset: const Offset(0, 5),
+                                      blurRadius: 0,
+                                    ),
+                                  ]
+                                : AppDimens.shadowPrimaryButton),
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDimens.space16,
+                          ),
+                          child: subtitle != null
+                              ? FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        text,
+                                        style: isLarge
+                                            ? AppTextStyles.primaryButtonLarge
+                                            : AppTextStyles.primaryButton,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: AppDimens.space4),
+                                      Text(
+                                        subtitle!,
+                                        style:
+                                            AppTextStyles.primaryButtonSubtitle,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
                                   ),
-                                ]
-                              : AppDimens.shadowPrimaryButton),
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space16,
+                                )
+                              : FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    text,
+                                    style: isLarge
+                                        ? AppTextStyles.primaryButtonLarge
+                                        : AppTextStyles.primaryButton,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                  ),
+                                ),
                         ),
-                        child: widget.subtitle != null
-                            ? FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      widget.text,
-                                      style: widget.isLarge
-                                          ? AppTextStyles.primaryButtonLarge
-                                          : AppTextStyles.primaryButton,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: AppDimens.space4),
-                                    Text(
-                                      widget.subtitle!,
-                                      style:
-                                          AppTextStyles.primaryButtonSubtitle,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  widget.text,
-                                  style: widget.isLarge
-                                      ? AppTextStyles.primaryButtonLarge
-                                      : AppTextStyles.primaryButton,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                ),
-                              ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

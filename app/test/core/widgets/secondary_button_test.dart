@@ -90,5 +90,170 @@ void main() {
       final constrainedBox = tester.widget<ConstrainedBox>(sizeBoxFinder.first);
       expect(constrainedBox.constraints.minHeight, greaterThanOrEqualTo(AppDimens.minTouchTarget));
     });
+
+    testWidgets('SecondaryButton hızlı dokunuşta (tester.tap): basılı görünüm (3 px kayma, gölge kalkması) uygulanır, en az 110 ms korunur', (tester) async {
+      int pressCount = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SecondaryButton(
+                text: 'Hızlı Buton',
+                onPressed: () => pressCount++,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byType(SecondaryButton);
+      final containerFinder = find.descendant(
+        of: buttonFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(containerFinder).dy;
+      var dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isNotEmpty);
+
+      // Hızlı dokun (tap down & up aynı anda)
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      // onPressed gecikmesiz çalışır (actionDelay=0)
+      expect(pressCount, 1);
+      // Listener sayesinde anında gölge kalkar
+      dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isEmpty);
+
+      // 90 ms sonra aşağı tam kayma gerçekleşir ve gölge kalkık kalır
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop + AppDimens.secondaryButtonPressOffset, 0.01));
+      dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isEmpty);
+
+      // 110 ms minPressedDuration sonrasında (90 + 30 = 120 ms) bırakılır
+      await tester.pump(const Duration(milliseconds: 30));
+
+      // 90 ms animasyon ile başlangıç pozisyonuna döner
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop, 0.01));
+      dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isNotEmpty);
+      expect(pressCount, 1);
+    });
+
+    testWidgets('SecondaryButton ListView içinde hızlı dokunuşta gecikmesiz basma efekti gösterir', (tester) async {
+      int pressCount = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              children: [
+                const SizedBox(height: 50),
+                SecondaryButton(
+                  text: 'Listede Buton',
+                  onPressed: () => pressCount++,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byType(SecondaryButton);
+      final containerFinder = find.descendant(
+        of: buttonFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(containerFinder).dy;
+
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      expect(pressCount, 1);
+      var dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isEmpty);
+
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop + AppDimens.secondaryButtonPressOffset, 0.01));
+
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop, 0.01));
+      dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isNotEmpty);
+    });
+
+    testWidgets('SecondaryButton uzun basma ve sürükleyerek iptal (cancel) davranışını doğru işletir', (tester) async {
+      int pressCount = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SecondaryButton(
+                text: 'İptal',
+                onPressed: () => pressCount++,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byType(SecondaryButton);
+      final containerFinder = find.descendant(
+        of: buttonFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(containerFinder).dy;
+
+      final gesture = await tester.startGesture(tester.getCenter(buttonFinder));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop + AppDimens.secondaryButtonPressOffset, 0.01));
+
+      await gesture.cancel();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop, 0.01));
+      expect(pressCount, 0);
+    });
+
+    testWidgets('SecondaryButton devre dışıyken (onPressed: null) basma efekti çalışmaz', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SecondaryButton(
+                text: 'Pasif',
+                onPressed: null,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final buttonFinder = find.byType(SecondaryButton);
+      final containerFinder = find.descendant(
+        of: buttonFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(containerFinder).dy;
+
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      var dec = tester.widget<Container>(containerFinder).decoration as BoxDecoration;
+      expect(dec.boxShadow, isNotEmpty);
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop, 0.01));
+
+      await tester.pump(const Duration(milliseconds: 90));
+      expect(tester.getTopLeft(containerFinder).dy, closeTo(initialTop, 0.01));
+      await tester.pumpAndSettle();
+    });
   });
 }
