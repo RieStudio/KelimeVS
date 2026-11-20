@@ -300,22 +300,30 @@ void main() {
     });
   });
 
-  group('MatchDetailScreen - Varsayılan Açık Tur ve Kart Açma/Kapama', () {
-    testWidgets('4. Kaybedilen son tur varsayılan olarak açık gelir (Tur 2)', (tester) async {
-      // Tur 1: Kazandım, Tur 2: Kaybettim, Tur 3: Kazandım -> Tur 2 açık olmalı!
+  group('MatchDetailScreen - Tur Kartları Başlangıç Durumu ve Açma/Kapama', () {
+    testWidgets('4. Ekran açıldığında hiçbir tur açık değildir (tüm turlar kapalı gelir)', (tester) async {
+      // Tur 1: Kazandım, Tur 2: Kaybettim, Tur 3: Kazandım
       final match = createSampleMatch();
       await tester.pumpWidget(createDetailTestWidget(match: match));
       await tester.pumpAndSettle();
 
-      // Tur 2'nin içeriğindeki 'Amerika' görünür olmalı
-      expect(find.text('Amerika'), findsOneWidget);
-      // Tur 1'in içeriğindeki 'Ispanak' ve Tur 3'ün içeriğindeki 'Börtlen' kapalı olmalı
+      // Hiçbir turun içeriğindeki denemeler görünür olmamalıdır
       expect(find.text('Ispanak'), findsNothing);
+      expect(find.text('Amerika'), findsNothing);
       expect(find.text('Börtlen'), findsNothing);
+
+      // Kart başlıkları (tur özeti ve sorular) kapalıyken de görünür olmalıdır
+      expect(find.textContaining('TUR 1 ·'), findsOneWidget);
+      expect(find.textContaining('TUR 2 ·'), findsOneWidget);
+      expect(find.textContaining('TUR 3 ·'), findsOneWidget);
+      expect(find.text('Kışlık sebzeler'), findsOneWidget);
+      expect(find.text('G20 ülkeleri'), findsOneWidget);
+      expect(find.text('B ile başlayan hayvanlar'), findsOneWidget);
     });
 
-    testWidgets('5. Hiç kaybedilen tur yoksa son tur varsayılan açık gelir', (tester) async {
-      final allWonMatch = createSampleMatch(
+    testWidgets('5. Özel durumlarda ve tek turlu maçlarda da başlangıçta tüm turlar kapalıdır', (tester) async {
+      final singleRoundMatch = createSampleMatch(
+        isFriendly: true,
         rounds: [
           const RoundRecord(
             questionId: 'q1',
@@ -331,50 +339,43 @@ void main() {
               ),
             ],
           ),
-          const RoundRecord(
-            questionId: 'q2',
-            starterPlayerId: 'me',
-            winnerId: 'me',
-            reason: RoundEndReason.timeout,
-            attempts: [
-              TurnAttempt(
-                playerId: 'me',
-                rawInput: 'Cevap2',
-                resultType: AttemptResultType.correct,
-                nowMs: 2000,
-              ),
-            ],
-          ),
         ],
-        questionTexts: ['Soru 1', 'Soru 2'],
+        questionTexts: ['Soru 1'],
       );
 
-      await tester.pumpWidget(createDetailTestWidget(match: allWonMatch));
+      await tester.pumpWidget(createDetailTestWidget(match: singleRoundMatch));
       await tester.pumpAndSettle();
 
+      // Tek tur olmasına ve arkadaş maçı olmasına rağmen başlangıçta içerik görünmemelidir
       expect(find.text('Cevap1'), findsNothing);
-      expect(find.text('Cevap2'), findsOneWidget);
+      expect(find.textContaining('TUR 1 ·'), findsOneWidget);
+      expect(find.text('Soru 1'), findsOneWidget);
     });
 
-    testWidgets('6. Tur kartına dokunulduğunda açılır ve kapanır', (tester) async {
+    testWidgets('6. Ekran açıldığında hiçbir tur açık değil, bir tura dokununca açılıyor, tekrar dokununca kapanıyor', (tester) async {
       final match = createSampleMatch();
       await tester.pumpWidget(createDetailTestWidget(match: match));
       await tester.pumpAndSettle();
 
-      // Başlangıçta Tur 3 kapalı
+      // Başlangıçta hiçbir tur açık değil
+      expect(find.text('Ispanak'), findsNothing);
+      expect(find.text('Amerika'), findsNothing);
       expect(find.text('Börtlen'), findsNothing);
 
-      // Tur 3 kartının başlığına dokun
-      await tester.tap(find.textContaining('TUR 3'));
+      // Tur 2 kartının başlığına dokun -> Açılır ve 'Amerika' görünür
+      await tester.tap(find.textContaining('TUR 2'));
       await tester.pumpAndSettle();
 
-      // Şimdi Tur 3 açık ve 'Börtlen' görünür
-      expect(find.text('Börtlen'), findsOneWidget);
+      expect(find.text('Amerika'), findsOneWidget);
+      expect(find.text('Ispanak'), findsNothing);
+      expect(find.text('Börtlen'), findsNothing);
 
-      // Tekrar dokunup kapat
-      await tester.tap(find.textContaining('TUR 3'));
+      // Tekrar dokunup kapat -> Kapanır ve 'Amerika' gizlenir
+      await tester.tap(find.textContaining('TUR 2'));
       await tester.pumpAndSettle();
 
+      expect(find.text('Amerika'), findsNothing);
+      expect(find.text('Ispanak'), findsNothing);
       expect(find.text('Börtlen'), findsNothing);
     });
 
@@ -459,6 +460,13 @@ void main() {
       await tester.pumpWidget(createDetailTestWidget(match: emptyRoundMatch));
       await tester.pumpAndSettle();
 
+      // Başlangıçta tur kapalıdır
+      expect(find.text(AppStrings.noAttemptsInRound), findsNothing);
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
+      await tester.pumpAndSettle();
+
       expect(find.text(AppStrings.noAttemptsInRound), findsOneWidget);
     });
 
@@ -490,6 +498,10 @@ void main() {
       );
 
       await tester.pumpWidget(createDetailTestWidget(match: emptyAttemptMatch));
+      await tester.pumpAndSettle();
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
       await tester.pumpAndSettle();
 
       // Boş denemeler filtrelendiği için tur boş durumunu göstermelidir
@@ -535,6 +547,14 @@ void main() {
       await tester.pumpWidget(createDetailTestWidget(match: closeAttemptMatch));
       await tester.pumpAndSettle();
 
+      // Başlangıçta kapalı olduğu için denemeler görünmez
+      expect(find.text('aude'), findsNothing);
+      expect(find.text('ferari'), findsNothing);
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
+      await tester.pumpAndSettle();
+
       // İki deneme de görünür olmalı
       expect(find.text('aude'), findsOneWidget);
       expect(find.text('ferari'), findsOneWidget);
@@ -567,6 +587,10 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
+      await tester.pumpAndSettle();
+
       // kufur sansürlenmiş olmalı
       expect(find.text('***'), findsOneWidget);
       expect(find.text('kufur'), findsNothing);
@@ -577,7 +601,10 @@ void main() {
       await tester.pumpWidget(createDetailTestWidget(match: match));
       await tester.pumpAndSettle();
 
-      // Tur 2 açık ('Amerika' yanlış cevabım)
+      // Tur 2 kartına dokunup aç ('Amerika' yanlış cevabım)
+      await tester.tap(find.textContaining('TUR 2'));
+      await tester.pumpAndSettle();
+
       expect(find.text('“Amerika” kabul edilmedi. Sence doğru muydu?'), findsOneWidget);
       expect(find.text(AppStrings.appeal), findsOneWidget);
 
@@ -609,6 +636,10 @@ void main() {
       await tester.pumpWidget(createDetailTestWidget(match: match));
       await tester.pumpAndSettle();
 
+      // Tur 2 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 2'));
+      await tester.pumpAndSettle();
+
       expect(find.text(AppStrings.objectionSent), findsOneWidget);
       expect(find.text(AppStrings.appeal), findsNothing);
     });
@@ -635,6 +666,10 @@ void main() {
       );
 
       await tester.pumpWidget(createDetailTestWidget(match: repeatedMatch));
+      await tester.pumpAndSettle();
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.alreadySaidNotice), findsOneWidget);
@@ -669,6 +704,10 @@ void main() {
       );
 
       await tester.pumpWidget(createDetailTestWidget(match: multiRejectMatch));
+      await tester.pumpAndSettle();
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
       await tester.pumpAndSettle();
 
       // Varsayılan olarak sonuncu olan 'red2' seçili
@@ -790,6 +829,10 @@ void main() {
       );
 
       await tester.pumpWidget(createDetailTestWidget(match: groupedMatch));
+      await tester.pumpAndSettle();
+
+      // Tur 1 kartına dokunup aç
+      await tester.tap(find.textContaining('TUR 1'));
       await tester.pumpAndSettle();
 
       final bubbles = tester.widgetList<AnswerBubble>(find.byType(AnswerBubble)).toList();

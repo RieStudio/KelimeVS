@@ -37,7 +37,7 @@ enum RoundResultStatus {
 /// - Üst bar: Geri ikonu + "Maç Detayı"
 /// - Özet kartı: "Sen" avatarı, skor (Fredoka 42), ResultBadge, rakip avatar & adı
 /// - Tur kartları: "TUR N", soru metni, ResultBadge, 200 ms rotasyonlu ok
-/// - Varsayılan açık tur: Kaybedilen son tur; kayıp yoksa son tur
+/// - Açılış durumu: Tüm turlar kapalı gelir
 /// - Kart içi: kronolojik cevap balonları (ben sağda, rakip solda)
 /// - İtiraz kutusu: o turdaki son reddedilen denemem varsayılan seçili; wrong/nearMiss itiraz edilebilir
 class MatchDetailScreen extends ConsumerStatefulWidget {
@@ -53,19 +53,9 @@ class MatchDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
-  late final Set<int> _expandedRounds;
+  final Set<int> _expandedRounds = {};
   final Map<int, int> _selectedAttempts = {};
   final Set<ObjectionKey> _localObjections = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _expandedRounds = {};
-    if (widget.match.roundRecords.isNotEmpty) {
-      final defaultOpen = _calculateDefaultOpenRound(widget.match);
-      _expandedRounds.add(defaultOpen);
-    }
-  }
 
   static RoundResultStatus _getRoundStatus(RoundRecord round) {
     if (round.reason == RoundEndReason.forfeit) {
@@ -78,19 +68,6 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
       return RoundResultStatus.lost;
     }
     return RoundResultStatus.draw;
-  }
-
-  int _calculateDefaultOpenRound(MatchHistoryEntry match) {
-    if (match.roundRecords.isEmpty) return 0;
-    // Kaybettiğim son tur (status == RoundResultStatus.lost; terk edilen tur lost sayılmaz)
-    for (int i = match.roundRecords.length - 1; i >= 0; i--) {
-      final r = match.roundRecords[i];
-      if (_getRoundStatus(r) == RoundResultStatus.lost) {
-        return i;
-      }
-    }
-    // Kaybettiğim tur yoksa son tur
-    return match.roundRecords.length - 1;
   }
 
   int? _getSelectedAttempt(int roundIndex, RoundRecord round) {
