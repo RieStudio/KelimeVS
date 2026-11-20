@@ -244,4 +244,80 @@ void main() {
     expect(find.text('CanliEngellenen'), findsOneWidget);
     expect(find.text(AppStrings.emptyBlockedUsers), findsNothing);
   });
+
+  testWidgets('6. Kaldır butonuna basılı tutulduğunda basma efekti (3 px kayma, gölgenin kalkması) gerçekleşir ve bırakınca eski haline döner', (tester) async {
+    final users = [
+      const BlockedUser(id: 'b1', nickname: 'Ali', blockedAt: 1729000000000),
+    ];
+    final client = FakeBlockedUsersApiClient(usersToReturn: users);
+    await tester.pumpWidget(buildTestScreen(client));
+    await tester.pumpAndSettle();
+
+    final buttonFinder = find.widgetWithText(SecondaryButton, AppStrings.unblockAction);
+    expect(buttonFinder, findsOneWidget);
+
+    final innerContainerFinder = find.descendant(
+      of: buttonFinder,
+      matching: find.byType(Container),
+    ).first;
+
+    final initialTop = tester.getTopLeft(innerContainerFinder).dy;
+    var dec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(dec.boxShadow, isNotEmpty);
+    expect(dec.boxShadow!.first.offset, const Offset(0, 4));
+
+    final gesture = await tester.startGesture(tester.getCenter(buttonFinder));
+    // ListView içindeki kPressTimeout (100 ms) gecikmesini ve butonun 90 ms kayma animasyonunu işlet
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 90));
+
+    expect(tester.getTopLeft(innerContainerFinder).dy, closeTo(initialTop + 3.0, 0.01));
+    dec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(dec.boxShadow, isEmpty);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(client.unblockCalled, isTrue);
+    expect(client.unblockedId, 'b1');
+  });
+
+  testWidgets('7. Kaldır butonu devre dışı (onPressed: null) olduğunda basma efekti çalışmaz', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SecondaryButton(
+              text: AppStrings.unblockAction,
+              height: 42,
+              width: 84,
+              onPressed: null,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final buttonFinder = find.widgetWithText(SecondaryButton, AppStrings.unblockAction);
+    final innerContainerFinder = find.descendant(
+      of: buttonFinder,
+      matching: find.byType(Container),
+    ).first;
+
+    final initialTop = tester.getTopLeft(innerContainerFinder).dy;
+    final dec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(dec.boxShadow, isNotEmpty);
+
+    final gesture = await tester.startGesture(tester.getCenter(buttonFinder));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+
+    expect(tester.getTopLeft(innerContainerFinder).dy, closeTo(initialTop, 0.01));
+    final pressedDec = tester.widget<Container>(innerContainerFinder).decoration as BoxDecoration;
+    expect(pressedDec.boxShadow, isNotEmpty);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
 }

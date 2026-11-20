@@ -7,6 +7,7 @@ import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/widgets/app_pressable.dart';
 import 'friend_host_screen.dart';
 import 'friend_join_screen.dart';
 
@@ -69,6 +70,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
 
           // 1. "Oda Kur" Seçim Kartı
           _buildActionCard(
+            key: const ValueKey('friend_duel_action_create_room'),
             context: context,
             svgAsset: createRoomAsset,
             title: AppStrings.createRoom,
@@ -87,6 +89,7 @@ class FriendDuelBottomSheet extends ConsumerWidget {
 
           // 2. "Koda Katıl" Seçim Kartı
           _buildActionCard(
+            key: const ValueKey('friend_duel_action_join_room'),
             context: context,
             svgAsset: joinRoomAsset,
             title: AppStrings.joinRoom,
@@ -107,69 +110,79 @@ class FriendDuelBottomSheet extends ConsumerWidget {
   }
 
   Widget _buildActionCard({
+    Key? key,
     required BuildContext context,
     required String svgAsset,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppDimens.space16),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: AppDimens.borderRadiusListCard,
-          border: Border.all(
-            color: AppColors.ink,
-            width: AppDimens.borderThin,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(0, 3),
-              blurRadius: 0,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            ExcludeSemantics(
-              child: SvgPicture.asset(
-                svgAsset,
-                width: iconSize,
-                height: iconSize,
-                fit: BoxFit.contain,
+    return Semantics(
+      button: true,
+      label: '$title, $subtitle',
+      child: AppPressable(
+        key: key,
+        pressOffset: 3.0,
+        onTap: onTap,
+        builder: (context, isPressed) {
+          return Container(
+            padding: const EdgeInsets.all(AppDimens.space16),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppDimens.borderRadiusListCard,
+              border: Border.all(
+                color: AppColors.ink,
+                width: AppDimens.borderThin,
               ),
+              boxShadow: isPressed
+                  ? const []
+                  : const [
+                      BoxShadow(
+                        color: AppColors.ink,
+                        offset: Offset(0, 3),
+                        blurRadius: 0,
+                      ),
+                    ],
             ),
-            const SizedBox(width: AppDimens.space16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.cardTitle.copyWith(fontSize: 18),
+            child: Row(
+              children: [
+                ExcludeSemantics(
+                  child: SvgPicture.asset(
+                    svgAsset,
+                    width: iconSize,
+                    height: iconSize,
+                    fit: BoxFit.contain,
                   ),
-                  const SizedBox(height: AppDimens.space4),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.bodyText.copyWith(
-                      color: AppColors.muted,
-                      fontSize: 13,
-                    ),
+                ),
+                const SizedBox(width: AppDimens.space16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTextStyles.cardTitle.copyWith(fontSize: 18),
+                      ),
+                      const SizedBox(height: AppDimens.space4),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.bodyText.copyWith(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.muted,
+                  size: 26,
+                ),
+              ],
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.muted,
-              size: 26,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

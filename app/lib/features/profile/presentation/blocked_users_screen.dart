@@ -189,12 +189,12 @@ class BlockedUsersScreen extends ConsumerWidget {
 class _BlockedUserTile extends StatelessWidget {
   final BlockedUser user;
   final String formattedDate;
-  final VoidCallback onUnblock;
+  final VoidCallback? onUnblock;
 
   const _BlockedUserTile({
     required this.user,
     required this.formattedDate,
-    required this.onUnblock,
+    this.onUnblock,
   });
 
   @override

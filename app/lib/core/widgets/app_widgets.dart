@@ -22,4 +22,5 @@ export 'global_offline_banner.dart';
 export 'offline_splash_screen.dart';
 export 'match_tip_card.dart';
 export 'empty_state_card.dart';
+export 'app_pressable.dart';
 export 'splash_gate.dart';

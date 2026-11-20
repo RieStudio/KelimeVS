@@ -10,6 +10,7 @@ import 'package:app/core/icons/app_icons.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/widgets/app_icon_button.dart';
+import 'package:app/core/widgets/app_pressable.dart';
 import 'package:app/core/widgets/match_tip_card.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/features/friend_match/data/friend_match_client.dart';
@@ -267,6 +268,146 @@ void main() {
       final rootContainer = tester.widget<Container>(rootContainerFinder);
       final decoration = rootContainer.decoration as BoxDecoration?;
       expect(decoration?.color, AppColors.card);
+    });
+
+    testWidgets(
+        '1g. "Oda Kur" seçeneğine basılı tutulduğunda basma efekti (3 px kayma, gölgenin kalkması) gerçekleşir ve bırakınca eski haline döner',
+        (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: FriendDuelBottomSheet(),
+            ),
+          ),
+        ),
+      );
+
+      final createRoomFinder =
+          find.byKey(const ValueKey('friend_duel_action_create_room'));
+      expect(createRoomFinder, findsOneWidget);
+
+      final createContainer = find.descendant(
+        of: createRoomFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialCreateTop = tester.getTopLeft(createContainer).dy;
+      var createDec =
+          tester.widget<Container>(createContainer).decoration as BoxDecoration;
+      expect(createDec.boxShadow, isNotEmpty);
+      expect(createDec.boxShadow!.first.offset, const Offset(0, 3));
+
+      final gesture = await tester.startGesture(tester.getCenter(createRoomFinder));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(createContainer).dy,
+          closeTo(initialCreateTop + 3.0, 0.01));
+      createDec =
+          tester.widget<Container>(createContainer).decoration as BoxDecoration;
+      expect(createDec.boxShadow, isEmpty);
+
+      // Bırakınca (cancel) efekt sıfırlanır ve eski konumuna döner
+      await gesture.cancel();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(createContainer).dy, closeTo(initialCreateTop, 0.01));
+      createDec =
+          tester.widget<Container>(createContainer).decoration as BoxDecoration;
+      expect(createDec.boxShadow, isNotEmpty);
+      final pressableState = tester.state<AppPressableState>(createRoomFinder);
+      expect(pressableState.isPressed, isFalse);
+    });
+
+    testWidgets(
+        '1h. "Koda Katıl" seçeneğine basılı tutulduğunda basma efekti (3 px kayma, gölgenin kalkması) gerçekleşir ve bırakınca eski haline döner',
+        (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: FriendDuelBottomSheet(),
+            ),
+          ),
+        ),
+      );
+
+      final joinRoomFinder =
+          find.byKey(const ValueKey('friend_duel_action_join_room'));
+      expect(joinRoomFinder, findsOneWidget);
+
+      final joinContainer = find.descendant(
+        of: joinRoomFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialJoinTop = tester.getTopLeft(joinContainer).dy;
+      var joinDec =
+          tester.widget<Container>(joinContainer).decoration as BoxDecoration;
+      expect(joinDec.boxShadow, isNotEmpty);
+      expect(joinDec.boxShadow!.first.offset, const Offset(0, 3));
+
+      final gesture = await tester.startGesture(tester.getCenter(joinRoomFinder));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(joinContainer).dy,
+          closeTo(initialJoinTop + 3.0, 0.01));
+      joinDec =
+          tester.widget<Container>(joinContainer).decoration as BoxDecoration;
+      expect(joinDec.boxShadow, isEmpty);
+
+      // Bırakınca (cancel) efekt sıfırlanır ve eski konumuna döner
+      await gesture.cancel();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(joinContainer).dy, closeTo(initialJoinTop, 0.01));
+      joinDec =
+          tester.widget<Container>(joinContainer).decoration as BoxDecoration;
+      expect(joinDec.boxShadow, isNotEmpty);
+      final pressableState = tester.state<AppPressableState>(joinRoomFinder);
+      expect(pressableState.isPressed, isFalse);
+    });
+
+    testWidgets(
+        '1i. Arkadaşla düello kartı basılıyken sürükleme/cancel olursa basma efekti eski haline döner',
+        (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: FriendDuelBottomSheet(),
+            ),
+          ),
+        ),
+      );
+
+      final createRoomFinder =
+          find.byKey(const ValueKey('friend_duel_action_create_room'));
+      final createContainer = find.descendant(
+        of: createRoomFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final initialTop = tester.getTopLeft(createContainer).dy;
+      final gesture = await tester.startGesture(tester.getCenter(createRoomFinder));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(createContainer).dy, closeTo(initialTop + 3.0, 0.01));
+
+      // Sürükleme veya iptal
+      await gesture.cancel();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 90));
+
+      expect(tester.getTopLeft(createContainer).dy, closeTo(initialTop, 0.01));
+      final dec =
+          tester.widget<Container>(createContainer).decoration as BoxDecoration;
+      expect(dec.boxShadow, isNotEmpty);
     });
   });
 

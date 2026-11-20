@@ -9,6 +9,7 @@ import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/app_pressable.dart';
 import '../../../../core/widgets/coin_icon.dart';
 import '../../../../core/widgets/energy_icon.dart';
 import '../../../profile/domain/energy_state.dart';
@@ -343,64 +344,67 @@ class _EnergyTabViewState extends ConsumerState<EnergyTabView> {
           const SizedBox(width: AppDimens.space8),
 
           // Fiyat Butonu / Dolu Durumu
-          GestureDetector(
+          AppPressable(
             key: ValueKey('buy_energy_pack_${pack.id}'),
-            behavior: HitTestBehavior.opaque,
+            enablePressAnimation: !isDisabled,
+            pressOffset: 2.0,
             onTap: () => _handlePurchase(pack.id, pack.cost),
-            child: Opacity(
-              opacity: isDisabled ? 0.6 : 1.0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.space12,
-                  vertical: AppDimens.space8,
-                ),
-                decoration: BoxDecoration(
-                  color: isFull
-                      ? AppColors.surface
-                      : (canAfford ? AppColors.coin : AppColors.card),
-                  borderRadius: AppDimens.borderRadiusFull,
-                  border: Border.all(
-                    color: AppColors.ink,
-                    width: AppDimens.borderThin,
+            builder: (context, isPressed) {
+              return Opacity(
+                opacity: isDisabled ? 0.6 : 1.0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimens.space12,
+                    vertical: AppDimens.space8,
                   ),
-                  boxShadow: isFull || !canAfford
-                      ? null
-                      : const [
-                          BoxShadow(
-                            color: AppColors.ink,
-                            offset: Offset(0, 2),
-                            blurRadius: 0,
-                          ),
-                        ],
-                ),
-                child: isFull
-                    ? Text(
-                        AppStrings.energyFullButton,
-                        style: const TextStyle(
-                          fontFamily: AppTextStyles.fontNunito,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          color: AppColors.muted,
-                        ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CoinIcon(size: 18),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${pack.cost}',
-                            style: const TextStyle(
-                              fontFamily: AppTextStyles.fontFredoka,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                  decoration: BoxDecoration(
+                    color: isFull
+                        ? AppColors.surface
+                        : (canAfford ? AppColors.coin : AppColors.card),
+                    borderRadius: AppDimens.borderRadiusFull,
+                    border: Border.all(
+                      color: AppColors.ink,
+                      width: AppDimens.borderThin,
+                    ),
+                    boxShadow: (isFull || !canAfford || isPressed)
+                        ? null
+                        : const [
+                            BoxShadow(
                               color: AppColors.ink,
+                              offset: Offset(0, 2),
+                              blurRadius: 0,
                             ),
+                          ],
+                  ),
+                  child: isFull
+                      ? Text(
+                          AppStrings.energyFullButton,
+                          style: const TextStyle(
+                            fontFamily: AppTextStyles.fontNunito,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: AppColors.muted,
                           ),
-                        ],
-                      ),
-              ),
-            ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CoinIcon(size: 18),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${pack.cost}',
+                              style: const TextStyle(
+                                fontFamily: AppTextStyles.fontFredoka,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              );
+            },
           ),
         ],
       ),
