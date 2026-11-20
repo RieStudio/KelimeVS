@@ -327,6 +327,18 @@ export default {
             }
           );
         }
+        if (msg === 'nickname_blocked') {
+          return new Response(
+            JSON.stringify({
+              error: 'nickname_blocked',
+              message: 'Bu takma ad kullanılamaz.',
+            }),
+            {
+              status: 422,
+              headers: jsonHeaders,
+            }
+          );
+        }
         return new Response(
           JSON.stringify({ error: 'invalid_nickname', message: msg }),
           {

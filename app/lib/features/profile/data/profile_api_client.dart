@@ -184,6 +184,11 @@ class ProfileUpdateSuccess extends ProfileUpdateResult {
   const ProfileUpdateSuccess(this.nickname);
 }
 
+class ProfileUpdateBlockedNickname extends ProfileUpdateResult {
+  final String message;
+  const ProfileUpdateBlockedNickname([this.message = AppStrings.nicknameBlockedError]);
+}
+
 class ProfileUpdateInvalidNickname extends ProfileUpdateResult {
   final String message;
   const ProfileUpdateInvalidNickname(this.message);
@@ -314,6 +319,15 @@ class HttpProfileApiClient implements ProfileApiClient {
       } else if (response.statusCode == 410) {
         onAccountDeleted?.call();
         return const ProfileUpdateNetworkError('account_deleted');
+      } else if (response.statusCode == 422) {
+        String msg = AppStrings.nicknameBlockedError;
+        try {
+          final decoded = response.decodeJsonMap();
+          if (decoded['message'] is String && (decoded['message'] as String).isNotEmpty) {
+            msg = decoded['message'] as String;
+          }
+        } catch (_) {}
+        return ProfileUpdateBlockedNickname(msg);
       } else if (response.statusCode == 403) {
         String msg = AppStrings.guestNicknameLocked;
         try {
@@ -339,6 +353,11 @@ class HttpProfileApiClient implements ProfileApiClient {
         String msg = 'Geçersiz takma ad';
         try {
           final decoded = response.decodeJsonMap();
+          if (decoded['error'] == 'nickname_blocked') {
+            return ProfileUpdateBlockedNickname(
+              decoded['message'] as String? ?? AppStrings.nicknameBlockedError,
+            );
+          }
           msg = decoded['message'] as String? ?? msg;
         } catch (_) {}
         return ProfileUpdateInvalidNickname(msg);

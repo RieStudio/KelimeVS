@@ -249,6 +249,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
             if (ref.mounted) {
               state = state.copyWith(syncError: uploadRes.message);
             }
+          } else if (uploadRes is ProfileUpdateBlockedNickname) {
+            await repo.setNicknameSyncPending(false);
+            if (ref.mounted) {
+              state = state.copyWith(syncError: uploadRes.message);
+            }
           } else if (uploadRes is ProfileUpdateCooldown) {
             await repo.setNicknameSyncPending(false);
             if (ref.mounted) {
@@ -442,6 +447,16 @@ class ProfileNotifier extends Notifier<ProfileState> {
       }
       await repo.setNicknameSyncPending(false);
       throw Exception(res.message);
+    } else if (res is ProfileUpdateBlockedNickname) {
+      // Sunucu "bu ad kullanılamaz" (422) derse işareti temizle ve kullanıcıya bildir
+      if (previousNickname != null) {
+        await repo.setNickname(previousNickname);
+        state = state.copyWith(nickname: previousNickname, syncError: res.message);
+      } else {
+        state = state.copyWith(syncError: res.message);
+      }
+      await repo.setNicknameSyncPending(false);
+      throw Exception(res.message);
     }
   }
 
@@ -459,6 +474,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
       await repo.setNicknameSyncPending(false);
       state = state.copyWith(nickname: res.nickname);
     } else if (res is ProfileUpdateInvalidNickname) {
+      await repo.setNicknameSyncPending(false);
+      state = state.copyWith(syncError: res.message);
+    } else if (res is ProfileUpdateBlockedNickname) {
       await repo.setNicknameSyncPending(false);
       state = state.copyWith(syncError: res.message);
     } else if (res is ProfileUpdateCooldown) {

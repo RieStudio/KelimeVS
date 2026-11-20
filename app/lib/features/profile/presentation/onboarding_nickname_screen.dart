@@ -81,9 +81,19 @@ class _OnboardingNicknameScreenState
       _isSubmitting = true;
     });
 
-    await ref
-        .read(profileProvider.notifier)
-        .setNickname(validation.normalized!);
+    try {
+      await ref
+          .read(profileProvider.notifier)
+          .setNickname(validation.normalized!);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+      return;
+    }
 
     if (!mounted) return;
 

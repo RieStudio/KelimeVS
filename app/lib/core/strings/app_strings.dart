@@ -368,6 +368,7 @@ abstract final class AppStrings {
       'Bu Google hesabı daha önce başka bir hesaba bağlanmış. Bu Google hesabına geçersen şu anki misafir ilerlemen (jetonlar, çerçeveler, istatistikler ve maç geçmişi) yeni hesaba taşınmaz ve kaybolur. Devam edilsin mi?';
   static const String nicknameReservedError =
       'Bu takma ad sistem tarafından ayrılmıştır, lütfen başka bir ad seçin.';
+  static const String nicknameBlockedError = 'Bu takma ad kullanılamaz';
   static const String nicknameGuestPatternError =
       'Bu takma ad kalıbı (M-####) misafir oyuncular için ayrılmıştır.';
   static const String guestNicknameInfo =

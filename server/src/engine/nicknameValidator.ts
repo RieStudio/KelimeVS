@@ -1,6 +1,7 @@
 // Saf TypeScript - Harici ağ bağımlılığı yoktur.
 import { normalize } from './normalizer';
 import { PROFANITY_WORDS } from './profanityWords';
+import { isNicknameBlocked } from './nicknameFilter';
 
 export interface NicknameValidationResult {
   readonly isValid: boolean;
@@ -96,7 +97,17 @@ export function validateNickname(raw: unknown): NicknameValidationResult {
     };
   }
 
-  // 5. Küfür ve uygunsuz kelime kontrolü (Türkçe aksan normalizasyonlu)
+  // 6. Küfür ve uygunsuz kelime kontrolü (gelişmiş normalizasyonlu ve çok katmanlı blok listesi)
+  if (isNicknameBlocked(trimmed)) {
+    return {
+      isValid: false,
+      normalized: null,
+      error: 'profanity',
+      errorMessage: 'Bu takma ad uygunsuz ifadeler içeriyor.',
+    };
+  }
+
+  // Geriye dönük uyumluluk için PROFANITY_WORDS kontrolü
   const normalizedText = normalize(trimmed);
   for (const badWord of PROFANITY_WORDS) {
     if (normalizedText.includes(badWord)) {

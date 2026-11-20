@@ -971,6 +971,9 @@ export class UserProfile extends DurableObject<Env> {
       if (validation.error === 'reserved') {
         throw new Error('reserved_nickname');
       }
+      if (validation.error === 'profanity') {
+        throw new Error('nickname_blocked');
+      }
       throw new Error('invalid_nickname');
     }
 
@@ -3827,6 +3830,15 @@ export class UserProfile extends DurableObject<Env> {
           return new Response(
             JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
             { status: 410, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (msg === 'nickname_blocked') {
+          return new Response(
+            JSON.stringify({
+              error: 'nickname_blocked',
+              message: 'Bu takma ad kullanılamaz.',
+            }),
+            { status: 422, headers: { 'Content-Type': 'application/json' } }
           );
         }
         return new Response(JSON.stringify({ error: 'invalid_nickname', message: msg }), {

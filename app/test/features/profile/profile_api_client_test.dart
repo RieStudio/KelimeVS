@@ -392,5 +392,43 @@ void main() {
       expect(cooldown.remainingSeconds, 7200);
       expect(cooldown.message, AppStrings.nicknameCooldownError);
     });
+
+    test('7. updateNickname() 422 nickname_blocked döndüğünde ProfileUpdateBlockedNickname üretir', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_123');
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 422,
+          responseBody: jsonEncode({
+            'error': 'nickname_blocked',
+            'message': 'Bu takma ad kullanılamaz.',
+          }),
+        ),
+      );
+
+      final res = await client.updateNickname('orospu');
+      expect(res, isA<ProfileUpdateBlockedNickname>());
+      final blocked = res as ProfileUpdateBlockedNickname;
+      expect(blocked.message, 'Bu takma ad kullanılamaz.');
+    });
+
+    test('8. updateNickname() 400 nickname_blocked döndüğünde ProfileUpdateBlockedNickname üretir', () async {
+      final fakeAuth = FakeAuthTokenProvider(token: 'token_123');
+      final client = HttpProfileApiClient(
+        authTokenProvider: fakeAuth,
+        clientFactory: () => FakeHttpClient(
+          statusCode: 400,
+          responseBody: jsonEncode({
+            'error': 'nickname_blocked',
+            'message': AppStrings.nicknameBlockedError,
+          }),
+        ),
+      );
+
+      final res = await client.updateNickname('s1k1s');
+      expect(res, isA<ProfileUpdateBlockedNickname>());
+      final blocked = res as ProfileUpdateBlockedNickname;
+      expect(blocked.message, AppStrings.nicknameBlockedError);
+    });
   });
 }
