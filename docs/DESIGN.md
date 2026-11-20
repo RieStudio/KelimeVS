@@ -13,6 +13,7 @@
 - **Renk yönü:** Beyaz ve yeşil. Sıcak vurgu olarak tek bir sarı (jeton). Kırmızı sadece olumsuz durumlar için.
 - **Maskot yok.** Kimlik tamamen tipografi ve ikonlarla kurulur.
 - **Logo:** `KelimeVS`. "Kelime" `ink` renginde (#14532D, Fredoka 700); "VS" ise canlı yeşil (`primary`, #15803D) dolgulu, beyaz (`card`) metinli ve sol alt köşesinde "Kelime"ye doğru bakan konuşma çentiğine (WhatsApp tarzı kuyruk) sahip bir konuşma balonu içindedir (Fredoka 700). Balonun alt kenarı "Kelime" taban çizgisiyle (baseline) hizalanır. Kenarlık ve gölgesi yoktur. Logo eğik ya da döndürülmüş olmaz.
+- **Ekran Yönelimi:** [KARAR] Oyun yalnızca dikey (portrait) modda çalışır; yatay (landscape) yönelim desteklenmez.
 
 ## 2. Renk jetonları
 

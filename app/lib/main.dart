@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/icons/app_icons.dart';
@@ -32,6 +33,9 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   registerFontLicenses();
   await AppBuildInfo.initialize();
   String? authError;
@@ -45,6 +49,13 @@ Future<void> main() async {
   }
 
   runApp(ProviderScope(child: KelimeVSApp(authError: authError)));
+}
+
+/// Uygulama ekran yönelimini dikey (portraitUp) modda kilitler.
+Future<void> setAppOrientation() async {
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
 }
 
 class KelimeVSApp extends ConsumerWidget {
