@@ -72,4 +72,5 @@ export const ALLOW_WORDS: readonly string[] = [
   'grass',
   'class',
   'bass',
+  'finnigan',
 ];

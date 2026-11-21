@@ -20,6 +20,7 @@
 export const CONTAINS_WORDS: readonly string[] = [
   // Türkçe Güçlü Küfür / Hakaret / Cinsel Terimler
   'orospu',
+  'serefsiz',
   'orospucocugu',
   'picinoglu',
   'picler',

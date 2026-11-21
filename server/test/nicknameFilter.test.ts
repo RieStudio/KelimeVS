@@ -96,7 +96,7 @@ describe('NicknameFilter - Normalization & Engine Rules', () => {
       expect(isNicknameBlocked('orooosspuuu')).toBe(true);
       expect(isNicknameBlocked('siiikkkiiisss')).toBe(true);
       expect(isNicknameBlocked('piiiççç')).toBe(true);
-      expect(isNicknameBlocked('saalaak')).toBe(true);
+      expect(isNicknameBlocked('booook')).toBe(true);
     });
 
     it('Exact kelimelerde sondaki rakamları da yakalar', () => {

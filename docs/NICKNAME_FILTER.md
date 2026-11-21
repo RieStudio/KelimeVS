@@ -97,3 +97,27 @@ npm --prefix server test test/nicknameFilter.test.ts
 npm --prefix server run deploy
 ```
 Mobil uygulamaya güncelleme göndermenize **gerek yoktur**; tüm kullanıcılar anında yeni listeden etkilenir.
+
+---
+
+## 5. Maç İçi Küfür Maskeleme (In-Game Text Masker - Faz 1)
+
+Maç içi serbest cevaplarda (özellikle yanlış cevap balonlarında) küfür ve hakaretlerin karşı oyuncuya gösterilmesini engellemek için **`server/src/engine/textMasker.ts`** devrededir.
+
+### 5.1. Temel İlkeler ve Davranış
+1. **Aynı Blok Listeleri ve Normalizasyon:**
+   - Maç içi maskeleyici de aynı `server/src/engine/nicknameBlocklist/` dosyalarını (`contains.ts`, `exact.ts`, `allow.ts`) ve aynı `normalizeForFilter` fonksiyonunu kullanır. Liste tek bir merkezden yönetilir.
+2. **Sözcük Bazlı Eşleştirme (Word-Boundary Matching):**
+   - Takma ad filtresinden farklı olarak metindeki boşluklar toptan silinmez; cümle sözcük sınırlarına ve ayraçlara göre ayrılır.
+   - Bu sayede sözlükte yer alan "tuşlu telefon", "Windows 3 1", "Perran Kutman" gibi masum birleşik kelimelerin kelime aralığı çakışmalarından dolayı yanlış pozitif (false positive) üretmesi engellenir.
+3. **Aralıklı Tek Harf Yakalama:**
+   - `s i k`, `s  i  k`, `o . r . o . s . p . u` gibi harfler arasına boşluk veya ayraç konularak kaçılmaya çalışılan yazımlar tespit edilip tek aday olarak denetlenir ve ilgili aralığın tamamı maskelenir.
+4. **Maske Biçimi:**
+   - İlk Unicode karakteri (büyük/küçük harf ve Türkçe karakter özellikleri: `Ş`, `ş`, `İ`, `ı`, `ç`, `ö`, `ü`, `ğ` vb. korunur) + kelimenin geri kalan uzunluğu kadar `*` (örn. `orospu` $\rightarrow$ `o*****`, `Şerefsiz` $\rightarrow$ `Ş*******`, `sik99` $\rightarrow$ `s****`).
+5. **Oyun Mantığı ve Depolama Kesintiye Uğramaz:**
+   - Oyun motoru (`engine.ts`), puanlama, tur geçişleri, veritabanı kayıtları (`MatchRoom` durumu ve `REPORT_STORE` için tutulan cevaplar) **ham metinle** çalışmaya devam eder.
+   - Maskeleme yalnızca istemciye giden DTO üretim katmanında (`toClientAttempt`) ve **yalnızca karşı oyuncunun denemeleri (`mine: false`)** için uygulanır.
+   - Oyuncunun kendi yazdığı cevaplar (`mine: true`) ve itiraz kutusu (`MatchDetailScreen._buildObjectionBox`) ham kalır.
+6. **Dağıtım (Deployment):**
+   - Liste güncellemeleri veya maskeleme kuralları için yalnızca `server/` dizininde `npm run deploy` yeterlidir; mobil uygulamaya paket güncellemesi **gerekmez**.
+

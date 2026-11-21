@@ -14,6 +14,7 @@ import type {
   ClientRoundRecord,
   ClientStateMessage,
 } from './protocol';
+import { maskInappropriateText } from './engine/textMasker';
 
 export type { MatchState };
 
@@ -87,6 +88,30 @@ export function deserializeMatchState(raw: SerializedMatchState): MatchState {
   };
 }
 
+/**
+ * Tek fabrika fonksiyonu: TurnAttempt'i istemciye gidecek ClientAttempt DTO'suna dönüştürür.
+ * - viewerUid'ye ait denemeler (mine: true) ham metin olarak kalır (itiraz ve kendi gösterimi için).
+ * - Rakibe ait denemeler (mine: false) ise maskInappropriateText fonksiyonundan geçirilerek
+ *   küfür ve uygunsuz içerikler 'ilk harf + yıldızlar' şeklinde maskelenir.
+ */
+export function toClientAttempt(params: {
+  readonly attempt: TurnAttempt;
+  readonly viewerUid: string;
+}): ClientAttempt {
+  const { attempt, viewerUid } = params;
+  const isMine = attempt.playerId === viewerUid;
+  const rawText = attempt.displayText ?? attempt.rawInput;
+  const text = isMine ? rawText : maskInappropriateText(rawText);
+
+  return {
+    mine: isMine,
+    text,
+    result: attempt.resultType,
+    ...(attempt.hintShown ? { hintShown: true } : {}),
+    ...(attempt.viaPowerup ? { viaPowerup: true } : {}),
+  };
+}
+
 export function filterStateForPlayer(params: {
   readonly state: MatchState;
   readonly playerUid: string;
@@ -137,13 +162,9 @@ export function filterStateForPlayer(params: {
   const isRoundActive = state.phase === 'roundActive';
   const filteredAttempts = visibleAttempts(currentRecord, playerUid, isRoundActive);
 
-  const clientAttempts: ClientAttempt[] = filteredAttempts.map((a) => ({
-    mine: a.playerId === playerUid,
-    text: a.displayText ?? a.rawInput,
-    result: a.resultType,
-    ...(a.hintShown ? { hintShown: true } : {}),
-    ...(a.viaPowerup ? { viaPowerup: true } : {}),
-  }));
+  const clientAttempts: ClientAttempt[] = filteredAttempts.map((a) =>
+    toClientAttempt({ attempt: a, viewerUid: playerUid })
+  );
 
   let lastRound:
     | {
@@ -214,13 +235,9 @@ export function buildFinalMessage(params: {
 
   const rounds: ClientRoundRecord[] = state.roundHistory.map((r) => ({
     questionId: r.questionId,
-    attempts: r.attempts.map((a) => ({
-      mine: a.playerId === playerUid,
-      text: a.displayText ?? a.rawInput,
-      result: a.resultType,
-      ...(a.hintShown ? { hintShown: true } : {}),
-      ...(a.viaPowerup ? { viaPowerup: true } : {}),
-    })),
+    attempts: r.attempts.map((a) =>
+      toClientAttempt({ attempt: a, viewerUid: playerUid })
+    ),
     winnerIsMe: r.winnerId === null ? null : r.winnerId === playerUid,
     reason: r.reason,
   }));
@@ -247,4 +264,7 @@ export function buildFinalMessage(params: {
     ...(rematchAvailable !== undefined ? { rematchAvailable } : {}),
   };
 }
+
+export const buildClientState = filterStateForPlayer;
+
 

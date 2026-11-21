@@ -26,6 +26,7 @@ export const EXACT_WORDS: readonly string[] = [
   'göt',
   'bok',
   'mal',
+  'aptal',
   'dalyan',
   'it',
   'itler',

@@ -102,7 +102,7 @@ Doğrulama **yalnızca oyun sunucusunda** (Cloudflare Worker / Durable Object) y
 Yanlış denemeler rakibe gösterildiği için oyuncunun yazdığı metin fiilen bir sohbet kanalıdır. Bu yüzden:
 
 - **[VARSAYIM]** Deneme metni en fazla 40 karakterdir; baştaki/sondaki boşluklar silinir, ardışık boşluklar tek boşluğa iner.
-- **[VARSAYIM]** Rakibe gösterilmeden önce sunucu, metni küfür/hakaret listesine karşı süzer ve eşleşen kısmı maskeler (`***`). Liste sunucuda tutulur ve güncellenebilir.
+- **[KARAR]** Rakibe gösterilmeden önce sunucu (`toClientAttempt` DTO katmanı), karşı oyuncunun yazdığı serbest cevap metinlerini (özellikle yanlış cevaplar dahil) küfür/hakaret listesine karşı sözcük bazlı süzer ve uygunsuz sözcükleri "ilk harf + yıldızlar" (`k****`) olarak maskeler. Oyun mantığı, doğrulama, puanlama ve saklanan veritabanı kayıtları ham metinle çalışmaya devam eder; maskeleme yalnızca karşı oyuncunun ekranındaki görsel katmanda gerçekleşir. Oyuncunun kendi cevabı (`mine: true`) ve itiraz kutusu ham kalır. Kelime listesi yalnızca sunucuda barınır ve deploy ile güncellenir.
 - Bir oyuncu uygunsuz rakibi **engelleyebilir**; mağazalar kullanıcı üretimli içerik için güvenlik mekanizmaları ister (bölüm 9).
 - Botların yanlış denemeleri kısa, zararsız bir kelime listesinden gelir.
 
