@@ -278,7 +278,7 @@ class _FriendJoinScreenState extends ConsumerState<FriendJoinScreen> {
                               color: AppColors.primary,
                               size: 24,
                             ),
-                            tooltip: 'Yapıştır',
+                            tooltip: AppStrings.pasteCode,
                             onPressed: _pasteFromClipboard,
                           ),
                         ],

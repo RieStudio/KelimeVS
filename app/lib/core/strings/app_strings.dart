@@ -9,8 +9,6 @@ abstract final class AppStrings {
   static const String quickMatch = 'Hızlı Maç';
   static const String quickMatchSubtitle = 'Rastgele bir rakiple eşleş';
   static const String playWithFriend = 'Arkadaşınla Oyna';
-  static const String playWithFriendComingSoon =
-      'Arkadaşınla Oyna modu yakında eklenecek.';
   static const String comingSoon = 'Yakında';
   static const String recentMatches = 'SON MAÇLARIM';
   static const String noMatchesYet = 'Henüz maç oynamadın. İlk maçını oyna!';
@@ -123,8 +121,6 @@ abstract final class AppStrings {
   static const String nextQuestionLabel = 'Sıradaki soru';
   static const String vs = 'VS';
   static const String searchTipTitle = 'İPUCU';
-  static const String searchTipContent =
-      'Türkçe karakter kullanmasan da olur, "turkiye" yazman yeterli.';
 
   // Maç Öncesi İpucu Havuzu
   static const String matchTipBestOfThree =
@@ -144,11 +140,11 @@ abstract final class AppStrings {
   static const String matchTipForfeit =
       'Maçı terk edersen rakibin maçı kazanır.';
   static const String matchTipReconnection =
-      'Bağlantın koparsa kısa süre içinde geri dönüp maça devam edebilirsin.';
+      'Bağlantın koparsa 30 saniye içinde geri dönüp maça kaldığın yerden devam edebilirsin.';
   static const String matchTipRankedCoins =
-      'Sıralamalı online maçları kazanarak jeton toplayabilir, Mağaza\'da harcayabilirsin.';
+      'Sıralamalı maçlarda galibiyete +30, mağlubiyete +5 jeton kazanırsın; günlük sınır 300 jeton.';
   static const String matchTipFriendlyNoCoins =
-      'Arkadaş düellosu ve alıştırma maçları jeton kazandırmaz; antrenman içindir.';
+      'Arkadaş düellosu enerji harcamaz; jeton kazandırmaz ve sıralamaya sayılmaz.';
   static const String matchTipStoreFrames =
       'Kazandığın jetonlarla Mağaza\'dan avatar çerçeveleri alabilirsin.';
   static const String matchTipExhaustedDraw =
@@ -162,9 +158,23 @@ abstract final class AppStrings {
   static const String matchTipOpponentMistakesVisible =
       'Rakibinin hatalı denemelerini sen de görürsün.';
   static const String matchTipRankedPowerup =
-      'Sıralamalı online maçlarda jetonla ek süre güçlendiricisi alabilirsin.';
+      'Sıralamalı maçlarda jetonla Süre (+5 sn) veya Cevap Ver jokerini birer kez kullanabilirsin.';
   static const String matchTipLeaderboardReset =
       'Haftalık sıralama her pazartesi sıfırlanır.';
+  static const String matchTipEnergyCostAndRegen =
+      'Sıralamalı maç 1 enerji harcar; enerjin her 20 dakikada bir yenilenir.';
+  static const String matchTipRematchRules =
+      'Maç bitince rakibine rövanş isteği gönderebilirsin. İstek 45 saniye geçerli; her maç için tek hakkın var.';
+  static const String matchTipDisableMatchRequests =
+      'Ayarlar\'dan maç ve rövanş isteklerini istediğin zaman kapatabilirsin.';
+  static const String matchTipBlockUser =
+      'Uygunsuz oyuncuları profilinden engelleyebilirsin; engellediklerinle eşleşmezsin.';
+  static const String matchTipLeaderboardProfileMatchRequest =
+      'Sıralamadaki bir oyuncunun profiline dokunarak istatistiklerine bakabilir, ona dostluk maçı isteği gönderebilirsin.';
+  static const String matchTipLeaderboardPairWinCap =
+      'Aynı rakibe karşı haftada en fazla 20 galibiyetin sıralamaya sayılır.';
+  static const String matchTipDrawsAndRoundLimit =
+      'Berabere biten turlar skora sayılmaz; bir maç en fazla 5 tur sürer.';
 
   /// Maç öncesi ipucu havuzundaki tüm metinlerin listesi.
   /// [answerSeconds] değeri MatchConfig'ten dinamik geçirilebilir.
@@ -188,6 +198,13 @@ abstract final class AppStrings {
         matchTipOpponentMistakesVisible,
         matchTipRankedPowerup,
         matchTipLeaderboardReset,
+        matchTipEnergyCostAndRegen,
+        matchTipRematchRules,
+        matchTipDisableMatchRequests,
+        matchTipBlockUser,
+        matchTipLeaderboardProfileMatchRequest,
+        matchTipLeaderboardPairWinCap,
+        matchTipDrawsAndRoundLimit,
       ];
 
   // Maç İçi
@@ -426,11 +443,9 @@ abstract final class AppStrings {
   static const String reauthWrongAccountError =
       'Lütfen uygulamaya bağlı Google hesabını seç.';
 
-  // Oyuncu Engelleme
+  // Oyuncu Engelleme ve İstemci Rapor Katmanı
   static const String blockAction = 'Engelle';
   static const String blockedStatus = 'Engellendi';
-
-  // İstemci API Katmanı Rapor Hata Mesajları (Arayüzde doğrudan kullanılmaz; geri dönüş için bırakıldı)
   static const String reportAlreadyReported =
       'Bu maç için zaten bildirim yaptın.';
   static const String reportDailyLimit = 'Günlük bildirim sınırına ulaştın.';
@@ -520,6 +535,7 @@ abstract final class AppStrings {
   static const String copyCode = 'Kodu Kopyala';
   static const String codeCopied = 'Davet kodu panoya kopyalandı!';
   static const String shareCode = 'Kodu Paylaş';
+  static const String pasteCode = 'Yapıştır';
   static const String waitingForOpponent = 'Arkadaşının katılması bekleniyor…';
   static const String codeValidity = 'Kalan süre:';
   static const String cancelRoom = 'Odayı Kapat';
@@ -556,9 +572,9 @@ abstract final class AppStrings {
   static const String extraTimeAlreadyUsed =
       'Bu maçta ek süre hakkını zaten kullandın.';
   static const String notYourTurnPowerup =
-      'Ek süre sadece kendi cevabında kullanılabilir.';
+      'Ek süre sadece kendi sıranda kullanılabilir.';
   static const String powerupGenericError =
-      'Güçlendirici şu anda kullanılamıyor.';
+      'Joker şu anda kullanılamıyor.';
   static const String powerupTemporaryError =
       'Şu anda kullanılamıyor, tekrar dene.';
 
@@ -598,6 +614,7 @@ abstract final class AppStrings {
   static const String frameEquippedSuccess = 'Çerçeve kuşandı';
   static const String alreadyOwnedError = 'Bu çerçeveye zaten sahipsin.';
   static const String itemNotOwnedError = 'Bu çerçeveye henüz sahip değilsin.';
+  static const String alreadyInCollection = 'Koleksiyonunda Mevcut';
   static const String storeInvalidFrameError = 'Geçersiz çerçeve seçildi.';
   static const String storeServerError =
       'Sunucu hatası oluştu, lütfen daha sonra tekrar dene.';
@@ -697,7 +714,8 @@ abstract final class AppStrings {
   static const String energyPackFullDesc = 'Tüm enerjini anında 5/5 yap';
   static const String energyPackPurchased =
       'Enerji paketi başarıyla satın alındı!';
-  static const String energyAlreadyFull = 'Enerjiniz zaten dolu';
+  static const String energyAlreadyFull = 'Enerjin zaten dolu';
+  static String energyBuyPackAction(int cost) => '1 Enerji  ·  $cost Jeton';
   static const String energyDisabled = 'Enerji sistemi şu anda aktif değil';
 
   static const String energyDepletedTitle = 'Enerjin bitti';

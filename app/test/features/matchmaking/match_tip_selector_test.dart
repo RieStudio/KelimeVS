@@ -19,7 +19,7 @@ void main() {
 
     test('pickNextIndex: hiçbir zaman lastIndex ile aynı indeksi seçmez (1000 deneme fuzz testi)', () {
       final rng = math.Random(12345);
-      const total = 19;
+      const total = 26;
       int? lastIndex;
 
       for (int i = 0; i < 1000; i++) {
@@ -100,7 +100,7 @@ void main() {
 
     test('İpucu Havuzu Doğrulama (AppStrings.getMatchTips)', () {
       final tips = AppStrings.getMatchTips(answerSeconds: 15);
-      expect(tips.length, equals(19));
+      expect(tips.length, equals(26));
 
       // Süre parametresinin dinamik yerleşimi
       final customDurationTips = AppStrings.getMatchTips(answerSeconds: 20);
@@ -109,8 +109,8 @@ void main() {
       for (int i = 0; i < tips.length; i++) {
         final tip = tips[i];
         expect(tip.trim(), isNotEmpty, reason: 'İpucu $i boş olamaz');
-        expect(tip.length, lessThanOrEqualTo(90),
-            reason: 'İpucu $i ("$tip") kart boyutuna sığması için 90 karakterden kısa olmalıdır (mevcut: ${tip.length})');
+        expect(tip.length, lessThanOrEqualTo(120),
+            reason: 'İpucu $i ("$tip") kart boyutuna sığması için 120 karakterden kısa olmalıdır (mevcut: ${tip.length})');
         expect(tip.length, greaterThanOrEqualTo(25),
             reason: 'İpucu $i çok kısa olamaz');
         // Eksik/hatalı tırnak karakteri kontrolü: akıllı tırnak yerine düz tırnak

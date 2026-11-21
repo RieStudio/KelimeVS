@@ -258,10 +258,11 @@ void main() {
 
       // PurchaseBottomSheet should be open
       expect(find.byType(PurchaseBottomSheet), findsOneWidget);
-      expect(find.text('100 Jeton'), findsOneWidget);
+      expect(find.text('100${AppStrings.coinSuffix}'), findsOneWidget);
 
       // Tap confirm button in sheet
-      final confirmButton = find.text('${AppStrings.buyAction} (100 Jeton)');
+      final confirmButton =
+          find.text('${AppStrings.buyAction} (100${AppStrings.coinSuffix})');
       expect(confirmButton, findsOneWidget);
       await tester.tap(confirmButton);
       await tester.pumpAndSettle();
@@ -320,7 +321,8 @@ void main() {
       await tester.tap(buyButton);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('${AppStrings.buyAction} (100 Jeton)'));
+      await tester
+          .tap(find.text('${AppStrings.buyAction} (100${AppStrings.coinSuffix})'));
       await tester.pumpAndSettle();
 
       // Satın alma sonrası:
@@ -443,8 +445,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PurchaseBottomSheet), findsOneWidget);
-      expect(find.text('100 Jeton'), findsOneWidget);
-      expect(find.text('${AppStrings.buyAction} (100 Jeton)'), findsOneWidget);
+      expect(find.text('100${AppStrings.coinSuffix}'), findsOneWidget);
+      expect(find.text('${AppStrings.buyAction} (100${AppStrings.coinSuffix})'),
+          findsOneWidget);
     });
 
     testWidgets(

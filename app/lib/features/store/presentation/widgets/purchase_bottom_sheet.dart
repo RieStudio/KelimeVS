@@ -129,7 +129,7 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
                       const CoinIcon(size: 24),
                       const SizedBox(width: AppDimens.space8),
                       Text(
-                        '${item.price} Jeton',
+                        '${item.price}${AppStrings.coinSuffix}',
                         style: AppTextStyles.cardTitle.copyWith(fontSize: 16),
                       ),
                     ],
@@ -140,7 +140,7 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
               Text(
                 item.isEquipped
                     ? AppStrings.equippedStatus
-                    : 'Koleksiyonunda Mevcut',
+                    : AppStrings.alreadyInCollection,
                 style: AppTextStyles.bodyText.copyWith(
                   color: AppColors.muted,
                   fontWeight: FontWeight.w700,
@@ -176,7 +176,8 @@ class _PurchaseBottomSheetState extends State<PurchaseBottomSheet> {
               _isSubmitting
                   ? const Center(child: CircularProgressIndicator())
                   : PrimaryButton(
-                      text: '${AppStrings.buyAction} (${item.price} Jeton)',
+                      text:
+                          '${AppStrings.buyAction} (${item.price}${AppStrings.coinSuffix})',
                       onPressed: () async {
                         if (_isSubmitting) return;
                         final nav = Navigator.of(context);

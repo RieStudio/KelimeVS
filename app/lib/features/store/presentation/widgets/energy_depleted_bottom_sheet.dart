@@ -237,7 +237,7 @@ class _EnergyDepletedBottomSheetState
             // Buton 1: "1 Enerji · 20 Jeton"
             PrimaryButton(
               key: const Key('energy_sheet_buy_button'),
-              text: '1 Enerji  ·  ${packOne.cost} Jeton',
+              text: AppStrings.energyBuyPackAction(packOne.cost),
               onPressed: _isPurchasing
                   ? null
                   : () => _handleBuyOneEnergy(packOne.cost),
