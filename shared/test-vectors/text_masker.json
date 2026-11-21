@@ -1,0 +1,327 @@
+{
+  "version": 1,
+  "description": "Test vectors for KelimeVS in-game text masker parity between TypeScript server and Dart client",
+  "totalCases": 80,
+  "cases": [
+    {
+      "input": "orospu",
+      "expected": "o*****"
+    },
+    {
+      "input": "Orospu",
+      "expected": "O*****"
+    },
+    {
+      "input": "OROSPU",
+      "expected": "O*****"
+    },
+    {
+      "input": "sik",
+      "expected": "s**"
+    },
+    {
+      "input": "SiK",
+      "expected": "S**"
+    },
+    {
+      "input": "bok",
+      "expected": "b**"
+    },
+    {
+      "input": "pic",
+      "expected": "p**"
+    },
+    {
+      "input": "piç",
+      "expected": "p**"
+    },
+    {
+      "input": "got",
+      "expected": "g**"
+    },
+    {
+      "input": "göt",
+      "expected": "g**"
+    },
+    {
+      "input": "mal",
+      "expected": "m**"
+    },
+    {
+      "input": "aptal",
+      "expected": "a****"
+    },
+    {
+      "input": "serefsiz",
+      "expected": "s*******"
+    },
+    {
+      "input": "Şerefsiz",
+      "expected": "Ş*******"
+    },
+    {
+      "input": "şerefsiz",
+      "expected": "ş*******"
+    },
+    {
+      "input": "İbne",
+      "expected": "İ***"
+    },
+    {
+      "input": "ıbne",
+      "expected": "ı***"
+    },
+    {
+      "input": "amcik",
+      "expected": "a****"
+    },
+    {
+      "input": "yarrak",
+      "expected": "y*****"
+    },
+    {
+      "input": "orospu123",
+      "expected": "o********"
+    },
+    {
+      "input": "sik99",
+      "expected": "s****"
+    },
+    {
+      "input": "pic123",
+      "expected": "p*****"
+    },
+    {
+      "input": "orospu!",
+      "expected": "o******"
+    },
+    {
+      "input": "!orospu",
+      "expected": "!******"
+    },
+    {
+      "input": "orospu,",
+      "expected": "o******"
+    },
+    {
+      "input": "sen bir orospusun",
+      "expected": "sen bir o********"
+    },
+    {
+      "input": "ben, orospu değilim.",
+      "expected": "ben, o***** değilim."
+    },
+    {
+      "input": "tamam ben geliyorum",
+      "expected": "tamam ben geliyorum"
+    },
+    {
+      "input": "bu cok guzel bir oyun",
+      "expected": "bu cok guzel bir oyun"
+    },
+    {
+      "input": "Merhaba! Nasılsın?",
+      "expected": "Merhaba! Nasılsın?"
+    },
+    {
+      "input": "Elma, armut, muz.",
+      "expected": "Elma, armut, muz."
+    },
+    {
+      "input": "sen s i k misin",
+      "expected": "sen s**** misin"
+    },
+    {
+      "input": "b o k yeme",
+      "expected": "b**** yeme"
+    },
+    {
+      "input": "s i k",
+      "expected": "s****"
+    },
+    {
+      "input": "s  i  k",
+      "expected": "s******"
+    },
+    {
+      "input": "o r o s p u",
+      "expected": "o**********"
+    },
+    {
+      "input": "o.r.o.s.p.u",
+      "expected": "o**********"
+    },
+    {
+      "input": "o_r_o_s_p_u",
+      "expected": "o**********"
+    },
+    {
+      "input": "s_i_k",
+      "expected": "s****"
+    },
+    {
+      "input": "p.i.c",
+      "expected": "p****"
+    },
+    {
+      "input": "o ve a",
+      "expected": "o ve a"
+    },
+    {
+      "input": "a b c d e",
+      "expected": "a b c d e"
+    },
+    {
+      "input": "0r0spu",
+      "expected": "0*****"
+    },
+    {
+      "input": "51k15",
+      "expected": "5****"
+    },
+    {
+      "input": "5!k!5",
+      "expected": "5****"
+    },
+    {
+      "input": "s!k",
+      "expected": "s**"
+    },
+    {
+      "input": "p1c",
+      "expected": "p**"
+    },
+    {
+      "input": "p!c",
+      "expected": "p**"
+    },
+    {
+      "input": "31",
+      "expected": "31"
+    },
+    {
+      "input": "13",
+      "expected": "13"
+    },
+    {
+      "input": "1993",
+      "expected": "1993"
+    },
+    {
+      "input": "3.1",
+      "expected": "3.1"
+    },
+    {
+      "input": "3 1",
+      "expected": "3 1"
+    },
+    {
+      "input": "Apollo 13",
+      "expected": "Apollo 13"
+    },
+    {
+      "input": "Windows 3 1",
+      "expected": "Windows 3 1"
+    },
+    {
+      "input": "1923",
+      "expected": "1923"
+    },
+    {
+      "input": "10/10",
+      "expected": "10/10"
+    },
+    {
+      "input": "1923-1938",
+      "expected": "1923-1938"
+    },
+    {
+      "input": "damla",
+      "expected": "damla"
+    },
+    {
+      "input": "kamil",
+      "expected": "kamil"
+    },
+    {
+      "input": "amiral",
+      "expected": "amiral"
+    },
+    {
+      "input": "tamam",
+      "expected": "tamam"
+    },
+    {
+      "input": "fizik",
+      "expected": "fizik"
+    },
+    {
+      "input": "müzik",
+      "expected": "müzik"
+    },
+    {
+      "input": "boks",
+      "expected": "boks"
+    },
+    {
+      "input": "boksör",
+      "expected": "boksör"
+    },
+    {
+      "input": "kemal",
+      "expected": "kemal"
+    },
+    {
+      "input": "siklamen",
+      "expected": "siklamen"
+    },
+    {
+      "input": "kasik",
+      "expected": "kasik"
+    },
+    {
+      "input": "fistik",
+      "expected": "fistik"
+    },
+    {
+      "input": "lastik",
+      "expected": "lastik"
+    },
+    {
+      "input": "finnigan",
+      "expected": "finnigan"
+    },
+    {
+      "input": "ｏｒｏｓｐｕ",
+      "expected": "ｏ*****"
+    },
+    {
+      "input": "ｓｉｋ",
+      "expected": "ｓ**"
+    },
+    {
+      "input": "bök",
+      "expected": "b**"
+    },
+    {
+      "input": "kâğıt",
+      "expected": "kâğıt"
+    },
+    {
+      "input": "",
+      "expected": ""
+    },
+    {
+      "input": "   ",
+      "expected": "   "
+    },
+    {
+      "input": "a",
+      "expected": "a"
+    },
+    {
+      "input": "1",
+      "expected": "1"
+    }
+  ]
+}

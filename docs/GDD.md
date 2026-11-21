@@ -102,7 +102,10 @@ Doğrulama **yalnızca oyun sunucusunda** (Cloudflare Worker / Durable Object) y
 Yanlış denemeler rakibe gösterildiği için oyuncunun yazdığı metin fiilen bir sohbet kanalıdır. Bu yüzden:
 
 - **[VARSAYIM]** Deneme metni en fazla 40 karakterdir; baştaki/sondaki boşluklar silinir, ardışık boşluklar tek boşluğa iner.
-- **[KARAR]** Rakibe gösterilmeden önce sunucu (`toClientAttempt` DTO katmanı), karşı oyuncunun yazdığı serbest cevap metinlerini (özellikle yanlış cevaplar dahil) küfür/hakaret listesine karşı sözcük bazlı süzer ve uygunsuz sözcükleri "ilk harf + yıldızlar" (`k****`) olarak maskeler. Oyun mantığı, doğrulama, puanlama ve saklanan veritabanı kayıtları ham metinle çalışmaya devam eder; maskeleme yalnızca karşı oyuncunun ekranındaki görsel katmanda gerçekleşir. Oyuncunun kendi cevabı (`mine: true`) ve itiraz kutusu ham kalır. Kelime listesi yalnızca sunucuda barınır ve deploy ile güncellenir.
+- **[KARAR]** Maçlarda (bot maçları, online dereceli, online arkadaş maçları) gösterilen hiçbir ekranda uygunsuz kelime yer almaz. Küfür/uygunsuz içerik engellenmez veya oyun akışı bozulmaz; bunun yerine görsel katmanda MASKELENİR: kelimenin ilk harfi görünür, geri kalanı yıldız olur (örn. ilk harf + `****`).
+  - **Sunucu Katmanı (`textMasker.ts`):** `toClientAttempt` DTO üretiminde karşı oyuncuya (`mine: false`) giden denemeleri süzerek maskeler.
+  - **İstemci Katmanı (`AppTextFilter`):** Bot maçları, oyuncunun kendi ekranındaki cevap balonları (`mine: true`), maç detayı balonları ve itiraz kutusu metin gösterimi (`AppStrings.objectionPrompt`) istemci tarafında da maskeden geçirilir.
+  - **Ham Veri Bütünlüğü:** Oyun mantığı, cevap doğrulama, puanlama, veritabanı kayıtları (`MatchRoom`, `REPORT_STORE`) ve itiraz akışı (`_submitObjection` ham metin gönderimi) kesinlikle ham metinle çalışır.
 - Bir oyuncu uygunsuz rakibi **engelleyebilir**; mağazalar kullanıcı üretimli içerik için güvenlik mekanizmaları ister (bölüm 9).
 - Botların yanlış denemeleri kısa, zararsız bir kelime listesinden gelir.
 

@@ -121,3 +121,40 @@ Maç içi serbest cevaplarda (özellikle yanlış cevap balonlarında) küfür v
 6. **Dağıtım (Deployment):**
    - Liste güncellemeleri veya maskeleme kuralları için yalnızca `server/` dizininde `npm run deploy` yeterlidir; mobil uygulamaya paket güncellemesi **gerekmez**.
 
+---
+
+## 6. İstemci Tarafı Küfür Maskeleme (Client-Side TextFilter)
+
+Bot maçları, oyuncunun kendi ekranı (`mine: true`), maç detayı ekranı ve itiraz kutusu dahil olmak üzere uygulamadaki tüm maç yüzeylerinde küfürlerin maskeli gösterilmesi için istemci tarafında `AppTextFilter` (`app/lib/core/text_filter/app_text_filter.dart`) uygulanmıştır.
+
+### 6.1. Tek Doğruluk Kaynağı ve Liste Senkronizasyonu
+- Kaynak liste **yalnızca** sunucuda (`server/src/engine/nicknameBlocklist/`) tutulur.
+- Sunucu liste dosyaları değiştiğinde istemci varlığı şu komutla güncellenir:
+  ```bash
+  npm --prefix server run export:blocklist
+  ```
+- Bu komut:
+  1. `server/src/engine/nicknameBlocklist/` listelerini `app/assets/text_filter/blocklist.json` dosyasına dışa aktarır.
+  2. `shared/test-vectors/text_masker.json` dosyasındaki test vektörlerini günceller.
+- Senkronizasyon güvenliği için hem sunucu (`server/test/blocklistAssetSync.test.ts`) hem de istemci (`app/test/core/text_filter/blocklist_asset_sync_test.dart`) testleri listelerin eşitliğini doğrular. Uyumsuzluk durumunda testler derhal başarısız olur.
+
+### 6.2. İstemci Normalizasyonu ve NFKC Katlama
+- İstemci, sunucudaki `normalizeForFilter` fonksiyonuyla 100% pariteye sahiptir.
+- Harici bir NFKC paketi eklenmemiş; standart Dart üzerinde tam genişlikli Latin harfleri/rakamları (`0xFF01-0xFF5E`), ligatürler (`ﬁ`, `ﬂ`, `ﬀ`, `ﬃ`, `ﬄ`), daire içine alınmış harf/rakamlar ve üst/alt simgeleri katlayan hafif bir uyumluluk tablosu (`foldNfkcCompatibility`) geliştirilmiştir.
+- Unicode grapheme yönetimi için Flutter standart kütüphanesindeki `characters` paketi kullanılmış; `word.characters.first` ile Türkçe harfler (`Ş`, `İ`, `ı`) ve surrogate çiftleri güvenle korunmuştur.
+
+### 6.3. Sayısal Muafiyet ve Aralıklı Yazım
+- İçinde en az bir harf (`\p{L}`) bulunmayan tüm girdiler (`31`, `13`, `1993`, `3.1`, `10/10`, `1923-1938`) maç içi maskelemeden muaftır.
+- Tek harfli aralıklı yazımlar (`s i k`, `o . r . o . s . p . u`) yalnızca harf karakterleri içeriyorsa tek sözcük gibi birleştirilerek denetlenir; `3 1`, `Apollo 13`, `Windows 3 1` gibi ifadeler asla bozulmaz.
+
+### 6.4. Gösterim Yüzeyleri ve Veri Ayrımı
+| Yüzey | Gösterilen Metin | Gönderilen / Saklanan Metin |
+| :--- | :--- | :--- |
+| **Bot Maçı Cevap Balonu** | Maskeli (`o*****`) | Ham motor kaydında orijinal (`orospu`) |
+| **Online Maç Rakip Balonu** | Sunucuda maskeli (`o*****`) | Ham veritabanı kaydı korunur |
+| **Online Maç Kendi Balonum** | İstemcide maskeli (`o*****`) | Sunucuya ham metin gider |
+| **Maç Detayı Balonları** | İstemcide maskeli (`o*****`) | Yerel depolama ham metni korur |
+| **İtiraz Kutusu Başlığı** | Maskeli: `"o***** doğru kabul edilmeli mi?"` | İtiraz gönderildiğinde ham metin (`orospu`) iletilir |
+| **Eski / Tarihi Maç Geçmişi** | Geçmiş maçlar açıldığında ekranda maskeli | Ham yerel kayıtlar bozulmaz |
+
+

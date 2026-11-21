@@ -606,6 +606,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
                           attemptIndex: selectedAttemptIndex!,
                           attempt: selectedAttempt,
                           isObjected: isObjected,
+                          textFilter: textFilter,
                         ),
                       ],
                     ],
@@ -633,7 +634,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
         ? (attempt.displayText ?? attempt.rawInput)
         : attempt.rawInput;
     final sanitizedInput = AttemptTextSanitizer.sanitize(textSource);
-    final displayText = isMe ? sanitizedInput : textFilter.apply(sanitizedInput);
+    final displayText = textFilter.apply(sanitizedInput);
 
     // Sadece kendi reddedilen ve boş olmayan cevaplarıma dokununca seçim aktifleşir
     final canSelect = isMe && isRejected && sanitizedInput.isNotEmpty;
@@ -659,6 +660,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
     required int attemptIndex,
     required TurnAttempt attempt,
     required bool isObjected,
+    required TextFilter textFilter,
   }) {
     // 1. Zaten söylenmiş cevap (itiraz linki yok)
     if (attempt.resultType == AttemptResultType.repeated) {
@@ -705,7 +707,7 @@ class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
         children: [
           Expanded(
             child: Text(
-              AppStrings.objectionPrompt(attempt.rawInput),
+              AppStrings.objectionPrompt(textFilter.apply(attempt.rawInput)),
               style: AppTextStyles.bodyText.copyWith(
                 color: AppColors.dangerDark,
                 fontSize: 13,

@@ -835,9 +835,7 @@ class MatchController extends Notifier<MatchUiState>
           text = att.rawInput;
         }
         text = AttemptTextSanitizer.sanitize(text);
-        if (att.playerId != state.myPlayerId) {
-          text = _textFilter.apply(text);
-        }
+        text = _textFilter.apply(text);
         return RoundAttemptUiModel(
           playerId: att.playerId,
           text: text,

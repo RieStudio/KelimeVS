@@ -382,9 +382,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
     final roundAttempts = onlineState.attempts.map((a) {
       final textSource = a.displayText ?? a.text;
       var cleanText = AttemptTextSanitizer.sanitize(textSource);
-      if (!a.mine) {
-        cleanText = _textFilter.apply(cleanText);
-      }
+      cleanText = _textFilter.apply(cleanText);
       return RoundAttemptUiModel(
         playerId: a.mine ? 'me' : 'bot',
         text: cleanText,
@@ -400,9 +398,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         .map((a) {
           final textSource = a.displayText ?? a.text;
           var cleanText = AttemptTextSanitizer.sanitize(textSource);
-          if (!a.mine) {
-            cleanText = _textFilter.apply(cleanText);
-          }
+          cleanText = _textFilter.apply(cleanText);
           return AcceptedAnswerUiModel(
             playerId: a.mine ? 'me' : 'bot',
             display: cleanText,

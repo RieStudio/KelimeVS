@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "test": "vitest run",
+    "export:blocklist": "tsx tools/export-blocklist.ts",
     "e2e": "tsx tools/e2e.ts",
     "ghost": "tsx tools/ghost-opponent.ts",
     "check:content": "tsx tools/check-content.ts",

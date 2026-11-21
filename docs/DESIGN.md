@@ -71,6 +71,13 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
 - Uzun soru ve cevap metni **alt satıra sarar**; kesilmez, küçülmez. Soru kartı ve balonlar içeriğe göre uzar.
 - Büyük harfe çevirme (örn. bölüm etiketi) Türkçe kurallarına uyar (`i` → `İ`).
 
+### Metin Maskeleme ve Gösterim Güvenliği (TextFilter)
+
+- **Görsel Katman Maskelemesi:** Maç ekranında (`MatchScreen`), maç detayında (`MatchDetailScreen`) ve itiraz kutusunda (`_buildObjectionBox`) serbest metin cevapları (yanlış denemeler dahil) gösterilmeden önce `textFilterProvider` üzerinden geçirilir.
+- **Biçim:** Kelimenin ilk Unicode karakteri (Türkçe ve büyük/küçük harf özellikleri korunarak) + kelimenin geri kalan uzunluğu kadar yıldız (`k****`). Tek karakterli ise `*`.
+- **Sayısal Girdiler:** İçinde harf bulunmayan sayısal değerler (`31`, `13`, `1993`, `3.1`) ve trivia cevapları asla maskelenmez.
+- **İtiraz İletişimi:** İtiraz kutusu metninde soru maskeli kelimeyle gösterilir ("o***** doğru kabul edilmeli mi?"), ancak kullanıcı "İtiraz Et" butonuna bastığında sunucuya ve itiraz deposuna ham metin iletilir; böylece inceleme yapan editör/sunucu hangi cevaba itiraz edildiğini eksiksiz görür.
+
 ## 4. Ölçüler
 
 **Boşluk:** 4 / 6 / 8 / 10 / 12 / 14 / 16 / 20 / 24. Ekran yan boşluğu **20**, üst boşluk **24** (güvenli alan eklenir). Bloklar arası boşluk 16, liste kartları arası 10, cevap balonları arası 8.

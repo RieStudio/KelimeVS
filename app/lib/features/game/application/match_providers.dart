@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/text_filter/app_text_filter.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../online/application/match_reconciler.dart';
 import '../../online/application/online_match_session.dart';
@@ -42,7 +43,7 @@ final matchConfigProvider = Provider<MatchConfig>((ref) {
 });
 
 final textFilterProvider = Provider<TextFilter>((ref) {
-  return const PassthroughTextFilter();
+  return AppTextFilter.instance;
 });
 
 final onlineMatchmakingEnabledProvider = Provider<bool>((ref) {

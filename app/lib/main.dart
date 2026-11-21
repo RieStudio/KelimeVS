@@ -10,6 +10,7 @@ import 'core/icons/app_icons.dart';
 import 'core/network/app_build_info.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
+import 'core/text_filter/app_text_filter.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_dimens.dart';
 import 'core/theme/app_text_styles.dart';
@@ -38,6 +39,13 @@ Future<void> main() async {
   ]);
   registerFontLicenses();
   await AppBuildInfo.initialize();
+  try {
+    final blocklistJson =
+        await rootBundle.loadString('assets/text_filter/blocklist.json');
+    AppTextFilter.init(blocklistJson);
+  } catch (_) {
+    // Dosya yüklenemezse AppTextFilter dahili geri çekilme mekanizmasını kullanır.
+  }
   String? authError;
 
   try {
