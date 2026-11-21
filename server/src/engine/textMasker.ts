@@ -13,8 +13,11 @@ const PREPARED_ALLOW: readonly string[] = parseWordList(ALLOW_WORDS)
   .filter((w) => w.length > 0)
   .sort((a, b) => b.length - a.length);
 
+// Takma ad filtresindeki sayısal liste girdileri (örn. '31') yalnızca takma ad doğrulamasında kalır;
+// maç içi maskeleme sayısal girdileri kullanmaz (trivia cevapları meşrudur).
 const PREPARED_EXACT: ReadonlySet<string> = new Set(
   parseWordList(EXACT_WORDS)
+    .filter((w) => !/^\d+$/.test(w.trim()))
     .map((w) => normalizeForFilter(w))
     .filter((w) => w.length > 0)
 );
@@ -29,18 +32,22 @@ const PREPARED_CONTAINS: readonly string[] = parseWordList(CONTAINS_WORDS)
  * yer alıp almadığını denetler.
  *
  * Kurallar:
- * 1. Allow listesi: Masum kelimeler (örn. 'kemal', 'siklamen', 'tamam', 'finnigan')
+ * 1. Sayısal muafiyet: Yalnızca rakamlardan (ve ondalık/ayraç noktalama işaretlerinden)
+ *    oluşan girdiler maç içi maskelemeden muaftır ("31", "13", "1993", "3.1" vb. trivia cevapları).
+ * 2. Allow listesi: Masum kelimeler (örn. 'kemal', 'siklamen', 'tamam', 'finnigan')
  *    önce metinden elenir.
- * 2. Exact listesi: Tam kelime veya sondaki rakamlar atılmış hali exact listesinde
+ * 3. Exact listesi: Tam kelime veya sondaki rakamlar atılmış hali exact listesinde
  *    varsa engellenir.
- * 3. Contains listesi: Normalleştirilmiş kelimenin içinde güçlü küfür kökleri
+ * 4. Contains listesi: Normalleştirilmiş kelimenin içinde güçlü küfür kökleri
  *    varsa engellenir.
  */
 export function isWordInappropriate(candidate: string): boolean {
   if (!candidate || candidate.length === 0) return false;
 
-  // Ondalıklı / sürüm numaraları (örn. 3.1, 8.1, 2.0) küfür değildir ve korunur
-  if (/^\d+(?:\.\d+)+$/.test(candidate.trim())) {
+  // Yalnızca rakamlardan ve noktalama/ayraç işaretlerinden oluşan sözcükler
+  // maç içi maskelemeden muaftır (trivia cevapları: 31, 13, 1993, 3.1 vb. meşrudur).
+  // İçinde en az bir harf (Unicode letter: \p{L}) bulunmayan her girdi korunur.
+  if (!/\p{L}/u.test(candidate)) {
     return false;
   }
 

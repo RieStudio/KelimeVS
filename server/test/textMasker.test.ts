@@ -122,7 +122,30 @@ describe('TextMasker - Maç İçi Küfür Maskeleme', () => {
       expect(maskInappropriateText('sik99')).toBe('s****');
       expect(maskInappropriateText('mal')).toBe('m**');
       expect(maskInappropriateText('bok')).toBe('b**');
-      expect(maskInappropriateText('31')).toBe('3*');
+      expect(maskInappropriateText('pic123')).toBe('p*****');
+    });
+
+    it('sayısal ve trivia değerleri (31, 13, 1993, 3.1 vb.) maç içi maskelemeden muaftır', () => {
+      expect(maskInappropriateText('31')).toBe('31');
+      expect(maskInappropriateText('13')).toBe('13');
+      expect(maskInappropriateText('1993')).toBe('1993');
+      expect(maskInappropriateText('3.1')).toBe('3.1');
+      expect(maskInappropriateText('3 1')).toBe('3 1');
+      expect(maskInappropriateText('Apollo 13')).toBe('Apollo 13');
+      expect(maskInappropriateText('Windows 3 1')).toBe('Windows 3 1');
+      expect(maskInappropriateText('1923')).toBe('1923');
+      expect(maskInappropriateText('10/10')).toBe('10/10');
+      expect(maskInappropriateText('1923-1938')).toBe('1923-1938');
+    });
+
+    it('harf-rakam karışık leetspeak veya sonuna rakam eklenmiş küfürler maskelenmeye devam eder', () => {
+      expect(maskInappropriateText('51k15')).toBe('5****');
+      expect(maskInappropriateText('0r0spu')).toBe('0*****');
+      expect(maskInappropriateText('p1c')).toBe('p**');
+      expect(maskInappropriateText('p!c')).toBe('p**');
+      expect(maskInappropriateText('s!k')).toBe('s**');
+      expect(maskInappropriateText('sik99')).toBe('s****');
+      expect(maskInappropriateText('orospu123')).toBe('o********');
     });
 
     it('contains listesindeki güçlü kökler ek aldığında da maskelenir', () => {

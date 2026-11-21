@@ -106,6 +106,7 @@ describe('NicknameFilter - Normalization & Engine Rules', () => {
       expect(isNicknameBlocked('got_2026')).toBe(true);
       expect(isNicknameBlocked('bok_06')).toBe(true);
       expect(isNicknameBlocked('sik99')).toBe(true);
+      expect(isNicknameBlocked('31')).toBe(true);
     });
   });
 
