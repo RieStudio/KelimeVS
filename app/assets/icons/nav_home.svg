@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><defs><linearGradient id="hRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ADE80"/><stop offset="1" stop-color="#15803D"/></linearGradient><linearGradient id="hDoor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE066"/><stop offset="1" stop-color="#FFB020"/></linearGradient><clipPath id="hClip"><path d="M32 7 Q34.5 7 36.5 9 L54.5 25 Q57 27.2 57 30 L57 51 Q57 57 51 57 L13 57 Q7 57 7 51 L7 30 Q7 27.2 9.5 25 L27.5 9 Q29.5 7 32 7 Z"/></clipPath></defs>
+<g clip-path="url(#hClip)"><rect x="0" y="0" width="64" height="64" fill="#FFF6DC"/><rect x="0" y="0" width="64" height="31" fill="url(#hRoof)"/><rect x="0" y="30" width="64" height="3.4" fill="#14402a"/></g>
+<path d="M26 57 V47 C26 43 28.5 41 32 41 C35.5 41 38 43 38 47 V57 Z" fill="url(#hDoor)" stroke="#14402a" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M32 7 Q34.5 7 36.5 9 L54.5 25 Q57 27.2 57 30 L57 51 Q57 57 51 57 L13 57 Q7 57 7 51 L7 30 Q7 27.2 9.5 25 L27.5 9 Q29.5 7 32 7 Z" fill="none" stroke="#14402a" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M17 25 L28 14.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

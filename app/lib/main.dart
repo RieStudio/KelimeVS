@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/icons/app_icons.dart';
 import 'core/network/app_build_info.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
@@ -210,10 +209,22 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   static const List<AppNavItem> _navItems = [
-    AppNavItem(icon: AppIcons.home, label: AppStrings.navHome),
-    AppNavItem(icon: AppIcons.leaderboard, label: AppStrings.navLeaderboard),
-    AppNavItem(icon: AppIcons.shop, label: AppStrings.navShop),
-    AppNavItem(icon: AppIcons.profile, label: AppStrings.navProfile),
+    AppNavItem(
+      svgAsset: AppBottomNavBar.homeAsset,
+      label: AppStrings.navHome,
+    ),
+    AppNavItem(
+      svgAsset: AppBottomNavBar.leaderboardAsset,
+      label: AppStrings.navLeaderboard,
+    ),
+    AppNavItem(
+      svgAsset: AppBottomNavBar.storeAsset,
+      label: AppStrings.navShop,
+    ),
+    AppNavItem(
+      svgAsset: AppBottomNavBar.profileAsset,
+      label: AppStrings.navProfile,
+    ),
   ];
 
   @override
