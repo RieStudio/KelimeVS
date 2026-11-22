@@ -158,11 +158,15 @@ class MatchRequestToastState {
   final String message;
   final bool isDanger;
   final int timestamp;
+  final String? iconAsset;
+  final Color? iconColor;
 
   const MatchRequestToastState({
     required this.message,
     this.isDanger = false,
     required this.timestamp,
+    this.iconAsset,
+    this.iconColor,
   });
 
   @override
@@ -172,10 +176,17 @@ class MatchRequestToastState {
           runtimeType == other.runtimeType &&
           message == other.message &&
           isDanger == other.isDanger &&
-          timestamp == other.timestamp;
+          timestamp == other.timestamp &&
+          iconAsset == other.iconAsset &&
+          iconColor == other.iconColor;
 
   @override
-  int get hashCode => message.hashCode ^ isDanger.hashCode ^ timestamp.hashCode;
+  int get hashCode =>
+      message.hashCode ^
+      isDanger.hashCode ^
+      timestamp.hashCode ^
+      iconAsset.hashCode ^
+      iconColor.hashCode;
 }
 
 /// Maç isteği geri bildirimlerini (toast) yöneten Notifier.
@@ -183,11 +194,18 @@ class MatchRequestToastNotifier extends Notifier<MatchRequestToastState?> {
   @override
   MatchRequestToastState? build() => null;
 
-  void showToast(String message, {bool isDanger = false}) {
+  void showToast(
+    String message, {
+    bool isDanger = false,
+    String? iconAsset,
+    Color? iconColor,
+  }) {
     state = MatchRequestToastState(
       message: message,
       isDanger: isDanger,
       timestamp: DateTime.now().millisecondsSinceEpoch,
+      iconAsset: iconAsset,
+      iconColor: iconColor,
     );
   }
 

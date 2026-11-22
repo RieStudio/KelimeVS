@@ -3,6 +3,7 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:app/features/match_request/domain/match_request_models.dart';
 import 'package:app/features/match_request/presentation/widgets/incoming_match_request_banner.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -35,6 +36,12 @@ void main() {
       expect(find.text(AppStrings.matchRequestSubtitleFriendly), findsOneWidget);
       expect(find.text(AppStrings.matchRequestAccept), findsOneWidget);
       expect(find.text(AppStrings.matchRequestDecline), findsOneWidget);
+
+      // Avatar sağ alt rozetinde gelen istek ikonu bulunur
+      expect(find.byType(SvgPicture), findsOneWidget);
+      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+      expect(svg.width, 12.0);
+      expect(svg.height, 12.0);
 
       // KESİNLİKLE bot rozeti veya bot metni bulunmamalı
       expect(find.textContaining('bot', findRichText: true), findsNothing);

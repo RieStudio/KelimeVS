@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -91,10 +92,14 @@ class _OutgoingMatchRequestChipState extends State<OutgoingMatchRequestChip> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.hourglass_top_rounded,
-              size: 16,
-              color: AppColors.ink,
+            SvgPicture.asset(
+              'assets/icons/match_request_sent.svg',
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(
+                AppColors.ink,
+                BlendMode.srcIn,
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(

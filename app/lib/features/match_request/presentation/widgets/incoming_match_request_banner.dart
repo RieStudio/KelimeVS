@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -188,10 +189,41 @@ class _IncomingMatchRequestBannerState
             // Üst Satır: Avatar + Başlık & Alt Başlık
             Row(
               children: [
-                PlayerAvatar.opponent(
-                  name: widget.request.fromNickname,
-                  frame: widget.request.fromFrame,
-                  size: 40,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    PlayerAvatar.opponent(
+                      name: widget.request.fromNickname,
+                      frame: widget.request.fromFrame,
+                      size: 40,
+                    ),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.ink,
+                            width: 1.5,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: SvgPicture.asset(
+                          'assets/icons/match_request_incoming.svg',
+                          width: 12,
+                          height: 12,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.ink,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: AppDimens.space12),
                 Expanded(

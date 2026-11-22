@@ -3,6 +3,7 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:app/features/match_request/domain/match_request_models.dart';
 import 'package:app/features/match_request/presentation/widgets/outgoing_match_request_chip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -34,6 +35,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(AppStrings.matchRequestCancel), findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
+      final svg = tester.widget<SvgPicture>(find.byType(SvgPicture));
+      expect(svg.width, 20.0);
+      expect(svg.height, 20.0);
     });
 
     testWidgets('İptal butonuna basıldığında onCancel tetiklenir', (tester) async {

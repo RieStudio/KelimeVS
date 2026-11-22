@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_guard.dart';
@@ -733,15 +734,31 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
             container: true,
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
-                key: const Key('match_end_rematch_waiting_text'),
-                AppStrings.rematchWaiting(rematchState.secondsRemaining),
-                style: AppTextStyles.secondaryText.copyWith(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/rematch.svg',
+                    width: 20,
+                    height: 20,
+                    colorFilter: const ColorFilter.mode(
+                      AppColors.primary,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    key: const Key('match_end_rematch_waiting_text'),
+                    AppStrings.rematchWaiting(rematchState.secondsRemaining),
+                    style: AppTextStyles.secondaryText.copyWith(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),

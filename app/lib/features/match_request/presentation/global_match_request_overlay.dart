@@ -58,7 +58,12 @@ class _GlobalMatchRequestOverlayState
     super.dispose();
   }
 
-  void _showToast(String message, {bool isDanger = false}) {
+  void _showToast(
+    String message, {
+    bool isDanger = false,
+    String? iconAsset,
+    Color? iconColor,
+  }) {
     _toastDismissTimer?.cancel();
     if (!mounted) return;
     setState(() {
@@ -66,6 +71,8 @@ class _GlobalMatchRequestOverlayState
         message: message,
         isDanger: isDanger,
         timestamp: DateTime.now().millisecondsSinceEpoch,
+        iconAsset: iconAsset,
+        iconColor: iconColor,
       );
     });
     _toastDismissTimer = Timer(const Duration(milliseconds: 3200), () {
@@ -129,7 +136,13 @@ class _GlobalMatchRequestOverlayState
 
     if (!isInlineHandled && endStatus.isOutgoing) {
       if (endStatus.status == MatchRequestEndStatus.declined) {
-        _showToast(AppStrings.matchRequestDeclinedToast, isDanger: true);
+        final iconCfg = matchRequestToastIconForEndStatus(endStatus.status);
+        _showToast(
+          AppStrings.matchRequestDeclinedToast,
+          isDanger: true,
+          iconAsset: iconCfg?.assetPath,
+          iconColor: iconCfg?.color,
+        );
       } else if (endStatus.status == MatchRequestEndStatus.expired) {
         _showToast(AppStrings.matchRequestExpiredToast, isDanger: false);
       }
@@ -150,6 +163,10 @@ class _GlobalMatchRequestOverlayState
 
     final wasAccepting = _isAccepting;
     _isAccepting = false;
+
+    final iconCfg = matchRequestToastIconForError(error.code);
+    final iconAsset = iconCfg?.assetPath;
+    final iconColor = iconCfg?.color;
 
     switch (error.code) {
       case MatchRequestErrorCode.noEnergy:
@@ -174,6 +191,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestOfflineToast,
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
 
@@ -181,6 +200,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestDisabledToast,
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
 
@@ -189,11 +210,15 @@ class _GlobalMatchRequestOverlayState
           _showToast(
             AppStrings.matchRequestUnavailableForAcceptToast,
             isDanger: false,
+            iconAsset: iconAsset,
+            iconColor: iconColor,
           );
         } else {
           _showToast(
             AppStrings.matchRequestUnavailableToast,
             isDanger: false,
+            iconAsset: iconAsset,
+            iconColor: iconColor,
           );
         }
         break;
@@ -203,6 +228,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestCooldownToast(sec),
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
 
@@ -210,6 +237,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestRateLimitedToast,
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
 
@@ -217,6 +246,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestOpponentNoEnergyToast,
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
 
@@ -224,6 +255,8 @@ class _GlobalMatchRequestOverlayState
         _showToast(
           AppStrings.matchRequestInvalidToast,
           isDanger: false,
+          iconAsset: iconAsset,
+          iconColor: iconColor,
         );
         break;
     }
@@ -266,7 +299,12 @@ class _GlobalMatchRequestOverlayState
       matchRequestToastProvider,
       (previous, current) {
         if (current != null) {
-          _showToast(current.message, isDanger: current.isDanger);
+          _showToast(
+            current.message,
+            isDanger: current.isDanger,
+            iconAsset: current.iconAsset,
+            iconColor: current.iconColor,
+          );
           ref.read(matchRequestToastProvider.notifier).clear();
         }
       },
@@ -457,6 +495,8 @@ class _GlobalMatchRequestOverlayState
                             child: MatchRequestToastWidget(
                               message: _currentToast!.message,
                               isDanger: _currentToast!.isDanger,
+                              iconAsset: _currentToast!.iconAsset,
+                              iconColor: _currentToast!.iconColor,
                               onDismiss: _dismissToast,
                             ),
                           )

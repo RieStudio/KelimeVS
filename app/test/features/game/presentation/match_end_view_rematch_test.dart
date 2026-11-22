@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -262,6 +263,13 @@ void main() {
 
       expect(find.byKey(const Key('match_end_rematch_waiting_text')), findsOneWidget);
       expect(find.textContaining('Rövanş bekleniyor'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Semantics),
+          matching: find.byType(SvgPicture),
+        ),
+        findsWidgets,
+      );
       expect(find.byKey(const Key('match_end_rematch_cancel_button')), findsOneWidget);
       expect(find.text(AppStrings.matchRequestCancel), findsOneWidget);
 
