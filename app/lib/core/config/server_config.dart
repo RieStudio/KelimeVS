@@ -56,6 +56,9 @@ abstract final class ServerConfig {
   /// Güçlendirici harcama yolu.
   static const String powerupsSpendPath = '/powerups/spend';
 
+  /// Solo maç sonucu bildirme yolu.
+  static const String soloMatchPath = '/matches/solo';
+
   /// Liderlik tablosu yolu.
   static const String leaderboardPath = '/leaderboard';
 
@@ -94,6 +97,9 @@ abstract final class ServerConfig {
 
   /// Tam Güçlendirici Harcama HTTP URL'si.
   static String get powerupsSpendUrl => joinUrl(serverUrl, powerupsSpendPath);
+
+  /// Tam Solo Maç Sonucu HTTP URL'si.
+  static String get soloMatchUrl => joinUrl(serverUrl, soloMatchPath);
 
   /// Tam Liderlik Tablosu HTTP URL'si.
   static String get leaderboardUrl => joinUrl(serverUrl, leaderboardPath);

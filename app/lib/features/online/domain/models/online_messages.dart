@@ -214,6 +214,7 @@ class FinalServerMessage extends ServerMessage {
   final int? coinsAwarded;
   final int? coins;
   final bool rematchAvailable;
+  final List<String>? unlockedAchievements;
 
   const FinalServerMessage({
     required this.rounds,
@@ -227,11 +228,12 @@ class FinalServerMessage extends ServerMessage {
     this.coinsAwarded,
     this.coins,
     this.rematchAvailable = false,
+    this.unlockedAchievements,
   });
 
   @override
   String toString() =>
-      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName, opponentUid: $opponentUid, coinsAwarded: $coinsAwarded, coins: $coins, rematchAvailable: $rematchAvailable)';
+      'FinalServerMessage(winnerIsMe: $winnerIsMe, scores: $myScore-$opponentScore, endedBy: $endedBy, opponentName: $opponentName, opponentUid: $opponentUid, coinsAwarded: $coinsAwarded, coins: $coins, rematchAvailable: $rematchAvailable, unlockedAchievements: $unlockedAchievements)';
 }
 
 /// İptal edilen maç bildirimi (`voided`).
@@ -385,6 +387,8 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         final coinsAwarded = (json['coinsAwarded'] as num?)?.toInt();
         final coins = (json['coins'] as num?)?.toInt();
         final rematchAvailable = json['rematchAvailable'] == true;
+        final rawAchievements = json['unlockedAchievements'] as List<dynamic>?;
+        final unlockedAchievements = rawAchievements?.map((e) => e.toString()).toList();
         return FinalServerMessage(
           rounds: roundsList,
           myScore: myScore,
@@ -397,6 +401,7 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
           coinsAwarded: coinsAwarded,
           coins: coins,
           rematchAvailable: rematchAvailable,
+          unlockedAchievements: unlockedAchievements,
         );
       case 'voided':
         final reason = json['reason'] as String? ?? 'opponent_absent';

@@ -16,6 +16,7 @@ import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/match_result_icon.dart';
 import '../../../core/widgets/secondary_button.dart';
+import '../../achievements/domain/achievement_ui_manifest.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../match_request/application/match_requests_notifier.dart';
 import '../../match_request/application/match_requests_providers.dart';
@@ -317,6 +318,7 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
     }
 
     final int? coinsAwarded = uiState.coinsAwarded;
+    final List<String> unlockedAchievements = uiState.unlockedAchievements;
     final bool isFriendly = uiState.isFriendly ||
         (uiState.lastSavedMatch?.isFriendly ?? false);
 
@@ -526,46 +528,59 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                           ),
                         ),
 
-                        // 6. Jeton Ödülü Kartı (Yalnızca normal maçlarda ve coinsAwarded varsa)
-                        if (!isFriendly && coinsAwarded != null) ...[
-                          const SizedBox(height: AppDimens.space20),
-                          Semantics(
-                            container: true,
-                            label: 'Jeton ödülü: $coinsAwarded',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppDimens.space20,
-                                vertical: AppDimens.space8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius: AppDimens.borderRadiusFull,
-                                border: Border.all(
-                                  color: AppColors.mint,
-                                  width: AppDimens.borderThin,
-                                ),
-                              ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CoinIcon(size: 32),
-                                    const SizedBox(width: AppDimens.space10),
-                                    Text(
-                                      AppStrings.coinReward(coinsAwarded),
-                                      style: AppTextStyles.questionText.copyWith(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.ink,
+                        // 6. Jeton Ödülü ve Başarım Bildirimleri (AnimatedSize ile yumuşak geçiş)
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!isFriendly && coinsAwarded != null) ...[
+                                const SizedBox(height: AppDimens.space20),
+                                Semantics(
+                                  container: true,
+                                  label: 'Jeton ödülü: $coinsAwarded',
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppDimens.space20,
+                                      vertical: AppDimens.space8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.card,
+                                      borderRadius: AppDimens.borderRadiusFull,
+                                      border: Border.all(
+                                        color: AppColors.mint,
+                                        width: AppDimens.borderThin,
                                       ),
                                     ),
-                                  ],
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const CoinIcon(size: 32),
+                                          const SizedBox(width: AppDimens.space10),
+                                          Text(
+                                            AppStrings.coinReward(coinsAwarded),
+                                            style: AppTextStyles.questionText.copyWith(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.ink,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              ],
+                              if (unlockedAchievements.isNotEmpty) ...[
+                                const SizedBox(height: AppDimens.space12),
+                                ..._buildAchievementCards(unlockedAchievements),
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
 
                         const Spacer(flex: 4),
 
@@ -911,6 +926,130 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
             onPressed: onGoHome,
           ),
       ],
+    );
+  }
+
+  List<Widget> _buildAchievementCards(List<String> achievementIds) {
+    final items = achievementIds
+        .map(AchievementUiManifest.get)
+        .whereType<AchievementUiItem>()
+        .take(3)
+        .toList();
+
+    if (items.isEmpty) return const [];
+
+    return items
+        .map((item) => _AchievementNotificationCard(item: item))
+        .toList();
+  }
+}
+
+/// Maç sonu ekranında açılan başarımları gösteren sade bildirim kartı.
+class _AchievementNotificationCard extends StatelessWidget {
+  final AchievementUiItem item;
+
+  const _AchievementNotificationCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Başarım açıldı: ${item.title}, ${item.description}',
+      child: Container(
+        margin: const EdgeInsets.only(top: AppDimens.space8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+          vertical: AppDimens.space10,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppDimens.borderRadiusListCard,
+          border: Border.all(
+            color: AppColors.coin,
+            width: AppDimens.borderThin,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.ink,
+              offset: Offset(2, 2),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: AppDimens.borderRadiusFull,
+                border: Border.all(
+                  color: AppColors.ink,
+                  width: AppDimens.borderThin,
+                ),
+              ),
+              child: const Center(
+                child: AppIcon(
+                  AppIcons.trophy,
+                  color: AppColors.ink,
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppDimens.space12),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimens.space6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.mint,
+                          borderRadius: AppDimens.borderRadiusFull,
+                        ),
+                        child: Text(
+                          'BAŞARIM AÇILDI',
+                          style: AppTextStyles.sectionLabel.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.title,
+                    style: AppTextStyles.cardTitle.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  Text(
+                    item.description,
+                    style: AppTextStyles.secondaryText.copyWith(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:app/features/game/domain/bot/bot_config.dart';
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -135,6 +136,7 @@ Widget _buildTestApp({
   String? initialOpponentName,
   ProfileState? profileState,
   double textScale = 1.0,
+  math.Random? random,
 }) {
   return ProviderScope(
     overrides: [
@@ -159,6 +161,7 @@ Widget _buildTestApp({
       home: MatchmakingScreen(
         searchDuration: searchDuration,
         initialOpponentName: initialOpponentName,
+        random: random,
       ),
     ),
   );
@@ -178,6 +181,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -281,6 +285,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -790,6 +795,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -938,6 +944,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -1121,6 +1128,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -1171,6 +1179,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();
@@ -1308,6 +1317,7 @@ void main() {
           onlineSession: onlineSession,
           matchmakingClient: mmClient,
           initialOpponentName: 'Deniz',
+          random: math.Random(1),
         ),
       );
       await tester.pump();

@@ -153,6 +153,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _initAuth();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reconcilePendingMatches();
+      _processPendingSoloMatches();
       _userInboxCoordinator = ref.read(userInboxLifecycleCoordinatorProvider);
       _userInboxCoordinator?.start();
       if (mounted) {
@@ -167,11 +168,16 @@ class _MainShellState extends ConsumerState<MainShell>
       ref.read(networkStatusProvider.notifier).onAppResumed();
       _reconcilePendingMatches();
       ref.read(profileProvider.notifier).retryPendingNicknameSync();
+      _processPendingSoloMatches();
     }
   }
 
   void _reconcilePendingMatches() {
     ref.read(matchReconcilerProvider).reconcile();
+  }
+
+  void _processPendingSoloMatches() {
+    unawaited(ref.read(soloMatchQueueManagerProvider).processQueue());
   }
 
   Future<void> _initAuth() async {
@@ -198,6 +204,7 @@ class _MainShellState extends ConsumerState<MainShell>
     ref.read(profileProvider.notifier).syncWithServer();
     ref.invalidate(leaderboardNotifierProvider);
     ref.read(matchReconcilerProvider).reconcile();
+    _processPendingSoloMatches();
   }
 
   @override

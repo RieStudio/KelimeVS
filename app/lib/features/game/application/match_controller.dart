@@ -12,6 +12,8 @@ import '../../../core/utils/bot_frame_resolver.dart';
 
 import '../data/powerup_api_client.dart';
 import '../data/question_repository.dart';
+import '../data/solo_match_api_client.dart';
+import '../data/solo_match_queue_repository.dart';
 import '../domain/attempt_text_sanitizer.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/bot/bot_decision.dart';
@@ -30,6 +32,7 @@ import 'match_history_provider.dart';
 import 'match_providers.dart';
 import 'match_session.dart';
 import 'match_ui_state.dart';
+import 'solo_match_queue_manager.dart';
 
 abstract interface class GameClock {
   int nowMs();
@@ -62,6 +65,9 @@ class MatchController extends Notifier<MatchUiState>
   final SharedPreferences? _injectedPrefs;
   final String? _injectedSelfNickname;
   final PowerupApiClient? _injectedPowerupApiClient;
+  final SoloMatchApiClient? _injectedSoloMatchApiClient;
+  final SoloMatchQueueRepository? _injectedSoloMatchQueueRepository;
+  final SoloMatchQueueManager? _injectedSoloMatchQueueManager;
   final int Function()? _injectedCoinsProvider;
   final void Function(int coins)? _injectedOnCoinsUpdated;
   final int roundTransitionDelayMs;
@@ -76,6 +82,9 @@ class MatchController extends Notifier<MatchUiState>
     SharedPreferences? prefs,
     String? selfNickname,
     PowerupApiClient? powerupApiClient,
+    SoloMatchApiClient? soloMatchApiClient,
+    SoloMatchQueueRepository? soloMatchQueueRepository,
+    SoloMatchQueueManager? soloMatchQueueManager,
     int Function()? coinsProvider,
     void Function(int coins)? onCoinsUpdated,
     this.roundTransitionDelayMs = AppDimens.roundTransitionDurationMs,
@@ -88,10 +97,15 @@ class MatchController extends Notifier<MatchUiState>
         _injectedPrefs = prefs,
         _injectedSelfNickname = selfNickname,
         _injectedPowerupApiClient = powerupApiClient,
+        _injectedSoloMatchApiClient = soloMatchApiClient,
+        _injectedSoloMatchQueueRepository = soloMatchQueueRepository,
+        _injectedSoloMatchQueueManager = soloMatchQueueManager,
         _injectedCoinsProvider = coinsProvider,
         _injectedOnCoinsUpdated = onCoinsUpdated;
 
   String _botMatchId = '';
+  int _matchStartedAtMs = 0;
+  bool _hasSubmittedSoloMatch = false;
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -313,6 +327,13 @@ class MatchController extends Notifier<MatchUiState>
   TextFilter get _textFilter => _injectedTextFilter ?? ref.read(textFilterProvider);
   PowerupApiClient get _powerupApiClient =>
       _injectedPowerupApiClient ?? ref.read(powerupApiClientProvider);
+  SoloMatchApiClient get _soloMatchApiClient =>
+      _injectedSoloMatchApiClient ?? ref.read(soloMatchApiClientProvider);
+  SoloMatchQueueRepository get _soloMatchQueueRepository =>
+      _injectedSoloMatchQueueRepository ??
+      ref.read(soloMatchQueueRepositoryProvider);
+  SoloMatchQueueManager get _soloMatchQueueManager =>
+      _injectedSoloMatchQueueManager ?? ref.read(soloMatchQueueManagerProvider);
 
   int _getCoins() {
     if (_injectedCoinsProvider != null) return _injectedCoinsProvider();
@@ -344,6 +365,7 @@ class MatchController extends Notifier<MatchUiState>
   }) async {
     _cancelAllTimers();
     _isMatchSaved = false;
+    _hasSubmittedSoloMatch = false;
     _isPaused = false;
     _frozenRemainingTurnMs = null;
     _frozenRemainingBotDelayMs = null;
@@ -355,6 +377,7 @@ class MatchController extends Notifier<MatchUiState>
 
     final random = _random;
     final clock = _clock;
+    _matchStartedAtMs = clock.nowMs();
 
     _botMatchId = generateBotMatchId();
     try {
@@ -375,6 +398,8 @@ class MatchController extends Notifier<MatchUiState>
       opponentConnected: true,
       isVoided: false,
       isDisconnectedPermanent: false,
+      clearCoinsAwarded: true,
+      unlockedAchievements: const [],
       extraTimeCost: PowerupConstants.defaultExtraTimeCost,
       extraTimeSeconds: PowerupConstants.defaultExtraTimeSeconds,
       extraTimeRemainingUses: PowerupConstants.defaultExtraTimeInitialUses,
@@ -892,6 +917,10 @@ class MatchController extends Notifier<MatchUiState>
         _isMatchSaved = true;
         _saveMatchToHistory(nextState, clock, opponentName ?? state.opponentName);
       }
+
+      // Solo maç sonucunu sunucuya ilet (sonuç ekranı geçişi ve animasyonlardan ÖNCE)
+      _submitSoloMatchResult(nextState, clock);
+
       summary = MatchSummary(
         scores: nextState.scores,
         winnerId: nextState.winnerId!,
@@ -1275,6 +1304,98 @@ class MatchController extends Notifier<MatchUiState>
         );
       }
     }
+  }
+
+  void _submitSoloMatchResult(MatchState finishedState, GameClock clock) {
+    if (_hasSubmittedSoloMatch) return;
+    _hasSubmittedSoloMatch = true;
+
+    final myScore = finishedState.scores['me'] ?? 0;
+    final oppScore = finishedState.scores['bot'] ?? 0;
+    final isWinner = finishedState.winnerId == 'me';
+    final isForfeit = finishedState.endedBy == 'forfeit';
+    final outcome = isForfeit ? 'loss' : (isWinner ? 'win' : 'loss');
+    final endedBy = isForfeit ? 'forfeit' : 'normal';
+
+    int correctAnswers = 0;
+    for (final round in finishedState.roundHistory) {
+      for (final attempt in round.attempts) {
+        if (attempt.playerId == 'me' &&
+            attempt.resultType == AttemptResultType.correct) {
+          correctAnswers++;
+        }
+      }
+    }
+    correctAnswers = correctAnswers.clamp(0, 50);
+
+    final durationSeconds = math.max(
+      0,
+      ((clock.nowMs() - _matchStartedAtMs) / 1000).round(),
+    );
+
+    final submission = SoloMatchSubmission(
+      matchId: _botMatchId,
+      outcome: outcome,
+      myScore: myScore,
+      oppScore: oppScore,
+      correctAnswers: correctAnswers,
+      durationSeconds: durationSeconds,
+      endedBy: endedBy,
+      submittedAtMs:
+          math.max(clock.nowMs(), DateTime.now().millisecondsSinceEpoch),
+    );
+
+    unawaited(_executeSoloMatchSubmission(submission));
+  }
+
+  Future<void> _executeSoloMatchSubmission(
+    SoloMatchSubmission submission,
+  ) async {
+    try {
+      // 1. Önce bekleyen eski kuyruğu boşaltmayı dene (kural: "bir sonraki solo maç bitişinde")
+      unawaited(_soloMatchQueueManager.processQueue());
+
+      // 2. Bu maçı gönder
+      final res = await _soloMatchApiClient.submit(submission);
+
+      if (res is SubmitSoloMatchSuccess) {
+        if (res.counted) {
+          state = state.copyWith(
+            coinsAwarded: res.coinsAwarded,
+            unlockedAchievements: res.unlockedAchievements,
+          );
+          _updateCoins(res.coins);
+          if (res.energy != null) {
+            try {
+              ref.read(profileProvider.notifier).updateEnergy(res.energy!);
+            } catch (_) {}
+          }
+          try {
+            unawaited(ref.read(profileProvider.notifier).syncWithServer());
+          } catch (_) {}
+        }
+      } else if (res is SubmitSoloMatchTransientError) {
+        // Geçici ağ hatası: yerel bekleme kuyruğuna kaydet
+        await _soloMatchQueueRepository.enqueue(submission);
+      } else if (res is SubmitSoloMatchPermanentError) {
+        // 400 veya 410 gibi kalıcı hata durumunda kuyruğa eklenmez
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[MatchController] _executeSoloMatchSubmission error: $e');
+      }
+      try {
+        await _soloMatchQueueRepository.enqueue(submission);
+      } catch (_) {}
+    }
+  }
+
+  @visibleForTesting
+  void submitSoloMatchResultForTesting(
+    MatchState finishedState,
+    GameClock clock,
+  ) {
+    _submitSoloMatchResult(finishedState, clock);
   }
 }
 

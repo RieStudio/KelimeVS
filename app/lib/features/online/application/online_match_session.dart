@@ -695,6 +695,7 @@ class OnlineMatchSession extends Notifier<MatchUiState>
         roundHistory: entry.roundRecords,
       ),
       coinsAwarded: finalMsg.coinsAwarded,
+      unlockedAchievements: finalMsg.unlockedAchievements ?? const [],
       opponentFrame: resolvedOpponentFrame,
       rematchAvailable: canRematch,
     );

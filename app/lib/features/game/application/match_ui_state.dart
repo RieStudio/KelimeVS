@@ -81,6 +81,7 @@ class MatchUiState {
   final bool isDisconnectedPermanent;
   final bool isDisconnectedReplaced;
   final int? coinsAwarded;
+  final List<String> unlockedAchievements;
   final bool isFriendly;
   final int? extraTimeCost;
   final int? extraTimeSeconds;
@@ -122,6 +123,7 @@ class MatchUiState {
     this.isDisconnectedPermanent = false,
     this.isDisconnectedReplaced = false,
     this.coinsAwarded,
+    this.unlockedAchievements = const [],
     this.isFriendly = false,
     this.extraTimeCost,
     this.extraTimeSeconds,
@@ -214,6 +216,8 @@ class MatchUiState {
     bool? isDisconnectedPermanent,
     bool? isDisconnectedReplaced,
     int? coinsAwarded,
+    bool clearCoinsAwarded = false,
+    List<String>? unlockedAchievements,
     bool? isFriendly,
     int? extraTimeCost,
     int? extraTimeSeconds,
@@ -264,7 +268,11 @@ class MatchUiState {
           isDisconnectedPermanent ?? this.isDisconnectedPermanent,
       isDisconnectedReplaced:
           isDisconnectedReplaced ?? this.isDisconnectedReplaced,
-      coinsAwarded: coinsAwarded ?? this.coinsAwarded,
+      coinsAwarded: clearCoinsAwarded
+          ? null
+          : (coinsAwarded ?? this.coinsAwarded),
+      unlockedAchievements:
+          unlockedAchievements ?? this.unlockedAchievements,
       isFriendly: isFriendly ?? this.isFriendly,
       extraTimeCost: extraTimeCost ?? this.extraTimeCost,
       extraTimeSeconds: extraTimeSeconds ?? this.extraTimeSeconds,

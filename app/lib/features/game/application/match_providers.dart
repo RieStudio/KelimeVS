@@ -14,6 +14,8 @@ import '../../profile/application/profile_notifier.dart';
 import '../data/local_question_repository.dart';
 import '../data/powerup_api_client.dart';
 import '../data/question_repository.dart';
+import '../data/solo_match_api_client.dart';
+import '../data/solo_match_queue_repository.dart';
 import '../domain/bot/bot_config.dart';
 import '../domain/match/match_config.dart';
 import '../domain/text_filter.dart';
@@ -21,6 +23,7 @@ import 'match_controller.dart';
 import 'match_history_provider.dart';
 import 'match_session.dart';
 import 'match_ui_state.dart';
+import 'solo_match_queue_manager.dart';
 
 final questionRepositoryProvider = Provider<QuestionRepository>((ref) {
   return const LocalQuestionRepository();
@@ -119,6 +122,29 @@ final powerupApiClientProvider = Provider<PowerupApiClient>((ref) {
   return HttpPowerupApiClient(
     authTokenProvider: const FirebaseAuthTokenProvider(),
     onAccountDeleted: onDeleted,
+  );
+});
+
+final soloMatchApiClientProvider = Provider<SoloMatchApiClient>((ref) {
+  final onDeleted = ref.watch(accountDeletedHandlerProvider);
+  return HttpSoloMatchApiClient(
+    authTokenProvider: const FirebaseAuthTokenProvider(),
+    onAccountDeleted: onDeleted,
+  );
+});
+
+final soloMatchQueueRepositoryProvider =
+    Provider<SoloMatchQueueRepository>((ref) {
+  return const LocalSoloMatchQueueRepository();
+});
+
+final soloMatchQueueManagerProvider = Provider<SoloMatchQueueManager>((ref) {
+  final repo = ref.watch(soloMatchQueueRepositoryProvider);
+  final client = ref.watch(soloMatchApiClientProvider);
+  return SoloMatchQueueManager(
+    repository: repo,
+    apiClient: client,
+    ref: ref,
   );
 });
 

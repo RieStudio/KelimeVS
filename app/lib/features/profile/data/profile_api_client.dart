@@ -116,6 +116,39 @@ Map<String, dynamic>? _asMap(dynamic val) {
   return null;
 }
 
+class UserAchievement {
+  final String id;
+  final int unlockedAt;
+
+  const UserAchievement({
+    required this.id,
+    required this.unlockedAt,
+  });
+
+  factory UserAchievement.fromJson(Map<String, dynamic> json) {
+    return UserAchievement(
+      id: json['id'] as String? ?? '',
+      unlockedAt: (json['unlockedAt'] ?? json['unlocked_at'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'unlockedAt': unlockedAt,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserAchievement &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          unlockedAt == other.unlockedAt;
+
+  @override
+  int get hashCode => id.hashCode ^ unlockedAt.hashCode;
+}
+
 class UserProfileModel {
   final String uid;
   final String? nickname;
@@ -128,6 +161,9 @@ class UserProfileModel {
   final FrameMigrationInfo? frameMigration;
   final bool isGuest;
   final bool allowMatchRequests;
+  final List<UserAchievement> achievements;
+  final int currentStreak;
+  final int maxStreak;
 
   const UserProfileModel({
     required this.uid,
@@ -141,6 +177,9 @@ class UserProfileModel {
     this.frameMigration,
     this.isGuest = false,
     this.allowMatchRequests = true,
+    this.achievements = const [],
+    this.currentStreak = 0,
+    this.maxStreak = 0,
   });
 
   int get played => stats.played;
@@ -154,6 +193,19 @@ class UserProfileModel {
     final statsJson = _asMap(json['stats']);
     final energyJson = _asMap(json['energy']);
     final migrationJson = _asMap(json['frameMigration'] ?? json['frame_migration']);
+    final rawAchievements = json['achievements'] as List<dynamic>?;
+    final achievements = rawAchievements != null
+        ? rawAchievements
+            .whereType<Map>()
+            .map((e) => UserAchievement.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : const <UserAchievement>[];
+
+    final currentStreak =
+        (json['currentStreak'] ?? json['current_streak'] as num?)?.toInt() ?? 0;
+    final maxStreak =
+        (json['maxStreak'] ?? json['max_streak'] as num?)?.toInt() ?? 0;
+
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
       nickname: json['nickname'] as String?,
@@ -171,6 +223,9 @@ class UserProfileModel {
         json['allowMatchRequests'] ?? json['allow_match_requests'],
         defaultValue: true,
       ),
+      achievements: achievements,
+      currentStreak: currentStreak,
+      maxStreak: maxStreak,
     );
   }
 }
