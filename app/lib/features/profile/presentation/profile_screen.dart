@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_guard.dart';
@@ -549,23 +550,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.bright,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.ink,
-                            width: AppDimens.borderThin,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.check,
-                          size: 20,
-                          color: AppColors.ink,
-                        ),
+                      SvgPicture.asset(
+                        'assets/icons/account_linked_game.svg',
+                        width: 44,
+                        height: 44,
                       ),
                       const SizedBox(width: AppDimens.space12),
                       Expanded(

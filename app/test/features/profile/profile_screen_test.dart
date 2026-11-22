@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -27,7 +28,11 @@ class _TestAuthNotifier extends AuthNotifier {
   _TestAuthNotifier({this.isGoogleLinked = true});
 
   @override
-  AuthUiState build() => AuthUiState(isAuthenticated: true, isGoogleLinked: isGoogleLinked);
+  AuthUiState build() => AuthUiState(
+        isAuthenticated: true,
+        isGoogleLinked: isGoogleLinked,
+        linkedEmail: isGoogleLinked ? 'test@google.com' : null,
+      );
 }
 
 void main() {
@@ -102,5 +107,27 @@ void main() {
     const repo = LocalProfileRepository();
     final updated = await repo.getNickname();
     expect(updated, 'Baris_34');
+  });
+
+  testWidgets('3. Bağlı hesap kartında account_linked_game.svg ikonu (renkli, check olmadan) gösterilir', (tester) async {
+    await tester.pumpWidget(buildTestScreen(isGoogleLinked: true));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.linkedAccount), findsOneWidget);
+    expect(find.text('test@google.com'), findsOneWidget);
+
+    final svgFinder = find.byWidgetPredicate(
+      (w) =>
+          w is SvgPicture &&
+          w.bytesLoader is SvgAssetLoader &&
+          (w.bytesLoader as SvgAssetLoader).assetName ==
+              'assets/icons/account_linked_game.svg',
+    );
+    expect(svgFinder, findsOneWidget);
+    final svg = tester.widget<SvgPicture>(svgFinder);
+    expect(svg.width, 44);
+    expect(svg.height, 44);
+    expect(svg.colorFilter, isNull);
+    expect(find.byIcon(Icons.check), findsNothing);
   });
 }

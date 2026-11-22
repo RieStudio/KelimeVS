@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app/core/strings/app_strings.dart';
@@ -249,6 +250,19 @@ void main() {
       );
       expect(find.text(AppStrings.linkedAccount), findsOneWidget);
       expect(find.text('ahmet@gmail.com'), findsOneWidget);
+      final linkedSvgFinder = find.byWidgetPredicate(
+        (w) =>
+            w is SvgPicture &&
+            w.bytesLoader is SvgAssetLoader &&
+            (w.bytesLoader as SvgAssetLoader).assetName ==
+                'assets/icons/account_linked_game.svg',
+      );
+      expect(linkedSvgFinder, findsOneWidget);
+      final linkedSvg = tester.widget<SvgPicture>(linkedSvgFinder);
+      expect(linkedSvg.width, 44);
+      expect(linkedSvg.height, 44);
+      expect(linkedSvg.colorFilter, isNull);
+      expect(find.byIcon(Icons.check), findsNothing);
       expect(
         find.widgetWithText(SecondaryButton, AppStrings.signOut),
         findsNothing,
