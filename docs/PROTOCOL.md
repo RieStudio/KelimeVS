@@ -348,11 +348,13 @@ Maç sonuçlandığında her iki oyuncuya gönderilir. Maç detay ekranı ve ge�
   "opponentUid": "user_xyz789",
   "winnerIsMe": true,
   "endedBy": "normal" | "forfeit",
-  "rematchAvailable": true
+  "rematchAvailable": true,
+  "unlockedAchievements": ["first_match", "first_win"]
 }
 ```
 - `opponentUid`: Rakip oyuncunun kullanıcı kimliği (String). Gerçek oyuncu maçlarında döner; bot maçlarında bu alan hiç gönderilmez (omitted).
 - `rematchAvailable`: Opsiyonel (boolean). Maç NORMAL yolla bittiyse (`endedBy: 'normal'`) ve her iki taraf da gerçek oyuncuysa `true` döner. Hükmen/terk/kopma/iptal veya bot maçlarında `false` döner (veya eski sürümlerde hiç gönderilmez). İstemci bu bayrağa bakarak maç sonu ekranında "Rövanş" butonunun aktif olup olmayacağını belirler.
+- `unlockedAchievements`: Opsiyonel (string[]). Bu maç sonucunda kilidi yeni açılan başarımların kimlik listesi (örn. `["first_match", "first_win"]`). Eğer bu maçta yeni bir başarım eşiği geçilmediyse veya dostluk maçlarında bu alan gönderilmez (omitted). İstemci maç sonu ekranında bu listeyi kullanarak kazanılan başarımları görüntüler.
 
 #### İptal Edilen Maç (`voided`)
 Maçın kazanan olmadan iptal edildiğini bildirir. İptal durumunda jeton verilmez, lig/istatistik kaydı yapılmaz ve maça enerji harcamış tüm oyunculara enerjileri iade edilir:
@@ -682,7 +684,8 @@ Content-Type: application/json
 Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmiş hesaplar tüm uçlardan `410 Gone` alır.
 
 ### Profil ve Hesap
-- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `createdAt`, `equippedFrame`, `energy`, `isGuest`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `currentStreak`, `maxStreak`, `achievements`: `[{ id, unlockedAt }]`, `createdAt`, `equippedFrame`, `energy`, `isGuest`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+  - **Başarımlar ve Seri Sayaçları:** Yanıtta kullanıcının bugüne kadar açtığı tüm başarımların listesi (`achievements`), güncel galibiyet serisi (`currentStreak`) ve ulaşılan en yüksek galibiyet serisi (`maxStreak`) yer alır. Eski kullanıcılar için ilk istekte sessiz backfill yapılır ve geçmiş sayaçlarına denk gelen başarımlar profile otomatik olarak işlenir.
   - **Misafir (Anonim) Kullanıcılar:** Token'daki `firebase.sign_in_provider === 'anonymous'` olduğunda sunucu `isGuest: true` işaretler ve kullanıcıya otomatik olarak deterministik `"M-" + 4 haneli rakam` (örn. `M-4821`, 1000..9999 aralığında) takma adı atar. Mevcut tüm misafir hesaplar ilk istekte tembelce bu ada çevrilir. Misafirlik bayrağı tek yönlüdür (`1 -> 0`); Google'a bağlanan hesap bir daha misafir olamaz.
   - **İadeli Çerçeve Geçişi (`frameMigration`):** `clientBuild >= 11` istemciden gelen istekte kullanıcının sahip olduğu emekli çerçeveler varsa otomatik olarak envanterden silinir, bedelleri bakiye (`coins`) alanına eklenir ve kuşanılmışsa çerçeve `'classic'`e çekilir. Bu geçiş ilk kez yapıldığında yanıtta opsiyonel `frameMigration` nesnesi döner:
     ```json

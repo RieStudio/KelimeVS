@@ -55,6 +55,7 @@ export interface MatchRoomInitParams {
 export interface PlayerRewardInfo {
   readonly coinsAwarded: number;
   readonly coins: number;
+  readonly unlockedAchievements?: readonly string[];
 }
 
 interface PendingRefund {
@@ -1108,7 +1109,13 @@ export class MatchRoom extends DurableObject<Env> {
           uid: p1Uid,
           correctAnswers: p1CorrectAnswers,
         });
-        p1Reward = { coinsAwarded: r1.coinsAwarded, coins: r1.coins };
+        p1Reward = {
+          coinsAwarded: r1.coinsAwarded,
+          coins: r1.coins,
+          ...(r1.unlockedAchievements && r1.unlockedAchievements.length > 0
+            ? { unlockedAchievements: r1.unlockedAchievements }
+            : {}),
+        };
         p1Nick = r1.nickname;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1130,7 +1137,13 @@ export class MatchRoom extends DurableObject<Env> {
           uid: p2Uid,
           correctAnswers: p2CorrectAnswers,
         });
-        p2Reward = { coinsAwarded: r2.coinsAwarded, coins: r2.coins };
+        p2Reward = {
+          coinsAwarded: r2.coinsAwarded,
+          coins: r2.coins,
+          ...(r2.unlockedAchievements && r2.unlockedAchievements.length > 0
+            ? { unlockedAchievements: r2.unlockedAchievements }
+            : {}),
+        };
         p2Nick = r2.nickname;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1159,7 +1172,7 @@ export class MatchRoom extends DurableObject<Env> {
           ? resolveDisplayName({ nickname: p2Nick, uid: p2Uid })
           : undefined;
 
-    const newRewards: Record<string, { coinsAwarded: number; coins: number }> = {};
+    const newRewards: Record<string, PlayerRewardInfo> = {};
     if (p1Reward) newRewards[p1Uid] = p1Reward;
     if (p2Reward) newRewards[p2Uid] = p2Reward;
 
@@ -2072,6 +2085,9 @@ export class MatchRoom extends DurableObject<Env> {
         ? {
             coinsAwarded: playerReward.coinsAwarded,
             coins: playerReward.coins,
+            ...(playerReward.unlockedAchievements && playerReward.unlockedAchievements.length > 0
+              ? { unlockedAchievements: playerReward.unlockedAchievements }
+              : {}),
           }
         : {}),
     });

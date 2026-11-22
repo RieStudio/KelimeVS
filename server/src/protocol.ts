@@ -135,6 +135,7 @@ export interface ClientFinalMessage {
   readonly coinsAwarded?: number;
   readonly coins?: number;
   readonly rematchAvailable?: boolean;
+  readonly unlockedAchievements?: readonly string[];
 }
 
 export interface ClientFeedbackMessage {

@@ -75,6 +75,7 @@ flutter:
     - assets/frames/
     - assets/icons/
     - assets/text_filter/
+    - assets/achievements/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

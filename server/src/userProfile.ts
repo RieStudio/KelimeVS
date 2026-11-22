@@ -58,6 +58,7 @@ export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUI
   return GUEST_NICKNAME_LOCK_MIN_BUILD;
 }
 import type { Env } from './index';
+import { evaluateAchievements } from './achievements/definitions';
 
 export type MatchRewardOutcome =
   | 'win'
@@ -70,6 +71,28 @@ export interface UserStats {
   readonly won: number;
   readonly lost: number;
   readonly correctAnswers: number;
+}
+
+export interface UserAchievementItem {
+  readonly id: string;
+  readonly unlockedAt: number;
+}
+
+export interface ApplyResultToCountersParams {
+  readonly matchId: string;
+  readonly isWin: boolean;
+  readonly isLoss: boolean;
+  readonly source: 'ranked' | 'solo';
+  readonly correctCount?: number;
+  readonly nowMs?: number;
+}
+
+export interface ApplyResultToCountersResult {
+  readonly unlockedAchievements: readonly string[];
+  readonly currentStreak: number;
+  readonly maxStreak: number;
+  readonly played: number;
+  readonly won: number;
 }
 
 export interface FrameMigrationResult {
@@ -110,6 +133,9 @@ export interface UserProfileData {
   readonly isSystemNickname?: boolean;
   readonly frameMigration?: FrameMigrationResult;
   readonly allowMatchRequests?: boolean;
+  readonly currentStreak?: number;
+  readonly maxStreak?: number;
+  readonly achievements?: readonly UserAchievementItem[];
 }
 
 export interface MatchRewardResult {
@@ -117,6 +143,7 @@ export interface MatchRewardResult {
   readonly coins: number;
   readonly nickname?: string | null;
   readonly alreadyProcessed?: boolean;
+  readonly unlockedAchievements?: readonly string[];
 }
 
 export interface SpendCoinsResult {
@@ -218,6 +245,9 @@ interface ProfileRow extends Record<string, string | number | null> {
   energy: number | null;
   energy_updated_at: number | null;
   allow_match_requests: number | null;
+  current_streak: number | null;
+  max_streak: number | null;
+  achievements_initialized: number | null;
 }
 
 interface DailyCoinsRow extends Record<string, string | number | null> {
@@ -282,6 +312,13 @@ export class UserProfile extends DurableObject<Env> {
         lost INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS user_achievements (
+        id TEXT PRIMARY KEY,
+        unlocked_at INTEGER NOT NULL,
+        match_id TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_achievements_match ON user_achievements(match_id);
 
       CREATE TABLE IF NOT EXISTS daily_coins (
         day_key TEXT PRIMARY KEY,
@@ -448,6 +485,27 @@ export class UserProfile extends DurableObject<Env> {
       );
     }
 
+    const hasCurrentStreak = profileCols.some((c) => c.name === 'current_streak');
+    if (!hasCurrentStreak) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN current_streak INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
+    const hasMaxStreak = profileCols.some((c) => c.name === 'max_streak');
+    if (!hasMaxStreak) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN max_streak INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
+    const hasAchievementsInitialized = profileCols.some((c) => c.name === 'achievements_initialized');
+    if (!hasAchievementsInitialized) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN achievements_initialized INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS incoming_requests (
         id TEXT PRIMARY KEY,
@@ -525,6 +583,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM profiles;
       DELETE FROM daily_coins;
       DELETE FROM processed_matches;
+      DELETE FROM user_achievements;
       DELETE FROM blocked_users;
       DELETE FROM powerup_purchases;
       DELETE FROM owned_items;
@@ -831,6 +890,9 @@ export class UserProfile extends DurableObject<Env> {
       throw new Error('account_deleted');
     }
 
+    // Achievements listesi ve gerekirse sessiz backfill
+    this.ensureAchievementsBackfilled(nowMs);
+
     let frameMigration: FrameMigrationResult | undefined;
     if (clientBuild > 0) {
       const res = await this.migrateRetiredFrames(uid, clientBuild);
@@ -840,7 +902,7 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
-      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname, allow_match_requests FROM profiles LIMIT 1'
+      'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname, allow_match_requests, current_streak, max_streak, achievements_initialized FROM profiles LIMIT 1'
     );
     const rows = cursor.toArray();
 
@@ -892,6 +954,16 @@ export class UserProfile extends DurableObject<Env> {
 
       const allowMatchRequests = (row.allow_match_requests as number | undefined) !== 0;
 
+      const achRows = this.ctx.storage.sql
+        .exec<{ id: string; unlocked_at: number }>(
+          'SELECT id, unlocked_at FROM user_achievements ORDER BY unlocked_at ASC, id ASC'
+        )
+        .toArray();
+      const achievements: UserAchievementItem[] = achRows.map((r) => ({
+        id: r.id,
+        unlockedAt: r.unlocked_at,
+      }));
+
       return {
         uid: row.uid,
         nickname: currentNickname,
@@ -907,6 +979,9 @@ export class UserProfile extends DurableObject<Env> {
         isGuest: currentIsGuest === 1,
         isSystemNickname: currentIsSystem === 1,
         allowMatchRequests,
+        currentStreak: (row.current_streak as number | undefined) ?? 0,
+        maxStreak: (row.max_streak as number | undefined) ?? 0,
+        achievements,
         ...(frameMigration ? { frameMigration } : {}),
       };
     }
@@ -921,8 +996,8 @@ export class UserProfile extends DurableObject<Env> {
     const initialIsSystem = isGuest === true ? 1 : 0;
 
     this.ctx.storage.sql.exec(
-      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at, is_guest, is_system_nickname, allow_match_requests)
-       VALUES (?, ?, ?, 0, 0, 0, 0, ?, 'classic', ?, 0, ?, ?, 1)`,
+      `INSERT INTO profiles (uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, energy, energy_updated_at, is_guest, is_system_nickname, allow_match_requests, current_streak, max_streak, achievements_initialized)
+       VALUES (?, ?, ?, 0, 0, 0, 0, ?, 'classic', ?, 0, ?, ?, 1, 0, 0, 1)`,
       effectiveUid,
       initialNickname,
       initialCoins,
@@ -942,6 +1017,9 @@ export class UserProfile extends DurableObject<Env> {
       isGuest: initialIsGuest === 1,
       isSystemNickname: initialIsSystem === 1,
       allowMatchRequests: true,
+      currentStreak: 0,
+      maxStreak: 0,
+      achievements: [],
     };
   }
 
@@ -1055,6 +1133,166 @@ export class UserProfile extends DurableObject<Env> {
   }
 
   /**
+   * profiles.achievements_initialized = 0 ise mevcut played/won değerleriyle
+   * evaluateAchievements çalıştırıp açılanları match_id = 'backfill' ile ekler.
+   * Bu kayıtlar maç sonu unlockedAchievements listesine girmez.
+   */
+  private ensureAchievementsBackfilled(nowMs = Date.now()): void {
+    const row = this.ctx.storage.sql
+      .exec<{
+        uid: string;
+        played: number;
+        won: number;
+        achievements_initialized: number | null;
+      }>('SELECT uid, played, won, achievements_initialized FROM profiles LIMIT 1')
+      .toArray()[0];
+
+    if (!row || (row.achievements_initialized ?? 0) === 1) {
+      return;
+    }
+
+    const unlockedRows = this.ctx.storage.sql
+      .exec<{ id: string }>('SELECT id FROM user_achievements')
+      .toArray();
+    const unlocked = new Set(unlockedRows.map((x) => x.id));
+
+    const toUnlock = evaluateAchievements(
+      {
+        played: Math.max(0, row.played ?? 0),
+        won: Math.max(0, row.won ?? 0),
+        currentStreak: 0,
+        maxStreak: 0,
+      },
+      unlocked
+    );
+
+    for (const achId of toUnlock) {
+      this.ctx.storage.sql.exec(
+        'INSERT OR IGNORE INTO user_achievements (id, unlocked_at, match_id) VALUES (?, ?, ?)',
+        achId,
+        nowMs,
+        'backfill'
+      );
+    }
+
+    this.ctx.storage.sql.exec(
+      'UPDATE profiles SET achievements_initialized = 1 WHERE uid = ?',
+      row.uid
+    );
+  }
+
+  /**
+   * Sayaç, seri ve başarım güncellemesini gerçekleştiren yeniden kullanılabilir fonksiyon.
+   * Galibiyet/mağlubiyet sonucu, kaynak ('ranked' | 'solo') ve maç kimliği alır.
+   * applyMatchReward'a bağımlı değildir.
+   */
+  applyResultToCounters(params: ApplyResultToCountersParams): ApplyResultToCountersResult {
+    this.ensureSchema();
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const nowMs = params.nowMs ?? Date.now();
+
+    // 1. Önce sessiz backfill: Maçın sayaçları uygulanmadan ÖNCE mevcut played/won değerleriyle çalışır
+    this.ensureAchievementsBackfilled(nowMs);
+
+    // 2. Mevcut sayaçları oku
+    const profRows = this.ctx.storage.sql
+      .exec<{
+        uid: string;
+        played: number;
+        won: number;
+        lost: number;
+        correct_answers: number;
+        current_streak: number | null;
+        max_streak: number | null;
+      }>(
+        'SELECT uid, played, won, lost, correct_answers, current_streak, max_streak FROM profiles LIMIT 1'
+      )
+      .toArray();
+
+    if (profRows.length === 0) {
+      throw new Error('profile_not_found');
+    }
+
+    const prof = profRows[0];
+    const curStreak = prof.current_streak ?? 0;
+    const maxStreak = prof.max_streak ?? 0;
+
+    let newCurrentStreak = curStreak;
+    if (params.isWin) {
+      newCurrentStreak = curStreak + 1;
+    } else if (params.isLoss) {
+      newCurrentStreak = 0;
+    }
+    const newMaxStreak = Math.max(maxStreak, newCurrentStreak);
+
+    const isPlayedInc = params.source === 'ranked' || params.source === 'solo';
+    const newPlayed = prof.played + (isPlayedInc ? 1 : 0);
+    const newWon = prof.won + (params.isWin ? 1 : 0);
+    const newLost = prof.lost + (params.isLoss ? 1 : 0);
+    const correctCount = Math.max(0, params.correctCount ?? 0);
+    const newCorrectAnswers = (prof.correct_answers ?? 0) + correctCount;
+
+    // 3. Profili güncelle
+    this.ctx.storage.sql.exec(
+      `UPDATE profiles
+       SET played = ?,
+           won = ?,
+           lost = ?,
+           correct_answers = ?,
+           current_streak = ?,
+           max_streak = ?,
+           achievements_initialized = 1
+       WHERE uid = ?`,
+      newPlayed,
+      newWon,
+      newLost,
+      newCorrectAnswers,
+      newCurrentStreak,
+      newMaxStreak,
+      prof.uid
+    );
+
+    // 4. Açılmış başarımları oku
+    const unlockedRows = this.ctx.storage.sql
+      .exec<{ id: string }>('SELECT id FROM user_achievements')
+      .toArray();
+    const unlockedSet = new Set(unlockedRows.map((r) => r.id));
+
+    // 5. Güncel sayaçlarla evaluateAchievements çalıştır
+    const newlyUnlocked = evaluateAchievements(
+      {
+        played: newPlayed,
+        won: newWon,
+        currentStreak: newCurrentStreak,
+        maxStreak: newMaxStreak,
+      },
+      unlockedSet
+    );
+
+    // 6. Yeni açılanları match_id ile ekle
+    for (const achId of newlyUnlocked) {
+      this.ctx.storage.sql.exec(
+        'INSERT INTO user_achievements (id, unlocked_at, match_id) VALUES (?, ?, ?)',
+        achId,
+        nowMs,
+        params.matchId
+      );
+    }
+
+    return {
+      unlockedAchievements: newlyUnlocked,
+      currentStreak: newCurrentStreak,
+      maxStreak: newMaxStreak,
+      played: newPlayed,
+      won: newWon,
+    };
+  }
+
+  /**
    * Maç ödülü uygular. İdempotenttir; aynı matchId için ödül ve istatistik tekrar yazılmaz.
    */
   async applyMatchReward(params: {
@@ -1080,11 +1318,19 @@ export class UserProfile extends DurableObject<Env> {
     const existingMatches = existingMatchCursor.toArray();
 
     if (existingMatches.length > 0) {
+      const unlockedRows = this.ctx.storage.sql
+        .exec<{ id: string }>(
+          "SELECT id FROM user_achievements WHERE match_id = ? AND match_id != 'backfill' ORDER BY rowid ASC",
+          params.matchId
+        )
+        .toArray();
+
       return {
         coinsAwarded: existingMatches[0].coins_awarded,
         coins: profile.coins,
         nickname: profile.nickname,
         alreadyProcessed: true,
+        unlockedAchievements: unlockedRows.map((r) => r.id),
       };
     }
 
@@ -1127,54 +1373,69 @@ export class UserProfile extends DurableObject<Env> {
     const remainingCap = Math.max(0, dailyCap - currentEarnedToday);
 
     const actualCoinsAwarded = Math.max(0, Math.min(baseReward, remainingCap));
+    const nowMs = Date.now();
 
-    // 4. Günlük kazanç sayacını güncelle
-    this.ctx.storage.sql.exec(
-      `INSERT INTO daily_coins (day_key, earned) VALUES (?, ?)
-       ON CONFLICT(day_key) DO UPDATE SET earned = earned + ?`,
-      dayKey,
-      actualCoinsAwarded,
-      actualCoinsAwarded
-    );
-
-    // 5. İstatistikleri ve bakiyeyi güncelle
     const isWin =
       params.outcome === 'win' || params.outcome === 'win_by_opponent_disconnect';
     const isLoss =
       params.outcome === 'loss' || params.outcome === 'loss_by_disconnect';
     const correctCount = Math.max(0, params.correctAnswers ?? 0);
 
-    this.ctx.storage.sql.exec(
-      `UPDATE profiles
-       SET coins = coins + ?,
-           played = played + 1,
-           won = won + ?,
-           lost = lost + ?,
-           correct_answers = correct_answers + ?`,
-      actualCoinsAwarded,
-      isWin ? 1 : 0,
-      isLoss ? 1 : 0,
-      correctCount
-    );
+    // 4-6. Atomik SQLite işlemi (tüm yazmalar tek transactionSync içinde, processed_matches en sonda)
+    const runInTransaction = <T>(fn: () => T): T => {
+      if (typeof this.ctx.storage.transactionSync === 'function') {
+        return this.ctx.storage.transactionSync(fn);
+      }
+      return fn();
+    };
 
-    // 6. İşlenen maçı kaydet
-    const nowMs = Date.now();
-    this.ctx.storage.sql.exec(
-      `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
-       VALUES (?, ?, ?, ?)`,
-      params.matchId,
-      nowMs,
-      params.outcome,
-      actualCoinsAwarded
-    );
+    const counterRes = runInTransaction(() => {
+      // 4. Günlük kazanç sayacını güncelle
+      this.ctx.storage.sql.exec(
+        `INSERT INTO daily_coins (day_key, earned) VALUES (?, ?)
+         ON CONFLICT(day_key) DO UPDATE SET earned = earned + ?`,
+        dayKey,
+        actualCoinsAwarded,
+        actualCoinsAwarded
+      );
 
-    // Son 100 maçı koruyup daha eskilerini temizle
-    this.ctx.storage.sql.exec(`
-      DELETE FROM processed_matches
-      WHERE match_id NOT IN (
-        SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
-      )
-    `);
+      // Bakiyeyi güncelle
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins + ? WHERE uid = ?',
+        actualCoinsAwarded,
+        profile.uid
+      );
+
+      // 5. İstatistikleri, seriyi ve başarımları uygula
+      const res = this.applyResultToCounters({
+        matchId: params.matchId,
+        isWin,
+        isLoss,
+        source: 'ranked',
+        correctCount,
+        nowMs,
+      });
+
+      // 6. İŞLEMİN EN SONUNDA: İşlenen maçı kaydet
+      this.ctx.storage.sql.exec(
+        `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+         VALUES (?, ?, ?, ?)`,
+        params.matchId,
+        nowMs,
+        params.outcome,
+        actualCoinsAwarded
+      );
+
+      // Son 100 maçı koruyup daha eskilerini temizle
+      this.ctx.storage.sql.exec(`
+        DELETE FROM processed_matches
+        WHERE match_id NOT IN (
+          SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+        )
+      `);
+
+      return res;
+    });
 
     // 7. Güncel bakiyeyi oku
     const updatedProfile = await this.getProfile();
@@ -1182,6 +1443,7 @@ export class UserProfile extends DurableObject<Env> {
       coinsAwarded: actualCoinsAwarded,
       coins: updatedProfile.coins,
       nickname: updatedProfile.nickname,
+      unlockedAchievements: counterRes.unlockedAchievements,
     };
   }
 

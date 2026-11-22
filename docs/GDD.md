@@ -287,6 +287,30 @@ Hem maç sonu ekranındaki "Rövanş" hem de kullanıcı profilinden gönderilen
   - *Geri Bildirim Tostları:* İstek reddedildiğinde veya süresi dolduğunda tek seferlik tostlar gösterilir; iptallerde sessiz kalınır.
   - *Eşleşme ve Geçiş:* `matched` olayı geldiğinde açık sanal klavye ve diyaloglar kapatılır, stale maç ekranları temizlenerek `FriendMatchRevealScreen`'e geçilir. Bot rozeti veya ayrımı asla yapılmaz.
 
+### 8.5 Başarımlar (Achievements) Sistemi
+
+Sunucu yükünü artırmayan, maç sonucu işleme akışına entegre sayaç temelli başarım değerlendirme mimarisi.
+
+- **İlk Başarım Seti (11 Başarım):**
+  - *Toplam Maç (`matches_played`):* `first_match` (1 maç), `matches_10` (10 maç), `matches_50` (50 maç), `matches_100` (100 maç).
+  - *Toplam Galibiyet (`matches_won`):* `first_win` (1 galibiyet), `wins_10` (10 galibiyet), `wins_50` (50 galibiyet), `wins_100` (100 galibiyet).
+  - *Seri Galibiyet (`win_streak`):* `streak_3` (3 seri galibiyet), `streak_5` (5 seri galibiyet), `streak_10` (10 seri galibiyet).
+- **Sunucu ve İstemci Sorumluluk Ayrımı:**
+  - Sunucu yalnızca kimlikler, eşikler ve sayaç mantığını bilir (`definitions.ts`). UI başlıkları, açıklamaları ve ikonlar istemci yerel varlıklarında saklanır (`assets/achievements/achievements.json`).
+  - İki taraf arasındaki eşzamanlılık otomatik senkron testi (`achievementsAssetSync.test.ts`) ve dışa aktarım aracıyla (`npm run export:achievements`) korunur.
+- **Seri (Streak) ve Maç Sonucu Kuralları:**
+  - Galibiyet (`win` ve `win_by_opponent_disconnect`) durumunda `current_streak` +1 artar, `max_streak = max(max_streak, current_streak)` güncellenir.
+  - Mağlubiyet (`loss` ve `loss_by_disconnect`) durumunda `current_streak` 0'a sıfırlanır, `max_streak` korunur.
+  - Beraberlik veya iptal edilen maçlar seriyi etkilemez. Dostluk maçları sayaçları ve başarımları etkilemez.
+- **Sessiz Geçmiş Doldurma (Silent Backfill):**
+  - Eski kullanıcılar için ilk değerlendirmede veya ilk `GET /me` profil çağrısında mevcut `played` ve `won` istatistikleri taranır, eşleşen başarımlar `match_id = 'backfill'` ile kaydedilir ve `achievements_initialized = 1` yapılır.
+  - Bu backfill kayıtları maç sonu ekranındaki anlık "açılan başarımlar" bildirimine dahil edilmez; yalnızca profil listesinde görünür.
+- **Atomiklik ve İdempotens:**
+  - Maç ödülü, istatistikler, seriler ve başarımlar tek SQLite transaction içinde atomik olarak yazılır; `processed_matches` tablosuna kayıt en sonda eklenir. Yazım hatası durumunda rollback gerçekleşir ve `rewardRetry` ile yeniden denenebilir.
+  - Tekrar eden `matchId` çağrılarında (retry) mükerrer sayaç artışı yapılmaz; o maçta kazanılmış olan başarımlar doğrudan döndürülür.
+- **Hesap Silme (Tombstone):**
+  - `deleteProfile` tetiklendiğinde `user_achievements` tablosu tamamen temizlenir. Silinen hesap 410 Gone döner ve satırlar yeniden oluşturulmaz.
+
 ## 9. Güvenlik ilkeleri
 
 - Cevap listesi (`questions_pool`) istemci tarafından **okunamaz**; yalnızca oyun sunucusu okur (servis hesabıyla). Sunucu, her bağlantıda Firebase kimlik jetonunu doğrular.
