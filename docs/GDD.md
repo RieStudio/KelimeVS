@@ -302,6 +302,7 @@ Sunucu yükünü artırmayan, maç sonucu işleme akışına entegre sayaç teme
   - Galibiyet (`win` ve `win_by_opponent_disconnect`) durumunda `current_streak` +1 artar, `max_streak = max(max_streak, current_streak)` güncellenir.
   - Mağlubiyet (`loss` ve `loss_by_disconnect`) durumunda `current_streak` 0'a sıfırlanır, `max_streak` korunur.
   - Beraberlik veya iptal edilen maçlar seriyi etkilemez. Dostluk maçları sayaçları ve başarımları etkilemez.
+  - *Maç Kaynağı (`source: 'ranked' | 'solo'`):* Online dereceli ve solo maçların sayaçları (`played`, `won`, `lost`, `correct_answers`), galibiyet serileri (`current_streak`, `max_streak`) ve başarımları (`user_achievements`) aynı kurallarla birleşik ilerler. Solo maçlar için iç denetim sayaçları (`played_solo`, `won_solo`) veritabanında ayrı tutulur fakat kullanıcı profilinde birleşik sayaçlar sunulur.
 - **Sessiz Geçmiş Doldurma (Silent Backfill):**
   - Eski kullanıcılar için ilk değerlendirmede veya ilk `GET /me` profil çağrısında mevcut `played` ve `won` istatistikleri taranır, eşleşen başarımlar `match_id = 'backfill'` ile kaydedilir ve `achievements_initialized = 1` yapılır.
   - Bu backfill kayıtları maç sonu ekranındaki anlık "açılan başarımlar" bildirimine dahil edilmez; yalnızca profil listesinde görünür.

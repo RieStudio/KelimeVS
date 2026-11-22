@@ -116,6 +116,7 @@ function createEnv(overrides?: Partial<Env>) {
       idFromName: () => ({ toString: () => 'mm' }),
       get: () => ({
         leaveQueue: vi.fn().mockResolvedValue(true),
+        removeFromQueue: vi.fn().mockResolvedValue(true),
       }),
     } as any,
     MATCH_ROOM: {
@@ -140,6 +141,7 @@ function createEnv(overrides?: Partial<Env>) {
       idFromName: () => ({ toString: () => 'lb' }),
       get: () => ({
         deleteUser: vi.fn().mockResolvedValue(true),
+        deleteUserData: vi.fn().mockResolvedValue(true),
         updateNickname: vi.fn().mockResolvedValue(true),
         updateFrame: vi.fn().mockResolvedValue(true),
       }),
@@ -152,6 +154,7 @@ function createEnv(overrides?: Partial<Env>) {
     DISCONNECT_WIN_COINS: '30',
     DISCONNECT_LOSS_COINS: '0',
     DAILY_MATCH_COIN_CAP: '300',
+    ENERGY_ENABLED: 'true',
     ...overrides,
   };
 
@@ -468,5 +471,127 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
     await (profileStub as any).alarm();
     expect(getTableCount(profileStub, 'profiles')).toBe(0);
     expect(getTableCount(profileStub, 'tombstone')).toBe(1);
+  });
+
+  it('6. Başarımlar ve solo maçlar uyumluluğu: deleteProfile sonrası user_achievements, daily_solo_matches, processed_matches ve profile sayaçları silinir; GET /me ve POST /matches/solo 410 döner ve satır dirilmez', async () => {
+    const { env } = createEnv();
+    const uid = 'del_user_achieve_solo';
+    const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+
+    // 1. Profil başlatılır
+    await profileStub.getProfile(uid);
+
+    // 2. 1 online ranked galibiyet maçı işlenir -> başarımlar açılır, seriler güncellenir
+    await profileStub.applyMatchReward({
+      uid,
+      matchId: 'online_m_del_1',
+      outcome: 'win',
+    });
+
+    // 3. 1 solo galibiyet maçı işlenir -> daily_solo_matches, played_solo/won_solo, processed_matches güncellenir
+    const soloReq = new Request('http://127.0.0.1/matches/solo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer dev:${uid}`,
+      },
+      body: JSON.stringify({
+        matchId: 'bot:del_compliance_match_1',
+        outcome: 'win',
+        myScore: 2,
+        oppScore: 1,
+        correctAnswers: 5,
+        durationSeconds: 28,
+        endedBy: 'normal',
+      }),
+    });
+    const soloRes = await worker.fetch(soloReq, env);
+    expect(soloRes.status).toBe(200);
+
+    // Silme öncesi durumu doğrula:
+    expect(getTableCount(profileStub, 'profiles')).toBe(1);
+    expect(getTableCount(profileStub, 'user_achievements')).toBeGreaterThanOrEqual(2);
+    expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(1);
+    expect(getTableCount(profileStub, 'processed_matches')).toBe(2);
+    expect(getTableCount(profileStub, 'tombstone')).toBe(0);
+
+    // 4. Hesabı sil (DELETE /me)
+    const delReq = new Request('http://127.0.0.1/me', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer dev:${uid}`,
+      },
+    });
+    const delRes = await worker.fetch(delReq, env);
+    expect(delRes.status).toBe(200);
+    const delBody = (await delRes.json()) as any;
+    expect(delBody.ok).toBe(true);
+
+    // 5. Silme sonrası tüm tablolarda verilerin silindiğini ve tombstone oluştuğunu doğrula
+    expect(getTableCount(profileStub, 'tombstone')).toBe(1);
+    expect(getTableCount(profileStub, 'profiles')).toBe(0); // current_streak, max_streak, achievements_initialized, played_solo, won_solo profiles satırıyla birlikte otomatik silinir
+    expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
+    expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(0);
+    expect(getTableCount(profileStub, 'processed_matches')).toBe(0); // hem online hem bot:... solo maçları tamamen silindi
+
+    // 6. GET /me -> 410 dönmeli ve hiçbir satır yeniden OLUŞMAMALI
+    const getMeReq = new Request('http://127.0.0.1/me', {
+      headers: {
+        Authorization: `Bearer dev:${uid}`,
+      },
+    });
+    const getMeRes = await worker.fetch(getMeReq, env);
+    expect(getMeRes.status).toBe(410);
+    const getMeBody = (await getMeRes.json()) as any;
+    expect(getMeBody).toEqual({ error: 'account_deleted', message: 'Hesap silinmiş' });
+
+    expect(getTableCount(profileStub, 'profiles')).toBe(0);
+    expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
+
+    // 7. POST /matches/solo -> 410 dönmeli ve hiçbir satır yeniden OLUŞMAMALI
+    const postSoloReq = new Request('http://127.0.0.1/matches/solo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer dev:${uid}`,
+      },
+      body: JSON.stringify({
+        matchId: 'bot:after_del_match',
+        outcome: 'win',
+        myScore: 2,
+        oppScore: 0,
+        correctAnswers: 5,
+        durationSeconds: 25,
+        endedBy: 'normal',
+      }),
+    });
+    const postSoloRes = await worker.fetch(postSoloReq, env);
+    expect(postSoloRes.status).toBe(410);
+    const postSoloBody = (await postSoloRes.json()) as any;
+    expect(postSoloBody).toEqual({ ok: false, error: 'account_deleted' });
+
+    expect(getTableCount(profileStub, 'profiles')).toBe(0);
+    expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
+    expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(0);
+    expect(getTableCount(profileStub, 'processed_matches')).toBe(0);
+
+    // 8. DO seviyesinde applyBotMatchReward doğrudan çağrılırsa hata fırlatmalı ve satır diriltmemeli
+    await expect(
+      profileStub.applyBotMatchReward({
+        uid,
+        matchId: 'bot:direct_do_after_del',
+        outcome: 'win',
+        myScore: 2,
+        oppScore: 0,
+        correctAnswers: 5,
+        durationSeconds: 25,
+        endedBy: 'normal',
+      })
+    ).rejects.toThrow();
+
+    expect(getTableCount(profileStub, 'profiles')).toBe(0);
+    expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
+    expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(0);
+    expect(getTableCount(profileStub, 'processed_matches')).toBe(0);
   });
 });

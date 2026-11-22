@@ -913,5 +913,69 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
     ```
 - **İade (Refund):** Bu endpoint iade işlemi yapmaz; bot maçlarında iade endpoint'i bulunmaz.
 
+### Solo Maç Sonucu Bildirme (`POST /matches/solo` veya `POST /matches/solo/result`)
+İstemci tarafında yerel olarak tamamlanan solo maçların sonucunu sunucuya ileterek istatistik, seri, başarım ve jeton ödülü kazanılmasını sağlar.
+
+- **Uç Noktalar:** `POST /matches/solo` (ve alias: `POST /matches/solo/result`)
+- **Kimlik Doğrulama:** `Authorization: Bearer <token>` başlığı zorunludur. Geçersiz veya eksikse `401 Unauthorized` (`{"ok": false, "error": "unauthorized"}`).
+- **İstek Başlıkları:**
+  - `Authorization: Bearer <token>`
+  - `Content-Type: application/json`
+  - `X-App-Build: <build>` (opsiyonel istemci derleme numarası)
+- **Gövde Boyutu Sınırı:** En fazla 4 KB (4096 bayt). Aşılırsa `400 Bad Request` (`{"ok": false, "error": "bad_request"}`).
+- **İstek Gövdesi:**
+  ```json
+  {
+    "matchId": "bot:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "outcome": "win",
+    "myScore": 2,
+    "oppScore": 1,
+    "correctAnswers": 5,
+    "durationSeconds": 35,
+    "endedBy": "normal"
+  }
+  ```
+  - `matchId`: Zorunlu dize. `^bot:[A-Za-z0-9_-]{8,64}$` deseniyle eşleşmelidir.
+  - `outcome`: Zorunlu dize (`'win'` veya `'loss'`).
+  - `myScore`: Sayı (tam sayı, `>= 0`).
+  - `oppScore`: Sayı (tam sayı, `>= 0`).
+  - `correctAnswers`: Sayı (tam sayı, `0 <= correctAnswers <= 50`).
+  - `durationSeconds`: Sayı (saniye cinsinden, galibiyetlerde `>= 20`).
+  - `endedBy`: Zorunlu dize (`'normal'` veya `'forfeit'`).
+- **Doğrulama ve Güvenlik Kuralları (Sunucu Otoritesi):**
+  - *Skor Tutarlılığı (`roundsToWin = 2`):*
+    - `outcome = 'win'`: `myScore == 2` ve `oppScore < 2`. `endedBy` yalnızca `'normal'` olabilir.
+    - `outcome = 'loss'` ve `endedBy = 'normal'`: `oppScore == 2` ve `myScore < 2`.
+    - `outcome = 'loss'` ve `endedBy = 'forfeit'`: `myScore < 2` ve `oppScore < 2`.
+  - *Minimum Süre:* Galibiyet durumunda `durationSeconds >= 20` saniye (`MIN_SOLO_WIN_SECONDS`) zorunludur.
+  - *Enerji Düşümü:* Online maçlarla aynı enerji maliyeti (`spendEnergy`) uygulanır. Yetersiz enerjide işlem sayılmaz (`ok: true, counted: false, coinsAwarded: 0`).
+  - *Jeton Ödülü:* Sunucu hesaplar (galibiyet 30, mağlubiyet 5). Günlük 300 jeton tavanı (`DAILY_MATCH_COIN_CAP`) online ranked maçlarla ortaktır.
+  - *Günlük Güvenlik Tavanı:* Bir kullanıcı için günde en fazla 200 solo maç sonucu işlenir (`SOLO_DAILY_SAFETY_CAP = 200`). Tavan aşıldığında hata fırlatılmaz, nötr olarak `ok: true, counted: false, coinsAwarded: 0` dönülür.
+  - *İdempotentlik:* Aynı `matchId` tekrar gönderildiğinde enerji veya sayaçlar mükerrer etkilenmez; önceki sonuç `alreadyProcessed: true` bayrağı ile döner.
+  - *Lider Tablosu:* Solo maçlar lider tablosuna puan yazmaz (DO çağrısı yapılmaz).
+- **Yanıtlar ve Durum Kodları:**
+  - `200 OK`: Sonuç işlendi veya zaten işlenmiş.
+    ```json
+    {
+      "ok": true,
+      "counted": true,
+      "alreadyProcessed": false,
+      "coinsAwarded": 30,
+      "coins": 130,
+      "energy": {
+        "current": 4,
+        "max": 5,
+        "secondsToNext": 600,
+        "isUnlimited": false
+      },
+      "unlockedAchievements": ["first_match", "first_win"]
+    }
+    ```
+    *(Enerji yetersiz veya güvenlik tavanı aşıldığında: `{ "ok": true, "counted": false, "coinsAwarded": 0, "coins": 100, "energy": { ... }, "unlockedAchievements": [] }`)*
+  - `400 Bad Request`: Gövde boyutu > 4KB, geçersiz JSON veya doğrulama kuralı ihlali (`{"ok": false, "error": "bad_request" | "invalid_score" | "invalid_duration" | "invalid_answers"}`).
+  - `401 Unauthorized`: Kimliksiz veya geçersiz belirteç (`{"ok": false, "error": "unauthorized"}`).
+  - `410 Gone`: Silinmiş hesap (`{"ok": false, "error": "account_deleted"}`).
+
+
 
 

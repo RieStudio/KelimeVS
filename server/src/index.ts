@@ -7,6 +7,7 @@ import {
   isSupportedPowerup,
   type PowerupEnv,
 } from './powerup';
+import { validateSoloMatchResult } from './soloMatch';
 import { Matchmaker } from './matchmaker';
 import { MatchRoom } from './matchRoom';
 import { UserProfile, GUEST_NICKNAME_LOCK_MIN_BUILD, getGuestNicknameLockMinBuild, getNicknameCooldownMessage } from './userProfile';
@@ -828,6 +829,103 @@ export default {
         }
         return new Response(
           JSON.stringify({ ok: false, error: 'internal_error', message: msg }),
+          { status: 500, headers: jsonHeaders }
+        );
+      }
+    }
+
+    // Solo maç sonucu rotası: POST /matches/solo (veya POST /matches/solo/result)
+    if (request.method === 'POST' && (pathname === '/matches/solo' || pathname === '/matches/solo/result')) {
+      const auth = await authenticateAuth(request, env);
+      if (!auth) {
+        return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+      const uid = auth.uid;
+
+      // X-App-Build başlığı ayrıştırılır (kimlikli endpoint desen uyumu)
+      parseClientBuild(request);
+
+      // Gövde boyutu sınırı (maksimum 4KB)
+      const contentLength = parseInt(request.headers.get('content-length') ?? '0', 10);
+      if (contentLength > 4096) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Payload too large' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      let rawText: string;
+      try {
+        rawText = await request.text();
+      } catch {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Geçersiz istek gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (rawText.length > 4096) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Payload too large' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      let body: unknown;
+      try {
+        body = JSON.parse(rawText);
+      } catch {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      const validation = validateSoloMatchResult(body);
+      if (!validation.isValid || !validation.data) {
+        return new Response(
+          JSON.stringify({ ok: false, error: validation.error ?? 'bad_request' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'account_deleted' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
+        const res = await profileStub.applyBotMatchReward({
+          matchId: validation.data.matchId,
+          outcome: validation.data.outcome,
+          myScore: validation.data.myScore,
+          oppScore: validation.data.oppScore,
+          correctAnswers: validation.data.correctAnswers,
+          durationSeconds: validation.data.durationSeconds,
+          endedBy: validation.data.endedBy,
+          uid,
+        });
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err: any) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'account_deleted' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(
+          JSON.stringify({ ok: false, error: 'internal_error' }),
           { status: 500, headers: jsonHeaders }
         );
       }

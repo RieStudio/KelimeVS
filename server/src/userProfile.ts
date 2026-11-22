@@ -59,6 +59,7 @@ export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUI
 }
 import type { Env } from './index';
 import { evaluateAchievements } from './achievements/definitions';
+import { SOLO_DAILY_SAFETY_CAP } from './soloMatch';
 
 export type MatchRewardOutcome =
   | 'win'
@@ -93,6 +94,28 @@ export interface ApplyResultToCountersResult {
   readonly maxStreak: number;
   readonly played: number;
   readonly won: number;
+}
+
+export interface ApplyBotMatchRewardParams {
+  readonly matchId: string;
+  readonly outcome: 'win' | 'loss';
+  readonly myScore: number;
+  readonly oppScore: number;
+  readonly correctAnswers: number;
+  readonly durationSeconds: number;
+  readonly endedBy: 'normal' | 'forfeit';
+  readonly uid?: string;
+  readonly nowMs?: number;
+}
+
+export interface ApplyBotMatchRewardResult {
+  readonly ok: true;
+  readonly counted: boolean;
+  readonly alreadyProcessed?: boolean;
+  readonly coinsAwarded: number;
+  readonly coins: number;
+  readonly energy: EnergyState;
+  readonly unlockedAchievements: readonly string[];
 }
 
 export interface FrameMigrationResult {
@@ -248,6 +271,8 @@ interface ProfileRow extends Record<string, string | number | null> {
   current_streak: number | null;
   max_streak: number | null;
   achievements_initialized: number | null;
+  played_solo: number | null;
+  won_solo: number | null;
 }
 
 interface DailyCoinsRow extends Record<string, string | number | null> {
@@ -294,6 +319,22 @@ export interface BlockedUserItem {
 
 export class UserProfile extends DurableObject<Env> {
   private initialized = false;
+  private inTransaction = false;
+
+  private runInTransaction<T>(fn: () => T): T {
+    if (this.inTransaction) {
+      return fn();
+    }
+    if (typeof this.ctx.storage.transactionSync === 'function') {
+      this.inTransaction = true;
+      try {
+        return this.ctx.storage.transactionSync(fn);
+      } finally {
+        this.inTransaction = false;
+      }
+    }
+    return fn();
+  }
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -506,6 +547,27 @@ export class UserProfile extends DurableObject<Env> {
       );
     }
 
+    const hasPlayedSolo = profileCols.some((c) => c.name === 'played_solo');
+    if (!hasPlayedSolo) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN played_solo INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
+    const hasWonSolo = profileCols.some((c) => c.name === 'won_solo');
+    if (!hasWonSolo) {
+      this.ctx.storage.sql.exec(
+        'ALTER TABLE profiles ADD COLUMN won_solo INTEGER NOT NULL DEFAULT 0'
+      );
+    }
+
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS daily_solo_matches (
+        day_key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS incoming_requests (
         id TEXT PRIMARY KEY,
@@ -595,6 +657,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM match_request_cooldowns;
       DELETE FROM match_request_rate_limits;
       DELETE FROM user_presence;
+      DELETE FROM daily_solo_matches;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -1166,19 +1229,21 @@ export class UserProfile extends DurableObject<Env> {
       unlocked
     );
 
-    for (const achId of toUnlock) {
-      this.ctx.storage.sql.exec(
-        'INSERT OR IGNORE INTO user_achievements (id, unlocked_at, match_id) VALUES (?, ?, ?)',
-        achId,
-        nowMs,
-        'backfill'
-      );
-    }
+    this.runInTransaction(() => {
+      for (const achId of toUnlock) {
+        this.ctx.storage.sql.exec(
+          'INSERT OR IGNORE INTO user_achievements (id, unlocked_at, match_id) VALUES (?, ?, ?)',
+          achId,
+          nowMs,
+          'backfill'
+        );
+      }
 
-    this.ctx.storage.sql.exec(
-      'UPDATE profiles SET achievements_initialized = 1 WHERE uid = ?',
-      row.uid
-    );
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET achievements_initialized = 1 WHERE uid = ?',
+        row.uid
+      );
+    });
   }
 
   /**
@@ -1334,46 +1399,9 @@ export class UserProfile extends DurableObject<Env> {
       };
     }
 
-    // 2. Taban ödülü hesapla
-    let baseReward = 0;
-    switch (params.outcome) {
-      case 'win': {
-        const val = parseInt(this.env.WIN_COINS ?? '30', 10);
-        baseReward = Number.isFinite(val) && val >= 0 ? val : 30;
-        break;
-      }
-      case 'loss': {
-        const val = parseInt(this.env.LOSS_COINS ?? '5', 10);
-        baseReward = Number.isFinite(val) && val >= 0 ? val : 5;
-        break;
-      }
-      case 'win_by_opponent_disconnect': {
-        const val = parseInt(this.env.DISCONNECT_WIN_COINS ?? '30', 10);
-        baseReward = Number.isFinite(val) && val >= 0 ? val : 30;
-        break;
-      }
-      case 'loss_by_disconnect': {
-        const val = parseInt(this.env.DISCONNECT_LOSS_COINS ?? '0', 10);
-        baseReward = Number.isFinite(val) && val >= 0 ? val : 0;
-        break;
-      }
-    }
-
-    // 3. Günlük üst sınır (Cap) kontrolü: UTC gün
-    const dayKey = new Date().toISOString().slice(0, 10);
-    const dailyCursor = this.ctx.storage.sql.exec<DailyCoinsRow>(
-      'SELECT day_key, earned FROM daily_coins WHERE day_key = ? LIMIT 1',
-      dayKey
-    );
-    const dailyRows = dailyCursor.toArray();
-    const currentEarnedToday = dailyRows.length > 0 ? dailyRows[0].earned : 0;
-
-    const capVal = parseInt(this.env.DAILY_MATCH_COIN_CAP ?? '300', 10);
-    const dailyCap = Number.isFinite(capVal) && capVal >= 0 ? capVal : 300;
-    const remainingCap = Math.max(0, dailyCap - currentEarnedToday);
-
-    const actualCoinsAwarded = Math.max(0, Math.min(baseReward, remainingCap));
+    // 2-3. Jeton ödülü ve günlük tavan hesabı
     const nowMs = Date.now();
+    const { actualCoinsAwarded, dayKey } = this.calculateMatchCoins(params.outcome, nowMs);
 
     const isWin =
       params.outcome === 'win' || params.outcome === 'win_by_opponent_disconnect';
@@ -1382,14 +1410,7 @@ export class UserProfile extends DurableObject<Env> {
     const correctCount = Math.max(0, params.correctAnswers ?? 0);
 
     // 4-6. Atomik SQLite işlemi (tüm yazmalar tek transactionSync içinde, processed_matches en sonda)
-    const runInTransaction = <T>(fn: () => T): T => {
-      if (typeof this.ctx.storage.transactionSync === 'function') {
-        return this.ctx.storage.transactionSync(fn);
-      }
-      return fn();
-    };
-
-    const counterRes = runInTransaction(() => {
+    const counterRes = this.runInTransaction(() => {
       // 4. Günlük kazanç sayacını güncelle
       this.ctx.storage.sql.exec(
         `INSERT INTO daily_coins (day_key, earned) VALUES (?, ?)
@@ -1443,6 +1464,226 @@ export class UserProfile extends DurableObject<Env> {
       coinsAwarded: actualCoinsAwarded,
       coins: updatedProfile.coins,
       nickname: updatedProfile.nickname,
+      unlockedAchievements: counterRes.unlockedAchievements,
+    };
+  }
+
+  /**
+   * Online ve solo maçlar için taban jeton ödülü ve günlük tavanı (DAILY_MATCH_COIN_CAP) ortak hesaplar.
+   */
+  private calculateMatchCoins(
+    outcome: MatchRewardOutcome,
+    nowMs = Date.now()
+  ): { actualCoinsAwarded: number; dayKey: string } {
+    let baseReward = 0;
+    switch (outcome) {
+      case 'win': {
+        const val = parseInt(this.env.WIN_COINS ?? '30', 10);
+        baseReward = Number.isFinite(val) && val >= 0 ? val : 30;
+        break;
+      }
+      case 'loss': {
+        const val = parseInt(this.env.LOSS_COINS ?? '5', 10);
+        baseReward = Number.isFinite(val) && val >= 0 ? val : 5;
+        break;
+      }
+      case 'win_by_opponent_disconnect': {
+        const val = parseInt(this.env.DISCONNECT_WIN_COINS ?? '30', 10);
+        baseReward = Number.isFinite(val) && val >= 0 ? val : 30;
+        break;
+      }
+      case 'loss_by_disconnect': {
+        const val = parseInt(this.env.DISCONNECT_LOSS_COINS ?? '0', 10);
+        baseReward = Number.isFinite(val) && val >= 0 ? val : 0;
+        break;
+      }
+    }
+
+    const dayKey = new Date(nowMs).toISOString().slice(0, 10);
+    const dailyCursor = this.ctx.storage.sql.exec<DailyCoinsRow>(
+      'SELECT day_key, earned FROM daily_coins WHERE day_key = ? LIMIT 1',
+      dayKey
+    );
+    const dailyRows = dailyCursor.toArray();
+    const currentEarnedToday = dailyRows.length > 0 ? dailyRows[0].earned : 0;
+
+    const capVal = parseInt(this.env.DAILY_MATCH_COIN_CAP ?? '300', 10);
+    const dailyCap = Number.isFinite(capVal) && capVal >= 0 ? capVal : 300;
+    const remainingCap = Math.max(0, dailyCap - currentEarnedToday);
+
+    const actualCoinsAwarded = Math.max(0, Math.min(baseReward, remainingCap));
+    return { actualCoinsAwarded, dayKey };
+  }
+
+  /**
+   * İstemcide oynanan solo maç sonucunu atomik ve idempotent olarak işler.
+   * Lider tablosuna yazmaz.
+   */
+  async applyBotMatchReward(params: ApplyBotMatchRewardParams): Promise<ApplyBotMatchRewardResult> {
+    this.ensureSchema(params.nowMs);
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const nowMs = params.nowMs ?? Date.now();
+    const profile = await this.getProfile(params.uid, 0, undefined, nowMs);
+    const effectiveUid = profile.uid;
+
+    // 1. İdempotency kontrolü: Bu matchId zaten işlendi mi?
+    const existingMatchCursor = this.ctx.storage.sql.exec<ProcessedMatchRow>(
+      'SELECT match_id, coins_awarded FROM processed_matches WHERE match_id = ? LIMIT 1',
+      params.matchId
+    );
+    const existingMatches = existingMatchCursor.toArray();
+
+    if (existingMatches.length > 0) {
+      const unlockedRows = this.ctx.storage.sql
+        .exec<{ id: string }>(
+          "SELECT id FROM user_achievements WHERE match_id = ? AND match_id != 'backfill' ORDER BY rowid ASC",
+          params.matchId
+        )
+        .toArray();
+
+      const energyState = await this.getEnergyState(effectiveUid, nowMs);
+      return {
+        ok: true,
+        counted: true,
+        alreadyProcessed: true,
+        coinsAwarded: existingMatches[0].coins_awarded,
+        coins: profile.coins,
+        energy: energyState,
+        unlockedAchievements: unlockedRows.map((r) => r.id),
+      };
+    }
+
+    // 2. Günlük güvenlik tavanı kontrolü (SOLO_DAILY_SAFETY_CAP = 200)
+    const dayKey = new Date(nowMs).toISOString().slice(0, 10);
+    const safetyCursor = this.ctx.storage.sql.exec<{ count: number }>(
+      'SELECT count FROM daily_solo_matches WHERE day_key = ? LIMIT 1',
+      dayKey
+    );
+    const safetyRows = safetyCursor.toArray();
+    const todaySoloCount = safetyRows.length > 0 ? safetyRows[0].count : 0;
+
+    if (todaySoloCount >= SOLO_DAILY_SAFETY_CAP) {
+      const energyState = await this.getEnergyState(effectiveUid, nowMs);
+      return {
+        ok: true,
+        counted: false,
+        coinsAwarded: 0,
+        coins: profile.coins,
+        energy: energyState,
+        unlockedAchievements: [],
+      };
+    }
+
+    // 3. Enerji kontrolü ve düşümü (online maç ile aynı iç fonksiyon ve maliyet)
+    const energyEnabled = isEnergyEnabledForUser(this.env, effectiveUid);
+    if (energyEnabled) {
+      const energyCost = getEnergyCostPerMatch(this.env);
+      const spendRes = await this.spendEnergy({
+        matchId: params.matchId,
+        amount: energyCost,
+        uid: effectiveUid,
+        nowMs,
+      });
+
+      if (!spendRes.success) {
+        const energyState = await this.getEnergyState(effectiveUid, nowMs);
+        return {
+          ok: true,
+          counted: false,
+          coinsAwarded: 0,
+          coins: profile.coins,
+          energy: energyState,
+          unlockedAchievements: [],
+        };
+      }
+    }
+
+    // 4. Jeton hesaplama (online ile aynı ortak sayaç ve günlük tavan)
+    const { actualCoinsAwarded } = this.calculateMatchCoins(params.outcome, nowMs);
+
+    const isWin = params.outcome === 'win';
+    const isLoss = params.outcome === 'loss';
+    const correctCount = Math.max(0, params.correctAnswers ?? 0);
+
+    // 5-7. Atomik SQLite işlemi (tüm yazmalar tek transactionSync içinde, processed_matches en sonda)
+    const counterRes = this.runInTransaction(() => {
+      // 5. Günlük coin sayacını güncelle
+      this.ctx.storage.sql.exec(
+        `INSERT INTO daily_coins (day_key, earned) VALUES (?, ?)
+         ON CONFLICT(day_key) DO UPDATE SET earned = earned + ?`,
+        dayKey,
+        actualCoinsAwarded,
+        actualCoinsAwarded
+      );
+
+      // Bakiyeyi güncelle
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET coins = coins + ? WHERE uid = ?',
+        actualCoinsAwarded,
+        effectiveUid
+      );
+
+      // İç denetim sayaçlarını artır (played_solo, won_solo)
+      this.ctx.storage.sql.exec(
+        `UPDATE profiles
+         SET played_solo = played_solo + 1,
+             won_solo = won_solo + ?
+         WHERE uid = ?`,
+        isWin ? 1 : 0,
+        effectiveUid
+      );
+
+      // Günlük solo maç sayısını artır
+      this.ctx.storage.sql.exec(
+        `INSERT INTO daily_solo_matches (day_key, count) VALUES (?, 1)
+         ON CONFLICT(day_key) DO UPDATE SET count = count + 1`,
+        dayKey
+      );
+
+      // 6. Birleşik sayaçları, seriyi ve başarımları uygula (source: 'solo')
+      const res = this.applyResultToCounters({
+        matchId: params.matchId,
+        isWin,
+        isLoss,
+        source: 'solo',
+        correctCount,
+        nowMs,
+      });
+
+      // 7. İŞLEMİN EN SONUNDA: İşlenen maçı kaydet
+      this.ctx.storage.sql.exec(
+        `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+         VALUES (?, ?, ?, ?)`,
+        params.matchId,
+        nowMs,
+        params.outcome,
+        actualCoinsAwarded
+      );
+
+      // Son 100 maçı koruyup daha eskilerini temizle
+      this.ctx.storage.sql.exec(`
+        DELETE FROM processed_matches
+        WHERE match_id NOT IN (
+          SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+        )
+      `);
+
+      return res;
+    });
+
+    const updatedProfile = await this.getProfile(effectiveUid);
+    const energyState = await this.getEnergyState(effectiveUid, nowMs);
+
+    return {
+      ok: true,
+      counted: true,
+      coinsAwarded: actualCoinsAwarded,
+      coins: updatedProfile.coins,
+      energy: energyState,
       unlockedAchievements: counterRes.unlockedAchievements,
     };
   }
@@ -2022,7 +2263,7 @@ export class UserProfile extends DurableObject<Env> {
     const nowMs = params.nowMs ?? Date.now();
     const cost = params.amount ?? getEnergyCostPerMatch(this.env);
 
-    return this.ctx.storage.transactionSync(() => {
+    return this.runInTransaction(() => {
       // 1. İdempotentlik kontrolü: bu maç için zaten enerji düşüldü mü?
       const existing = this.ctx.storage.sql
         .exec<{ match_id: string; amount: number }>(
@@ -2132,7 +2373,7 @@ export class UserProfile extends DurableObject<Env> {
     const effectiveUid = profile.uid;
     const nowMs = params.nowMs ?? Date.now();
 
-    return this.ctx.storage.transactionSync(() => {
+    return this.runInTransaction(() => {
       const existing = this.ctx.storage.sql
         .exec<{ amount: number; refunded_at: number | null }>(
           'SELECT amount, refunded_at FROM energy_spends WHERE match_id = ? AND uid = ? LIMIT 1',
