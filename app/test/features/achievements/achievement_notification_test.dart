@@ -122,6 +122,75 @@ void main() {
         }
       }
     });
+
+    testWidgets('4. Rozet konumu ve açısı item ve override parametreleriyle ayarlanabilir', (tester) async {
+      Transform findBadgeTransform() {
+        return tester.widgetList<Transform>(
+          find.descendant(
+            of: find.byType(AchievementNotificationCard),
+            matching: find.byType(Transform),
+          ),
+        ).first;
+      }
+
+      Positioned findBadgePositioned() {
+        return tester.widget<Positioned>(
+          find.descendant(
+            of: find.byType(AchievementNotificationCard),
+            matching: find.byType(Positioned),
+          ),
+        );
+      }
+
+      // first_win için varsayılan: badgeDx: -6, badgeRotationDeg: -6
+      final firstWin = AchievementUiManifest.get('first_win')!;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AchievementNotificationCard(item: firstWin),
+          ),
+        ),
+      );
+
+      final positioned1 = findBadgePositioned();
+      expect(positioned1.left, equals(-6.0));
+      final transform1 = findBadgeTransform();
+      // -6° in radians = -6 * pi / 180 ≈ -0.1047 -> cos(-6°) ≈ 0.9945
+      expect(transform1.transform.storage[0], closeTo(0.9945, 0.001));
+
+      // wins_10 için: badgeDx: -14, badgeRotationDeg: -12
+      final wins10 = AchievementUiManifest.get('wins_10')!;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AchievementNotificationCard(item: wins10),
+          ),
+        ),
+      );
+      final positioned2 = findBadgePositioned();
+      expect(positioned2.left, equals(-14.0));
+      final transform2 = findBadgeTransform();
+      // -12° in radians: cos(-12°) ≈ 0.9781
+      expect(transform2.transform.storage[0], closeTo(0.9781, 0.001));
+
+      // Override parametreleri
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AchievementNotificationCard(
+              item: firstWin,
+              badgeDx: -25.0,
+              badgeRotationDeg: -18.0,
+            ),
+          ),
+        ),
+      );
+      final positioned3 = findBadgePositioned();
+      expect(positioned3.left, equals(-25.0));
+      final transform3 = findBadgeTransform();
+      // cos(-18°) ≈ 0.9510
+      expect(transform3.transform.storage[0], closeTo(0.9510, 0.001));
+    });
   });
 
   group('AchievementNotificationNotifier & FIFO Queue Tests', () {

@@ -1495,7 +1495,7 @@ class _NotificationsGallerySectionContentState
         ),
         const SizedBox(height: AppDimens.space4),
         const Text(
-          'Kart Önizlemesi (3px çerçeve, 4px gölge, sol taşan -6° SVG, 58px sol boşluk):',
+          'Kart Önizlemesi (3px çerçeve, 4px gölge, rozet ofseti ve açısı ayarlanabilir, 58px sol boşluk):',
           style: AppTextStyles.secondaryText,
         ),
         const SizedBox(height: AppDimens.space8),

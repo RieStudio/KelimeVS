@@ -86,5 +86,48 @@ void main() {
         expect(lowerDesc.contains('alıştırma'), isFalse);
       }
     });
+
+    test('Rozet konumu (badgeDx) ve dönme açısı (badgeRotationDeg) sözleşmeye uygundur', () {
+      // 1. first_win: sol üstteki küçük yıldız kart sol kenar çizgisiyle hizalı (badgeDx = -6, badgeRotationDeg = -6)
+      final firstWin = AchievementUiManifest.get('first_win')!;
+      expect(firstWin.badgeDx, equals(-6.0));
+      expect(firstWin.badgeRotationDeg, equals(-6.0));
+
+      // 2. wins_10: rozet sola daha yatık (-12°) ve sol kenardan dışarı taşar (-14px)
+      final wins10 = AchievementUiManifest.get('wins_10')!;
+      expect(wins10.badgeDx, equals(-14.0));
+      expect(wins10.badgeRotationDeg, equals(-12.0));
+
+      // 3. first_match: çimen SVG'de +6° döndürülmüş olup kart alt çizgisine paralel kalması için -6° olmalıdır
+      final firstMatch = AchievementUiManifest.get('first_match')!;
+      expect(firstMatch.badgeDx, equals(-12.0));
+      expect(firstMatch.badgeRotationDeg, equals(-6.0));
+
+      // 4. Diğer başarımlar varsayılan değerleri (-12px, -6°) korur
+      final defaultIds = [
+        'matches_10',
+        'matches_50',
+        'matches_100',
+        'wins_50',
+        'wins_100',
+        'streak_3',
+        'streak_5',
+        'streak_10',
+      ];
+      for (final id in defaultIds) {
+        final item = AchievementUiManifest.get(id)!;
+        expect(item.badgeDx, equals(-12.0), reason: '$id için badgeDx -12 olmalıdır');
+        expect(item.badgeRotationDeg, equals(-6.0), reason: '$id için badgeRotationDeg -6 olmalıdır');
+      }
+
+      // 5. AchievementUiItem varsayılan kurucu parametreleri bugünkü davranışla birebir aynıdır
+      const sampleItem = AchievementUiItem(
+        id: 'sample',
+        title: 'Örnek',
+        description: 'Açıklama',
+      );
+      expect(sampleItem.badgeDx, equals(-12.0));
+      expect(sampleItem.badgeRotationDeg, equals(-6.0));
+    });
   });
 }

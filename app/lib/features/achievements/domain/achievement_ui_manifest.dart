@@ -4,10 +4,18 @@ class AchievementUiItem {
   final String title;
   final String description;
 
+  /// Rozetin kart sol kenarına göre yatay konumu (px, sola negatif, varsayılan -12.0).
+  final double badgeDx;
+
+  /// Rozetin dönme açısı derece cinsinden (varsayılan -6.0).
+  final double badgeRotationDeg;
+
   const AchievementUiItem({
     required this.id,
     required this.title,
     required this.description,
+    this.badgeDx = -12.0,
+    this.badgeRotationDeg = -6.0,
   });
 
   /// Başarıma ait çok renkli SVG ikon dosyasının asset yolu.
@@ -20,10 +28,17 @@ class AchievementUiItem {
           runtimeType == other.runtimeType &&
           id == other.id &&
           title == other.title &&
-          description == other.description;
+          description == other.description &&
+          badgeDx == other.badgeDx &&
+          badgeRotationDeg == other.badgeRotationDeg;
 
   @override
-  int get hashCode => id.hashCode ^ title.hashCode ^ description.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      description.hashCode ^
+      badgeDx.hashCode ^
+      badgeRotationDeg.hashCode;
 }
 
 /// İstemci tarafında başarım kimliklerini (ID) Türkçe başlık ve açıklamalara eşleyen manifest.
@@ -34,6 +49,7 @@ abstract final class AchievementUiManifest {
       id: 'first_match',
       title: 'İlk Adım',
       description: 'İlk maçını tamamla',
+      badgeRotationDeg: -6.0,
     ),
     'matches_10': AchievementUiItem(
       id: 'matches_10',
@@ -54,11 +70,15 @@ abstract final class AchievementUiManifest {
       id: 'first_win',
       title: 'İlk Zafer',
       description: 'İlk galibiyetini al',
+      badgeDx: -6.0,
+      badgeRotationDeg: -6.0,
     ),
     'wins_10': AchievementUiItem(
       id: 'wins_10',
       title: 'Yükselen Yıldız',
       description: '10 galibiyet al',
+      badgeDx: -14.0,
+      badgeRotationDeg: -12.0,
     ),
     'wins_50': AchievementUiItem(
       id: 'wins_50',

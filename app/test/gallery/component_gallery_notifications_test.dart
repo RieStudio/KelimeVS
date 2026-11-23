@@ -62,6 +62,42 @@ void main() {
       expect(find.text('Listelenen Bildirim Türleri Özeti:'), findsOneWidget);
     });
 
+    testWidgets('Galeride first_match, first_win ve wins_10 başarım kartları başarıyla seçilip görüntülenir', (tester) async {
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.reset());
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: NotificationsGallerySection(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // 1. Başlangıçta first_match ('İlk Adım') seçilidir
+      expect(find.text('İlk Adım'), findsWidgets);
+
+      // 2. 'İlk Zafer' (first_win) çipine dokun
+      await tester.tap(find.widgetWithText(ChoiceChip, 'İlk Zafer'));
+      await tester.pumpAndSettle();
+      expect(find.text('İlk Zafer'), findsWidgets);
+      expect(find.text('İlk galibiyetini al'), findsOneWidget);
+
+      // 3. 'Yükselen Yıldız' (wins_10) çipine dokun
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Yükselen Yıldız'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yükselen Yıldız'), findsWidgets);
+      expect(find.text('10 galibiyet al'), findsOneWidget);
+    });
+
     testWidgets('3\'lü seri başarım butonu FIFO kuyruğu doğru sırayla tetikler', (tester) async {
       tester.view.physicalSize = const Size(800, 4000);
       tester.view.devicePixelRatio = 1.0;

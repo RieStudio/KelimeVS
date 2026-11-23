@@ -14,9 +14,10 @@ import '../domain/achievement_ui_manifest.dart';
 /// - 3 px kalınlığında koyu yeşil çerçeve (AppColors.ink).
 /// - Alt tarafa 4 px ofsetli sert neo-brutalist gölge (AppColors.ink).
 /// - Köşe yarıçapı 20 px.
-/// - Kartın sol kenarından dışarı taşan (-12 px), -6 derece eğimli,
+/// - Kartın sol kenarından dışarı taşan (ikon bazında veya varsayılan -12 px),
+///   -6 derece (veya ikon bazında ayarlı) eğimli,
 ///   altında yumuşak gölgesi olan 68 px SVG başarım görseli (ColorFilter UYGULANMAZ).
-/// - İkon taşması nedeniyle sol iç boşluk 56 px (metinler ikona çarpmaz).
+/// - İkon taşması nedeniyle sol iç boşluk 58 px (metinler ikona çarpmaz).
 /// - Kalın koyu yeşil başlık (Fredoka 16 w700, AppColors.ink),
 ///   daha küçük ve mat yeşil açıklama (Nunito 12 w600, AppColors.muted).
 /// - "BAŞARIM AÇILDI" rozeti YOK, süre/timer çubuğu YOK.
@@ -24,15 +25,22 @@ import '../domain/achievement_ui_manifest.dart';
 class AchievementNotificationCard extends StatelessWidget {
   final AchievementUiItem item;
   final VoidCallback? onDismiss;
+  final double? badgeDx;
+  final double? badgeRotationDeg;
 
   const AchievementNotificationCard({
     super.key,
     required this.item,
     this.onDismiss,
+    this.badgeDx,
+    this.badgeRotationDeg,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveBadgeDx = badgeDx ?? item.badgeDx;
+    final effectiveRotationDeg = badgeRotationDeg ?? item.badgeRotationDeg;
+
     return Semantics(
       container: true,
       liveRegion: true,
@@ -107,14 +115,14 @@ class AchievementNotificationCard extends StatelessWidget {
               ),
             ),
 
-            // Dışarı Taşan Rozet (68x68, -6 derece eğimli, yumuşak gölgeli)
+            // Dışarı Taşan Rozet (68x68, konumu ve eğim açısı ayarlanabilir, yumuşak gölgeli)
             Positioned(
-              left: -12,
+              left: effectiveBadgeDx,
               top: 0,
               bottom: 0,
               child: Center(
                 child: Transform.rotate(
-                  angle: -6 * math.pi / 180,
+                  angle: effectiveRotationDeg * math.pi / 180,
                   child: Container(
                     width: 68,
                     height: 68,
