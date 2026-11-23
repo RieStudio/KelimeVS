@@ -69,6 +69,27 @@ class CancelledServerMessage extends ServerMessage {
   String toString() => 'CancelledServerMessage()';
 }
 
+/// Eşleştirme havuzunda rakip bulunamadığında gelen sunucu bildirimi (`no_opponent`).
+class NoOpponentServerMessage extends ServerMessage {
+  final String? ticketId;
+  final String? matchId;
+  final int? issuedAt;
+  final MatchedEnergyInfo? energy;
+  final String? error;
+
+  const NoOpponentServerMessage({
+    this.ticketId,
+    this.matchId,
+    this.issuedAt,
+    this.energy,
+    this.error,
+  });
+
+  @override
+  String toString() =>
+      'NoOpponentServerMessage(ticketId: $ticketId, matchId: $matchId, issuedAt: $issuedAt, energy: $energy, error: $error)';
+}
+
 /// matched mesajı içinde gelen enerji durumu.
 class MatchedEnergyInfo {
   final int current;
@@ -311,6 +332,22 @@ ServerMessage parseServerMessage(dynamic raw, {int? receivedLocalMs}) {
         return const QueuedServerMessage();
       case 'cancelled':
         return const CancelledServerMessage();
+      case 'no_opponent':
+        final error = json['error'] as String?;
+        final ticketId = json['ticketId'] as String?;
+        final matchId = json['matchId'] as String?;
+        final issuedAt = (json['issuedAt'] as num?)?.toInt();
+        final energyRaw = json['energy'];
+        final energy = energyRaw is Map<String, dynamic>
+            ? MatchedEnergyInfo.fromJson(energyRaw)
+            : null;
+        return NoOpponentServerMessage(
+          ticketId: ticketId,
+          matchId: matchId,
+          issuedAt: issuedAt,
+          energy: energy,
+          error: error,
+        );
       case 'matched':
         final matchId = json['matchId'];
         final opponentName = json['opponentName'];
@@ -447,9 +484,13 @@ String sanitizeSubmitText(String? raw) {
 }
 
 /// Kuyruğa girme istemci mesajı oluşturur (JSON string).
-String createQueueMessage(String name) {
+String createQueueMessage(String name, {bool supportsSoloTicket = false}) {
   final cleanName = sanitizePlayerName(name);
-  return jsonEncode({'t': 'queue', 'name': cleanName});
+  return jsonEncode({
+    't': 'queue',
+    'name': cleanName,
+    if (supportsSoloTicket) 'supportsSoloTicket': true,
+  });
 }
 
 /// Kuyruktan çıkma istemci mesajı oluşturur (JSON string).

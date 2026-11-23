@@ -31,6 +31,7 @@ void main() {
       expect(fakeConnection.sentMessages.length, 1);
       expect(fakeConnection.sentMessages[0], contains('"queue"'));
       expect(fakeConnection.sentMessages[0], contains('Ahmet'));
+      expect(fakeConnection.sentMessages[0], contains('"supportsSoloTicket":true'));
 
       // Sunucu "queued" yanıtı döner
       fakeConnection.emitIncoming('{"t":"queued"}');
@@ -54,12 +55,69 @@ void main() {
       await client.dispose();
     });
 
-    test('10 sn eşleşme penceresinde rakip bulunamazsa cancel gönderilir ve noOpponent yayılır',
+    test('sunucudan no_opponent bilet ile gelince MatchmakingNoOpponent yayılır',
         () async {
       final client = MatchmakingClient(
         connector: fakeConnector,
         tokenProvider: fakeTokenProvider,
-        matchWindowDuration: const Duration(milliseconds: 30),
+      );
+
+      final events = <MatchmakingEvent>[];
+      final sub = client.events.listen(events.add);
+
+      await client.start('TestUser');
+      fakeConnection.emitIncoming('{"t":"queued"}');
+      await Future<void>.delayed(Duration.zero);
+
+      fakeConnection.emitIncoming(
+        '{"t":"no_opponent","ticketId":"ticket_abc","matchId":"bot:12345678","issuedAt":1700000000,"energy":{"current":4,"max":5}}',
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events.length, 3);
+      final noOpp = events[2] as MatchmakingNoOpponent;
+      expect(noOpp.ticketId, 'ticket_abc');
+      expect(noOpp.matchId, 'bot:12345678');
+      expect(noOpp.issuedAt, 1700000000);
+      expect(noOpp.energy?.current, 4);
+      expect(noOpp.energy?.max, 5);
+      expect(fakeConnection.isClosed, isTrue);
+
+      await sub.cancel();
+      await client.dispose();
+    });
+
+    test('sunucudan no_opponent error:no_energy gelince MatchmakingNoEnergy yayılır',
+        () async {
+      final client = MatchmakingClient(
+        connector: fakeConnector,
+        tokenProvider: fakeTokenProvider,
+      );
+
+      final events = <MatchmakingEvent>[];
+      final sub = client.events.listen(events.add);
+
+      await client.start('TestUser');
+      fakeConnection.emitIncoming('{"t":"queued"}');
+      await Future<void>.delayed(Duration.zero);
+
+      fakeConnection.emitIncoming('{"t":"no_opponent","error":"no_energy"}');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events.length, 3);
+      expect(events[2], isA<MatchmakingNoEnergy>());
+      expect(fakeConnection.isClosed, isTrue);
+
+      await sub.cancel();
+      await client.dispose();
+    });
+
+    test('15 sn sunucu zaman aşımı durumunda cancel gönderilir ve server_timeout hatası yayılır',
+        () async {
+      final client = MatchmakingClient(
+        connector: fakeConnector,
+        tokenProvider: fakeTokenProvider,
+        serverTimeoutDuration: const Duration(milliseconds: 30),
       );
 
       final events = <MatchmakingEvent>[];
@@ -71,10 +129,15 @@ void main() {
 
       expect(events.any((e) => e is MatchmakingQueued), isTrue);
 
-      // 30 ms'lik pencerenin dolmasını bekle
+      // 30 ms'lik zaman aşımı süresinin dolmasını bekle
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(events.any((e) => e is MatchmakingNoOpponent), isTrue);
+      expect(
+        events.any(
+          (e) => e is MatchmakingFailed && e.reason == 'server_timeout',
+        ),
+        isTrue,
+      );
       expect(fakeConnection.sentMessages.any((msg) => msg.contains('"cancel"')), isTrue);
       expect(fakeConnection.isClosed, isTrue);
 

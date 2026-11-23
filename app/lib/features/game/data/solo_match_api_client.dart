@@ -9,6 +9,7 @@ import '../../profile/domain/energy_state.dart';
 /// Solo maç sonucunun sunucuya iletilmesi için gerekli istek gövdesi.
 class SoloMatchSubmission {
   final String matchId;
+  final String? ticketId;
   final String outcome; // 'win' | 'loss'
   final int myScore;
   final int oppScore;
@@ -19,6 +20,7 @@ class SoloMatchSubmission {
 
   const SoloMatchSubmission({
     required this.matchId,
+    this.ticketId,
     required this.outcome,
     required this.myScore,
     required this.oppScore,
@@ -30,6 +32,7 @@ class SoloMatchSubmission {
 
   Map<String, dynamic> toJson() => {
         'matchId': matchId,
+        if (ticketId != null) 'ticketId': ticketId,
         'outcome': outcome,
         'myScore': myScore,
         'oppScore': oppScore,
@@ -42,6 +45,7 @@ class SoloMatchSubmission {
   factory SoloMatchSubmission.fromJson(Map<String, dynamic> json) {
     return SoloMatchSubmission(
       matchId: json['matchId'] as String? ?? '',
+      ticketId: json['ticketId'] as String?,
       outcome: json['outcome'] as String? ?? 'loss',
       myScore: (json['myScore'] as num?)?.toInt() ?? 0,
       oppScore: (json['oppScore'] as num?)?.toInt() ?? 0,
@@ -131,6 +135,7 @@ class HttpSoloMatchApiClient implements SoloMatchApiClient {
         method: 'POST',
         clientFactory: clientFactory,
         jsonBody: {
+          if (submission.ticketId != null) 'ticketId': submission.ticketId,
           'matchId': submission.matchId,
           'outcome': submission.outcome,
           'myScore': submission.myScore,

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app/features/online/data/matchmaking_client.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -19,6 +22,7 @@ import 'package:app/core/widgets/result_badge.dart';
 import 'package:app/core/widgets/secondary_button.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
+import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/home/presentation/home_screen.dart';
@@ -54,10 +58,30 @@ class _MockProfileNotifier extends ProfileNotifier {
   ProfileState build() => _state;
 }
 
+class _FakeMatchmakingClient extends MatchmakingClient {
+  final StreamController<MatchmakingEvent> _controller =
+      StreamController<MatchmakingEvent>.broadcast(sync: true);
+
+  @override
+  Stream<MatchmakingEvent> get events => _controller.stream;
+
+  @override
+  Future<void> start(String name) async {}
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+}
+
 Widget _buildTestApp(MatchHistoryRepository repo, {ProfileState? profileState}) {
   return ProviderScope(
     overrides: [
       matchHistoryRepositoryProvider.overrideWithValue(repo),
+      matchmakingClientFactoryProvider.overrideWithValue(() => _FakeMatchmakingClient()),
       if (profileState != null)
         profileProvider.overrideWith(() => _MockProfileNotifier(profileState)),
     ],
@@ -92,6 +116,7 @@ Widget _buildMainShellTestApp(
     overrides: [
       authRepositoryProvider.overrideWithValue(_HomeTestAuthRepo()),
       matchHistoryRepositoryProvider.overrideWithValue(repo),
+      matchmakingClientFactoryProvider.overrideWithValue(() => _FakeMatchmakingClient()),
       if (profileState != null)
         profileProvider.overrideWith(() => _MockProfileNotifier(profileState)),
     ],

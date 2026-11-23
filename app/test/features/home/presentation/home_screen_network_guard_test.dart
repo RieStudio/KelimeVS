@@ -1,16 +1,39 @@
+import 'dart:async';
+
 import 'package:app/core/network/network_service.dart';
 import 'package:app/core/network/network_status_provider.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/theme/app_theme.dart';
 import 'package:app/features/game/application/match_history_provider.dart';
+import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/domain/history/match_history_entry.dart';
 import 'package:app/features/game/domain/history/match_history_repository.dart';
 import 'package:app/features/home/presentation/home_screen.dart';
 import 'package:app/features/matchmaking/presentation/matchmaking_screen.dart';
+import 'package:app/features/online/data/matchmaking_client.dart';
 import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakeMatchmakingClient extends MatchmakingClient {
+  final StreamController<MatchmakingEvent> _controller =
+      StreamController<MatchmakingEvent>.broadcast(sync: true);
+
+  @override
+  Stream<MatchmakingEvent> get events => _controller.stream;
+
+  @override
+  Future<void> start(String name) async {}
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+}
 
 class FakeMatchHistoryRepository implements MatchHistoryRepository {
   @override
@@ -119,6 +142,7 @@ void main() {
             networkServiceProvider.overrideWithValue(FakeOnlineNetworkService()),
             matchHistoryRepositoryProvider.overrideWithValue(FakeMatchHistoryRepository()),
             profileProvider.overrideWith(FakeProfileNotifier.new),
+            matchmakingClientFactoryProvider.overrideWithValue(() => _FakeMatchmakingClient()),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,

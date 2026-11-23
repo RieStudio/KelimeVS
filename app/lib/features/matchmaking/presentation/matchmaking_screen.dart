@@ -77,6 +77,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   String? _opponentUid;
   String _opponentFrame = 'classic';
   String? _matchedMatchId;
+  String? _soloTicketId;
+  String? _soloMatchId;
   bool _isOnlineMatch = false;
   bool _isOpponentFound = false;
   bool _isCancelled = false;
@@ -88,6 +90,7 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
 
   MatchmakingClient? _client;
   StreamSubscription<MatchmakingEvent>? _subscription;
+  Timer? _queueFlushTimer;
   Timer? _searchTimer;
   Timer? _minSearchTimer;
   Timer? _transitionTimer;
@@ -191,6 +194,25 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   }
 
   void _startOnlineMatchmaking() {
+    // İstemcide eşleşme arama ekranına girerken bekleyen solo maç kuyruğunu boşaltmayı dene
+    try {
+      _queueFlushTimer?.cancel();
+      _queueFlushTimer = Timer(const Duration(seconds: 3), () {
+        _queueFlushTimer = null;
+      });
+      ref
+          .read(soloMatchQueueManagerProvider)
+          .processQueue()
+          .then((_) {
+            _queueFlushTimer?.cancel();
+            _queueFlushTimer = null;
+          })
+          .catchError((_) {
+            _queueFlushTimer?.cancel();
+            _queueFlushTimer = null;
+          });
+    } catch (_) {}
+
     final client =
         widget.matchmakingClient ??
         ref.read(matchmakingClientFactoryProvider)();
@@ -244,15 +266,49 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
                 .updateEnergy(currentProfile.energy!.copyWith(current: 0));
           }
         }
-      } else if (event is MatchmakingNoOpponent ||
-          event is MatchmakingUnavailable ||
-          event is MatchmakingFailed) {
-        // Sessizce yerel botlu maça düş (hata gösterilmez, bot ibaresi yok)
+      } else if (event is MatchmakingNoOpponent) {
+        // Sunucudan biletle gelen maç: enerji düşümü bilet anında gerçekleştiğinden anında güncelle
+        if (event.energy != null) {
+          final currentEnergy = ref.read(profileProvider).energy;
+          final updatedEnergy = (currentEnergy ??
+                  EnergyState(
+                    enabled: true,
+                    current: event.energy!.current,
+                    max: event.energy!.max,
+                  ))
+              .copyWith(
+            enabled: true,
+            current: event.energy!.current,
+            max: event.energy!.max,
+            nextEnergyAtMs: event.energy!.nextEnergyAtMs,
+          );
+          ref.read(profileProvider.notifier).updateEnergy(updatedEnergy);
+        }
+
         _isOnlineMatch = false;
-        _matchedMatchId = null;
+        _soloTicketId = event.ticketId;
+        _soloMatchId = event.matchId;
         _opponentName = _fallbackOpponentName;
         _opponentFrame = BotFrameResolver.resolve(_opponentName);
+        setState(() {});
         _handleOpponentFound();
+      } else if (event is MatchmakingUnavailable ||
+          event is MatchmakingFailed) {
+        // Çevrimdışı sessiz maç düşüşü yok; bağlantı hatası sayılır ve ana ekrana dönülür
+        _cancelAllTimers();
+        _cancelMatchmakingClient();
+        if (mounted) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const MainShell()),
+            );
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(AppStrings.connectionLostNotice)),
+          );
+        }
       }
     });
 
@@ -361,6 +417,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
         ref
             .read(matchControllerProvider.notifier)
             .startMatch(
+              matchId: _soloMatchId,
+              ticketId: _soloTicketId,
               opponentName: oppName,
               preselectedQuestionId: _preselectedBotQuestion?.id,
               questions: _localQuestions.isNotEmpty ? _localQuestions : null,
@@ -399,6 +457,8 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
   }
 
   void _cancelAllTimers() {
+    _queueFlushTimer?.cancel();
+    _queueFlushTimer = null;
     _searchTimer?.cancel();
     _searchTimer = null;
     _minSearchTimer?.cancel();

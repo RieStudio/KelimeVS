@@ -48,6 +48,8 @@ class FakeMatchController extends MatchController {
 
   @override
   Future<void> startMatch({
+    String? matchId,
+    String? ticketId,
     List<Question>? questions,
     String? opponentName,
     String? initialTurnPlayerId,

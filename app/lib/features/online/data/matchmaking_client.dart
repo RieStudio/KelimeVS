@@ -59,12 +59,23 @@ class MatchmakingCancelled extends MatchmakingEvent {
   String toString() => 'MatchmakingCancelled()';
 }
 
-/// Eşleştirme penceresi içinde (10 sn) rakip bulunamadı.
+/// Eşleştirme havuzunda rakip bulunamadığında sunucudan biletle gelen bildirim (`no_opponent`).
 class MatchmakingNoOpponent extends MatchmakingEvent {
-  const MatchmakingNoOpponent();
+  final String? ticketId;
+  final String? matchId;
+  final int? issuedAt;
+  final MatchedEnergyInfo? energy;
+
+  const MatchmakingNoOpponent({
+    this.ticketId,
+    this.matchId,
+    this.issuedAt,
+    this.energy,
+  });
 
   @override
-  String toString() => 'MatchmakingNoOpponent()';
+  String toString() =>
+      'MatchmakingNoOpponent(ticketId: $ticketId, matchId: $matchId, issuedAt: $issuedAt, energy: $energy)';
 }
 
 /// Sunucu veya içerik kullanılamıyor (botlu maça yönlendirilir).
@@ -101,7 +112,7 @@ class MatchmakingClient {
   final AuthTokenProvider _tokenProvider;
   final String? _customServerWsUrl;
   final Duration _connectTimeout;
-  final Duration _matchWindowDuration;
+  final Duration _serverTimeoutDuration;
   final Timer Function(Duration duration, void Function() callback)?
   _timerFactory;
 
@@ -121,11 +132,13 @@ class MatchmakingClient {
     AuthTokenProvider? tokenProvider,
     String? serverWsUrl,
     this._connectTimeout = const Duration(seconds: 8),
-    this._matchWindowDuration = const Duration(seconds: 10),
+    Duration? matchWindowDuration,
+    Duration serverTimeoutDuration = const Duration(seconds: 15),
     this._timerFactory,
   }) : _connector = connector ?? const IoWebSocketConnector(),
        _tokenProvider = tokenProvider ?? FirebaseAuthTokenProvider(),
-       _customServerWsUrl = serverWsUrl;
+       _customServerWsUrl = serverWsUrl,
+       _serverTimeoutDuration = serverTimeoutDuration;
 
   /// Eşleştirme olay akışı.
   Stream<MatchmakingEvent> get events => _controller.stream;
@@ -203,9 +216,9 @@ class MatchmakingClient {
       },
     );
 
-    // 4. Kuyruğa girme mesajını ilet
+    // 4. Kuyruğa girme mesajını ilet (supportsSoloTicket: true ile)
     try {
-      _connection!.send(createQueueMessage(name));
+      _connection!.send(createQueueMessage(name, supportsSoloTicket: true));
     } catch (e) {
       _finishWith(MatchmakingFailed('send_failed: $e'));
     }
@@ -218,7 +231,7 @@ class MatchmakingClient {
     if (msg is QueuedServerMessage) {
       _emit(const MatchmakingQueued());
 
-      // "queued" alındıktan sonra 10 sn eşleşme penceresi başlar (bağlantı süresini saymaz)
+      // Sunucudan 15 sn içinde ne eşleşme ne no_opponent gelmezse bağlantı sorunu sayılır (server_timeout)
       _matchTimer?.cancel();
       Future<void> timerCallback() async {
         if (_isFinished || _isCancelled) return;
@@ -226,13 +239,14 @@ class MatchmakingClient {
           _connection?.send(createCancelMessage());
         } catch (_) {}
         await _cleanupConnection();
-        _finishWith(const MatchmakingNoOpponent());
+        _finishWith(const MatchmakingFailed('server_timeout'));
       }
 
+      final timeoutDuration = _serverTimeoutDuration;
       if (_timerFactory != null) {
-        _matchTimer = _timerFactory(_matchWindowDuration, timerCallback);
+        _matchTimer = _timerFactory(timeoutDuration, timerCallback);
       } else {
-        _matchTimer = Timer(_matchWindowDuration, timerCallback);
+        _matchTimer = Timer(timeoutDuration, timerCallback);
       }
     } else if (msg is MatchedServerMessage) {
       _matchTimer?.cancel();
@@ -249,6 +263,22 @@ class MatchmakingClient {
         ),
       );
       _finishAndClose();
+    } else if (msg is NoOpponentServerMessage) {
+      _matchTimer?.cancel();
+      _matchTimer = null;
+      if (msg.error == 'no_energy') {
+        _finishWith(const MatchmakingNoEnergy());
+      } else {
+        _emit(
+          MatchmakingNoOpponent(
+            ticketId: msg.ticketId,
+            matchId: msg.matchId,
+            issuedAt: msg.issuedAt,
+            energy: msg.energy,
+          ),
+        );
+        _finishAndClose();
+      }
     } else if (msg is ErrorServerMessage) {
       _matchTimer?.cancel();
       _matchTimer = null;

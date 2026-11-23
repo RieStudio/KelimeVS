@@ -26,6 +26,7 @@ import '../domain/match/match_state.dart';
 import '../domain/history/match_history_entry.dart';
 import '../domain/models.dart';
 import '../domain/text_filter.dart';
+import '../../match_request/application/match_requests_providers.dart';
 import '../../match_request/application/presence_controller.dart';
 import '../../profile/application/profile_notifier.dart';
 import 'match_history_provider.dart';
@@ -70,6 +71,8 @@ class MatchController extends Notifier<MatchUiState>
   final SoloMatchQueueManager? _injectedSoloMatchQueueManager;
   final int Function()? _injectedCoinsProvider;
   final void Function(int coins)? _injectedOnCoinsUpdated;
+  final Stream<bool>? _injectedConnectionStream;
+  final Duration _disconnectForfeitDuration;
   final int roundTransitionDelayMs;
 
   MatchController({
@@ -87,6 +90,8 @@ class MatchController extends Notifier<MatchUiState>
     SoloMatchQueueManager? soloMatchQueueManager,
     int Function()? coinsProvider,
     void Function(int coins)? onCoinsUpdated,
+    Stream<bool>? connectionStream,
+    Duration disconnectForfeitDuration = const Duration(seconds: 15),
     this.roundTransitionDelayMs = AppDimens.roundTransitionDurationMs,
   })  : _injectedClock = clock,
         _injectedRandom = random,
@@ -101,11 +106,17 @@ class MatchController extends Notifier<MatchUiState>
         _injectedSoloMatchQueueRepository = soloMatchQueueRepository,
         _injectedSoloMatchQueueManager = soloMatchQueueManager,
         _injectedCoinsProvider = coinsProvider,
-        _injectedOnCoinsUpdated = onCoinsUpdated;
+        _injectedOnCoinsUpdated = onCoinsUpdated,
+        _injectedConnectionStream = connectionStream,
+        _disconnectForfeitDuration = disconnectForfeitDuration;
 
   String _botMatchId = '';
+  String? _soloTicketId;
   int _matchStartedAtMs = 0;
   bool _hasSubmittedSoloMatch = false;
+  bool _isDisconnectForfeit = false;
+  StreamSubscription<bool>? _connectionSubscription;
+  Timer? _disconnectForfeitTimer;
 
   Timer? _tickTimer;
   Timer? _botTimer;
@@ -137,6 +148,17 @@ class MatchController extends Notifier<MatchUiState>
 
   @visibleForTesting
   String get botMatchIdForTesting => _botMatchId;
+
+  @visibleForTesting
+  String? get soloTicketIdForTesting => _soloTicketId;
+
+  @visibleForTesting
+  Timer? get disconnectForfeitTimerForTesting => _disconnectForfeitTimer;
+
+  @visibleForTesting
+  void setConnectionStatusForTesting(bool isConnected) {
+    _onConnectionStatusChanged(isConnected);
+  }
 
   @visibleForTesting
   void handleAppLifecycleStateForTesting(AppLifecycleState lifecycleState) {
@@ -356,6 +378,8 @@ class MatchController extends Notifier<MatchUiState>
 
   /// Yeni bir botlu maç başlatır.
   Future<void> startMatch({
+    String? matchId,
+    String? ticketId,
     List<Question>? questions,
     String? opponentName,
     String? initialTurnPlayerId,
@@ -366,6 +390,7 @@ class MatchController extends Notifier<MatchUiState>
     _cancelAllTimers();
     _isMatchSaved = false;
     _hasSubmittedSoloMatch = false;
+    _isDisconnectForfeit = false;
     _isPaused = false;
     _frozenRemainingTurnMs = null;
     _frozenRemainingBotDelayMs = null;
@@ -379,12 +404,16 @@ class MatchController extends Notifier<MatchUiState>
     final clock = _clock;
     _matchStartedAtMs = clock.nowMs();
 
-    _botMatchId = generateBotMatchId();
+    _botMatchId = matchId ?? generateBotMatchId();
+    _soloTicketId = ticketId;
+    _startConnectionMonitoring();
+
     try {
       ref.read(presenceControllerProvider.notifier).acquireBusy('bot_match');
     } catch (_) {}
 
     state = state.copyWith(
+      connectionStatus: ConnectionStatus.connected,
       isPaused: false,
       isLoading: true,
       errorMessage: null,
@@ -780,6 +809,87 @@ class MatchController extends Notifier<MatchUiState>
       engineResult: result,
       clock: _clock,
       random: _random,
+    );
+  }
+
+  void _startConnectionMonitoring() {
+    _connectionSubscription?.cancel();
+    _disconnectForfeitTimer?.cancel();
+    _disconnectForfeitTimer = null;
+
+    Stream<bool>? stream = _injectedConnectionStream;
+    if (stream == null) {
+      try {
+        stream = ref.read(userInboxClientProvider).connectionStatus;
+      } catch (_) {}
+    }
+
+    if (stream != null) {
+      _connectionSubscription = stream.listen((isConnected) {
+        if (_isDisposed) return;
+        _onConnectionStatusChanged(isConnected);
+      });
+    }
+  }
+
+  void _onConnectionStatusChanged(bool isConnected) {
+    final match = state.matchState;
+    if (match == null ||
+        match.phase == MatchPhase.matchFinished ||
+        _pendingFinishedMatchState != null) {
+      return;
+    }
+
+    if (!isConnected) {
+      if (state.connectionStatus != ConnectionStatus.reconnecting) {
+        state = state.copyWith(connectionStatus: ConnectionStatus.reconnecting);
+        _disconnectForfeitTimer?.cancel();
+        _disconnectForfeitTimer = Timer(_disconnectForfeitDuration, () {
+          _handleDisconnectForfeit();
+        });
+      }
+    } else {
+      if (state.connectionStatus == ConnectionStatus.reconnecting) {
+        _disconnectForfeitTimer?.cancel();
+        _disconnectForfeitTimer = null;
+        state = state.copyWith(connectionStatus: ConnectionStatus.connected);
+      }
+    }
+  }
+
+  void _handleDisconnectForfeit() {
+    _disconnectForfeitTimer?.cancel();
+    _disconnectForfeitTimer = null;
+
+    final match = state.matchState;
+    if (match == null ||
+        match.phase == MatchPhase.matchFinished ||
+        _pendingFinishedMatchState != null) {
+      return;
+    }
+
+    _cancelAllTimers();
+    _unregisterLifecycleObserver();
+    final clock = _clock;
+    final random = _random;
+    final now = clock.nowMs();
+
+    final res = MatchEngine.forfeit(
+      state: match,
+      playerId: 'me',
+      nowMs: now,
+    );
+
+    _isDisconnectForfeit = true;
+    _applyEngineResult(
+      engineResult: res,
+      clock: clock,
+      random: random,
+    );
+
+    state = state.copyWith(
+      connectionStatus: ConnectionStatus.permanentDisconnected,
+      isDisconnectedPermanent: true,
     );
   }
 
@@ -1212,6 +1322,10 @@ class MatchController extends Notifier<MatchUiState>
     _tickTimer = null;
     _cancelBotTimer();
     _cancelTransitionTimer();
+    _disconnectForfeitTimer?.cancel();
+    _disconnectForfeitTimer = null;
+    _connectionSubscription?.cancel();
+    _connectionSubscription = null;
     _frozenRemainingTurnMs = null;
     _pendingFinishedMatchState = null;
     _pendingSummary = null;
@@ -1256,6 +1370,11 @@ class MatchController extends Notifier<MatchUiState>
       final forfeitedPlayer = isForfeit
           ? (isWinner ? 'bot' : 'me')
           : null;
+      final endReason = _isDisconnectForfeit
+          ? MatchEndReason.baglantiKoptu
+          : (isForfeit
+              ? (isWinner ? MatchEndReason.rakipTerk : MatchEndReason.terk)
+              : MatchEndReason.normal);
 
       if (kDebugMode) {
         debugPrint(
@@ -1275,12 +1394,14 @@ class MatchController extends Notifier<MatchUiState>
 
       final entry = MatchHistoryEntry(
         id: 'match_${finishedAtMs}_${_random.nextInt(100000)}',
+        matchId: _botMatchId.isNotEmpty ? _botMatchId : null,
         opponentName: opponentName.isNotEmpty ? opponentName : 'Rakip',
         finishedAtMs: finishedAtMs,
         myScore: myScore,
         opponentScore: opponentScore,
         result: isWinner ? MatchResult.win : MatchResult.lose,
         endType: isForfeit ? MatchEndType.forfeit : MatchEndType.normal,
+        endReason: endReason,
         forfeitedPlayerId: forfeitedPlayer,
         roundRecords: finishedState.roundHistory,
         roundQuestionTexts: questionTexts,
@@ -1335,6 +1456,7 @@ class MatchController extends Notifier<MatchUiState>
 
     final submission = SoloMatchSubmission(
       matchId: _botMatchId,
+      ticketId: _soloTicketId,
       outcome: outcome,
       myScore: myScore,
       oppScore: oppScore,
