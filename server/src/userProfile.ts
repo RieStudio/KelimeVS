@@ -59,7 +59,7 @@ export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUI
 }
 import type { Env } from './index';
 import { evaluateAchievements } from './achievements/definitions';
-import { SOLO_DAILY_SAFETY_CAP } from './soloMatch';
+import { MIN_SOLO_WIN_SECONDS, SOLO_DAILY_SAFETY_CAP } from './soloMatch';
 
 export type MatchRewardOutcome =
   | 'win'
@@ -98,14 +98,28 @@ export interface ApplyResultToCountersResult {
 
 export interface ApplyBotMatchRewardParams {
   readonly matchId: string;
+  readonly ticketId: string;
   readonly outcome: 'win' | 'loss';
   readonly myScore: number;
   readonly oppScore: number;
-  readonly correctAnswers: number;
-  readonly durationSeconds: number;
+  readonly correctAnswers?: number;
+  readonly durationSeconds?: number;
   readonly endedBy: 'normal' | 'forfeit';
   readonly uid?: string;
   readonly nowMs?: number;
+}
+
+export interface IssueSoloTicketResult {
+  readonly ok: boolean;
+  readonly reason?: 'no_energy' | 'account_deleted';
+  readonly ticketId?: string;
+  readonly matchId?: string;
+  readonly issuedAt?: number;
+  readonly energy?: {
+    readonly current: number;
+    readonly max: number;
+    readonly nextEnergyAtMs: number | null;
+  };
 }
 
 export interface ApplyBotMatchRewardResult {
@@ -566,6 +580,16 @@ export class UserProfile extends DurableObject<Env> {
         day_key TEXT PRIMARY KEY,
         count INTEGER NOT NULL DEFAULT 0
       );
+
+      CREATE TABLE IF NOT EXISTS solo_tickets (
+        ticket_id TEXT PRIMARY KEY,
+        match_id TEXT NOT NULL,
+        issued_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_solo_tickets_match ON solo_tickets(match_id);
     `);
 
     this.ctx.storage.sql.exec(`
@@ -658,6 +682,7 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM match_request_rate_limits;
       DELETE FROM user_presence;
       DELETE FROM daily_solo_matches;
+      DELETE FROM solo_tickets;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -967,9 +992,14 @@ export class UserProfile extends DurableObject<Env> {
     const cursor = this.ctx.storage.sql.exec<ProfileRow>(
       'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname, allow_match_requests, current_streak, max_streak, achievements_initialized FROM profiles LIMIT 1'
     );
-    const rows = cursor.toArray();
+    let rows = cursor.toArray();
 
     if (rows.length > 0) {
+      if (this.expireAbandonedTickets(nowMs, rows[0].uid)) {
+        rows = this.ctx.storage.sql.exec<ProfileRow>(
+          'SELECT uid, nickname, coins, played, won, lost, correct_answers, created_at, equipped_frame, is_guest, is_system_nickname, allow_match_requests, current_streak, max_streak, achievements_initialized FROM profiles LIMIT 1'
+        ).toArray();
+      }
       const row = rows[0];
       let currentIsGuest = (row.is_guest as number | undefined) ?? 0;
       let currentIsSystem = (row.is_system_nickname as number | undefined) ?? 0;
@@ -1507,16 +1537,229 @@ export class UserProfile extends DurableObject<Env> {
     const dailyRows = dailyCursor.toArray();
     const currentEarnedToday = dailyRows.length > 0 ? dailyRows[0].earned : 0;
 
-    const capVal = parseInt(this.env.DAILY_MATCH_COIN_CAP ?? '300', 10);
-    const dailyCap = Number.isFinite(capVal) && capVal >= 0 ? capVal : 300;
+    const rawCap = this.env.DAILY_MATCH_COIN_CAP?.trim().toLowerCase();
+    const isUnlimited = !rawCap || rawCap === 'unlimited' || rawCap === '0';
+    if (isUnlimited) {
+      return { actualCoinsAwarded: baseReward, dayKey };
+    }
+
+    const capVal = parseInt(rawCap, 10);
+    const dailyCap = Number.isFinite(capVal) && capVal > 0 ? capVal : baseReward;
     const remainingCap = Math.max(0, dailyCap - currentEarnedToday);
 
     const actualCoinsAwarded = Math.max(0, Math.min(baseReward, remainingCap));
     return { actualCoinsAwarded, dayKey };
   }
 
+  private expireAbandonedTickets(nowMs: number, effectiveUid: string): boolean {
+    const expired = this.ctx.storage.sql
+      .exec<{ ticket_id: string; match_id: string }>(
+        'SELECT ticket_id, match_id FROM solo_tickets WHERE used = 0 AND expires_at < ? LIMIT 10',
+        nowMs
+      )
+      .toArray();
+
+    if (expired.length === 0) return false;
+
+    this.runInTransaction(() => {
+      for (const t of expired) {
+        this.ctx.storage.sql.exec(
+          'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+          t.ticket_id
+        );
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET played_solo = played_solo + 1 WHERE uid = ?',
+          effectiveUid
+        );
+        this.applyResultToCounters({
+          matchId: t.match_id,
+          isWin: false,
+          isLoss: true,
+          correctCount: 0,
+          source: 'solo',
+          nowMs,
+        });
+        this.ctx.storage.sql.exec(
+          `INSERT OR IGNORE INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+           VALUES (?, ?, 'solo_abandoned', 0)`,
+          t.match_id,
+          nowMs
+        );
+      }
+      this.ctx.storage.sql.exec(`
+        DELETE FROM processed_matches
+        WHERE match_id NOT IN (
+          SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+        )
+      `);
+    });
+    return true;
+  }
+
   /**
-   * İstemcide oynanan solo maç sonucunu atomik ve idempotent olarak işler.
+   * İstemcide oynanacak maç için bilet üretir ve enerjiyi atomik olarak düşer.
+   * Önceki kullanılmamış biletleri 'terk edilmiş' (kayıp) olarak kapatır.
+   */
+  async issueSoloTicket(uid?: string, nowMs = Date.now()): Promise<IssueSoloTicketResult> {
+    this.ensureSchema(nowMs);
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    const profile = await this.getProfile(uid, 0, undefined, nowMs);
+    const effectiveUid = profile.uid;
+
+    return this.runInTransaction(() => {
+      // 1. Enerji kontrolü (yetersizse HİÇBİR ŞEY yazma ve hemen dön)
+      const energyEnabled = isEnergyEnabledForUser(this.env, effectiveUid);
+      const maxEnergy = getEnergyMax(this.env);
+      const regenMinutes = getEnergyRegenMinutes(this.env);
+      const cost = getEnergyCostPerMatch(this.env);
+
+      let newEnergy = maxEnergy;
+      let nextEnergyAtMs: number | null = null;
+      let newUpdatedAtMs = nowMs;
+
+      if (energyEnabled) {
+        const rows = this.ctx.storage.sql
+          .exec<{ energy?: number; energy_updated_at?: number }>(
+            'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+          )
+          .toArray();
+
+        const savedEnergy =
+          rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+            ? Number(rows[0].energy)
+            : maxEnergy;
+        const savedUpdatedAt =
+          rows.length > 0 &&
+          rows[0].energy_updated_at !== undefined &&
+          rows[0].energy_updated_at !== null
+            ? Number(rows[0].energy_updated_at)
+            : 0;
+
+        const regen = calculateRegeneratedEnergy(
+          savedEnergy,
+          savedUpdatedAt,
+          nowMs,
+          maxEnergy,
+          regenMinutes
+        );
+
+        if (regen.current < cost) {
+          return {
+            ok: false,
+            reason: 'no_energy',
+          };
+        }
+
+        newEnergy = regen.current - cost;
+        newUpdatedAtMs = regen.current >= maxEnergy ? nowMs : regen.updatedAtMs;
+        nextEnergyAtMs =
+          newEnergy < maxEnergy ? newUpdatedAtMs + regenMinutes * 60 * 1000 : null;
+      }
+
+      // 2. Önceki kullanılmamış (used=0) biletleri "terk edilmiş" (kayıp) olarak kapat
+      const unusedTickets = this.ctx.storage.sql
+        .exec<{ ticket_id: string; match_id: string }>(
+          'SELECT ticket_id, match_id FROM solo_tickets WHERE used = 0'
+        )
+        .toArray();
+
+      for (const t of unusedTickets) {
+        this.ctx.storage.sql.exec(
+          'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+          t.ticket_id
+        );
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET played_solo = played_solo + 1 WHERE uid = ?',
+          effectiveUid
+        );
+        this.applyResultToCounters({
+          matchId: t.match_id,
+          isWin: false,
+          isLoss: true,
+          correctCount: 0,
+          source: 'solo',
+          nowMs,
+        });
+        this.ctx.storage.sql.exec(
+          `INSERT OR IGNORE INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+           VALUES (?, ?, 'solo_abandoned', 0)`,
+          t.match_id,
+          nowMs
+        );
+      }
+      if (unusedTickets.length > 0) {
+        this.ctx.storage.sql.exec(`
+          DELETE FROM processed_matches
+          WHERE match_id NOT IN (
+            SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+          )
+        `);
+      }
+
+      // 3. match_id ve ticketId üret
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+      const matchBytes = new Uint8Array(24);
+      crypto.getRandomValues(matchBytes);
+      let randMatch = '';
+      for (let i = 0; i < 24; i++) {
+        randMatch += chars[matchBytes[i] % chars.length];
+      }
+      const matchId = `bot:${randMatch}`;
+
+      const ticketBytes = new Uint8Array(24);
+      crypto.getRandomValues(ticketBytes);
+      let randTicket = '';
+      for (let i = 0; i < 24; i++) {
+        randTicket += chars[ticketBytes[i] % chars.length];
+      }
+      const ticketId = `stk_${randTicket}`;
+
+      // 4. Enerjiyi düş
+      if (energyEnabled) {
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+          newEnergy,
+          newUpdatedAtMs
+        );
+        this.ctx.storage.sql.exec(
+          'INSERT INTO energy_spends (match_id, uid, amount, created_at) VALUES (?, ?, ?, ?)',
+          matchId,
+          effectiveUid,
+          cost,
+          nowMs
+        );
+      }
+
+      // 5. Yeni bileti kaydet (15 dakika geçerli)
+      const expiresAt = nowMs + 15 * 60 * 1000;
+      this.ctx.storage.sql.exec(
+        'INSERT INTO solo_tickets (ticket_id, match_id, issued_at, expires_at, used) VALUES (?, ?, ?, ?, 0)',
+        ticketId,
+        matchId,
+        nowMs,
+        expiresAt
+      );
+
+      return {
+        ok: true,
+        ticketId,
+        matchId,
+        issuedAt: nowMs,
+        energy: {
+          current: newEnergy,
+          max: maxEnergy,
+          nextEnergyAtMs,
+        },
+      };
+    });
+  }
+
+  /**
+   * İstemcide oynanan solo maç sonucunu bilet doğrulamasıyla atomik ve idempotent olarak işler.
    * Lider tablosuna yazmaz.
    */
   async applyBotMatchReward(params: ApplyBotMatchRewardParams): Promise<ApplyBotMatchRewardResult> {
@@ -1531,13 +1774,15 @@ export class UserProfile extends DurableObject<Env> {
     const effectiveUid = profile.uid;
 
     // 1. İdempotency kontrolü: Bu matchId zaten işlendi mi?
+    // Not: Normal tamamlanmış bir maç tekrar gelirse 200 idempotent yanıt dönülür.
+    // Terk edilmiş veya süresi dolmuş biletler (solo_abandoned) ise geçerli bir maç olarak kabul edilmez.
     const existingMatchCursor = this.ctx.storage.sql.exec<ProcessedMatchRow>(
-      'SELECT match_id, coins_awarded FROM processed_matches WHERE match_id = ? LIMIT 1',
+      'SELECT match_id, coins_awarded, outcome FROM processed_matches WHERE match_id = ? LIMIT 1',
       params.matchId
     );
     const existingMatches = existingMatchCursor.toArray();
 
-    if (existingMatches.length > 0) {
+    if (existingMatches.length > 0 && existingMatches[0].outcome !== 'solo_abandoned') {
       const unlockedRows = this.ctx.storage.sql
         .exec<{ id: string }>(
           "SELECT id FROM user_achievements WHERE match_id = ? AND match_id != 'backfill' ORDER BY rowid ASC",
@@ -1557,7 +1802,47 @@ export class UserProfile extends DurableObject<Env> {
       };
     }
 
-    // 2. Günlük güvenlik tavanı kontrolü (SOLO_DAILY_SAFETY_CAP = 200)
+    // 2. Bilet doğrulaması: Var, bu kullanıcıya ait, match_id eşleşiyor, used=0, süresi dolmamış
+    if (!params.ticketId || typeof params.ticketId !== 'string') {
+      throw new Error('ticket_required');
+    }
+    const ticketRows = this.ctx.storage.sql
+      .exec<{
+        ticket_id: string;
+        match_id: string;
+        issued_at: number;
+        expires_at: number;
+        used: number;
+      }>(
+        'SELECT ticket_id, match_id, issued_at, expires_at, used FROM solo_tickets WHERE ticket_id = ? LIMIT 1',
+        params.ticketId.trim()
+      )
+      .toArray();
+
+    if (ticketRows.length === 0) {
+      throw new Error('ticket_invalid');
+    }
+    const ticket = ticketRows[0];
+    if (ticket.expires_at < nowMs) {
+      throw new Error('ticket_expired');
+    }
+    if (ticket.used === 1) {
+      throw new Error('ticket_already_used');
+    }
+    if (ticket.match_id !== params.matchId) {
+      throw new Error('ticket_invalid');
+    }
+
+    // 3. Galibiyette sunucu saatine göre minimum süre kontrolü (MIN_SOLO_WIN_SECONDS = 20)
+    // Çok hızlı galibiyet 400 ile reddedilir ve bilet kullanılmamış (used=0) kalır.
+    if (params.outcome === 'win') {
+      const elapsedSeconds = Math.floor((nowMs - ticket.issued_at) / 1000);
+      if (elapsedSeconds < MIN_SOLO_WIN_SECONDS) {
+        throw new Error('match_too_fast');
+      }
+    }
+
+    // 4. Günlük güvenlik tavanı kontrolü (SOLO_DAILY_SAFETY_CAP = 1000)
     const dayKey = new Date(nowMs).toISOString().slice(0, 10);
     const safetyCursor = this.ctx.storage.sql.exec<{ count: number }>(
       'SELECT count FROM daily_solo_matches WHERE day_key = ? LIMIT 1',
@@ -1567,6 +1852,10 @@ export class UserProfile extends DurableObject<Env> {
     const todaySoloCount = safetyRows.length > 0 ? safetyRows[0].count : 0;
 
     if (todaySoloCount >= SOLO_DAILY_SAFETY_CAP) {
+      this.ctx.storage.sql.exec(
+        'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+        ticket.ticket_id
+      );
       const energyState = await this.getEnergyState(effectiveUid, nowMs);
       return {
         ok: true,
@@ -1578,40 +1867,21 @@ export class UserProfile extends DurableObject<Env> {
       };
     }
 
-    // 3. Enerji kontrolü ve düşümü (online maç ile aynı iç fonksiyon ve maliyet)
-    const energyEnabled = isEnergyEnabledForUser(this.env, effectiveUid);
-    if (energyEnabled) {
-      const energyCost = getEnergyCostPerMatch(this.env);
-      const spendRes = await this.spendEnergy({
-        matchId: params.matchId,
-        amount: energyCost,
-        uid: effectiveUid,
-        nowMs,
-      });
-
-      if (!spendRes.success) {
-        const energyState = await this.getEnergyState(effectiveUid, nowMs);
-        return {
-          ok: true,
-          counted: false,
-          coinsAwarded: 0,
-          coins: profile.coins,
-          energy: energyState,
-          unlockedAchievements: [],
-        };
-      }
-    }
-
-    // 4. Jeton hesaplama (online ile aynı ortak sayaç ve günlük tavan)
+    // 5. Jeton hesaplama (online ile aynı ortak sayaç ve günlük tavan)
     const { actualCoinsAwarded } = this.calculateMatchCoins(params.outcome, nowMs);
 
     const isWin = params.outcome === 'win';
     const isLoss = params.outcome === 'loss';
     const correctCount = Math.max(0, params.correctAnswers ?? 0);
 
-    // 5-7. Atomik SQLite işlemi (tüm yazmalar tek transactionSync içinde, processed_matches en sonda)
+    // 6. Atomik SQLite işlemi (bileti used=1 yap, sayaçları artır, processed_matches en sonda)
+    // NOT: Enerji bilet verilirken düşüldüğü için tekrar düşülmez!
     const counterRes = this.runInTransaction(() => {
-      // 5. Günlük coin sayacını güncelle
+      this.ctx.storage.sql.exec(
+        'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+        ticket.ticket_id
+      );
+
       this.ctx.storage.sql.exec(
         `INSERT INTO daily_coins (day_key, earned) VALUES (?, ?)
          ON CONFLICT(day_key) DO UPDATE SET earned = earned + ?`,
@@ -1620,14 +1890,12 @@ export class UserProfile extends DurableObject<Env> {
         actualCoinsAwarded
       );
 
-      // Bakiyeyi güncelle
       this.ctx.storage.sql.exec(
         'UPDATE profiles SET coins = coins + ? WHERE uid = ?',
         actualCoinsAwarded,
         effectiveUid
       );
 
-      // İç denetim sayaçlarını artır (played_solo, won_solo)
       this.ctx.storage.sql.exec(
         `UPDATE profiles
          SET played_solo = played_solo + 1,
@@ -1637,14 +1905,12 @@ export class UserProfile extends DurableObject<Env> {
         effectiveUid
       );
 
-      // Günlük solo maç sayısını artır
       this.ctx.storage.sql.exec(
         `INSERT INTO daily_solo_matches (day_key, count) VALUES (?, 1)
          ON CONFLICT(day_key) DO UPDATE SET count = count + 1`,
         dayKey
       );
 
-      // 6. Birleşik sayaçları, seriyi ve başarımları uygula (source: 'solo')
       const res = this.applyResultToCounters({
         matchId: params.matchId,
         isWin,
@@ -1654,7 +1920,6 @@ export class UserProfile extends DurableObject<Env> {
         nowMs,
       });
 
-      // 7. İŞLEMİN EN SONUNDA: İşlenen maçı kaydet
       this.ctx.storage.sql.exec(
         `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
          VALUES (?, ?, ?, ?)`,
@@ -1664,7 +1929,6 @@ export class UserProfile extends DurableObject<Env> {
         actualCoinsAwarded
       );
 
-      // Son 100 maçı koruyup daha eskilerini temizle
       this.ctx.storage.sql.exec(`
         DELETE FROM processed_matches
         WHERE match_id NOT IN (

@@ -49,10 +49,12 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 ```json
 {
   "t": "queue",
-  "name": "Ahmet"
+  "name": "Ahmet",
+  "supportsSoloTicket": true
 }
 ```
 - `name`: Oyuncunun ekranda görünecek adı (en fazla 20 karakter, baştaki/sondaki boşluklar kırpılır).
+- `supportsSoloTicket`: (opsiyonel boolean). `true` ise sunucu 10.000 ms eşleşme son tarihi kurar; süre dolduğunda rakip bulunamazsa kuyruktan çıkarıp `no_opponent` mesajı ile bilet düzenler. Belirtilmezse veya `false` ise sunucu zamanlayıcı kurmaz (eski uyumlu akış).
 
 #### Kuyruktan Çıkma (`cancel`)
 ```json
@@ -74,6 +76,29 @@ Tüm iletişim JSON formatında WebSocket üzerinden gerçekleştirilir.
 ```json
 {
   "t": "cancelled"
+}
+```
+
+#### Rakip Bulunamadı / Bilet Düzenlendi (`no_opponent`)
+10 saniye içinde çevrim içi rakip bulunamadığında `supportsSoloTicket: true` bildiren istemciye iletilir. Enerji bu anda düşülür ve tek kullanımlık bilet üretilir:
+```json
+{
+  "t": "no_opponent",
+  "ticketId": "stk_abc123xyz789...",
+  "matchId": "bot:1234567890abcdef...",
+  "issuedAt": 1700000000000,
+  "energy": {
+    "current": 4,
+    "max": 5,
+    "nextEnergyAtMs": 1700000600000
+  }
+}
+```
+Eğer kullanıcının enerjisi yetersizse bilet üretilmez, enerji düşülmez ve hata döner:
+```json
+{
+  "t": "no_opponent",
+  "error": "no_energy"
 }
 ```
 
@@ -927,6 +952,7 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
   ```json
   {
     "matchId": "bot:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "ticketId": "stk_1234567890abcdef...",
     "outcome": "win",
     "myScore": 2,
     "oppScore": 1,
@@ -936,22 +962,24 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
   }
   ```
   - `matchId`: Zorunlu dize. `^bot:[A-Za-z0-9_-]{8,64}$` deseniyle eşleşmelidir.
+  - `ticketId`: Zorunlu dize. Sunucu tarafından `no_opponent` mesajıyla verilen tek kullanımlık bilet kimliğidir (`^stk_[A-Za-z0-9_-]{8,64}$` veya `^[A-Za-z0-9_-]{8,64}$`).
   - `outcome`: Zorunlu dize (`'win'` veya `'loss'`).
   - `myScore`: Sayı (tam sayı, `>= 0`).
   - `oppScore`: Sayı (tam sayı, `>= 0`).
   - `correctAnswers`: Sayı (tam sayı, `0 <= correctAnswers <= 50`).
-  - `durationSeconds`: Sayı (saniye cinsinden, galibiyetlerde `>= 20`).
+  - `durationSeconds`: Sayı (opsiyonel; istemcinin beyanı doğrulamada kullanılmaz).
   - `endedBy`: Zorunlu dize (`'normal'` veya `'forfeit'`).
 - **Doğrulama ve Güvenlik Kuralları (Sunucu Otoritesi):**
+  - *Bilet Doğrulaması (Zorunlu):* İstekte geçerli bir `ticketId` bulunmalıdır. Bilet yoksa `ticket_required`, geçersizse `ticket_invalid`, önceden kullanılmışsa `ticket_already_used`, süresi dolmuşsa `ticket_expired` (HTTP 400) döner. Biletsiz geçiş yolu yoktur.
   - *Skor Tutarlılığı (`roundsToWin = 2`):*
     - `outcome = 'win'`: `myScore == 2` ve `oppScore < 2`. `endedBy` yalnızca `'normal'` olabilir.
     - `outcome = 'loss'` ve `endedBy = 'normal'`: `oppScore == 2` ve `myScore < 2`.
     - `outcome = 'loss'` ve `endedBy = 'forfeit'`: `myScore < 2` ve `oppScore < 2`.
-  - *Minimum Süre:* Galibiyet durumunda `durationSeconds >= 20` saniye (`MIN_SOLO_WIN_SECONDS`) zorunludur.
-  - *Enerji Düşümü:* Online maçlarla aynı enerji maliyeti (`spendEnergy`) uygulanır. Yetersiz enerjide işlem sayılmaz (`ok: true, counted: false, coinsAwarded: 0`).
-  - *Jeton Ödülü:* Sunucu hesaplar (galibiyet 30, mağlubiyet 5). Günlük 300 jeton tavanı (`DAILY_MATCH_COIN_CAP`) online ranked maçlarla ortaktır.
-  - *Günlük Güvenlik Tavanı:* Bir kullanıcı için günde en fazla 200 solo maç sonucu işlenir (`SOLO_DAILY_SAFETY_CAP = 200`). Tavan aşıldığında hata fırlatılmaz, nötr olarak `ok: true, counted: false, coinsAwarded: 0` dönülür.
-  - *İdempotentlik:* Aynı `matchId` tekrar gönderildiğinde enerji veya sayaçlar mükerrer etkilenmez; önceki sonuç `alreadyProcessed: true` bayrağı ile döner.
+  - *Minimum Süre (Sunucu Otoritesi):* Galibiyet durumunda sunucu saatine göre geçen süre `now - ticket.issued_at >= 20` saniye (`MIN_SOLO_WIN_SECONDS = 20`) olmalıdır. İstemci beyanı yok sayılır. Çok hızlı galibiyetlerde istek `400 Bad Request` (`{"ok": false, "error": "match_too_fast"}`) ile reddedilir ve bilet kullanılmamış (`used = 0`) kalır.
+  - *Enerji:* Enerji maç başında bilet verilirken atomik olarak düşüldüğü için sonuç bildiriminde TEKRAR DÜŞÜLMEZ.
+  - *Jeton Ödülü:* Sunucu hesaplar (galibiyet 30, mağlubiyet 5). `DAILY_MATCH_COIN_CAP` yapılandırması `'unlimited'` (sınırsız) olarak ayarlanmıştır.
+  - *Günlük Güvenlik Tavanı:* Bir kullanıcı için günde en fazla 1000 solo maç sonucu işlenir (`SOLO_DAILY_SAFETY_CAP = 1000`). Tavan aşıldığında hata fırlatılmaz, nötr olarak `ok: true, counted: false, coinsAwarded: 0` dönülür.
+  - *İdempotentlik:* Aynı `matchId` tekrar gönderildiğinde bilet kullanılmış olsa dahi 400 verilmez; önceki sonuç `alreadyProcessed: true` bayrağı ile döner.
   - *Lider Tablosu:* Solo maçlar lider tablosuna puan yazmaz (DO çağrısı yapılmaz).
 - **Yanıtlar ve Durum Kodları:**
   - `200 OK`: Sonuç işlendi veya zaten işlenmiş.
@@ -971,8 +999,8 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
       "unlockedAchievements": ["first_match", "first_win"]
     }
     ```
-    *(Enerji yetersiz veya güvenlik tavanı aşıldığında: `{ "ok": true, "counted": false, "coinsAwarded": 0, "coins": 100, "energy": { ... }, "unlockedAchievements": [] }`)*
-  - `400 Bad Request`: Gövde boyutu > 4KB, geçersiz JSON veya doğrulama kuralı ihlali (`{"ok": false, "error": "bad_request" | "invalid_score" | "invalid_duration" | "invalid_answers"}`).
+    *(Güvenlik tavanı aşıldığında: `{ "ok": true, "counted": false, "coinsAwarded": 0, "coins": 100, "energy": { ... }, "unlockedAchievements": [] }`)*
+  - `400 Bad Request`: Gövde boyutu > 4KB, geçersiz JSON veya doğrulama kuralı ihlali (`{"ok": false, "error": "ticket_required" | "ticket_invalid" | "ticket_already_used" | "ticket_expired" | "match_too_fast" | "bad_request" | "invalid_score" | "invalid_answers"}`).
   - `401 Unauthorized`: Kimliksiz veya geçersiz belirteç (`{"ok": false, "error": "unauthorized"}`).
   - `410 Gone`: Silinmiş hesap (`{"ok": false, "error": "account_deleted"}`).
 

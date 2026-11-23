@@ -36,6 +36,12 @@ describe('ghost-opponent-logic', () => {
       expect(cfg.apiKey).toBeUndefined();
       expect(cfg.fresh).toBe(false);
       expect(cfg.devAuth).toBe(false);
+      expect(cfg.deleteAccount).toBe(false);
+    });
+
+    it('--delete-account bayrağını ayrıştırır', () => {
+      const cfg = parseGhostArgs(['--delete-account']);
+      expect(cfg.deleteAccount).toBe(true);
     });
 
     it('özel bayrakları ve ortam değişkenlerini ayrıştırır', () => {

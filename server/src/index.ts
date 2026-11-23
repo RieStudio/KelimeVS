@@ -845,6 +845,15 @@ export default {
       }
       const uid = auth.uid;
 
+      // Sıra 1: Tombstone kontrolü (silinmiş hesap -> 410)
+      const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+      if (await profileStub.isDeleted()) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'account_deleted' }),
+          { status: 410, headers: jsonHeaders }
+        );
+      }
+
       // X-App-Build başlığı ayrıştırılır (kimlikli endpoint desen uyumu)
       parseClientBuild(request);
 
@@ -893,16 +902,9 @@ export default {
       }
 
       try {
-        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
-        if (await profileStub.isDeleted()) {
-          return new Response(
-            JSON.stringify({ ok: false, error: 'account_deleted' }),
-            { status: 410, headers: jsonHeaders }
-          );
-        }
-
         const res = await profileStub.applyBotMatchReward({
           matchId: validation.data.matchId,
+          ticketId: validation.data.ticketId,
           outcome: validation.data.outcome,
           myScore: validation.data.myScore,
           oppScore: validation.data.oppScore,
@@ -922,6 +924,18 @@ export default {
           return new Response(
             JSON.stringify({ ok: false, error: 'account_deleted' }),
             { status: 410, headers: jsonHeaders }
+          );
+        }
+        if (
+          msg === 'ticket_required' ||
+          msg === 'ticket_invalid' ||
+          msg === 'ticket_already_used' ||
+          msg === 'ticket_expired' ||
+          msg === 'match_too_fast'
+        ) {
+          return new Response(
+            JSON.stringify({ ok: false, error: msg }),
+            { status: 400, headers: jsonHeaders }
           );
         }
         return new Response(

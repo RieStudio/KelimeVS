@@ -488,7 +488,10 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
       outcome: 'win',
     });
 
-    // 3. 1 solo galibiyet maçı işlenir -> daily_solo_matches, played_solo/won_solo, processed_matches güncellenir
+    // 3. 1 solo galibiyet maçı işlenir -> bilet üretilir ve daily_solo_matches, played_solo/won_solo, processed_matches güncellenir
+    const ticketRes = await profileStub.issueSoloTicket(uid, Date.now() - 25000);
+    expect(ticketRes.ok).toBe(true);
+
     const soloReq = new Request('http://127.0.0.1/matches/solo', {
       method: 'POST',
       headers: {
@@ -496,7 +499,8 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
         Authorization: `Bearer dev:${uid}`,
       },
       body: JSON.stringify({
-        matchId: 'bot:del_compliance_match_1',
+        matchId: ticketRes.matchId,
+        ticketId: ticketRes.ticketId,
         outcome: 'win',
         myScore: 2,
         oppScore: 1,
@@ -512,6 +516,7 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
     expect(getTableCount(profileStub, 'profiles')).toBe(1);
     expect(getTableCount(profileStub, 'user_achievements')).toBeGreaterThanOrEqual(2);
     expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(1);
+    expect(getTableCount(profileStub, 'solo_tickets')).toBe(1);
     expect(getTableCount(profileStub, 'processed_matches')).toBe(2);
     expect(getTableCount(profileStub, 'tombstone')).toBe(0);
 
@@ -573,12 +578,14 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
     expect(getTableCount(profileStub, 'profiles')).toBe(0);
     expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
     expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(0);
+    expect(getTableCount(profileStub, 'solo_tickets')).toBe(0);
     expect(getTableCount(profileStub, 'processed_matches')).toBe(0);
 
     // 8. DO seviyesinde applyBotMatchReward doğrudan çağrılırsa hata fırlatmalı ve satır diriltmemeli
     await expect(
       profileStub.applyBotMatchReward({
         uid,
+        ticketId: 'stk_mock_after_del',
         matchId: 'bot:direct_do_after_del',
         outcome: 'win',
         myScore: 2,
@@ -590,6 +597,7 @@ describe('Account Deletion & Tombstone Compliance (server/)', () => {
     ).rejects.toThrow();
 
     expect(getTableCount(profileStub, 'profiles')).toBe(0);
+    expect(getTableCount(profileStub, 'solo_tickets')).toBe(0);
     expect(getTableCount(profileStub, 'user_achievements')).toBe(0);
     expect(getTableCount(profileStub, 'daily_solo_matches')).toBe(0);
     expect(getTableCount(profileStub, 'processed_matches')).toBe(0);

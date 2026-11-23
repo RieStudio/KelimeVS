@@ -200,9 +200,19 @@ npm run ghost -- --mode=drop --drop-after=15 --back-after=5
 # 5. Ardışık birden fazla maç oynama:
 npm run ghost -- --mode=play --rounds=3
 
-# 6. Farklı sunucu adresi ve doğrudan API anahtarı verme:
+# 6. Güvenli test: Arkadaş maçı modu (Liderlik tablosunu ETKİLEMEZ, jeton/başarım üretmez):
+npm run ghost -- --mode=friend-join --code=AB12
+# veya botun oda kurması:
+npm run ghost -- --mode=friend-host
+
+# 7. Test hesabını silme ve oturumu temizleme (DELETE /me):
+npm run ghost -- --delete-account
+
+# 8. Farklı sunucu adresi ve doğrudan API anahtarı verme:
 npm run ghost -- --url=wss://api.riestudio.com.tr --api-key=AIzaSy... --mode=play
 ```
+
+> **Önemli Test Notu:** `--mode=play` (dereceli mod) gerçek bir oyuncu gibi eşleşir ve maç bitiminde canlı `Leaderboard` verilerini günceller. Üretim ortamında liderlik tablosunu kirletmemek için arkadaş maçı modları (`--mode=friend-host` veya `--mode=friend-join`) tercih edilmelidir. Test bittiğinde ghost hesabı `--delete-account` komutuyla silinebilir.
 
 ### 5. Liderlik Tablosu Yerel Tohumlama Aracı (seed-leaderboard)
 Liderlik tablosunu yerel ortamda test etmek, 100 satırlık listenin kaydırılmasını, eşitlik kurallarını ve yeni görsel avatar çerçevelerini incelemek için kullanılan test verisi tohumlama aracıdır.

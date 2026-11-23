@@ -1,7 +1,12 @@
 // KelimeGo Canlı Sunucu "Hayalet Rakip" (Ghost Opponent) Test Betiği
 // Gerçek sunucuya karşı otomatik veya belirlenmiş davranış modlarıyla oynar.
+//
+// ÖNEMLİ NOTLAR:
+// 1. Dereceli Mod (--mode=play): Gerçek oyuncu gibi eşleşir ve applyMatchReward ile canlı lider tablosuna (Leaderboard DO) puan yazar.
+// 2. Arkadaş Maçı Modu (--mode=friend-host veya --mode=friend-join): Başarım veya jeton üretmez; lider tablosunu ETKİLEMEZ. Güvenli test için tavsiye edilir.
+// 3. Hesap Silme (--delete-account): Kayıtlı oturumla DELETE /me çağırarak hesaba tombstone koyar ve .ghost-session.json'u temizler.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import WebSocket from 'ws';
 import { getFrameCatalogItem } from '../src/frames.js';
@@ -614,6 +619,48 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
+  }
+
+  // --delete-account bayrağı: hesabı sil ve oturum önbelleğini temizle
+  if (config.deleteAccount) {
+    const sessionPath = resolveSessionFilePath();
+    if (!existsSync(sessionPath) && !config.devAuth) {
+      log('Hesap silme için kayıtlı oturum dosyası (.ghost-session.json) bulunamadı.');
+      process.exitCode = 0;
+      return;
+    }
+
+    const httpUrl = config.serverUrl.replace(/^ws(s)?:\/\//, 'http$1://');
+    log(`Hesap silme işlemi başlatılıyor (${httpUrl}/me)...`);
+
+    try {
+      const resp = await fetch(`${httpUrl}/me`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (resp.ok || resp.status === 410) {
+        log('✓ Hesap başarıyla silindi (tombstone oluşturuldu).');
+      } else {
+        logError(`Hesap silme sunucu tarafından reddedildi: HTTP ${resp.status}`);
+      }
+    } catch (err) {
+      logError(`Hesap silme HTTP isteği başarısız: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    if (existsSync(sessionPath)) {
+      try {
+        unlinkSync(sessionPath);
+        log('✓ .ghost-session.json oturum önbelleği temizlendi.');
+      } catch (err) {
+        logError(`.ghost-session.json silinemedi: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    process.exitCode = 0;
+    return;
   }
 
   if (config.frame) {

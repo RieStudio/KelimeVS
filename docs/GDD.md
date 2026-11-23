@@ -364,3 +364,19 @@ Sunucu yükünü artırmayan, maç sonucu işleme akışına entegre sayaç teme
 - **Alan adı:** `riestudio.com.tr` proje sahibine aittir. İleride şunlar için kullanılabilir: kayıt/doğrulama e-postalarının gönderen adresi, mağazalar için gerekli gizlilik politikası ve destek sayfası, "Arkadaşınla Oyna" davet bağlantıları.
 - **[AÇIK]** Kayıt doğrulaması: e-posta ile doğrulama kodu isteniyorsa, Firebase Authentication'ın yerleşik e-posta doğrulaması bağlantı tabanlıdır; kod (OTP) göndermek için ayrı bir e-posta servisi ya da farklı bir Firebase Authentication yapılandırması gerekebilir. Güncel seçenekler Faz 4 öncesinde kontrol edilir.
 - **İçerik alışkanlığı:** CMS'te doğru cevabın yaygın kısaltma, alternatif ad ve yazım hataları ("abd", "amerika birleşik devletleri", "maydonoz", "çedar") alternatif cevap olarak girilir; eşleştirici bunları ilgili ana cevabın varyantı sayar.
+
+---
+
+### 8.4 Bilet Modeli, Terk Edilmiş Maç ve Jeton Tavanı Kuralları
+
+- **Bilet Modeli ve Enerji Güvencesi:** Çevrim içi rakip bulunamadığında sunucu 10 saniye sonunda oyuncuyu kuyruktan çıkarır ve tek kullanımlık bir solo maç bileti (`ticketId`) düzenler. Enerji bu anda atomik olarak düşülür; maç sonucunda tekrar enerji düşülmez.
+- **Terk Edilmiş Maç = Kayıp Kuralı:**
+  - Kullanıcıya bir bilet verildikten sonra bu bilet kullanılmadan yeni bir bilet talep edilirse veya biletin 15 dakikalık süresi dolarsa, önceki bilet sunucu tarafından "terk edilmiş" (`solo_abandoned`) olarak kapatılır.
+  - Terk edilen maç oyuncunun istatistiklerine **mağlubiyet** olarak yansır (`played = played + 1, lost = lost + 1`).
+  - Oyuncunun mevcut galibiyet serisi sıfırlanır (`current_streak = 0`).
+  - Bu işlem için jeton ödülü verilmez (`coins_awarded = 0`).
+  - İlgili maç kimliği `processed_matches` tablosuna `solo_abandoned` sonucuyla kaydedilir.
+- **Jeton Tavanı Kararı (`DAILY_MATCH_COIN_CAP`):**
+  - Günlük maç jeton tavanı varsayılan olarak **sınırsız** (`'unlimited'`) olarak yapılandırılmıştır.
+  - `daily_coins` tablosu gün bazlı kazanılan jetonları istatistiksel olarak izlemeye devam eder; ancak sınır uygulanmadığından oyuncular kazandıkları maçlardan tam ödül alırlar. İleride tavan yeniden etkinleştirilmek istenirse ortam değişkeni üzerinden sayısal bir değer atanabilir.
+- **Solo Güvenlik Tavanı:** Günlük azami solo maç güvenlik tavanı 1000 olarak güncellenmiştir (`SOLO_DAILY_SAFETY_CAP = 1000`). Tavan aşıldığında maç işlenir ancak ödül verilmez (`counted: false`).

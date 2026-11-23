@@ -27,7 +27,7 @@ export function sanitizeFriendCode(raw: unknown): string | null {
 }
 
 export type MatchmakerClientMessage =
-  | { readonly t: 'queue'; readonly name: string }
+  | { readonly t: 'queue'; readonly name: string; readonly supportsSoloTicket?: boolean }
   | { readonly t: 'cancel' }
   | { readonly t: 'create_room'; readonly name?: string }
   | { readonly t: 'resume_room'; readonly code: string }
@@ -37,6 +37,18 @@ export type MatchmakerClientMessage =
 export type MatchmakerServerMessage =
   | { readonly t: 'queued' }
   | { readonly t: 'cancelled' }
+  | {
+      readonly t: 'no_opponent';
+      readonly ticketId?: string;
+      readonly matchId?: string;
+      readonly issuedAt?: number;
+      readonly energy?: {
+        readonly current: number;
+        readonly max: number;
+        readonly nextEnergyAtMs: number | null;
+      };
+      readonly error?: 'no_energy';
+    }
   | { readonly t: 'room_created'; readonly code: string; readonly expiresAt: number }
   | { readonly t: 'room_resumed'; readonly code: string; readonly expiresAt: number }
   | { readonly t: 'room_expired' }
@@ -264,6 +276,9 @@ export function parseMatchmakerMessage(raw: unknown): MatchmakerClientMessage | 
       return {
         t: 'queue',
         name: sanitizePlayerName(data.name),
+        ...(typeof data.supportsSoloTicket === 'boolean'
+          ? { supportsSoloTicket: data.supportsSoloTicket }
+          : {}),
       };
     }
     if (data.t === 'cancel') {

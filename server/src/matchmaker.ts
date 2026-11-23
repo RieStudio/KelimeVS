@@ -31,6 +31,8 @@ export interface QueueEntry {
   readonly frame?: string;
   readonly joinedAt: number;
   readonly blockedUids?: readonly string[];
+  readonly supportsSoloTicket?: boolean;
+  readonly soloTicketDeadline?: number;
 }
 
 export interface CreateDirectMatchParams {
@@ -272,13 +274,18 @@ export class Matchmaker extends DurableObject<Env> {
       }
 
       // Aynı uid varsa güncelle, yoksa ekle (FIFO)
+      const supportsSoloTicket = parsed.supportsSoloTicket === true;
+      const now = Date.now();
+      const soloTicketDeadline = supportsSoloTicket ? now + 10000 : undefined;
+
       const existingIdx = this.queue.findIndex((e) => e.uid === uid);
       const newEntry: QueueEntry = {
         uid,
         name: playerInfo.name,
         frame: playerInfo.frame,
-        joinedAt: Date.now(),
+        joinedAt: now,
         blockedUids,
+        ...(supportsSoloTicket ? { supportsSoloTicket: true, soloTicketDeadline } : {}),
       };
 
       if (existingIdx !== -1) {
@@ -297,9 +304,13 @@ export class Matchmaker extends DurableObject<Env> {
       }
 
       await this.tryMatch();
+      if (supportsSoloTicket) {
+        await this.scheduleCombinedAlarm();
+      }
     } else if (parsed.t === 'cancel') {
       this.queue = this.queue.filter((e) => e.uid !== uid);
       await this.ctx.storage.put('queue', this.queue);
+      await this.scheduleCombinedAlarm();
 
       const cancelMsg: MatchmakerServerMessage = { t: 'cancelled' };
       try {
@@ -327,6 +338,7 @@ export class Matchmaker extends DurableObject<Env> {
     this.queue = this.queue.filter((e) => e.uid !== uid);
     if (this.queue.length !== beforeLen) {
       await this.ctx.storage.put('queue', this.queue);
+      await this.scheduleCombinedAlarm();
     }
 
     // Kullanıcının açık arkadaş odasını da temizle
@@ -345,6 +357,7 @@ export class Matchmaker extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.pruneExpiredFriendRooms();
     await this.processPendingEnergyRefunds();
+    await this.processSoloTicketFallbacks();
     await this.scheduleCombinedAlarm();
   }
 
@@ -965,8 +978,84 @@ export class Matchmaker extends DurableObject<Env> {
         earliest = refund.nextRetryAt;
       }
     }
+    for (const entry of this.queue) {
+      if (entry.soloTicketDeadline !== undefined) {
+        if (entry.soloTicketDeadline < earliest) {
+          earliest = Math.max(now, entry.soloTicketDeadline);
+        }
+      }
+    }
     if (earliest !== Infinity) {
       await this.ctx.storage.setAlarm(earliest);
+    }
+  }
+
+  private async processSoloTicketFallbacks(): Promise<void> {
+    const now = Date.now();
+    // 1. Son tarihi dolmuş veya geçmiş adayları tespit et
+    const expiredEntries = this.queue.filter(
+      (e) =>
+        e.supportsSoloTicket === true &&
+        e.soloTicketDeadline !== undefined &&
+        e.soloTicketDeadline <= now
+    );
+    if (expiredEntries.length === 0) return;
+
+    for (const item of expiredEntries) {
+      const qIdx = this.queue.findIndex((e) => e.uid === item.uid);
+      if (qIdx === -1) continue;
+
+      // KRİTİK YARIŞ ÖNLEMİ: Önce kuyruktan çıkarıyoruz!
+      // Böylece bu işlem sürerken veya sonrasında tryMatch döngüsü bu oyuncuyu ASLA eşleştiremez.
+      this.queue.splice(qIdx, 1);
+      await this.ctx.storage.put('queue', this.queue);
+
+      const sockets = this.ctx.getWebSockets(item.uid);
+      if (sockets.length === 0) {
+        continue;
+      }
+
+      // UserProfile DO üzerinden bilet üret
+      let ticketRes: {
+        ok: boolean;
+        reason?: string;
+        ticketId?: string;
+        matchId?: string;
+        issuedAt?: number;
+        energy?: { current: number; max: number; nextEnergyAtMs: number | null };
+      } | null = null;
+
+      try {
+        if (this.env.USER_PROFILE) {
+          const profileStub = this.env.USER_PROFILE.get(this.env.USER_PROFILE.idFromName(item.uid));
+          ticketRes = await profileStub.issueSoloTicket(item.uid, now);
+        }
+      } catch (err) {
+        console.error(`issueSoloTicket failed for uid ${item.uid}:`, err);
+      }
+
+      for (const ws of sockets) {
+        try {
+          if (ticketRes && ticketRes.ok && ticketRes.ticketId && ticketRes.matchId && ticketRes.issuedAt) {
+            const noOpponentMsg: MatchmakerServerMessage = {
+              t: 'no_opponent',
+              ticketId: ticketRes.ticketId,
+              matchId: ticketRes.matchId,
+              issuedAt: ticketRes.issuedAt,
+              energy: ticketRes.energy,
+            };
+            ws.send(JSON.stringify(noOpponentMsg));
+          } else {
+            const noOpponentMsg: MatchmakerServerMessage = {
+              t: 'no_opponent',
+              error: 'no_energy',
+            };
+            ws.send(JSON.stringify(noOpponentMsg));
+          }
+        } catch {
+          // yoksay
+        }
+      }
     }
   }
 
@@ -1126,6 +1215,7 @@ export class Matchmaker extends DurableObject<Env> {
     this.queue = this.queue.filter((e) => e.uid !== uid);
     if (this.queue.length !== beforeLen) {
       await this.ctx.storage.put('queue', this.queue);
+      await this.scheduleCombinedAlarm();
     }
   }
 
@@ -1134,8 +1224,12 @@ export class Matchmaker extends DurableObject<Env> {
     const uid = tags[0];
     if (!uid) return;
 
+    const beforeLen = this.queue.length;
     this.queue = this.queue.filter((e) => e.uid !== uid);
-    await this.ctx.storage.put('queue', this.queue);
+    if (this.queue.length !== beforeLen) {
+      await this.ctx.storage.put('queue', this.queue);
+      await this.scheduleCombinedAlarm();
+    }
   }
 
   private prewarmContent(): void {
@@ -1198,6 +1292,7 @@ export class Matchmaker extends DurableObject<Env> {
       this.queue.splice(matchIdx2, 1);
       this.queue.splice(matchIdx1, 1);
       await this.ctx.storage.put('queue', this.queue);
+      await this.scheduleCombinedAlarm();
 
       let allQuestions: Question[];
       let fetchFailed = false;

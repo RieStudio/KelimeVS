@@ -128,6 +128,7 @@ function createEnv(overrides: Partial<Env> = {}) {
 describe('Solo Match Result - Doğrulama Fonksiyonu (validateSoloMatchResult)', () => {
   const validWinBody: SoloMatchResultBody = {
     matchId: 'bot:a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    ticketId: 'stk_validticket12345678',
     outcome: 'win',
     myScore: 2,
     oppScore: 1,
@@ -277,23 +278,26 @@ describe('Solo Match Result - Doğrulama Fonksiyonu (validateSoloMatchResult)', 
     });
   });
 
-  describe('Süre ve Doğru Cevap Sınırları', () => {
-    it(`Galibiyette süre MIN_SOLO_WIN_SECONDS (${MIN_SOLO_WIN_SECONDS}) altında ise reddedilir`, () => {
-      const res = validateSoloMatchResult({
-        ...validWinBody,
-        outcome: 'win',
-        durationSeconds: MIN_SOLO_WIN_SECONDS - 1,
-      });
+  describe('Bilet, Süre ve Doğru Cevap Sınırları', () => {
+    it('ticketId eksikse ticket_required hatası verir', () => {
+      const { ticketId, ...noTicket } = validWinBody;
+      const res = validateSoloMatchResult(noTicket);
       expect(res.isValid).toBe(false);
-      expect(res.error).toBe('invalid_duration');
+      expect(res.error).toBe('ticket_required');
     });
 
-    it(`Galibiyette süre tam MIN_SOLO_WIN_SECONDS (${MIN_SOLO_WIN_SECONDS}) ise kabul edilir`, () => {
+    it('ticketId geçersiz karakter içeriyorsa ticket_invalid hatası verir', () => {
       const res = validateSoloMatchResult({
         ...validWinBody,
-        outcome: 'win',
-        durationSeconds: MIN_SOLO_WIN_SECONDS,
+        ticketId: 'invalid ticket with spaces!',
       });
+      expect(res.isValid).toBe(false);
+      expect(res.error).toBe('ticket_invalid');
+    });
+
+    it('durationSeconds opsiyoneldir ve verilmediğinde de kabul edilir', () => {
+      const { durationSeconds, ...noDuration } = validWinBody;
+      const res = validateSoloMatchResult(noDuration);
       expect(res.isValid).toBe(true);
     });
 
@@ -414,9 +418,13 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
 
     await profileDO.getProfile('user_1'); // initialize
 
+    const ticket = await profileDO.issueSoloTicket('user_1', Date.now() - 25000);
+    expect(ticket.ok).toBe(true);
+
     const result = await profileDO.applyBotMatchReward({
       uid: 'user_1',
-      matchId: 'bot:match_win_001',
+      ticketId: ticket.ticketId!,
+      matchId: ticket.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 1,
@@ -452,7 +460,7 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     expect((profile as any).won_solo).toBeUndefined();
 
     // processed_matches kaydını doğrula
-    const processed = rawDb.prepare('SELECT * FROM processed_matches WHERE match_id = ?').get('bot:match_win_001') as any;
+    const processed = rawDb.prepare('SELECT * FROM processed_matches WHERE match_id = ?').get(ticket.matchId!) as any;
     expect(processed).toBeDefined();
     expect(processed.outcome).toBe('win');
     expect(processed.coins_awarded).toBe(30);
@@ -466,9 +474,11 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     await profileDO.getProfile('user_2');
 
     // Önce 1 galibiyet
+    const t1 = await profileDO.issueSoloTicket('user_2', Date.now() - 25000);
     await profileDO.applyBotMatchReward({
       uid: 'user_2',
-      matchId: 'bot:m_win_1',
+      ticketId: t1.ticketId!,
+      matchId: t1.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -478,9 +488,11 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     });
 
     // Sonra 1 mağlubiyet
+    const t2 = await profileDO.issueSoloTicket('user_2', Date.now() - 25000);
     const lossResult = await profileDO.applyBotMatchReward({
       uid: 'user_2',
-      matchId: 'bot:m_loss_2',
+      ticketId: t2.ticketId!,
+      matchId: t2.matchId!,
       outcome: 'loss',
       myScore: 1,
       oppScore: 2,
@@ -524,32 +536,33 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     const stateBefore = await profileDO.getEnergyState('user_no_energy');
     expect(stateBefore.current).toBe(0);
 
-    // Enerji sıfırken maç sonucu bildir
-    const result = await profileDO.applyBotMatchReward({
-      uid: 'user_no_energy',
-      matchId: 'bot:match_energy_depleted',
-      outcome: 'win',
-      myScore: 2,
-      oppScore: 0,
-      correctAnswers: 5,
-      durationSeconds: 25,
-      endedBy: 'normal',
-    });
+    // Enerji sıfırken bilet talep et
+    const ticketRes = await profileDO.issueSoloTicket('user_no_energy');
+    expect(ticketRes.ok).toBe(false);
+    expect(ticketRes.reason).toBe('no_energy');
 
-    expect(result.ok).toBe(true);
-    expect(result.counted).toBe(false);
-    expect(result.coinsAwarded).toBe(0);
-    expect(result.coins).toBe(100);
-    expect(result.energy.current).toBe(0);
-    expect(result.unlockedAchievements).toEqual([]);
+    // Biletsiz maç sonucu doğrudan reddedilir
+    await expect(
+      profileDO.applyBotMatchReward({
+        uid: 'user_no_energy',
+        ticketId: '',
+        matchId: 'bot:match_energy_depleted',
+        outcome: 'win',
+        myScore: 2,
+        oppScore: 0,
+        correctAnswers: 5,
+        durationSeconds: 25,
+        endedBy: 'normal',
+      })
+    ).rejects.toThrow('ticket_required');
 
     // DB'de hiçbir şey yazılmadığını doğrula
     const profileAfter = await profileDO.getProfile('user_no_energy');
     expect(profileAfter.stats.played).toBe(0);
     expect(profileAfter.stats.won).toBe(0);
 
-    const processed = rawDb.prepare('SELECT * FROM processed_matches WHERE match_id = ?').get('bot:match_energy_depleted');
-    expect(processed).toBeUndefined();
+    const ticketCount = rawDb.prepare('SELECT COUNT(*) as count FROM solo_tickets').get() as any;
+    expect(ticketCount.count).toBe(0);
   });
 
   it('4. İdempotentlik ve Yeniden Deneme (Retry): Aynı matchId tekrar gelirse mükerrer harcama/artırım olmaz', async () => {
@@ -559,10 +572,14 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
 
     await profileDO.getProfile('user_retry');
 
+    const ticket = await profileDO.issueSoloTicket('user_retry', Date.now() - 25000);
+    expect(ticket.ok).toBe(true);
+
     // 1. Çağrı
     const r1 = await profileDO.applyBotMatchReward({
       uid: 'user_retry',
-      matchId: 'bot:retry_id_001',
+      ticketId: ticket.ticketId!,
+      matchId: ticket.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -577,10 +594,11 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     expect(r1.energy.current).toBe(4);
     expect(r1.unlockedAchievements).toEqual(['first_match', 'first_win']);
 
-    // 2. Çağrı (aynı matchId)
+    // 2. Çağrı (aynı matchId) - Bilet used=1 olsa bile 400 değil idempotent döner
     const r2 = await profileDO.applyBotMatchReward({
       uid: 'user_retry',
-      matchId: 'bot:retry_id_001',
+      ticketId: ticket.ticketId!,
+      matchId: ticket.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -612,10 +630,12 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     const dayKey = new Date().toISOString().slice(0, 10);
     rawDb.exec(`INSERT INTO daily_coins (day_key, earned) VALUES ('${dayKey}', 280)`);
 
+    const t1 = await profileDO.issueSoloTicket('user_cap', Date.now() - 25000);
     // 30 jetonluk galibiyet -> sadece 20 jeton verilmeli
     const r1 = await profileDO.applyBotMatchReward({
       uid: 'user_cap',
-      matchId: 'bot:cap_match_1',
+      ticketId: t1.ticketId!,
+      matchId: t1.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -627,10 +647,12 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     expect(r1.coinsAwarded).toBe(20);
     expect(r1.coins).toBe(120);
 
+    const t2 = await profileDO.issueSoloTicket('user_cap', Date.now() - 25000);
     // Sonraki galibiyet -> 0 jeton
     const r2 = await profileDO.applyBotMatchReward({
       uid: 'user_cap',
-      matchId: 'bot:cap_match_2',
+      ticketId: t2.ticketId!,
+      matchId: t2.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -655,9 +677,11 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     const dayKey = new Date().toISOString().slice(0, 10);
     rawDb.exec(`INSERT INTO daily_solo_matches (day_key, count) VALUES ('${dayKey}', ${SOLO_DAILY_SAFETY_CAP})`);
 
+    const ticket = await profileDO.issueSoloTicket('user_safety', Date.now() - 25000);
     const result = await profileDO.applyBotMatchReward({
       uid: 'user_safety',
-      matchId: 'bot:match_over_safety_cap',
+      ticketId: ticket.ticketId!,
+      matchId: ticket.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 0,
@@ -670,7 +694,7 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     expect(result.counted).toBe(false);
     expect(result.coinsAwarded).toBe(0);
     expect(result.coins).toBe(100);
-    expect(result.energy.current).toBe(5); // Enerji düşmez
+    expect(result.energy.current).toBe(4); // Bilet düzenlenirken düştü, burada tekrar düşmez
     expect(result.unlockedAchievements).toEqual([]);
 
     const profile = await profileDO.getProfile('user_safety');
@@ -688,6 +712,7 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     await expect(
       profileDO.applyBotMatchReward({
         uid: 'user_deleted',
+        ticketId: 'stk_mock_123',
         matchId: 'bot:match_on_deleted_user',
         outcome: 'win',
         myScore: 2,
@@ -729,9 +754,11 @@ describe('UserProfile DO - applyBotMatchReward Mantığı ve Kuralları', () => 
     expect(o2.unlockedAchievements).toEqual([]);
 
     // 3. Solo Galibiyet (applyBotMatchReward) -> Seri 3'e ulaşır ve streak_3 AÇILIR!
+    const t3 = await profileDO.issueSoloTicket('combo_player', Date.now() - 25000);
     const s3 = await profileDO.applyBotMatchReward({
       uid: 'combo_player',
-      matchId: 'bot:combo_solo_match_3',
+      ticketId: t3.ticketId!,
+      matchId: t3.matchId!,
       outcome: 'win',
       myScore: 2,
       oppScore: 1,
@@ -775,6 +802,7 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
         Authorization: 'Bearer dev:http_user_1',
       },
       body: JSON.stringify({
+        ticketId: 'stk_valid123456789012345678',
         matchId: 'invalid_no_bot_prefix',
         outcome: 'win',
         myScore: 2,
@@ -792,6 +820,32 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
     expect(data.error).toBe('bad_request');
   });
 
+  it('2b. Bilet eksik ise 400 ve ticket_required döner', async () => {
+    const { env } = createEnv();
+    const req = new Request('http://127.0.0.1/matches/solo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer dev:http_user_1',
+      },
+      body: JSON.stringify({
+        matchId: 'bot:valid-match-id-1234',
+        outcome: 'win',
+        myScore: 2,
+        oppScore: 0,
+        correctAnswers: 5,
+        durationSeconds: 25,
+        endedBy: 'normal',
+      }),
+    });
+
+    const res = await worker.fetch(req, env);
+    expect(res.status).toBe(400);
+    const data = (await res.json()) as any;
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('ticket_required');
+  });
+
   it('3. 4KB sınırını aşan gövde 400 ile reddedilir', async () => {
     const { env } = createEnv();
     const req = new Request('http://127.0.0.1/matches/solo', {
@@ -801,6 +855,7 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
         Authorization: 'Bearer dev:http_user_1',
       },
       body: JSON.stringify({
+        ticketId: 'stk_valid123456789012345678',
         matchId: 'bot:valid-match-id-1234',
         outcome: 'win',
         myScore: 2,
@@ -820,7 +875,12 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
   });
 
   it('4. Başarılı POST /matches/solo isteği 200 döner ve beklenen alanları içerir', async () => {
-    const { env } = createEnv();
+    const { env, userProfiles } = createEnv();
+    const profile =
+      userProfiles.get('http_user_2') ||
+      (env.USER_PROFILE.get(env.USER_PROFILE.idFromName('http_user_2')) as unknown as UserProfile);
+    const issued = await profile.issueSoloTicket('http_user_2', Date.now() - 25000);
+
     const req = new Request('http://127.0.0.1/matches/solo', {
       method: 'POST',
       headers: {
@@ -828,7 +888,8 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
         Authorization: 'Bearer dev:http_user_2',
       },
       body: JSON.stringify({
-        matchId: 'bot:http_match_001',
+        ticketId: issued.ticketId,
+        matchId: issued.matchId,
         outcome: 'win',
         myScore: 2,
         oppScore: 1,
@@ -850,7 +911,12 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
   });
 
   it('5. POST /matches/solo/result alias yolu da aynı şekilde çalışır', async () => {
-    const { env } = createEnv();
+    const { env, userProfiles } = createEnv();
+    const profile =
+      userProfiles.get('http_user_3') ||
+      (env.USER_PROFILE.get(env.USER_PROFILE.idFromName('http_user_3')) as unknown as UserProfile);
+    const issued = await profile.issueSoloTicket('http_user_3', Date.now() - 25000);
+
     const req = new Request('http://127.0.0.1/matches/solo/result', {
       method: 'POST',
       headers: {
@@ -858,7 +924,8 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
         Authorization: 'Bearer dev:http_user_3',
       },
       body: JSON.stringify({
-        matchId: 'bot:http_match_002',
+        ticketId: issued.ticketId,
+        matchId: issued.matchId,
         outcome: 'loss',
         myScore: 0,
         oppScore: 2,
@@ -879,7 +946,9 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
 
   it('6. Silinmiş kullanıcı için 410 döner', async () => {
     const { env, userProfiles } = createEnv();
-    const profile = userProfiles.get('http_user_del') || (env.USER_PROFILE.get(env.USER_PROFILE.idFromName('http_user_del')) as unknown as UserProfile);
+    const profile =
+      userProfiles.get('http_user_del') ||
+      (env.USER_PROFILE.get(env.USER_PROFILE.idFromName('http_user_del')) as unknown as UserProfile);
     await profile.deleteProfile('http_user_del');
 
     const req = new Request('http://127.0.0.1/matches/solo', {
@@ -889,6 +958,7 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
         Authorization: 'Bearer dev:http_user_del',
       },
       body: JSON.stringify({
+        ticketId: 'stk_mock_del_123456789012',
         matchId: 'bot:http_match_del_001',
         outcome: 'win',
         myScore: 2,
