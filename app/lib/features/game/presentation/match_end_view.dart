@@ -16,7 +16,7 @@ import '../../../core/widgets/coin_icon.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/match_result_icon.dart';
 import '../../../core/widgets/secondary_button.dart';
-import '../../achievements/domain/achievement_ui_manifest.dart';
+import '../../achievements/application/achievement_notification_service.dart';
 import '../../match_detail/presentation/match_detail_screen.dart';
 import '../../match_request/application/match_requests_notifier.dart';
 import '../../match_request/application/match_requests_providers.dart';
@@ -61,10 +61,29 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
   bool _awaitingResponseForSend = false;
   String? _lastActiveRequestId;
   Timer? _countdownTicker;
+  final Set<String> _handledAchievementKeys = {};
 
   /// Rakip adını sanitize eder (ortak [OpponentNameSanitizer] sınıfını kullanır).
   static String _sanitizeOpponentName(String? raw, {String? opponentUid}) =>
       OpponentNameSanitizer.sanitize(raw, opponentUid: opponentUid);
+
+  void _triggerAchievementsIfNeeded(List<String> achievements) {
+    if (achievements.isEmpty) return;
+    final uiState = ref.read(activeMatchUiStateProvider);
+    final matchId = uiState.lastSavedMatch?.matchId ?? 'match';
+    final dedupKey = '$matchId:${achievements.join(',')}';
+    if (_handledAchievementKeys.contains(dedupKey)) return;
+    _handledAchievementKeys.add(dedupKey);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(achievementNotificationProvider.notifier).showAll(
+          achievements,
+          initialDelay: const Duration(milliseconds: 600),
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -319,6 +338,9 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
 
     final int? coinsAwarded = uiState.coinsAwarded;
     final List<String> unlockedAchievements = uiState.unlockedAchievements;
+    if (unlockedAchievements.isNotEmpty) {
+      _triggerAchievementsIfNeeded(unlockedAchievements);
+    }
     final bool isFriendly = uiState.isFriendly ||
         (uiState.lastSavedMatch?.isFriendly ?? false);
 
@@ -573,10 +595,6 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
                                     ),
                                   ),
                                 ),
-                              ],
-                              if (unlockedAchievements.isNotEmpty) ...[
-                                const SizedBox(height: AppDimens.space12),
-                                ..._buildAchievementCards(unlockedAchievements),
                               ],
                             ],
                           ),
@@ -928,128 +946,5 @@ class _MatchEndViewState extends ConsumerState<MatchEndView>
       ],
     );
   }
-
-  List<Widget> _buildAchievementCards(List<String> achievementIds) {
-    final items = achievementIds
-        .map(AchievementUiManifest.get)
-        .whereType<AchievementUiItem>()
-        .take(3)
-        .toList();
-
-    if (items.isEmpty) return const [];
-
-    return items
-        .map((item) => _AchievementNotificationCard(item: item))
-        .toList();
-  }
 }
 
-/// Maç sonu ekranında açılan başarımları gösteren sade bildirim kartı.
-class _AchievementNotificationCard extends StatelessWidget {
-  final AchievementUiItem item;
-
-  const _AchievementNotificationCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: 'Başarım açıldı: ${item.title}, ${item.description}',
-      child: Container(
-        margin: const EdgeInsets.only(top: AppDimens.space8),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.space16,
-          vertical: AppDimens.space10,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: AppDimens.borderRadiusListCard,
-          border: Border.all(
-            color: AppColors.coin,
-            width: AppDimens.borderThin,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.ink,
-              offset: Offset(2, 2),
-              blurRadius: 0,
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: AppDimens.borderRadiusFull,
-                border: Border.all(
-                  color: AppColors.ink,
-                  width: AppDimens.borderThin,
-                ),
-              ),
-              child: const Center(
-                child: AppIcon(
-                  AppIcons.trophy,
-                  color: AppColors.ink,
-                  size: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: AppDimens.space12),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.mint,
-                          borderRadius: AppDimens.borderRadiusFull,
-                        ),
-                        child: Text(
-                          'BAŞARIM AÇILDI',
-                          style: AppTextStyles.sectionLabel.copyWith(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.title,
-                    style: AppTextStyles.cardTitle.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  Text(
-                    item.description,
-                    style: AppTextStyles.secondaryText.copyWith(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

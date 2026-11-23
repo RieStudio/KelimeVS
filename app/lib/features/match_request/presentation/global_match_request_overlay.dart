@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../achievements/presentation/achievement_notification_overlay.dart';
 import '../../friend_match/presentation/friend_reveal_screen.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../../store/presentation/widgets/energy_depleted_bottom_sheet.dart';
@@ -364,8 +365,11 @@ class _GlobalMatchRequestOverlayState
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Gelen İstek Bildirim Bandı
+                    children: [
+                      // Başarım Bildirimi
+                      const AchievementNotificationOverlay(),
+
+                      // Gelen İstek Bildirim Bandı
                   AnimatedSwitcher(
                     duration: animationDuration,
                     reverseDuration: disableAnimations

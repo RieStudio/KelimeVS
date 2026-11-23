@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -150,6 +151,11 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text(AppStrings.copyrightPrefix), findsOneWidget);
+    });
+
+    test('SettingsScreen default isDebug is bound to kDebugMode', () {
+      const screen = SettingsScreen();
+      expect(screen.isDebug, kDebugMode);
     });
 
     testWidgets('Gallery row is HIDDEN in release mode (isDebug = false)', (tester) async {

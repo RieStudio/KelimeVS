@@ -10,6 +10,9 @@ class AchievementUiItem {
     required this.description,
   });
 
+  /// Başarıma ait çok renkli SVG ikon dosyasının asset yolu.
+  String get iconAsset => 'assets/icons/ach_$id.svg';
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -90,4 +93,9 @@ abstract final class AchievementUiManifest {
   /// Belirtilen kimliğe karşılık gelen başarım UI bilgisini döner.
   /// Bilinmeyen ID gelirse sessizce null döner.
   static AchievementUiItem? get(String id) => _items[id];
+
+  /// Belirtilen kimliğe karşılık gelen çok renkli SVG ikon asset yolunu döner.
+  /// Bilinmeyen ID gelirse sessizce null döner.
+  static String? iconAssetFor(String id) =>
+      _items.containsKey(id) ? 'assets/icons/ach_$id.svg' : null;
 }

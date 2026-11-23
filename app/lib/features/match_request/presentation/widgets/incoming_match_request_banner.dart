@@ -23,6 +23,7 @@ class IncomingMatchRequestBanner extends StatefulWidget {
   final VoidCallback onAccept;
   final VoidCallback onDecline;
   final bool isAccepting;
+  final bool enableCountdownTicker;
 
   const IncomingMatchRequestBanner({
     super.key,
@@ -30,6 +31,7 @@ class IncomingMatchRequestBanner extends StatefulWidget {
     required this.onAccept,
     required this.onDecline,
     this.isAccepting = false,
+    this.enableCountdownTicker = true,
   });
 
   @override
@@ -73,6 +75,10 @@ class _IncomingMatchRequestBannerState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!widget.enableCountdownTicker) {
+      _updateProgress(disableAnimations: true);
+      return;
+    }
     final disableAnimations = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (_ticker == null && _steppedTimer == null) {
       _animationsDisabled = disableAnimations;

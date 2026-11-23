@@ -16,11 +16,13 @@ import '../../domain/match_request_models.dart';
 class OutgoingMatchRequestChip extends StatefulWidget {
   final OutgoingMatchRequest request;
   final VoidCallback onCancel;
+  final bool enablePeriodicTicker;
 
   const OutgoingMatchRequestChip({
     super.key,
     required this.request,
     required this.onCancel,
+    this.enablePeriodicTicker = true,
   });
 
   @override
@@ -36,16 +38,18 @@ class _OutgoingMatchRequestChipState extends State<OutgoingMatchRequestChip> {
   void initState() {
     super.initState();
     _remainingSec = widget.request.calculateRemainingSeconds();
-    _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (mounted) {
-        final sec = widget.request.calculateRemainingSeconds();
-        if (sec != _remainingSec) {
-          setState(() {
-            _remainingSec = sec;
-          });
+    if (widget.enablePeriodicTicker) {
+      _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted) {
+          final sec = widget.request.calculateRemainingSeconds();
+          if (sec != _remainingSec) {
+            setState(() {
+              _remainingSec = sec;
+            });
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   @override

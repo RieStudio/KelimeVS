@@ -15,6 +15,15 @@ import '../features/game/application/match_providers.dart';
 import '../features/game/presentation/match_screen.dart';
 import '../features/online/application/network_diagnostics.dart';
 import '../features/online/application/server_connection_test.dart';
+import '../features/achievements/application/achievement_notification_service.dart';
+import '../features/achievements/domain/achievement_ui_manifest.dart';
+import '../features/achievements/presentation/achievement_notification_card.dart';
+import '../features/game/application/match_ui_state.dart';
+import '../features/match_request/application/match_requests_providers.dart';
+import '../features/match_request/domain/match_request_models.dart';
+import '../features/match_request/presentation/widgets/incoming_match_request_banner.dart';
+import '../features/match_request/presentation/widgets/match_request_toast.dart';
+import '../features/match_request/presentation/widgets/outgoing_match_request_chip.dart';
 
 /// Geliştirme sürecinde tasarım altyapısını ve tüm bileşenleri
 /// canlı olarak incelemek için kullanılan galeri ekranı.
@@ -597,6 +606,12 @@ class ComponentGallery extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppDimens.space24),
+
+            // 12. BİLDİRİMLER (Banner, Çip, Tost & Başarım Bildirimleri)
+            const SectionLabel('Bildirimler (Banner, Çip, Tost & Başarım Bildirimleri)'),
+            const SizedBox(height: AppDimens.space10),
+            const NotificationsGallerySection(),
+            const SizedBox(height: AppDimens.space24),
           ],
         ),
       ),
@@ -1082,3 +1097,588 @@ class FrameGallerySectionState extends State<FrameGallerySection> {
     );
   }
 }
+
+/// Geliştirici galerisinde projedeki tüm bildirim, banner, çip, tost ve
+/// başarım bildirimlerini canlı ve statik olarak sergileyen bölüm.
+class NotificationsGallerySection extends StatelessWidget {
+  const NotificationsGallerySection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      ProviderScope.containerOf(context);
+      return const _NotificationsGallerySectionContent();
+    } catch (_) {
+      return const ProviderScope(
+        child: _NotificationsGallerySectionContent(),
+      );
+    }
+  }
+}
+
+class _NotificationsGallerySectionContent extends ConsumerStatefulWidget {
+  const _NotificationsGallerySectionContent();
+
+  @override
+  ConsumerState<_NotificationsGallerySectionContent> createState() =>
+      _NotificationsGallerySectionContentState();
+}
+
+class _NotificationsGallerySectionContentState
+    extends ConsumerState<_NotificationsGallerySectionContent> {
+  // ConnectionBanner durumları
+  ConnectionStatus _connectionStatus = ConnectionStatus.reconnecting;
+  bool _opponentConnected = true;
+
+  // Başarım bildirim seçimi
+  String _selectedAchievementId = 'first_match';
+
+  // Son etkileşim metni
+  String? _lastActionNote;
+
+  void _setNote(String note) {
+    setState(() {
+      _lastActionNote = note;
+    });
+  }
+
+  Widget _buildStatusChip({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.ink : AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.ink, width: 1.5),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? AppColors.card : AppColors.ink,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToastItem(
+    BuildContext context, {
+    required String label,
+    required String message,
+    required bool isDanger,
+    required String iconCode,
+  }) {
+    final iconCfg = matchRequestToastIconForCode(iconCode);
+    return InkWell(
+      onTap: () {
+        ref.read(matchRequestToastProvider.notifier).showToast(
+              message,
+              isDanger: isDanger,
+              iconAsset: iconCfg?.assetPath,
+              iconColor: iconCfg?.color,
+            );
+        _setNote('Tost global overlay üzerinde tetiklendi: $label');
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          MatchRequestToastWidget(
+            message: message,
+            isDanger: isDanger,
+            iconAsset: iconCfg?.assetPath,
+            iconColor: iconCfg?.color,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final achievementState = ref.watch(achievementNotificationProvider);
+    final selectedItem = AchievementUiManifest.get(_selectedAchievementId) ??
+        AchievementUiManifest.items.values.first;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_lastActionNote != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.space12,
+              vertical: AppDimens.space8,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppDimens.borderRadiusBadge,
+              border: Border.all(
+                color: AppColors.bright,
+                width: AppDimens.borderThin,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: AppColors.ink),
+                const SizedBox(width: AppDimens.space8),
+                Expanded(
+                  child: Text(
+                    _lastActionNote!,
+                    style: AppTextStyles.secondaryText.copyWith(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppDimens.space14),
+        ],
+
+        // a) Gelen Maç İsteği Bildirim Bandı
+        Text(
+          'a) Gelen Maç İsteği Bandı (IncomingMatchRequestBanner)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space6),
+        IncomingMatchRequestBanner(
+          request: IncomingMatchRequest(
+            id: 'gallery_in_1',
+            fromUid: 'u_gallery_1',
+            fromNickname: 'Ahmet',
+            fromFrame: 'emerald',
+            type: MatchRequestType.friendly,
+            origin: MatchRequestOrigin.profile,
+            expiresAtMs: DateTime.now().millisecondsSinceEpoch + 45000,
+          ),
+          enableCountdownTicker: false,
+          onAccept: () => _setNote('Gelen istek kabul edildi (örnek tetikleyici)'),
+          onDecline: () => _setNote('Gelen istek reddedildi (örnek tetikleyici)'),
+        ),
+        const SizedBox(height: AppDimens.space16),
+
+        // b) Giden Maç İsteği Bilgi Çipi
+        Text(
+          'b) Giden Maç İsteği Çipi (OutgoingMatchRequestChip)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space6),
+        Center(
+          child: OutgoingMatchRequestChip(
+            request: OutgoingMatchRequest(
+              id: 'gallery_out_1',
+              toUid: 'u_gallery_2',
+              toNickname: 'Zeynep',
+              type: MatchRequestType.friendly,
+              origin: MatchRequestOrigin.profile,
+              expiresAtMs: DateTime.now().millisecondsSinceEpoch + 45000,
+            ),
+            enablePeriodicTicker: false,
+            onCancel: () => _setNote('Giden istek iptal edildi'),
+          ),
+        ),
+        const SizedBox(height: AppDimens.space16),
+
+        // c) Maç İsteği Tostları
+        Text(
+          'c) Maç İsteği Tostları (MatchRequestToastWidget - Tüm Varyantlar)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space4),
+        const Text(
+          'Tostlara dokunarak global overlay üzerinde canlı olarak görebilirsiniz:',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space8),
+        Wrap(
+          spacing: AppDimens.space8,
+          runSpacing: AppDimens.space8,
+          children: [
+            _buildToastItem(
+              context,
+              label: 'Reddedildi',
+              message: AppStrings.matchRequestDeclinedToast,
+              isDanger: true,
+              iconCode: 'declined',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Zaman Aşımı',
+              message: AppStrings.matchRequestExpiredToast,
+              isDanger: false,
+              iconCode: 'expired',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Müsait Değil',
+              message: AppStrings.matchRequestUnavailableToast,
+              isDanger: false,
+              iconCode: 'unavailable',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Kabul Edilemedi',
+              message: AppStrings.matchRequestUnavailableForAcceptToast,
+              isDanger: false,
+              iconCode: 'unavailable',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Çevrimdışı',
+              message: AppStrings.matchRequestOfflineToast,
+              isDanger: false,
+              iconCode: 'offline',
+            ),
+            _buildToastItem(
+              context,
+              label: 'İstekler Kapalı',
+              message: AppStrings.matchRequestDisabledToast,
+              isDanger: false,
+              iconCode: 'requests_disabled',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Bekleme Süresi (45s)',
+              message: AppStrings.matchRequestCooldownToast(45),
+              isDanger: false,
+              iconCode: 'cooldown_active',
+            ),
+            _buildToastItem(
+              context,
+              label: 'İstek Sıklığı',
+              message: AppStrings.matchRequestRateLimitedToast,
+              isDanger: false,
+              iconCode: 'rate_limited',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Gönderilemedi',
+              message: AppStrings.matchRequestInvalidToast,
+              isDanger: false,
+              iconCode: 'invalid',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Rakip Enerjisi Yok',
+              message: AppStrings.matchRequestOpponentNoEnergyToast,
+              isDanger: false,
+              iconCode: 'opponent_no_energy',
+            ),
+            _buildToastItem(
+              context,
+              label: 'Kabul Edildi / Başladı',
+              message: 'İstek kabul edildi!',
+              isDanger: false,
+              iconCode: 'accepted',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space16),
+
+        // d) Bağlantı Uyarısı ve Küresel Ağ Bandı
+        Text(
+          'd) Bağlantı Bandı (ConnectionBanner & GlobalOfflineBanner)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space8),
+        Wrap(
+          spacing: AppDimens.space8,
+          runSpacing: AppDimens.space6,
+          children: [
+            _buildStatusChip(
+              title: 'Yeniden Bağlanıyor',
+              isSelected: _connectionStatus == ConnectionStatus.reconnecting &&
+                  _opponentConnected,
+              onTap: () => setState(() {
+                _connectionStatus = ConnectionStatus.reconnecting;
+                _opponentConnected = true;
+              }),
+            ),
+            _buildStatusChip(
+              title: 'Kalıcı Koptu (Disconnected)',
+              isSelected: _connectionStatus ==
+                      ConnectionStatus.permanentDisconnected &&
+                  _opponentConnected,
+              onTap: () => setState(() {
+                _connectionStatus = ConnectionStatus.permanentDisconnected;
+                _opponentConnected = true;
+              }),
+            ),
+            _buildStatusChip(
+              title: 'Tekrar Bağlandı (Pill)',
+              isSelected: _connectionStatus == ConnectionStatus.connected &&
+                  _opponentConnected,
+              onTap: () => setState(() {
+                _connectionStatus = ConnectionStatus.connected;
+                _opponentConnected = true;
+              }),
+            ),
+            _buildStatusChip(
+              title: 'Rakip Koptu',
+              isSelected: !_opponentConnected,
+              onTap: () => setState(() {
+                _connectionStatus = ConnectionStatus.connected;
+                _opponentConnected = false;
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space8),
+        Container(
+          height: 60,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppDimens.borderRadiusListCard,
+            border: Border.all(
+              color: AppColors.ink,
+              width: AppDimens.borderThin,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: AppDimens.borderRadiusListCard,
+            child: Stack(
+              children: [
+                const Center(
+                  child: Text(
+                    'Oyun Ekranı Alanı',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ConnectionBanner(
+                    status: _connectionStatus,
+                    opponentConnected: _opponentConnected,
+                    debounceDuration: Duration.zero,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppDimens.space10),
+        const Text(
+          'Uygulama Geneli Çevrimdışı Bandı (GlobalOfflineBanner):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space6),
+        GlobalOfflineBanner(
+          isChecking: false,
+          onRetry: () => _setNote('Ağ yeniden kontrol ediliyor'),
+        ),
+        const SizedBox(height: AppDimens.space16),
+
+        // e) Başarım Bildirimi
+        Text(
+          'e) Başarım Bildirimi (AchievementNotificationCard & Global Overlay)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space4),
+        const Text(
+          'Kart Önizlemesi (3px çerçeve, 4px gölge, sol taşan -6° SVG, 58px sol boşluk):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space8),
+        AchievementNotificationCard(
+          item: selectedItem,
+          onDismiss: () => _setNote('Önizleme kartına dokunuldu'),
+        ),
+        const SizedBox(height: AppDimens.space12),
+        const Text(
+          '11 Başarım Seçimi (Dokunarak seçin ve tetikleyin):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space6),
+        Wrap(
+          spacing: AppDimens.space6,
+          runSpacing: AppDimens.space6,
+          children: [
+            for (final item in AchievementUiManifest.items.values)
+              ChoiceChip(
+                label: Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _selectedAchievementId == item.id
+                        ? AppColors.card
+                        : AppColors.ink,
+                  ),
+                ),
+                selected: _selectedAchievementId == item.id,
+                selectedColor: AppColors.ink,
+                backgroundColor: AppColors.card,
+                onSelected: (val) {
+                  if (val) {
+                    setState(() {
+                      _selectedAchievementId = item.id;
+                    });
+                  }
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space10),
+        Wrap(
+          spacing: AppDimens.space8,
+          runSpacing: AppDimens.space8,
+          children: [
+            SecondaryButton(
+              text: 'Seçili Başarımı Göster (Hemen)',
+              onPressed: () {
+                ref
+                    .read(achievementNotificationProvider.notifier)
+                    .show(_selectedAchievementId, initialDelay: Duration.zero);
+                _setNote('Başarım bildirimi gönderildi: ${selectedItem.title}');
+              },
+            ),
+            SecondaryButton(
+              text: 'Seçili Başarımı Göster (600ms gecikmeli)',
+              onPressed: () {
+                ref.read(achievementNotificationProvider.notifier).show(
+                      _selectedAchievementId,
+                      initialDelay: const Duration(milliseconds: 600),
+                    );
+                _setNote(
+                  '600ms gecikmeli başarım gönderildi: ${selectedItem.title}',
+                );
+              },
+            ),
+            PrimaryButton(
+              text: "3'lü Seri Başarım Göster (FIFO Kuyruk Testi)",
+              onPressed: () {
+                ref.read(achievementNotificationProvider.notifier).showAll(
+                  ['streak_3', 'matches_10', 'first_win'],
+                  initialDelay: Duration.zero,
+                );
+                _setNote(
+                  "3'lü seri başarım sıraya alındı (streak_3 -> matches_10 -> first_win)",
+                );
+              },
+            ),
+            SecondaryButton(
+              text: 'Bekleyen Kuyruğu Temizle',
+              onPressed: () {
+                ref.read(achievementNotificationProvider.notifier).clearQueue();
+                _setNote('Bekleyen başarım kuyruğu temizlendi');
+              },
+            ),
+          ],
+        ),
+        if (achievementState.currentItem != null) ...[
+          const SizedBox(height: AppDimens.space8),
+          Text(
+            'Aktif Gösterilen: ${achievementState.currentItem!.title} | Kuyrukta Kalan: ${ref.read(achievementNotificationProvider.notifier).queueLength}',
+            style: AppTextStyles.secondaryText.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+        const SizedBox(height: AppDimens.space16),
+
+        // f) Diğer Bildirimler (SnackBarlar)
+        Text(
+          'f) Sistem Uyarıları (Kayan SnackBar Çeşitleri)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space8),
+        Wrap(
+          spacing: AppDimens.space8,
+          runSpacing: AppDimens.space8,
+          children: [
+            SecondaryButton(
+              text: 'Bilgi SnackBar Göster',
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Profil başarıyla güncellendi.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+            SecondaryButton(
+              text: 'Hata SnackBar Göster',
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(AppStrings.noInternetActionError),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space16),
+
+        // Bölüm Özeti
+        Container(
+          padding: const EdgeInsets.all(AppDimens.space14),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppDimens.borderRadiusListCard,
+            border: Border.all(
+              color: AppColors.ink,
+              width: AppDimens.borderThin,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Listelenen Bildirim Türleri Özeti:',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontFredoka,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
+              ),
+              SizedBox(height: AppDimens.space6),
+              Text(
+                '1. Gelen Maç İsteği Bildirim Bandı (IncomingMatchRequestBanner): Üstten kayan davet bandı (Kabul / Red).\n'
+                '2. Giden Maç İsteği Bilgi Çipi (OutgoingMatchRequestChip): Geri sayımlı kompakt bekleme çipi (İptal).\n'
+                '3. Maç İsteği Tostları (MatchRequestToastWidget): 10 farklı durum ikonu ve renk varyantıyla hızlı geri bildirim.\n'
+                '4. Bağlantı Uyarı Şeridi (ConnectionBanner): Kopma, yeniden bağlanma ve 1.5 sn "Bağlandı" hapı.\n'
+                '5. Küresel Çevrimdışı Bandı (GlobalOfflineBanner): Ağ kesintisinde tüm ekranların üstünde sabit bant.\n'
+                '6. Başarım Bildirimi (AchievementNotificationCard): Üstten hafif yaylanarak inen, -6° rozetli, 4000 ms süreli ve FIFO kuyruklu bildirim.\n'
+                '7. Kayan Sistem Uyarıları (Floating SnackBar): Hızlı işlem sonuçları ve kullanıcı bilgilendirmeleri.',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.fontNunito,
+                  fontSize: 12,
+                  color: AppColors.ink,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+

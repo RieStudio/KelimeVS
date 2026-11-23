@@ -55,6 +55,23 @@ void main() {
     test('Bilinmeyen bir id sorgulandığında sessizce null döner (çökmez)', () {
       expect(AchievementUiManifest.get('unknown_future_achievement'), isNull);
       expect(AchievementUiManifest.get(''), isNull);
+      expect(AchievementUiManifest.iconAssetFor('unknown_future_achievement'), isNull);
+    });
+
+    test('Sözleşme Testi: Manifest içindeki tüm 11 başarımın SVG görsel dosyası mevcut olmalıdır', () {
+      expect(AchievementUiManifest.items.length, equals(11));
+
+      for (final item in AchievementUiManifest.items.values) {
+        expect(item.iconAsset, equals('assets/icons/ach_${item.id}.svg'));
+        expect(AchievementUiManifest.iconAssetFor(item.id), equals('assets/icons/ach_${item.id}.svg'));
+
+        final iconFile = File(item.iconAsset);
+        expect(
+          iconFile.existsSync(),
+          isTrue,
+          reason: 'Başarım "${item.id}" için ${item.iconAsset} dosyası mevcut olmalıdır.',
+        );
+      }
     });
 
     test('Kullanıcıya açık metinlerde kısıtlı kelimeler (bot, yapay zeka, alıştırma maçı) geçmez', () {

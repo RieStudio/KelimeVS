@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
+import 'package:app/features/achievements/application/achievement_notification_service.dart';
 import 'package:app/features/game/application/match_providers.dart';
 import 'package:app/features/game/application/match_session.dart';
 import 'package:app/features/game/application/match_ui_state.dart';
@@ -28,13 +29,13 @@ void main() {
 
   MatchState makeFinishedMatch({
     int myScore = 2,
-    int botScore = 1,
+    int oppScore = 1,
     String winnerId = 'me',
   }) {
     return MatchState(
       config: const MatchConfig(),
-      playerIds: const ['me', 'bot'],
-      scores: {'me': myScore, 'bot': botScore},
+      playerIds: const ['me', 'opp'],
+      scores: {'me': myScore, 'opp': oppScore},
       decisiveRounds: 3,
       totalRoundsPlayed: 3,
       phase: MatchPhase.matchFinished,
@@ -42,7 +43,7 @@ void main() {
       usedAnswerIds: const {},
       turnPlayerId: null,
       deadlineMs: 0,
-      remainingNearMisses: const {'me': 0, 'bot': 0},
+      remainingNearMisses: const {'me': 0, 'opp': 0},
       usedQuestionIds: const {},
       currentRoundAttempts: const [],
       roundHistory: const [],
@@ -50,8 +51,8 @@ void main() {
     );
   }
 
-  group('MatchEndView Achievements Display Tests', () {
-    testWidgets('1. Açılan başarımlar (örn. first_win) bildirim kartı olarak doğru başlık ve açıklamayla gösterilir', (tester) async {
+  group('MatchEndView Achievements Separation & Notification Forwarding Tests', () {
+    testWidgets('1. MatchEndView gövdesinde eski "BAŞARIM AÇILDI" inline kartı ARTIK BULUNMAZ', (tester) async {
       final uiState = MatchUiState(
         matchState: makeFinishedMatch(),
         myPlayerId: 'me',
@@ -59,14 +60,19 @@ void main() {
         unlockedAchievements: const ['first_win'],
       );
 
+      final container = ProviderContainer(
+        overrides: [
+          activeMatchSessionModeProvider.overrideWith(
+            () => _TestSessionModeNotifier(MatchSessionMode.bot),
+          ),
+          activeMatchUiStateProvider.overrideWithValue(uiState),
+        ],
+      );
+      addTearDown(container.dispose);
+
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            activeMatchSessionModeProvider.overrideWith(
-              () => _TestSessionModeNotifier(MatchSessionMode.bot),
-            ),
-            activeMatchUiStateProvider.overrideWithValue(uiState),
-          ],
+        UncontrolledProviderScope(
+          container: container,
           child: const MaterialApp(
             home: Scaffold(
               body: MatchEndView(),
@@ -77,37 +83,34 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Başarım kartı semantics ve metinleri
-      expect(find.text('BAŞARIM AÇILDI'), findsOneWidget);
-      expect(find.text('İlk Zafer'), findsOneWidget);
-      expect(find.text('İlk galibiyetini al'), findsOneWidget);
+      // Eski inline başarım kartı gövdede olmamalıdır
+      expect(find.text('BAŞARIM AÇILDI'), findsNothing);
 
-      // Jeton kartı da görünür
+      // Jeton ödülü kartı gövdede görünmeye devam eder
       expect(find.text('+30${AppStrings.coinSuffix}'), findsOneWidget);
     });
 
-    testWidgets('2. 3 ten fazla başarım açıldığında en fazla 3 tanesi gösterilir', (tester) async {
+    testWidgets('2. Açılan başarımlar (600ms gecikmeli olarak) global bildirim servisine iletilir', (tester) async {
       final uiState = MatchUiState(
         matchState: makeFinishedMatch(),
         myPlayerId: 'me',
         coinsAwarded: 50,
-        unlockedAchievements: const [
-          'first_match',
-          'first_win',
-          'streak_3',
-          'wins_10',
-          'matches_10',
+        unlockedAchievements: const ['first_match', 'first_win', 'streak_3'],
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          activeMatchSessionModeProvider.overrideWith(
+            () => _TestSessionModeNotifier(MatchSessionMode.online),
+          ),
+          activeMatchUiStateProvider.overrideWithValue(uiState),
         ],
       );
+      addTearDown(container.dispose);
 
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            activeMatchSessionModeProvider.overrideWith(
-              () => _TestSessionModeNotifier(MatchSessionMode.online),
-            ),
-            activeMatchUiStateProvider.overrideWithValue(uiState),
-          ],
+        UncontrolledProviderScope(
+          container: container,
           child: const MaterialApp(
             home: Scaffold(
               body: MatchEndView(),
@@ -116,64 +119,46 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      // İlk çizim
+      await tester.pump();
+      // 600ms gecikme dolmadan önce henüz bildirim servisinde aktif öğe yoktur
+      expect(container.read(achievementNotificationProvider).currentItem, isNull);
 
-      // En fazla 3 adet "BAŞARIM AÇILDI" rozeti olmalıdır
-      expect(find.text('BAŞARIM AÇILDI'), findsNWidgets(3));
-      expect(find.text('İlk Adım'), findsOneWidget);
-      expect(find.text('İlk Zafer'), findsOneWidget);
-      expect(find.text('Üçlü Seri'), findsOneWidget);
-      // 4. ve 5. başarım gösterilmez
-      expect(find.text('Yükselen Yıldız'), findsNothing);
-      expect(find.text('Alışma Süreci'), findsNothing);
+      // 600ms gecikmeyi ilerlet
+      await tester.pump(const Duration(milliseconds: 600));
+
+      // Artık ilk başarım aktif olmalıdır
+      final active = container.read(achievementNotificationProvider).currentItem;
+      expect(active, isNotNull);
+      expect(active!.id, equals('first_match'));
+
+      // Kalan 2 başarım kuyrukta bekler
+      expect(
+        container.read(achievementNotificationProvider.notifier).queueLength,
+        equals(2),
+      );
     });
 
-    testWidgets('3. Bilinmeyen bir başarım kimliği geldiğinde sessizce atlanır, uygulama çökmez', (tester) async {
+    testWidgets('3. Tekrar önleme (dedup): Ekran yeniden çizildiğinde aynı başarımlar mükerrer sıraya alınmaz', (tester) async {
       final uiState = MatchUiState(
         matchState: makeFinishedMatch(),
         myPlayerId: 'me',
-        unlockedAchievements: const ['unknown_future_achievement'],
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            activeMatchSessionModeProvider.overrideWith(
-              () => _TestSessionModeNotifier(MatchSessionMode.bot),
-            ),
-            activeMatchUiStateProvider.overrideWithValue(uiState),
-          ],
-          child: const MaterialApp(
-            home: Scaffold(
-              body: MatchEndView(),
-            ),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Hiçbir başarım kartı gösterilmez
-      expect(find.text('BAŞARIM AÇILDI'), findsNothing);
-    });
-
-    testWidgets('4. Dostluk maçında jeton kartı gizlenir ancak başarım açılmışsa başarım kartı gösterilir', (tester) async {
-      final uiState = MatchUiState(
-        matchState: makeFinishedMatch(),
-        myPlayerId: 'me',
-        isFriendly: true,
-        coinsAwarded: 30, // Dostluk maçında coinsAwarded set edilse bile kart gizlenmeli
         unlockedAchievements: const ['streak_5'],
       );
 
+      final container = ProviderContainer(
+        overrides: [
+          activeMatchSessionModeProvider.overrideWith(
+            () => _TestSessionModeNotifier(MatchSessionMode.bot),
+          ),
+          activeMatchUiStateProvider.overrideWithValue(uiState),
+        ],
+      );
+      addTearDown(container.dispose);
+
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            activeMatchSessionModeProvider.overrideWith(
-              () => _TestSessionModeNotifier(MatchSessionMode.online),
-            ),
-            activeMatchUiStateProvider.overrideWithValue(uiState),
-          ],
+        UncontrolledProviderScope(
+          container: container,
           child: const MaterialApp(
             home: Scaffold(
               body: MatchEndView(),
@@ -182,17 +167,22 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(container.read(achievementNotificationProvider).currentItem?.id, equals('streak_5'));
 
-      // Jeton ödülü kartı HİÇ görünmez
-      expect(find.text('+30${AppStrings.coinSuffix}'), findsNothing);
+      // Ekranı birden fazla kez yeniden çizdir
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-      // Başarım kartı görünür
-      expect(find.text('BAŞARIM AÇILDI'), findsOneWidget);
-      expect(find.text('Beşli Seri'), findsOneWidget);
+      // Kuyrukta mükerrer öğe oluşmamalıdır
+      expect(
+        container.read(achievementNotificationProvider.notifier).queueLength,
+        equals(0),
+      );
     });
 
-    testWidgets('5. Maç sonu ekranında yasaklı kelimeler (bot, yapay zeka, alıştırma maçı) geçmez', (tester) async {
+    testWidgets('4. Maç sonu ekranında yasaklı kelimeler (bot, yapay zeka, alıştırma maçı) geçmez', (tester) async {
       final uiState = MatchUiState(
         matchState: makeFinishedMatch(),
         myPlayerId: 'me',
@@ -222,7 +212,7 @@ void main() {
         final content = text.data?.toLowerCase() ?? '';
         expect(content.contains('bot'), isFalse, reason: 'Yasaklı "bot" ifadesi bulundu: $content');
         expect(content.contains('yapay zeka'), isFalse, reason: 'Yasaklı "yapay zeka" ifadesi bulundu: $content');
-        expect(content.contains('alıştırma maçı'), isFalse, reason: 'Yasaklı "alıştırma maçı" ifadesi bulundu: $content');
+        expect(content.contains('alıştırma'), isFalse, reason: 'Yasaklı "alıştırma" ifadesi bulundu: $content');
       }
     });
   });
