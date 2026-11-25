@@ -404,210 +404,228 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppDimens.screenPaddingHorizontal,
             vertical: AppDimens.space12,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Üst Çubuk
-              Row(
-                children: [
-                  if (canPop)
-                    AppIconButton(
-                      icon: AppIcons.back,
-                      semanticLabel: AppStrings.back,
-                      onTap: () => Navigator.of(context).pop(),
-                    )
-                  else
-                    const SizedBox(width: 44, height: 44),
-                  const Expanded(
-                    child: Text(
-                      AppStrings.profileTitle,
-                      style: AppTextStyles.screenTitle,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  AppIconButton(
-                    key: _moreButtonKey,
-                    icon: AppIcons.more,
-                    semanticLabel: AppStrings.more,
-                    onTap: authState.isLoading
-                        ? null
-                        : () => _showMoreMenu(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimens.space24),
-
-              // Büyük Avatar
-              Center(
-                child: PlayerAvatar.selfHome(
-                  name: nickname,
-                  frame: profile.equippedFrame,
-                  size: 88,
-                  borderWidth: AppDimens.borderThick,
-                  includeFramePadding: true,
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.screenPaddingHorizontal,
                 ),
-              ),
-              const SizedBox(height: AppDimens.space16),
-
-              // Takma Ad Metni
-              Center(
-                child: Text(
-                  nickname,
-                  style: const TextStyle(
-                    fontFamily: AppTextStyles.fontFredoka,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(height: AppDimens.space24),
-
-              // Adı Değiştir Butonu VEYA Misafir Bilgi & Giriş Yönlendirmesi
-              if (authState.isGoogleLinked) ...[
-                SecondaryButton(
-                  text: AppStrings.changeNickname,
-                  onPressed: () => _showChangeNicknameDialog(context, nickname),
-                ),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(AppDimens.space16),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppDimens.borderRadiusListCard,
-                    border: Border.all(
-                      color: AppColors.ink,
-                      width: AppDimens.borderThin,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColors.ink,
-                        offset: Offset(0, 3),
-                        blurRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.info_outline_rounded,
-                            size: 20,
-                            color: AppColors.ink,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Üst Çubuk
+                    Row(
+                      children: [
+                        if (canPop)
+                          AppIconButton(
+                            icon: AppIcons.back,
+                            semanticLabel: AppStrings.back,
+                            onTap: () => Navigator.of(context).pop(),
+                          )
+                        else
+                          const SizedBox(width: 44, height: 44),
+                        const Expanded(
+                          child: Text(
+                            AppStrings.profileTitle,
+                            style: AppTextStyles.screenTitle,
+                            textAlign: TextAlign.center,
                           ),
-                          const SizedBox(width: AppDimens.space8),
-                          Expanded(
-                            child: Text(
-                              AppStrings.guestNicknameInfo,
-                              style: AppTextStyles.bodyText.copyWith(
-                                fontSize: 13,
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
+                        AppIconButton(
+                          key: _moreButtonKey,
+                          icon: AppIcons.more,
+                          semanticLabel: AppStrings.more,
+                          onTap: authState.isLoading
+                              ? null
+                              : () => _showMoreMenu(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppDimens.space24),
+
+                    // Büyük Avatar
+                    Center(
+                      child: PlayerAvatar.selfHome(
+                        name: nickname,
+                        frame: profile.equippedFrame,
+                        size: 88,
+                        borderWidth: AppDimens.borderThick,
+                        includeFramePadding: true,
                       ),
-                      const SizedBox(height: AppDimens.space12),
+                    ),
+                    const SizedBox(height: AppDimens.space16),
+
+                    // Takma Ad Metni
+                    Center(
+                      child: Text(
+                        nickname,
+                        style: const TextStyle(
+                          fontFamily: AppTextStyles.fontFredoka,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimens.space24),
+
+                    // Adı Değiştir Butonu VEYA Misafir Bilgi & Giriş Yönlendirmesi
+                    if (authState.isGoogleLinked) ...[
                       SecondaryButton(
-                        text: AppStrings.linkGoogle,
-                        onPressed: authState.isLoading
-                            ? null
-                            : () => _handleLinkGoogle(context),
+                        text: AppStrings.changeNickname,
+                        onPressed: () =>
+                            _showChangeNicknameDialog(context, nickname),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(AppDimens.space16),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: AppDimens.borderRadiusListCard,
+                          border: Border.all(
+                            color: AppColors.ink,
+                            width: AppDimens.borderThin,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: AppColors.ink,
+                              offset: Offset(0, 3),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 20,
+                                  color: AppColors.ink,
+                                ),
+                                const SizedBox(width: AppDimens.space8),
+                                Expanded(
+                                  child: Text(
+                                    AppStrings.guestNicknameInfo,
+                                    style: AppTextStyles.bodyText.copyWith(
+                                      fontSize: 13,
+                                      color: AppColors.ink,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppDimens.space12),
+                            SecondaryButton(
+                              text: AppStrings.linkGoogle,
+                              onPressed: authState.isLoading
+                                  ? null
+                                  : () => _handleLinkGoogle(context),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
+
+                    const SizedBox(height: AppDimens.space16),
+
+                    // Oyuncu İstatistikleri (3 Kart: Oynanan, Doğru, Kazanma Oranı)
+                    _ProfileStatsRow(stats: profile.stats),
+                  ],
                 ),
-              ],
-
-              const SizedBox(height: AppDimens.space16),
-
-              // Oyuncu İstatistikleri (3 Kart: Oynanan, Doğru, Kazanma Oranı)
-              _ProfileStatsRow(stats: profile.stats),
+              ),
 
               if (AchievementUiManifest.sortByPrestige(profile.achievements)
                   .isNotEmpty) ...[
                 const SizedBox(height: AppDimens.space8),
                 AchievementBadgesRow(
                   achievements: profile.achievements,
-                  horizontalPadding: 0,
                 ),
                 const SizedBox(height: AppDimens.space8),
               ] else ...[
                 const SizedBox(height: AppDimens.space16),
               ],
 
-              // Bağlı Hesap Kartı (Yalnızca Google bağlıysa)
-              if (authState.isGoogleLinked) ...[
-                // Bağlı Hesap Kartı
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.space16,
-                    vertical: AppDimens.space12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: AppDimens.borderRadiusListCard,
-                    border: Border.all(
-                      color: AppColors.mint,
-                      width: AppDimens.borderThin,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/account_linked_game.svg',
-                        width: 44,
-                        height: 44,
-                      ),
-                      const SizedBox(width: AppDimens.space12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.screenPaddingHorizontal,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Bağlı Hesap Kartı (Yalnızca Google bağlıysa)
+                    if (authState.isGoogleLinked) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimens.space16,
+                          vertical: AppDimens.space12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: AppDimens.borderRadiusListCard,
+                          border: Border.all(
+                            color: AppColors.mint,
+                            width: AppDimens.borderThin,
+                          ),
+                        ),
+                        child: Row(
                           children: [
-                            const Text(
-                              AppStrings.linkedAccount,
-                              style: AppTextStyles.sectionLabel,
+                            SvgPicture.asset(
+                              'assets/icons/account_linked_game.svg',
+                              width: 44,
+                              height: 44,
                             ),
-                            const SizedBox(height: AppDimens.space4),
-                            Text(
-                              authState.linkedEmail ?? '',
-                              style: AppTextStyles.playerName.copyWith(
-                                color: AppColors.ink,
+                            const SizedBox(width: AppDimens.space12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    AppStrings.linkedAccount,
+                                    style: AppTextStyles.sectionLabel,
+                                  ),
+                                  const SizedBox(height: AppDimens.space4),
+                                  Text(
+                                    authState.linkedEmail ?? '',
+                                    style: AppTextStyles.playerName.copyWith(
+                                      color: AppColors.ink,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
 
-              const SizedBox(height: AppDimens.space16),
+                    const SizedBox(height: AppDimens.space16),
 
-              // Engellenenler Butonu
-              SecondaryButton(
-                text: AppStrings.blockedUsersTitle,
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const BlockedUsersScreen(),
+                    // Engellenenler Butonu
+                    SecondaryButton(
+                      text: AppStrings.blockedUsersTitle,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BlockedUsersScreen(),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
 
-              const SizedBox(height: AppDimens.space24),
+                    const SizedBox(height: AppDimens.space24),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

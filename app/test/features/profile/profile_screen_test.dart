@@ -205,6 +205,32 @@ void main() {
     expect(find.byType(ShaderMask), findsOneWidget);
     expect(find.text('x4'), findsOneWidget);
 
+    // Satır ekran genişliğinde (360 dp) olmalı ve ilk rozet soldan 20 px içeride başlamalı
+    expect(tester.getSize(find.byType(AchievementBadgesRow)).width, 360.0);
+    final firstBadge = find.bySemanticsLabel(
+      AppStrings.achievementBadgeSemantic('Yükselen Yıldız', 1),
+    );
+    expect(tester.getTopLeft(firstBadge).dx, 20.0);
+
+    // En sağa kaydırınca ofset sıfırlanmamalı
+    final rowScrollable = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byType(AchievementBadgesRow),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final maxExtent = rowScrollable.position.maxScrollExtent;
+    expect(maxExtent, greaterThan(0.0));
+    await tester.drag(
+      find.descendant(
+        of: find.byType(AchievementBadgesRow),
+        matching: find.byType(ListView),
+      ),
+      Offset(-maxExtent - 50, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(rowScrollable.position.pixels, closeTo(maxExtent, 1.0));
+
     await tester.tap(find.bySemanticsLabel(AppStrings.achievementBadgeSemantic('Üçlü Seri', 4)));
     await tester.pumpAndSettle();
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -34,21 +35,27 @@ class AchievementBadgesRow extends StatefulWidget {
 class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
   static const double _badgeSpacing = AppDimens.space10;
   static const double _verticalPadding = AppDimens.space8;
+  static const double _fadeWidthPx = 28.0;
 
   late final ScrollController _scrollController;
-  bool _showRightFade = false;
+  late final ValueNotifier<bool> _showRightFadeNotifier;
+  late List<UserAchievement> _sortedAchievements;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_updateFadeFromController);
+    _showRightFadeNotifier = ValueNotifier<bool>(false);
+    _sortedAchievements = AchievementUiManifest.sortByPrestige(widget.achievements);
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateFadeFromController());
   }
 
   @override
   void didUpdateWidget(covariant AchievementBadgesRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.achievements != widget.achievements) {
+    final nextSorted = AchievementUiManifest.sortByPrestige(widget.achievements);
+    if (!listEquals(_sortedAchievements, nextSorted)) {
+      _sortedAchievements = nextSorted;
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateFadeFromController());
     }
   }
@@ -57,6 +64,7 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
   void dispose() {
     _scrollController.removeListener(_updateFadeFromController);
     _scrollController.dispose();
+    _showRightFadeNotifier.dispose();
     super.dispose();
   }
 
@@ -68,8 +76,8 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
 
   void _updateFadeMetrics(double pixels, double maxScrollExtent) {
     final shouldShow = maxScrollExtent > 0 && pixels < maxScrollExtent - 2.0;
-    if (shouldShow != _showRightFade && mounted) {
-      setState(() => _showRightFade = shouldShow);
+    if (_showRightFadeNotifier.value != shouldShow) {
+      _showRightFadeNotifier.value = shouldShow;
     }
   }
 
@@ -82,8 +90,7 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = AchievementUiManifest.sortByPrestige(widget.achievements);
-    if (sorted.isEmpty) {
+    if (_sortedAchievements.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -92,7 +99,7 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
         final badgeSize = _computeBadgeSize(constraints.maxWidth);
         final rowHeight = badgeSize + (_verticalPadding * 2);
 
-        Widget listView = NotificationListener<ScrollMetricsNotification>(
+        final Widget listView = NotificationListener<ScrollMetricsNotification>(
           onNotification: (notification) {
             _updateFadeMetrics(
               notification.metrics.pixels,
@@ -102,16 +109,16 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
           },
           child: ListView.separated(
             controller: _scrollController,
+            primary: false,
             scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
             padding: EdgeInsets.symmetric(
               horizontal: widget.horizontalPadding,
               vertical: _verticalPadding,
             ),
-            itemCount: sorted.length,
+            itemCount: _sortedAchievements.length,
             separatorBuilder: (_, __) => const SizedBox(width: _badgeSpacing),
             itemBuilder: (context, index) {
-              final achievement = sorted[index];
+              final achievement = _sortedAchievements[index];
               final item = AchievementUiManifest.get(achievement.id)!;
               return _AchievementBadgeTile(
                 achievement: achievement,
@@ -127,22 +134,39 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
           ),
         );
 
-        if (_showRightFade) {
-          listView = ShaderMask(
-            blendMode: BlendMode.dstIn,
-            shaderCallback: (bounds) => const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Colors.white, Colors.white, Colors.transparent],
-              stops: [0.0, 0.86, 1.0],
-            ).createShader(bounds),
-            child: listView,
-          );
-        }
-
+        // ShaderMask her zaman ağaçta kalır; yalnızca gradyan renkleri ValueListenableBuilder ile değişir.
+        // Böylece sona kaydırıldığında ListView yeniden kurulmaz ve kaydırma konumu korunur.
         return SizedBox(
           height: rowHeight,
-          child: listView,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _showRightFadeNotifier,
+            child: listView,
+            builder: (context, showRightFade, child) {
+              return ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) {
+                  if (!showRightFade || bounds.width <= 0) {
+                    return const LinearGradient(
+                      colors: [Colors.white, Colors.white],
+                    ).createShader(bounds);
+                  }
+                  final fadeStart =
+                      (1.0 - (_fadeWidthPx / bounds.width)).clamp(0.5, 0.98);
+                  return LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: const [
+                      Colors.white,
+                      Colors.white,
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, fadeStart, 1.0],
+                  ).createShader(bounds);
+                },
+                child: child,
+              );
+            },
+          ),
         );
       },
     );

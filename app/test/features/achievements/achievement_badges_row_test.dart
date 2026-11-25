@@ -158,35 +158,60 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.byType(ShaderMask), findsNothing);
+        expect(tester.getSize(find.byType(AchievementBadgesRow)).width, width);
+        // İlk rozet soldan 20 px içeride başlar
+        final firstBadge = find.bySemanticsLabel(
+          AppStrings.achievementBadgeSemantic('Yükselen Yıldız', 1),
+        );
+        expect(tester.getTopLeft(firstBadge).dx, 20.0);
+
+        final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+        expect(scrollable.position.maxScrollExtent, 0.0);
         expect(find.text('x1'), findsNothing);
       }
     });
 
-    testWidgets('5. rozet ve sonrasında yatay kaydırma ile sağ kenar ShaderMask solması aktif olur ve count>=2 x8 görünür', (tester) async {
+    testWidgets('5+ rozette sağ uca kaydırınca ofset sıfırlanmaz, parent rebuildde korunur ve solma sona gelince kalkar', (tester) async {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.reset());
 
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: AchievementBadgesRow(
-              achievements: [
-                UserAchievement(id: 'first_match', unlockedAt: 1000),
-                UserAchievement(id: 'first_win', unlockedAt: 2000),
-                UserAchievement(id: 'matches_10', unlockedAt: 3000),
-                UserAchievement(id: 'streak_3', unlockedAt: 4000, count: 8),
-                UserAchievement(id: 'wins_10', unlockedAt: 5000),
-              ],
+      Widget buildRow(List<UserAchievement> list) => MaterialApp(
+            home: Scaffold(
+              body: AchievementBadgesRow(achievements: list),
             ),
-          ),
-        ),
-      );
+          );
+
+      final initialList = [
+        const UserAchievement(id: 'first_match', unlockedAt: 1000),
+        const UserAchievement(id: 'first_win', unlockedAt: 2000),
+        const UserAchievement(id: 'matches_10', unlockedAt: 3000),
+        const UserAchievement(id: 'streak_3', unlockedAt: 4000, count: 8),
+        const UserAchievement(id: 'wins_10', unlockedAt: 5000),
+        const UserAchievement(id: 'matches_50', unlockedAt: 6000),
+      ];
+
+      await tester.pumpWidget(buildRow(initialList));
       await tester.pumpAndSettle();
 
       expect(find.byType(ShaderMask), findsOneWidget);
       expect(find.text('x8'), findsOneWidget);
+
+      final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+      final maxExtent = scrollable.position.maxScrollExtent;
+      expect(maxExtent, greaterThan(0.0));
+
+      // En sağa kaydır
+      await tester.drag(find.byType(ListView), Offset(-maxExtent - 50, 0));
+      await tester.pumpAndSettle();
+
+      // Sona gelince ofset sıfırlanmamalı (en sonda kalmalı)
+      expect(scrollable.position.pixels, closeTo(maxExtent, 1.0));
+
+      // Parent aynı içerikte yeni liste nesnesiyle rebuild olduğunda da ofset korunmalı
+      await tester.pumpWidget(buildRow(List<UserAchievement>.from(initialList)));
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, closeTo(maxExtent, 1.0));
     });
 
     testWidgets('Rozete dokununca AchievementDetailSheet başlık, açıklama, tarih ve tekrar sayısı ile açılır', (tester) async {
