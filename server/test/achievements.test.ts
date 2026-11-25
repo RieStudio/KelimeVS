@@ -12,7 +12,10 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-import { evaluateAchievements } from '../src/achievements/definitions';
+import {
+  evaluateAchievements,
+  evaluateRepeatableStreaks,
+} from '../src/achievements/definitions';
 import { UserProfile } from '../src/userProfile';
 import type { Env } from '../src/index';
 
@@ -618,5 +621,179 @@ describe('Achievements - UserProfile SQLite Entegrasyonu & applyMatchReward', ()
     expect(profile.stats.won).toBe(3);
     expect(profile.stats.lost).toBe(1);
     expect(profile.stats.correctAnswers).toBe(7);
+  });
+});
+
+describe('Achievements - Tekrarlanabilir Seri Sayaçları (count)', () => {
+  it('evaluateRepeatableStreaks yalnızca isWin=true, açık ve tam eşik (3, 5, 10) durumunda döner', () => {
+    const unlocked = new Set<string>(['first_match', 'first_win', 'streak_3', 'streak_5']);
+    expect(evaluateRepeatableStreaks(3, true, unlocked)).toEqual(['streak_3']);
+    expect(evaluateRepeatableStreaks(4, true, unlocked)).toEqual([]);
+    expect(evaluateRepeatableStreaks(5, true, unlocked)).toEqual(['streak_5']);
+    expect(evaluateRepeatableStreaks(10, true, unlocked)).toEqual([]); // streak_10 henüz açık değil
+    expect(evaluateRepeatableStreaks(3, false, unlocked)).toEqual([]); // isWin=false
+  });
+
+  it('Lazy migration: eski user_achievements tablosuna count DEFAULT 1 ekler', async () => {
+    const { ctx, rawDb } = createMockCtx();
+    rawDb.exec(`
+      CREATE TABLE profiles (
+        uid TEXT PRIMARY KEY,
+        nickname TEXT,
+        coins INTEGER NOT NULL,
+        played INTEGER NOT NULL DEFAULT 0,
+        won INTEGER NOT NULL DEFAULT 0,
+        lost INTEGER NOT NULL DEFAULT 0,
+        correct_answers INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        equipped_frame TEXT NOT NULL DEFAULT 'classic',
+        energy INTEGER NOT NULL DEFAULT 5,
+        energy_updated_at INTEGER NOT NULL DEFAULT 0,
+        is_guest INTEGER NOT NULL DEFAULT 0,
+        is_system_nickname INTEGER NOT NULL DEFAULT 0,
+        allow_match_requests INTEGER NOT NULL DEFAULT 1,
+        current_streak INTEGER NOT NULL DEFAULT 0,
+        max_streak INTEGER NOT NULL DEFAULT 0,
+        achievements_initialized INTEGER NOT NULL DEFAULT 1
+      );
+      CREATE TABLE user_achievements (
+        id TEXT PRIMARY KEY,
+        unlocked_at INTEGER NOT NULL,
+        match_id TEXT NOT NULL
+      );
+      INSERT INTO profiles (uid, nickname, coins, played, won, lost, created_at, current_streak, max_streak)
+      VALUES ('legacy_u', 'Legacy', 100, 5, 5, 0, 1000, 0, 3);
+      INSERT INTO user_achievements (id, unlocked_at, match_id)
+      VALUES ('streak_3', 5000, 'old_m3');
+    `);
+
+    const profileDO = new UserProfile(ctx, createEnv());
+    const profile = await profileDO.getProfile('legacy_u');
+    expect(profile.achievements).toEqual([
+      { id: 'streak_3', unlockedAt: 5000, count: 1 },
+    ]);
+  });
+
+  it('streak_3 ilk açılışta count=1 ve bildirimli; 4. galibiyette artmaz; sıfırlanıp tekrar 3 olunca count=2 ve bildirimsiz', async () => {
+    const { ctx, rawDb } = createMockCtx();
+    const profileDO = new UserProfile(ctx, createEnv());
+    await profileDO.getProfile('streak_u');
+
+    // 1..3 galibiyet -> streak_3 ilk açılış
+    await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm1', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm2', outcome: 'win' });
+    const r3 = await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm3', outcome: 'win' });
+    expect(r3.unlockedAchievements).toEqual(['streak_3']);
+
+    const after3 = await profileDO.getProfile('streak_u');
+    const s3First = after3.achievements!.find((a) => a.id === 'streak_3')!;
+    expect(s3First.count).toBe(1);
+    const firstUnlockedAt = s3First.unlockedAt;
+
+    // 4. galibiyet -> streak_3 artmaz
+    const r4 = await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm4', outcome: 'win' });
+    expect(r4.unlockedAchievements).toEqual([]);
+    const after4 = await profileDO.getProfile('streak_u');
+    expect(after4.achievements!.find((a) => a.id === 'streak_3')!.count).toBe(1);
+
+    // Mağlubiyet -> seri sıfırlanır
+    await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm5', outcome: 'loss' });
+
+    // Yeniden 3 galibiyet (ranked + solo karışık)
+    await profileDO.applyMatchReward({ uid: 'streak_u', matchId: 'm6', outcome: 'win' });
+    const solo2 = profileDO.applyResultToCounters({
+      matchId: 'bot:s7',
+      isWin: true,
+      isLoss: false,
+      source: 'solo',
+      nowMs: Date.now() + 5000,
+    });
+    expect(solo2.currentStreak).toBe(2);
+
+    const solo3 = profileDO.applyResultToCounters({
+      matchId: 'bot:s8',
+      isWin: true,
+      isLoss: false,
+      source: 'solo',
+      nowMs: Date.now() + 10000,
+    });
+    expect(solo3.currentStreak).toBe(3);
+    // Tekrarda bildirim yok!
+    expect(solo3.unlockedAchievements).toEqual([]);
+
+    const afterSecond3 = await profileDO.getProfile('streak_u');
+    const s3Second = afterSecond3.achievements!.find((a) => a.id === 'streak_3')!;
+    expect(s3Second.count).toBe(2);
+    expect(s3Second.unlockedAt).toBe(firstUnlockedAt);
+
+    // match_id korunmuş olmalı
+    const row = rawDb
+      .prepare('SELECT match_id FROM user_achievements WHERE id = ?')
+      .get('streak_3') as { match_id: string };
+    expect(row.match_id).toBe('m3');
+  });
+
+  it('streak_5 ve streak_10 tekrarı ile idempotency (aynı matchId tekrarında count artmaz)', async () => {
+    const { ctx } = createMockCtx();
+    const profileDO = new UserProfile(ctx, createEnv());
+    await profileDO.getProfile('pro_u');
+
+    // 10 galibiyet -> streak_3, streak_5, streak_10 açılır
+    for (let i = 1; i <= 10; i++) {
+      await profileDO.applyMatchReward({ uid: 'pro_u', matchId: `w1_${i}`, outcome: 'win' });
+    }
+    // Kayıp -> seri 0
+    await profileDO.applyMatchReward({ uid: 'pro_u', matchId: 'l1', outcome: 'loss' });
+
+    // Yeniden 10 galibiyet -> streak_3, streak_5, streak_10 tekrarları +1
+    for (let i = 1; i <= 10; i++) {
+      const res = await profileDO.applyMatchReward({ uid: 'pro_u', matchId: `w2_${i}`, outcome: 'win' });
+      expect(res.unlockedAchievements ?? []).not.toContain('streak_3');
+      expect(res.unlockedAchievements ?? []).not.toContain('streak_5');
+      expect(res.unlockedAchievements ?? []).not.toContain('streak_10');
+    }
+
+    // Aynı matchId (w2_10) idempotent tekrarı -> count artmamalı
+    const dup = await profileDO.applyMatchReward({ uid: 'pro_u', matchId: 'w2_10', outcome: 'win' });
+    expect(dup.alreadyProcessed).toBe(true);
+
+    const profile = await profileDO.getProfile('pro_u');
+    expect(profile.achievements!.find((a) => a.id === 'streak_3')!.count).toBe(2);
+    expect(profile.achievements!.find((a) => a.id === 'streak_5')!.count).toBe(2);
+    expect(profile.achievements!.find((a) => a.id === 'streak_10')!.count).toBe(2);
+  });
+
+  it('Rollback: tekrar UPDATE sırasında hata olursa count artmaz ve processed_matches yazılmaz', async () => {
+    const { ctx, rawDb } = createMockCtx();
+    const profileDO = new UserProfile(ctx, createEnv());
+    await profileDO.getProfile('rb_u');
+
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm1', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm2', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm3', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm4', outcome: 'loss' });
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm5', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm6', outcome: 'win' });
+
+    rawDb.exec(`
+      CREATE TRIGGER trigger_fail_repeat_update
+      BEFORE UPDATE ON user_achievements
+      BEGIN
+        SELECT RAISE(FAIL, 'Simulated repeat update failure');
+      END;
+    `);
+
+    await expect(
+      profileDO.applyMatchReward({ uid: 'rb_u', matchId: 'm7_fail', outcome: 'win' })
+    ).rejects.toThrow('Simulated repeat update failure');
+
+    const pmRows = rawDb
+      .prepare('SELECT * FROM processed_matches WHERE match_id = ?')
+      .all('m7_fail');
+    expect(pmRows.length).toBe(0);
+
+    const profile = await profileDO.getProfile('rb_u');
+    expect(profile.achievements!.find((a) => a.id === 'streak_3')!.count).toBe(1);
+    expect(profile.stats.played).toBe(6);
   });
 });

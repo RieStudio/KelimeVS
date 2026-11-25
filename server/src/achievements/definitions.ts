@@ -65,3 +65,35 @@ export function evaluateAchievements(
   eligible.sort((a, b) => a.order - b.order);
   return eligible.map((d) => d.id);
 }
+
+/**
+ * Saf fonksiyon: Tekrarlanabilir seri başarımları (streak_3, streak_5, streak_10) için
+ * bir galibiyet sonrası sayaç artışı gereken başarım ID'lerini döndürür.
+ * Yalnızca isWin === true, başarım daha önce açılmış (unlocked içinde) ve
+ * currentStreak tam olarak eşiğe eşitken (3, 5 veya 10; 4'te sayılmaz) döner.
+ */
+export function evaluateRepeatableStreaks(
+  currentStreak: number,
+  isWin: boolean,
+  unlocked: ReadonlySet<string>
+): string[] {
+  if (!isWin) {
+    return [];
+  }
+
+  const hits: AchievementDef[] = [];
+  for (const def of ACHIEVEMENT_DEFINITIONS) {
+    if (def.category !== 'win_streak') {
+      continue;
+    }
+    if (!unlocked.has(def.id)) {
+      continue;
+    }
+    if (currentStreak === def.threshold) {
+      hits.push(def);
+    }
+  }
+
+  hits.sort((a, b) => a.order - b.order);
+  return hits.map((d) => d.id);
+}

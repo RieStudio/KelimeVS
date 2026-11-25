@@ -709,8 +709,8 @@ Content-Type: application/json
 Tüm isteklerde `Authorization: Bearer <token>` başlığı zorunludur. Silinmiş hesaplar tüm uçlardan `410 Gone` alır.
 
 ### Profil ve Hesap
-- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `currentStreak`, `maxStreak`, `achievements`: `[{ id, unlockedAt }]`, `createdAt`, `equippedFrame`, `energy`, `isGuest`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
-  - **Başarımlar ve Seri Sayaçları:** Yanıtta kullanıcının bugüne kadar açtığı tüm başarımların listesi (`achievements`), güncel galibiyet serisi (`currentStreak`) ve ulaşılan en yüksek galibiyet serisi (`maxStreak`) yer alır. Eski kullanıcılar için ilk istekte sessiz backfill yapılır ve geçmiş sayaçlarına denk gelen başarımlar profile otomatik olarak işlenir.
+- `GET /me`: Kullanıcı profilini (`uid`, `nickname`, `coins`, `stats`: `{ played, won, lost, correctAnswers }`, `currentStreak`, `maxStreak`, `achievements`: `[{ id, unlockedAt, count }]`, `createdAt`, `equippedFrame`, `energy`, `isGuest`) döndürür. İstatistikler yalnızca ranked online maçları içerir (bot ve arkadaş düellosu sayılmaz). `winRate` sunucudan dönmez; istemcide `won / played` oranıyla hesaplanır. Mevcut kullanıcılarda doğru cevap sayacı güncelleme anından itibaren birikir.
+  - **Başarımlar ve Seri Sayaçları:** Yanıtta kullanıcının bugüne kadar açtığı tüm başarımların listesi (`achievements`), güncel galibiyet serisi (`currentStreak`) ve ulaşılan en yüksek galibiyet serisi (`maxStreak`) yer alır. Her başarım öğesinde `count` alanı bulunur (varsayılan `1`). Seri başarımları (`streak_3`, `streak_5`, `streak_10`) tekrarlanabilirdir: `currentStreak` bir galibiyetle tam olarak `3`, `5` veya `10` olduğunda ilgili başarımın `count` değeri `+1` artar (ör. `4`’e çıkınca artmaz; seri sıfırlanıp yeniden `3`’e ulaşınca artar). İlk açılışta `unlockedAt` ve `match_id` kaydedilir ve maç sonu `unlockedAchievements` listesinde bildirim tetiklenir; tekrarlarda `unlockedAt` değişmez ve `unlockedAchievements` listesine eklenmez (bildirim yok). Eski kullanıcılar için ilk istekte sessiz backfill yapılır ve geçmiş sayaçlarına denk gelen başarımlar `count: 1` ile profile otomatik olarak işlenir.
   - **Misafir (Anonim) Kullanıcılar:** Token'daki `firebase.sign_in_provider === 'anonymous'` olduğunda sunucu `isGuest: true` işaretler ve kullanıcıya otomatik olarak deterministik `"M-" + 4 haneli rakam` (örn. `M-4821`, 1000..9999 aralığında) takma adı atar. Mevcut tüm misafir hesaplar ilk istekte tembelce bu ada çevrilir. Misafirlik bayrağı tek yönlüdür (`1 -> 0`); Google'a bağlanan hesap bir daha misafir olamaz.
   - **İadeli Çerçeve Geçişi (`frameMigration`):** `clientBuild >= 11` istemciden gelen istekte kullanıcının sahip olduğu emekli çerçeveler varsa otomatik olarak envanterden silinir, bedelleri bakiye (`coins`) alanına eklenir ve kuşanılmışsa çerçeve `'classic'`e çekilir. Bu geçiş ilk kez yapıldığında yanıtta opsiyonel `frameMigration` nesnesi döner:
     ```json
@@ -825,19 +825,24 @@ Hedef oyuncunun herkese açık profil bilgilerini döndürür. Salt-okunurdur; v
     },
     "isBlocked": false,
     "blockId": null,
-    "isGuest": false
+    "isGuest": false,
+    "achievements": [
+      { "id": "first_match", "unlockedAt": 1700000000000, "count": 1 },
+      { "id": "streak_3", "unlockedAt": 1700000500000, "count": 4 }
+    ]
   }
   ```
   - `stats`: Yalnızca rekabetçi ranked maçları içerir (arkadaş düellosu sayılmaz). `winRate`, `played === 0` ise `0`, aksi halde `Math.round((won / played) * 100)` olarak sunucu tarafından hesaplanmış tam sayı yüzdedir.
   - `isBlocked`: İstek yapan kullanıcının bu oyuncuyu engelleyip engellemediği.
   - `blockId`: Engellendiyse ilgili engelleme kaydının UUID kimliği, aksi halde `null`.
   - `isGuest`: Kullanıcının misafir olup olmadığı (istemcide rozet gösterimi için).
+  - `achievements`: Hedef oyuncunun açtığı başarımlar (`[{ id, unlockedAt, count }]`; hiç yoksa `[]`). Salt-okunurdur; bu uç noktadan backfill/yazma yapılmaz.
   - Kullanıcı kendi UID'si için bu ucu çağırdığında da `200 OK` döner (`isBlocked: false, blockId: null`).
   - **Hassas Veri Koruması:** `coins`, `energy`, `email`, `token`, `correctAnswers`, `createdAt` gibi iç/özel alanlar ASLA dönülmez.
 - **Hata Durumları:**
   - `401 Unauthorized`: Yetkisiz veya geçersiz token.
   - `400 Bad Request`: `{"error": "invalid_uid"}`
-  - `404 Not Found`: `{"error": "not_found", "message": "Kullanıcı bulunamadı"}` (UID hiç var olmamışsa)
+  - `404 Not Found`: `{"error": "not_found", "message": "Kullanıcı bulunamadı"}` (UID hiç var olmamışsa veya `bot` / `bot_*` bot kimliğiyse)
   - `410 Gone`: `{"error": "deleted", "message": "Hesap silinmiş"}` (Hesap silinmişse / tombstone)
 
 #### Profil Üzerinden Oyuncu Engelleme: `POST /users/:uid/block`

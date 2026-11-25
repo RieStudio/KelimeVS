@@ -1351,6 +1351,13 @@ export default {
         );
       }
 
+      if (targetUid === 'bot' || targetUid.startsWith('bot_')) {
+        return new Response(
+          JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+          { status: 404, headers: jsonHeaders }
+        );
+      }
+
       if (!env.USER_PROFILE) {
         return new Response(JSON.stringify({ error: 'service_unavailable' }), {
           status: 503,
@@ -1403,6 +1410,7 @@ export default {
             isBlocked,
             blockId,
             isGuest: pubResult.profile.isGuest,
+            achievements: pubResult.profile.achievements,
           }),
           { status: 200, headers: jsonHeaders }
         );
@@ -1431,6 +1439,13 @@ export default {
         return new Response(
           JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
           { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (targetUid === 'bot' || targetUid.startsWith('bot_')) {
+        return new Response(
+          JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+          { status: 404, headers: jsonHeaders }
         );
       }
 
@@ -1531,6 +1546,13 @@ export default {
         );
       }
 
+      if (targetUid === 'bot' || targetUid.startsWith('bot_')) {
+        return new Response(
+          JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+          { status: 404, headers: jsonHeaders }
+        );
+      }
+
       if (!env.USER_PROFILE) {
         return new Response(JSON.stringify({ error: 'service_unavailable' }), {
           status: 503,
@@ -1582,6 +1604,13 @@ export default {
         return new Response(
           JSON.stringify({ error: 'invalid_uid', message: 'Geçersiz kullanıcı kimliği' }),
           { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (targetUid === 'bot' || targetUid.startsWith('bot_')) {
+        return new Response(
+          JSON.stringify({ error: 'not_found', message: 'Kullanıcı bulunamadı' }),
+          { status: 404, headers: jsonHeaders }
         );
       }
 

@@ -199,10 +199,15 @@ describe('API Routes: Public Player Profile (/users/:uid/*)', () => {
         isBlocked: false,
         blockId: null,
         isGuest: false,
+        achievements: [
+          { id: 'first_match', unlockedAt: expect.any(Number), count: 1 },
+          { id: 'first_win', unlockedAt: expect.any(Number), count: 1 },
+        ],
       });
 
       // Hassas alanların OLMADIĞINI tam anahtar listesiyle assert et
       expect(Object.keys(data1).sort()).toEqual([
+        'achievements',
         'blockId',
         'equippedFrame',
         'isBlocked',
@@ -255,6 +260,22 @@ describe('API Routes: Public Player Profile (/users/:uid/*)', () => {
       expect(data.nickname).toBe('SelfUser');
       expect(data.isBlocked).toBe(false);
       expect(data.blockId).toBeNull();
+      expect(data.achievements).toEqual([]);
+    });
+
+    it('7. Bot UID (bot veya bot_*) için DO uyandırmadan 404 not_found döner', async () => {
+      const { env } = createEnv();
+
+      for (const botUid of ['bot', 'bot_12345']) {
+        const req = new Request(`http://127.0.0.1/users/${botUid}/public`, {
+          method: 'GET',
+          headers: { Authorization: 'Bearer dev:caller_1' },
+        });
+        const res = await worker.fetch(req, env);
+        expect(res.status).toBe(404);
+        const data = (await res.json()) as any;
+        expect(data.error).toBe('not_found');
+      }
     });
   });
 

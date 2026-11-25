@@ -130,7 +130,7 @@ describe('UserProfile.getPublicProfile & Block Info Methods', () => {
 
     // Anahtarları tam liste olarak doğrula (white-list)
     const profileKeys = Object.keys(res.profile).sort();
-    expect(profileKeys).toEqual(['equippedFrame', 'isGuest', 'nickname', 'stats']);
+    expect(profileKeys).toEqual(['achievements', 'equippedFrame', 'isGuest', 'nickname', 'stats']);
 
     const statsKeys = Object.keys(res.profile.stats).sort();
     expect(statsKeys).toEqual(['lost', 'played', 'winRate', 'won']);
@@ -235,5 +235,50 @@ describe('UserProfile.getPublicProfile & Block Info Methods', () => {
     // Tekrar unblock çağrısı (idempotentlik testi)
     const unblockRes2 = await userProfile.unblockUserByUid('target_x');
     expect(unblockRes2).toEqual({ ok: true });
+  });
+
+  it('7. getPublicProfile açılmış başarımları (count dahil) döner, hiç yoksa [] döner ve backfill/yazma yapmaz', async () => {
+    const { userProfile, ctx } = createDO();
+    await userProfile.getProfile('ach_pub', 0, false);
+
+    // Başlangıçta hiç başarım yok -> []
+    let res = await userProfile.getPublicProfile();
+    expect(res.kind).toBe('ok');
+    if (res.kind === 'ok') {
+      expect(res.profile.achievements).toEqual([]);
+    }
+
+    // 3 galibiyet -> first_match, first_win, streak_3
+    await userProfile.applyMatchReward({ matchId: 'pm1', outcome: 'win' });
+    await userProfile.applyMatchReward({ matchId: 'pm2', outcome: 'win' });
+    await userProfile.applyMatchReward({ matchId: 'pm3', outcome: 'win' });
+
+    res = await userProfile.getPublicProfile();
+    expect(res.kind).toBe('ok');
+    if (res.kind === 'ok') {
+      expect(res.profile.achievements.map((a) => ({ id: a.id, count: a.count }))).toEqual([
+        { id: 'first_match', count: 1 },
+        { id: 'first_win', count: 1 },
+        { id: 'streak_3', count: 1 },
+      ]);
+      for (const a of res.profile.achievements) {
+        expect(typeof a.unlockedAt).toBe('number');
+        expect(a.unlockedAt).toBeGreaterThan(0);
+      }
+    }
+
+    // Salt-okunurluk: achievements_initialized = 0 olan eski profilde getPublicProfile backfill/yazma yapmamalı
+    ctx.db.exec("UPDATE profiles SET achievements_initialized = 0 WHERE uid = 'ach_pub'");
+    ctx.db.exec('DELETE FROM user_achievements');
+
+    const resReadOnly = await userProfile.getPublicProfile();
+    expect(resReadOnly.kind).toBe('ok');
+    if (resReadOnly.kind === 'ok') {
+      expect(resReadOnly.profile.achievements).toEqual([]);
+    }
+    const row = ctx.db
+      .prepare("SELECT achievements_initialized FROM profiles WHERE uid = 'ach_pub'")
+      .get() as { achievements_initialized: number };
+    expect(row.achievements_initialized).toBe(0);
   });
 });

@@ -58,7 +58,10 @@ export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUI
   return GUEST_NICKNAME_LOCK_MIN_BUILD;
 }
 import type { Env } from './index';
-import { evaluateAchievements } from './achievements/definitions';
+import {
+  evaluateAchievements,
+  evaluateRepeatableStreaks,
+} from './achievements/definitions';
 import {
   MIN_SOLO_WIN_SECONDS,
   SOLO_DAILY_SAFETY_CAP,
@@ -81,6 +84,7 @@ export interface UserStats {
 export interface UserAchievementItem {
   readonly id: string;
   readonly unlockedAt: number;
+  readonly count: number;
 }
 
 export interface ApplyResultToCountersParams {
@@ -155,6 +159,7 @@ export interface PublicProfileData {
   readonly equippedFrame: string;
   readonly stats: PublicProfileStats;
   readonly isGuest: boolean;
+  readonly achievements: readonly UserAchievementItem[];
 }
 
 export type PublicProfileResult =
@@ -377,7 +382,8 @@ export class UserProfile extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS user_achievements (
         id TEXT PRIMARY KEY,
         unlocked_at INTEGER NOT NULL,
-        match_id TEXT NOT NULL
+        match_id TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1
       );
       CREATE INDEX IF NOT EXISTS idx_user_achievements_match ON user_achievements(match_id);
 
@@ -579,6 +585,22 @@ export class UserProfile extends DurableObject<Env> {
       this.ctx.storage.sql.exec(
         'ALTER TABLE profiles ADD COLUMN won_solo INTEGER NOT NULL DEFAULT 0'
       );
+    }
+
+    const achCols = this.ctx.storage.sql
+      .exec<{ name: string }>('PRAGMA table_info(user_achievements)')
+      .toArray();
+    if (!achCols.some((c) => c.name === 'count')) {
+      try {
+        this.ctx.storage.sql.exec(
+          'ALTER TABLE user_achievements ADD COLUMN count INTEGER NOT NULL DEFAULT 1'
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('duplicate column name')) {
+          throw err;
+        }
+      }
     }
 
     this.ctx.storage.sql.exec(`
@@ -969,6 +991,17 @@ export class UserProfile extends DurableObject<Env> {
     const lost = Math.max(0, row.lost ?? 0);
     const winRate = played === 0 ? 0 : Math.round((won / played) * 100);
 
+    const achRows = this.ctx.storage.sql
+      .exec<{ id: string; unlocked_at: number; count: number | null }>(
+        'SELECT id, unlocked_at, count FROM user_achievements ORDER BY unlocked_at ASC, id ASC'
+      )
+      .toArray();
+    const achievements: UserAchievementItem[] = achRows.map((r) => ({
+      id: r.id,
+      unlockedAt: r.unlocked_at,
+      count: Number(r.count ?? 1),
+    }));
+
     return {
       kind: 'ok',
       profile: {
@@ -981,6 +1014,7 @@ export class UserProfile extends DurableObject<Env> {
           winRate,
         },
         isGuest,
+        achievements,
       },
     };
   }
@@ -1070,13 +1104,14 @@ export class UserProfile extends DurableObject<Env> {
       const allowMatchRequests = (row.allow_match_requests as number | undefined) !== 0;
 
       const achRows = this.ctx.storage.sql
-        .exec<{ id: string; unlocked_at: number }>(
-          'SELECT id, unlocked_at FROM user_achievements ORDER BY unlocked_at ASC, id ASC'
+        .exec<{ id: string; unlocked_at: number; count: number | null }>(
+          'SELECT id, unlocked_at, count FROM user_achievements ORDER BY unlocked_at ASC, id ASC'
         )
         .toArray();
       const achievements: UserAchievementItem[] = achRows.map((r) => ({
         id: r.id,
         unlockedAt: r.unlocked_at,
+        count: Number(r.count ?? 1),
       }));
 
       return {
@@ -1390,13 +1425,28 @@ export class UserProfile extends DurableObject<Env> {
       unlockedSet
     );
 
-    // 6. Yeni açılanları match_id ile ekle
+    // 6. Yeni açılanları match_id ve count = 1 ile ekle
     for (const achId of newlyUnlocked) {
       this.ctx.storage.sql.exec(
-        'INSERT INTO user_achievements (id, unlocked_at, match_id) VALUES (?, ?, ?)',
+        'INSERT INTO user_achievements (id, unlocked_at, match_id, count) VALUES (?, ?, ?, 1)',
         achId,
         nowMs,
         params.matchId
+      );
+    }
+
+    // 7. Tekrarlanabilir seri başarımları (streak_3, streak_5, streak_10) için sayaç artışı
+    // unlockedSet yeni açılışlardan önce okunduğu için aynı maçta hem ilk açılış hem tekrar sayılmaz.
+    // unlocked_at ve match_id korunur; tekrarlarda unlockedAchievements'a (bildirimlere) eklenmez.
+    const repeatableHits = evaluateRepeatableStreaks(
+      newCurrentStreak,
+      params.isWin,
+      unlockedSet
+    );
+    for (const achId of repeatableHits) {
+      this.ctx.storage.sql.exec(
+        'UPDATE user_achievements SET count = count + 1 WHERE id = ?',
+        achId
       );
     }
 
