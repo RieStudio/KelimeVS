@@ -2,18 +2,19 @@ import { isValidBotMatchId } from './powerup';
 
 export const MIN_SOLO_WIN_SECONDS = 20;
 export const SOLO_DAILY_SAFETY_CAP = 1000;
+export const SOLO_VOID_DAILY_REFUND_CAP = 5;
 export const MAX_SOLO_CORRECT_ANSWERS = 50;
 export const ROUNDS_TO_WIN = 2;
 
 export interface SoloMatchResultBody {
-  readonly matchId: string;
+  readonly matchId?: string;
   readonly ticketId: string;
-  readonly outcome: 'win' | 'loss';
-  readonly myScore: number;
-  readonly oppScore: number;
-  readonly correctAnswers: number;
+  readonly outcome: 'win' | 'loss' | 'void';
+  readonly myScore?: number;
+  readonly oppScore?: number;
+  readonly correctAnswers?: number;
   readonly durationSeconds?: number;
-  readonly endedBy: 'normal' | 'forfeit';
+  readonly endedBy?: 'normal' | 'forfeit' | 'draw_limit_reached';
 }
 
 export type SoloValidationError =
@@ -43,22 +44,97 @@ export function validateSoloMatchResult(body: unknown): {
     return { isValid: false, error: 'ticket_invalid' };
   }
 
-  // 2. matchId formatı (^bot:[A-Za-z0-9_-]{8,64}$)
+  // 2. outcome: 'win' | 'loss' | 'void'
+  if (b.outcome !== 'win' && b.outcome !== 'loss' && b.outcome !== 'void') {
+    return { isValid: false, error: 'bad_request' };
+  }
+
+  // 3. durationSeconds (opsiyonel; istemcinin beyanı süre doğrulamasında kullanılmaz)
+  let durationSeconds: number | undefined;
+  if (b.durationSeconds !== undefined) {
+    if (typeof b.durationSeconds !== 'number' || !Number.isFinite(b.durationSeconds) || b.durationSeconds < 0) {
+      return { isValid: false, error: 'bad_request' };
+    }
+    durationSeconds = b.durationSeconds;
+  }
+
+  // 4. 'void' sonucu: ticketId zorunlu, diğer alanlar opsiyonel (verilirse tip/format doğrulanır)
+  if (b.outcome === 'void') {
+    let matchId: string | undefined;
+    if (b.matchId !== undefined) {
+      if (!isValidBotMatchId(b.matchId)) {
+        return { isValid: false, error: 'bad_request' };
+      }
+      matchId = b.matchId;
+    }
+
+    let endedBy: 'normal' | 'forfeit' | 'draw_limit_reached' | undefined;
+    if (b.endedBy !== undefined) {
+      if (
+        b.endedBy !== 'normal' &&
+        b.endedBy !== 'forfeit' &&
+        b.endedBy !== 'draw_limit_reached'
+      ) {
+        return { isValid: false, error: 'bad_request' };
+      }
+      endedBy = b.endedBy;
+    }
+
+    let myScore: number | undefined;
+    if (b.myScore !== undefined) {
+      if (typeof b.myScore !== 'number' || !Number.isInteger(b.myScore) || b.myScore < 0) {
+        return { isValid: false, error: 'bad_request' };
+      }
+      myScore = b.myScore;
+    }
+
+    let oppScore: number | undefined;
+    if (b.oppScore !== undefined) {
+      if (typeof b.oppScore !== 'number' || !Number.isInteger(b.oppScore) || b.oppScore < 0) {
+        return { isValid: false, error: 'bad_request' };
+      }
+      oppScore = b.oppScore;
+    }
+
+    let correctAnswers: number | undefined;
+    if (b.correctAnswers !== undefined) {
+      if (
+        typeof b.correctAnswers !== 'number' ||
+        !Number.isInteger(b.correctAnswers) ||
+        b.correctAnswers < 0 ||
+        b.correctAnswers > MAX_SOLO_CORRECT_ANSWERS
+      ) {
+        return { isValid: false, error: 'invalid_answers' };
+      }
+      correctAnswers = b.correctAnswers;
+    }
+
+    return {
+      isValid: true,
+      data: {
+        ticketId: trimmedTicket,
+        outcome: 'void',
+        ...(matchId !== undefined ? { matchId } : {}),
+        ...(myScore !== undefined ? { myScore } : {}),
+        ...(oppScore !== undefined ? { oppScore } : {}),
+        ...(correctAnswers !== undefined ? { correctAnswers } : {}),
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+        ...(endedBy !== undefined ? { endedBy } : {}),
+      },
+    };
+  }
+
+  // 5. 'win' | 'loss' için matchId formatı (^bot:[A-Za-z0-9_-]{8,64}$) zorunlu
   if (!isValidBotMatchId(b.matchId)) {
     return { isValid: false, error: 'bad_request' };
   }
 
-  // 3. outcome: 'win' | 'loss'
-  if (b.outcome !== 'win' && b.outcome !== 'loss') {
-    return { isValid: false, error: 'bad_request' };
-  }
-
-  // 4. endedBy: 'normal' | 'forfeit'
+  // 6. endedBy: 'normal' | 'forfeit'
   if (b.endedBy !== 'normal' && b.endedBy !== 'forfeit') {
     return { isValid: false, error: 'bad_request' };
   }
 
-  // 5. Skor sayısal kontrolleri
+  // 7. Skor sayısal kontrolleri
   if (typeof b.myScore !== 'number' || !Number.isInteger(b.myScore) || b.myScore < 0) {
     return { isValid: false, error: 'bad_request' };
   }
@@ -66,7 +142,7 @@ export function validateSoloMatchResult(body: unknown): {
     return { isValid: false, error: 'bad_request' };
   }
 
-  // 6. correctAnswers sayısal kontrolleri (0 <= x <= MAX_SOLO_CORRECT_ANSWERS)
+  // 8. correctAnswers sayısal kontrolleri (0 <= x <= MAX_SOLO_CORRECT_ANSWERS)
   if (
     typeof b.correctAnswers !== 'number' ||
     !Number.isInteger(b.correctAnswers) ||
@@ -76,16 +152,7 @@ export function validateSoloMatchResult(body: unknown): {
     return { isValid: false, error: 'invalid_answers' };
   }
 
-  // 7. durationSeconds (opsiyonel; istemcinin beyanı süre doğrulamasında kullanılmaz)
-  let durationSeconds: number | undefined;
-  if (b.durationSeconds !== undefined) {
-    if (typeof b.durationSeconds !== 'number' || !Number.isFinite(b.durationSeconds) || b.durationSeconds < 0) {
-      return { isValid: false, error: 'bad_request' };
-    }
-    durationSeconds = b.durationSeconds;
-  }
-
-  // 8. Skor tutarlılığı
+  // 9. Skor tutarlılığı
   // roundsToWin sabiti: 2
   if (b.endedBy === 'forfeit') {
     // Forfeit durumunda outcome yalnızca 'loss' olabilir ve her iki skor da roundsToWin'in altındadır.

@@ -903,14 +903,7 @@ export default {
 
       try {
         const res = await profileStub.applyBotMatchReward({
-          matchId: validation.data.matchId,
-          ticketId: validation.data.ticketId,
-          outcome: validation.data.outcome,
-          myScore: validation.data.myScore,
-          oppScore: validation.data.oppScore,
-          correctAnswers: validation.data.correctAnswers,
-          durationSeconds: validation.data.durationSeconds,
-          endedBy: validation.data.endedBy,
+          ...validation.data,
           uid,
         });
 
@@ -927,6 +920,7 @@ export default {
           );
         }
         if (
+          msg === 'bad_request' ||
           msg === 'ticket_required' ||
           msg === 'ticket_invalid' ||
           msg === 'ticket_already_used' ||

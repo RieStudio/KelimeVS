@@ -59,7 +59,11 @@ export function getGuestNicknameLockMinBuild(env?: { GUEST_NICKNAME_LOCK_MIN_BUI
 }
 import type { Env } from './index';
 import { evaluateAchievements } from './achievements/definitions';
-import { MIN_SOLO_WIN_SECONDS, SOLO_DAILY_SAFETY_CAP } from './soloMatch';
+import {
+  MIN_SOLO_WIN_SECONDS,
+  SOLO_DAILY_SAFETY_CAP,
+  SOLO_VOID_DAILY_REFUND_CAP,
+} from './soloMatch';
 
 export type MatchRewardOutcome =
   | 'win'
@@ -97,14 +101,14 @@ export interface ApplyResultToCountersResult {
 }
 
 export interface ApplyBotMatchRewardParams {
-  readonly matchId: string;
+  readonly matchId?: string;
   readonly ticketId: string;
-  readonly outcome: 'win' | 'loss';
-  readonly myScore: number;
-  readonly oppScore: number;
+  readonly outcome: 'win' | 'loss' | 'void';
+  readonly myScore?: number;
+  readonly oppScore?: number;
   readonly correctAnswers?: number;
   readonly durationSeconds?: number;
-  readonly endedBy: 'normal' | 'forfeit';
+  readonly endedBy?: 'normal' | 'forfeit' | 'draw_limit_reached';
   readonly uid?: string;
   readonly nowMs?: number;
 }
@@ -125,9 +129,11 @@ export interface IssueSoloTicketResult {
 export interface ApplyBotMatchRewardResult {
   readonly ok: true;
   readonly counted: boolean;
+  readonly voided?: boolean;
+  readonly refunded?: boolean;
   readonly alreadyProcessed?: boolean;
-  readonly coinsAwarded: number;
-  readonly coins: number;
+  readonly coinsAwarded?: number;
+  readonly coins?: number;
   readonly energy: EnergyState;
   readonly unlockedAchievements: readonly string[];
 }
@@ -591,6 +597,22 @@ export class UserProfile extends DurableObject<Env> {
 
       CREATE INDEX IF NOT EXISTS idx_solo_tickets_match ON solo_tickets(match_id);
     `);
+
+    const soloDailyCols = this.ctx.storage.sql
+      .exec<{ name: string }>('PRAGMA table_info(daily_solo_matches)')
+      .toArray();
+    if (!soloDailyCols.some((c) => c.name === 'void_refund_count')) {
+      try {
+        this.ctx.storage.sql.exec(
+          'ALTER TABLE daily_solo_matches ADD COLUMN void_refund_count INTEGER NOT NULL DEFAULT 0'
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('duplicate column name')) {
+          throw err;
+        }
+      }
+    }
 
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS incoming_requests (
@@ -1551,6 +1573,37 @@ export class UserProfile extends DurableObject<Env> {
     return { actualCoinsAwarded, dayKey };
   }
 
+  private closeTicketAsAbandonedInTransaction(params: {
+    readonly ticketId: string;
+    readonly matchId: string;
+    readonly uid: string;
+    readonly nowMs: number;
+  }): ApplyResultToCountersResult {
+    this.ctx.storage.sql.exec(
+      'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+      params.ticketId
+    );
+    this.ctx.storage.sql.exec(
+      'UPDATE profiles SET played_solo = played_solo + 1 WHERE uid = ?',
+      params.uid
+    );
+    const counterRes = this.applyResultToCounters({
+      matchId: params.matchId,
+      isWin: false,
+      isLoss: true,
+      correctCount: 0,
+      source: 'solo',
+      nowMs: params.nowMs,
+    });
+    this.ctx.storage.sql.exec(
+      `INSERT OR IGNORE INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+       VALUES (?, ?, 'solo_abandoned', 0)`,
+      params.matchId,
+      params.nowMs
+    );
+    return counterRes;
+  }
+
   private expireAbandonedTickets(nowMs: number, effectiveUid: string): boolean {
     const expired = this.ctx.storage.sql
       .exec<{ ticket_id: string; match_id: string }>(
@@ -1563,28 +1616,12 @@ export class UserProfile extends DurableObject<Env> {
 
     this.runInTransaction(() => {
       for (const t of expired) {
-        this.ctx.storage.sql.exec(
-          'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
-          t.ticket_id
-        );
-        this.ctx.storage.sql.exec(
-          'UPDATE profiles SET played_solo = played_solo + 1 WHERE uid = ?',
-          effectiveUid
-        );
-        this.applyResultToCounters({
+        this.closeTicketAsAbandonedInTransaction({
+          ticketId: t.ticket_id,
           matchId: t.match_id,
-          isWin: false,
-          isLoss: true,
-          correctCount: 0,
-          source: 'solo',
+          uid: effectiveUid,
           nowMs,
         });
-        this.ctx.storage.sql.exec(
-          `INSERT OR IGNORE INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
-           VALUES (?, ?, 'solo_abandoned', 0)`,
-          t.match_id,
-          nowMs
-        );
       }
       this.ctx.storage.sql.exec(`
         DELETE FROM processed_matches
@@ -1668,28 +1705,12 @@ export class UserProfile extends DurableObject<Env> {
         .toArray();
 
       for (const t of unusedTickets) {
-        this.ctx.storage.sql.exec(
-          'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
-          t.ticket_id
-        );
-        this.ctx.storage.sql.exec(
-          'UPDATE profiles SET played_solo = played_solo + 1 WHERE uid = ?',
-          effectiveUid
-        );
-        this.applyResultToCounters({
+        this.closeTicketAsAbandonedInTransaction({
+          ticketId: t.ticket_id,
           matchId: t.match_id,
-          isWin: false,
-          isLoss: true,
-          correctCount: 0,
-          source: 'solo',
+          uid: effectiveUid,
           nowMs,
         });
-        this.ctx.storage.sql.exec(
-          `INSERT OR IGNORE INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
-           VALUES (?, ?, 'solo_abandoned', 0)`,
-          t.match_id,
-          nowMs
-        );
       }
       if (unusedTickets.length > 0) {
         this.ctx.storage.sql.exec(`
@@ -1734,7 +1755,7 @@ export class UserProfile extends DurableObject<Env> {
         );
       }
 
-      // 5. Yeni bileti kaydet (15 dakika geçerli)
+      // 5. Yeni bileti kaydet (15 dakika geçerli) ve eski kayıtları buda
       const expiresAt = nowMs + 15 * 60 * 1000;
       this.ctx.storage.sql.exec(
         'INSERT INTO solo_tickets (ticket_id, match_id, issued_at, expires_at, used) VALUES (?, ?, ?, ?, 0)',
@@ -1742,6 +1763,19 @@ export class UserProfile extends DurableObject<Env> {
         matchId,
         nowMs,
         expiresAt
+      );
+
+      const ticketPruneCutoffMs = nowMs - 30 * 24 * 60 * 60 * 1000;
+      this.ctx.storage.sql.exec(
+        'DELETE FROM solo_tickets WHERE used = 1 AND issued_at < ?',
+        ticketPruneCutoffMs
+      );
+      const dailySoloCutoffKey = new Date(nowMs - 7 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      this.ctx.storage.sql.exec(
+        'DELETE FROM daily_solo_matches WHERE day_key < ?',
+        dailySoloCutoffKey
       );
 
       return {
@@ -1773,20 +1807,173 @@ export class UserProfile extends DurableObject<Env> {
     const profile = await this.getProfile(params.uid, 0, undefined, nowMs);
     const effectiveUid = profile.uid;
 
+    // 0. İptal / beraberlik ('void') akışı: bileti kapatır, günlük tavan dahilinde 1 enerji iade eder,
+    // sayaç/seri/başarım/jeton/liderliğe dokunmaz.
+    if (params.outcome === 'void') {
+      if (!params.ticketId || typeof params.ticketId !== 'string' || params.ticketId.trim().length === 0) {
+        throw new Error('ticket_required');
+      }
+
+      const trimmedTicketId = params.ticketId.trim();
+      const ticketRows = this.ctx.storage.sql
+        .exec<{
+          ticket_id: string;
+          match_id: string;
+          issued_at: number;
+          expires_at: number;
+          used: number;
+        }>(
+          'SELECT ticket_id, match_id, issued_at, expires_at, used FROM solo_tickets WHERE ticket_id = ? LIMIT 1',
+          trimmedTicketId
+        )
+        .toArray();
+
+      if (ticketRows.length === 0) {
+        throw new Error('ticket_invalid');
+      }
+      const ticket = ticketRows[0];
+      if (params.matchId && ticket.match_id !== params.matchId) {
+        throw new Error('ticket_invalid');
+      }
+
+      // Aynı bilet/maç daha önce 'solo_voided' olarak işlendiyse idempotent yanıt dön (ikinci kez iade etme)
+      const existingVoidRows = this.ctx.storage.sql
+        .exec<ProcessedMatchRow>(
+          'SELECT match_id, coins_awarded, outcome FROM processed_matches WHERE match_id = ? LIMIT 1',
+          ticket.match_id
+        )
+        .toArray();
+
+      if (existingVoidRows.length > 0 && existingVoidRows[0].outcome === 'solo_voided') {
+        const energyState = await this.getEnergyState(effectiveUid, nowMs);
+        return {
+          ok: true,
+          counted: false,
+          voided: true,
+          refunded: false,
+          alreadyProcessed: true,
+          energy: energyState,
+          unlockedAchievements: [],
+        };
+      }
+
+      if (ticket.expires_at < nowMs) {
+        throw new Error('ticket_expired');
+      }
+      if (ticket.used === 1) {
+        throw new Error('ticket_already_used');
+      }
+
+      const dayKey = new Date(nowMs).toISOString().slice(0, 10);
+      const voidTxResult = this.runInTransaction(() => {
+        const dailyRow = this.ctx.storage.sql
+          .exec<{ void_refund_count: number }>(
+            'SELECT void_refund_count FROM daily_solo_matches WHERE day_key = ? LIMIT 1',
+            dayKey
+          )
+          .toArray()[0];
+        const currentVoidRefunds = dailyRow?.void_refund_count ?? 0;
+
+        if (currentVoidRefunds >= SOLO_VOID_DAILY_REFUND_CAP) {
+          // Günlük iade sınırı aşıldı: terk edilmiş bilet (solo_abandoned) gibi kapat (kayıp + seri sıfırla, jeton yok)
+          const counterRes = this.closeTicketAsAbandonedInTransaction({
+            ticketId: ticket.ticket_id,
+            matchId: ticket.match_id,
+            uid: effectiveUid,
+            nowMs,
+          });
+
+          this.ctx.storage.sql.exec(`
+            DELETE FROM processed_matches
+            WHERE match_id NOT IN (
+              SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+            )
+          `);
+
+          return {
+            counted: true,
+            voided: false,
+            refunded: false,
+            unlockedAchievements: counterRes.unlockedAchievements,
+          };
+        }
+
+        this.ctx.storage.sql.exec(
+          'UPDATE solo_tickets SET used = 1 WHERE ticket_id = ?',
+          ticket.ticket_id
+        );
+
+        const refundRes = this.refundEnergyInTransaction({
+          matchId: ticket.match_id,
+          uid: effectiveUid,
+          nowMs,
+          amount: 1,
+        });
+        const didRefund = refundRes.refunded;
+        if (didRefund) {
+          this.ctx.storage.sql.exec(
+            `INSERT INTO daily_solo_matches (day_key, count, void_refund_count) VALUES (?, 0, 1)
+             ON CONFLICT(day_key) DO UPDATE SET void_refund_count = void_refund_count + 1`,
+            dayKey
+          );
+        }
+
+        this.ctx.storage.sql.exec(
+          `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
+           VALUES (?, ?, 'solo_voided', 0)`,
+          ticket.match_id,
+          nowMs
+        );
+
+        this.ctx.storage.sql.exec(`
+          DELETE FROM processed_matches
+          WHERE match_id NOT IN (
+            SELECT match_id FROM processed_matches ORDER BY applied_at DESC LIMIT 100
+          )
+        `);
+
+        return {
+          counted: false,
+          voided: true,
+          refunded: didRefund,
+          unlockedAchievements: [] as readonly string[],
+        };
+      });
+
+      const energyState = await this.getEnergyState(effectiveUid, nowMs);
+      return {
+        ok: true,
+        counted: voidTxResult.counted,
+        voided: voidTxResult.voided,
+        refunded: voidTxResult.refunded,
+        energy: energyState,
+        unlockedAchievements: voidTxResult.unlockedAchievements,
+      };
+    }
+
+    if (!params.matchId) {
+      throw new Error('bad_request');
+    }
+    const matchId = params.matchId;
+
     // 1. İdempotency kontrolü: Bu matchId zaten işlendi mi?
     // Not: Normal tamamlanmış bir maç tekrar gelirse 200 idempotent yanıt dönülür.
-    // Terk edilmiş veya süresi dolmuş biletler (solo_abandoned) ise geçerli bir maç olarak kabul edilmez.
+    // Terk edilmiş (solo_abandoned) veya iptal edilmiş (solo_voided) biletler ise geçerli sonuç olarak kabul edilmez.
     const existingMatchCursor = this.ctx.storage.sql.exec<ProcessedMatchRow>(
       'SELECT match_id, coins_awarded, outcome FROM processed_matches WHERE match_id = ? LIMIT 1',
-      params.matchId
+      matchId
     );
     const existingMatches = existingMatchCursor.toArray();
 
-    if (existingMatches.length > 0 && existingMatches[0].outcome !== 'solo_abandoned') {
+    if (
+      existingMatches.length > 0 &&
+      existingMatches[0].outcome !== 'solo_abandoned' &&
+      existingMatches[0].outcome !== 'solo_voided'
+    ) {
       const unlockedRows = this.ctx.storage.sql
         .exec<{ id: string }>(
           "SELECT id FROM user_achievements WHERE match_id = ? AND match_id != 'backfill' ORDER BY rowid ASC",
-          params.matchId
+          matchId
         )
         .toArray();
 
@@ -1829,7 +2016,7 @@ export class UserProfile extends DurableObject<Env> {
     if (ticket.used === 1) {
       throw new Error('ticket_already_used');
     }
-    if (ticket.match_id !== params.matchId) {
+    if (ticket.match_id !== matchId) {
       throw new Error('ticket_invalid');
     }
 
@@ -1912,7 +2099,7 @@ export class UserProfile extends DurableObject<Env> {
       );
 
       const res = this.applyResultToCounters({
-        matchId: params.matchId,
+        matchId,
         isWin,
         isLoss,
         source: 'solo',
@@ -1923,7 +2110,7 @@ export class UserProfile extends DurableObject<Env> {
       this.ctx.storage.sql.exec(
         `INSERT INTO processed_matches (match_id, applied_at, outcome, coins_awarded)
          VALUES (?, ?, ?, ?)`,
-        params.matchId,
+        matchId,
         nowMs,
         params.outcome,
         actualCoinsAwarded
@@ -2618,6 +2805,77 @@ export class UserProfile extends DurableObject<Env> {
     });
   }
 
+  private refundEnergyInTransaction(params: {
+    readonly matchId: string;
+    readonly uid: string;
+    readonly nowMs: number;
+    readonly amount?: number;
+  }): RefundEnergyResult {
+    const existing = this.ctx.storage.sql
+      .exec<{ amount: number; refunded_at: number | null }>(
+        'SELECT amount, refunded_at FROM energy_spends WHERE match_id = ? AND uid = ? LIMIT 1',
+        params.matchId,
+        params.uid
+      )
+      .toArray();
+
+    const maxEnergy = getEnergyMax(this.env);
+    const regenMinutes = getEnergyRegenMinutes(this.env);
+
+    const rows = this.ctx.storage.sql
+      .exec<{ energy?: number; energy_updated_at?: number }>(
+        'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+      )
+      .toArray();
+
+    const savedEnergy =
+      rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+        ? Number(rows[0].energy)
+        : maxEnergy;
+    const savedUpdatedAt =
+      rows.length > 0 &&
+      rows[0].energy_updated_at !== undefined &&
+      rows[0].energy_updated_at !== null
+        ? Number(rows[0].energy_updated_at)
+        : 0;
+
+    const regen = calculateRegeneratedEnergy(
+      savedEnergy,
+      savedUpdatedAt,
+      params.nowMs,
+      maxEnergy,
+      regenMinutes
+    );
+
+    if (existing.length === 0 || existing[0].refunded_at !== null) {
+      return { ok: true, refunded: false, energy: regen.current };
+    }
+
+    const refundAmount = existing[0].amount ?? params.amount ?? 1;
+
+    this.ctx.storage.sql.exec(
+      'UPDATE energy_spends SET refunded_at = ? WHERE match_id = ? AND uid = ?',
+      params.nowMs,
+      params.matchId,
+      params.uid
+    );
+
+    const newEnergy = Math.min(maxEnergy, regen.current + refundAmount);
+    const newUpdatedAtMs = newEnergy >= maxEnergy ? params.nowMs : regen.updatedAtMs;
+
+    this.ctx.storage.sql.exec(
+      'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+      newEnergy,
+      newUpdatedAtMs
+    );
+
+    return {
+      ok: true,
+      refunded: true,
+      energy: newEnergy,
+    };
+  }
+
   /**
    * İptal veya eşleşme hatasında enerjiyi idempotent olarak iade eder.
    */
@@ -2637,71 +2895,14 @@ export class UserProfile extends DurableObject<Env> {
     const effectiveUid = profile.uid;
     const nowMs = params.nowMs ?? Date.now();
 
-    return this.runInTransaction(() => {
-      const existing = this.ctx.storage.sql
-        .exec<{ amount: number; refunded_at: number | null }>(
-          'SELECT amount, refunded_at FROM energy_spends WHERE match_id = ? AND uid = ? LIMIT 1',
-          params.matchId,
-          effectiveUid
-        )
-        .toArray();
-
-      const maxEnergy = getEnergyMax(this.env);
-      const regenMinutes = getEnergyRegenMinutes(this.env);
-
-      const rows = this.ctx.storage.sql
-        .exec<{ energy?: number; energy_updated_at?: number }>(
-          'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
-        )
-        .toArray();
-
-      const savedEnergy =
-        rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
-          ? Number(rows[0].energy)
-          : maxEnergy;
-      const savedUpdatedAt =
-        rows.length > 0 &&
-        rows[0].energy_updated_at !== undefined &&
-        rows[0].energy_updated_at !== null
-          ? Number(rows[0].energy_updated_at)
-          : 0;
-
-      const regen = calculateRegeneratedEnergy(
-        savedEnergy,
-        savedUpdatedAt,
+    return this.runInTransaction(() =>
+      this.refundEnergyInTransaction({
+        matchId: params.matchId,
+        uid: effectiveUid,
         nowMs,
-        maxEnergy,
-        regenMinutes
-      );
-
-      if (existing.length === 0 || existing[0].refunded_at !== null) {
-        return { ok: true, refunded: false, energy: regen.current };
-      }
-
-      const refundAmount = existing[0].amount ?? params.amount ?? 1;
-
-      this.ctx.storage.sql.exec(
-        'UPDATE energy_spends SET refunded_at = ? WHERE match_id = ? AND uid = ?',
-        nowMs,
-        params.matchId,
-        effectiveUid
-      );
-
-      const newEnergy = Math.min(maxEnergy, regen.current + refundAmount);
-      const newUpdatedAtMs = newEnergy >= maxEnergy ? nowMs : regen.updatedAtMs;
-
-      this.ctx.storage.sql.exec(
-        'UPDATE profiles SET energy = ?, energy_updated_at = ?',
-        newEnergy,
-        newUpdatedAtMs
-      );
-
-      return {
-        ok: true,
-        refunded: true,
-        energy: newEnergy,
-      };
-    });
+        amount: params.amount,
+      })
+    );
   }
 
   /**

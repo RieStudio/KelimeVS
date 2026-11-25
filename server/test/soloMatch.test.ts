@@ -18,6 +18,7 @@ import {
   validateSoloMatchResult,
   MIN_SOLO_WIN_SECONDS,
   SOLO_DAILY_SAFETY_CAP,
+  SOLO_VOID_DAILY_REFUND_CAP,
   MAX_SOLO_CORRECT_ANSWERS,
   type SoloMatchResultBody,
 } from '../src/soloMatch';
@@ -970,6 +971,420 @@ describe('HTTP Endpoint Entegrasyonu (POST /matches/solo & /matches/solo/result)
     });
 
     const res = await worker.fetch(req, env);
+    expect(res.status).toBe(410);
+    const data = (await res.json()) as any;
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('account_deleted');
+  });
+});
+
+describe('Solo Void / Draw Limit (outcome: void) ve Budama Testleri', () => {
+  it('1. validateSoloMatchResult outcome="void" yalnız ticketId ile kabul edilir; geçersiz opsiyonel alan reddedilir', () => {
+    const okMinimal = validateSoloMatchResult({
+      ticketId: 'stk_validticket12345678',
+      outcome: 'void',
+    });
+    expect(okMinimal.isValid).toBe(true);
+    expect(okMinimal.data?.outcome).toBe('void');
+
+    const okFull = validateSoloMatchResult({
+      ticketId: 'stk_validticket12345678',
+      matchId: 'bot:a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      outcome: 'void',
+      myScore: 1,
+      oppScore: 1,
+      correctAnswers: 4,
+      durationSeconds: 45,
+      endedBy: 'draw_limit_reached',
+    });
+    expect(okFull.isValid).toBe(true);
+
+    const missingTicket = validateSoloMatchResult({ outcome: 'void' });
+    expect(missingTicket.isValid).toBe(false);
+    expect(missingTicket.error).toBe('ticket_required');
+
+    const badMatchId = validateSoloMatchResult({
+      ticketId: 'stk_validticket12345678',
+      matchId: 'invalid_match',
+      outcome: 'void',
+    });
+    expect(badMatchId.isValid).toBe(false);
+    expect(badMatchId.error).toBe('bad_request');
+  });
+
+  it('2. Void başarılı enerji iadesi yapar; sayaç, seri, başarım, jeton ve liderliğe dokunmaz', async () => {
+    const recordMatchResult = vi.fn();
+    const { env } = createEnv({
+      LEADERBOARD: {
+        idFromName: () => ({ toString: () => 'global' }),
+        get: () => ({ recordMatchResult }),
+      } as any,
+    });
+    const { ctx, rawDb } = createMockCtx();
+    const profileDO = new UserProfile(ctx, env);
+    const uid = 'void_user_1';
+    const baseMs = 1_700_000_000_000;
+
+    // İlk olarak 1 galibiyet alarak seri=1, played=1, won=1 oluşturalım
+    const tWin = await profileDO.issueSoloTicket(uid, baseMs);
+    await profileDO.applyBotMatchReward({
+      uid,
+      ticketId: tWin.ticketId!,
+      matchId: tWin.matchId!,
+      outcome: 'win',
+      myScore: 2,
+      oppScore: 0,
+      correctAnswers: 3,
+      endedBy: 'normal',
+      nowMs: baseMs + 25_000,
+    });
+
+    const beforeProfile = await profileDO.getProfile(uid, 0, undefined, baseMs + 25_000);
+    const beforeEnergy = await profileDO.getEnergyState(uid, baseMs + 25_000);
+    expect(beforeEnergy.current).toBe(4);
+    expect(beforeProfile.currentStreak).toBe(1);
+    expect(beforeProfile.coins).toBe(130);
+
+    // Yeni bilet al -> enerji 3'e düşer
+    const tVoid = await profileDO.issueSoloTicket(uid, baseMs + 30_000);
+    expect(tVoid.energy?.current).toBe(3);
+
+    // Void bildirimi -> enerji 4'e iade edilir, sayaç/seri/başarım/jeton değişmez
+    const voidRes = await profileDO.applyBotMatchReward({
+      uid,
+      ticketId: tVoid.ticketId!,
+      outcome: 'void',
+      nowMs: baseMs + 35_000,
+    });
+
+    expect(voidRes.ok).toBe(true);
+    expect(voidRes.counted).toBe(false);
+    expect(voidRes.voided).toBe(true);
+    expect(voidRes.refunded).toBe(true);
+    expect(voidRes.energy.current).toBe(4);
+    expect(voidRes.unlockedAchievements).toEqual([]);
+
+    const afterProfile = await profileDO.getProfile(uid, 0, undefined, baseMs + 35_000);
+    expect(afterProfile.stats.played).toBe(1);
+    expect(afterProfile.stats.won).toBe(1);
+    expect(afterProfile.stats.lost).toBe(0);
+    expect(afterProfile.currentStreak).toBe(1);
+    expect(afterProfile.maxStreak).toBe(1);
+    expect(afterProfile.coins).toBe(130);
+    expect(afterProfile.achievements?.map((a) => a.id)).toEqual(['first_match', 'first_win']);
+    expect(recordMatchResult).not.toHaveBeenCalled();
+
+    const ticketRow = rawDb
+      .prepare('SELECT used FROM solo_tickets WHERE ticket_id = ?')
+      .get(tVoid.ticketId!) as { used: number };
+    expect(ticketRow.used).toBe(1);
+
+    const processedRow = rawDb
+      .prepare('SELECT outcome, coins_awarded FROM processed_matches WHERE match_id = ?')
+      .get(tVoid.matchId!) as { outcome: string; coins_awarded: number };
+    expect(processedRow.outcome).toBe('solo_voided');
+    expect(processedRow.coins_awarded).toBe(0);
+  });
+
+  it('3. Void tekrar çağrısında idempotenttir (alreadyProcessed: true, ikinci kez iade ETMEZ)', async () => {
+    const { env } = createEnv();
+    const { ctx } = createMockCtx();
+    const profileDO = new UserProfile(ctx, env);
+    const uid = 'void_idem_user';
+    const baseMs = 1_700_000_000_000;
+
+    // 2 bilet al -> enerji 5 -> 3 (2. bilet alınırken 1. bilet solo_abandoned olur; toplam 2 harcanır)
+    const t1 = await profileDO.issueSoloTicket(uid, baseMs);
+    const t2 = await profileDO.issueSoloTicket(uid, baseMs + 1000);
+    expect(t2.energy?.current).toBe(3);
+    expect(t1.ticketId).toBeDefined();
+
+    const firstVoid = await profileDO.applyBotMatchReward({
+      uid,
+      ticketId: t2.ticketId!,
+      outcome: 'void',
+      nowMs: baseMs + 5000,
+    });
+    expect(firstVoid.refunded).toBe(true);
+    expect(firstVoid.alreadyProcessed).toBeUndefined();
+    expect(firstVoid.energy.current).toBe(4);
+
+    // Aynı biletle ikinci void çağrısı -> idempotent, enerji 4 olarak kalır (5 olmaz!)
+    const secondVoid = await profileDO.applyBotMatchReward({
+      uid,
+      ticketId: t2.ticketId!,
+      outcome: 'void',
+      nowMs: baseMs + 6000,
+    });
+    expect(secondVoid.ok).toBe(true);
+    expect(secondVoid.counted).toBe(false);
+    expect(secondVoid.voided).toBe(true);
+    expect(secondVoid.refunded).toBe(false);
+    expect(secondVoid.alreadyProcessed).toBe(true);
+    expect(secondVoid.energy.current).toBe(4);
+  });
+
+  it('4. Günlük iade sınırı (SOLO_VOID_DAILY_REFUND_CAP = 5) aşılınca bilet solo_abandoned gibi kapanır (kayıp + seri sıfırlama + başarım, iade ve jeton yok)', async () => {
+    const { env } = createEnv();
+    const { ctx, rawDb } = createMockCtx();
+    const profileDO = new UserProfile(ctx, env);
+    const uid = 'void_cap_user';
+    const baseMs = 1_700_000_000_000;
+
+    expect(SOLO_VOID_DAILY_REFUND_CAP).toBe(5);
+
+    // Önce 7 mağlubiyet + 2 galibiyet -> played=9, won=2, lost=7, currentStreak=2, maxStreak=2
+    for (let i = 0; i < 7; i++) {
+      await profileDO.applyMatchReward({ uid, matchId: `cap_pre_l_${i}`, outcome: 'loss' });
+    }
+    await profileDO.applyMatchReward({ uid, matchId: 'cap_pre_w_1', outcome: 'win' });
+    await profileDO.applyMatchReward({ uid, matchId: 'cap_pre_w_2', outcome: 'win' });
+
+    const preProf = await profileDO.getProfile(uid, 0, undefined, baseMs);
+    expect(preProf.stats.played).toBe(9);
+    expect(preProf.stats.lost).toBe(7);
+    expect(preProf.currentStreak).toBe(2);
+    const coinsBeforeVoid = preProf.coins;
+
+    // İlk 5 void işleminde iade gerçekleşir, sayaç ve seri değişmez (enerji 5 -> 4 -> 5)
+    for (let i = 0; i < 5; i++) {
+      const t = await profileDO.issueSoloTicket(uid, baseMs + i * 2000);
+      expect(t.energy?.current).toBe(4);
+      const r = await profileDO.applyBotMatchReward({
+        uid,
+        ticketId: t.ticketId!,
+        outcome: 'void',
+        nowMs: baseMs + i * 2000 + 1000,
+      });
+      expect(r.ok).toBe(true);
+      expect(r.counted).toBe(false);
+      expect(r.voided).toBe(true);
+      expect(r.refunded).toBe(true);
+      expect(r.energy.current).toBe(5);
+      expect(r.unlockedAchievements).toEqual([]);
+    }
+
+    // 6. void işleminde günlük sınır aşılmış -> solo_abandoned gibi kapatılır
+    const t6 = await profileDO.issueSoloTicket(uid, baseMs + 20_000);
+    expect(t6.energy?.current).toBe(4);
+    const r6 = await profileDO.applyBotMatchReward({
+      uid,
+      ticketId: t6.ticketId!,
+      outcome: 'void',
+      nowMs: baseMs + 21_000,
+    });
+    expect(r6.ok).toBe(true);
+    expect(r6.counted).toBe(true);
+    expect(r6.voided).toBe(false);
+    expect(r6.refunded).toBe(false);
+    expect(r6.energy.current).toBe(4);
+    expect(r6.unlockedAchievements).toEqual(['matches_10']);
+
+    const afterProf = await profileDO.getProfile(uid, 0, undefined, baseMs + 21_000);
+    expect(afterProf.stats.played).toBe(10);
+    expect(afterProf.stats.won).toBe(2);
+    expect(afterProf.stats.lost).toBe(8);
+    expect(afterProf.currentStreak).toBe(0);
+    expect(afterProf.maxStreak).toBe(2);
+    expect(afterProf.coins).toBe(coinsBeforeVoid);
+
+    const t6Row = rawDb
+      .prepare('SELECT used FROM solo_tickets WHERE ticket_id = ?')
+      .get(t6.ticketId!) as { used: number };
+    expect(t6Row.used).toBe(1);
+
+    const processed6 = rawDb
+      .prepare('SELECT outcome, coins_awarded FROM processed_matches WHERE match_id = ?')
+      .get(t6.matchId!) as { outcome: string; coins_awarded: number };
+    expect(processed6.outcome).toBe('solo_abandoned');
+    expect(processed6.coins_awarded).toBe(0);
+
+    // Aynı bilete tekrar void veya win gönderilirse ticket_already_used döner
+    await expect(
+      profileDO.applyBotMatchReward({
+        uid,
+        ticketId: t6.ticketId!,
+        outcome: 'void',
+        nowMs: baseMs + 22_000,
+      })
+    ).rejects.toThrow('ticket_already_used');
+
+    // Void iadeleri SOLO_DAILY_SAFETY_CAP (1000) sayacını tüketmemelidir
+    const dayKey = new Date(baseMs).toISOString().slice(0, 10);
+    const dailyRow = rawDb
+      .prepare('SELECT count, void_refund_count FROM daily_solo_matches WHERE day_key = ?')
+      .get(dayKey) as { count: number; void_refund_count: number };
+    expect(dailyRow.void_refund_count).toBe(5);
+    expect(dailyRow.count).toBe(0);
+  });
+
+  it('5. Yarış koruması: Void sonrası aynı bilete win/loss gelirse (ve tersi) 400 ticket_already_used döner', async () => {
+    const { env, userProfiles } = createEnv();
+    const uid = 'void_race_user';
+    const profile =
+      userProfiles.get(uid) ||
+      (env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid)) as unknown as UserProfile);
+
+    // A) Önce void, sonra win -> win isteği 400 ticket_already_used almalı
+    const t1 = await profile.issueSoloTicket(uid, Date.now() - 25_000);
+    const voidHttpRes = await worker.fetch(
+      new Request('http://127.0.0.1/matches/solo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+        },
+        body: JSON.stringify({ ticketId: t1.ticketId, outcome: 'void' }),
+      }),
+      env
+    );
+    expect(voidHttpRes.status).toBe(200);
+    const voidJson = (await voidHttpRes.json()) as any;
+    expect(voidJson.voided).toBe(true);
+    expect(voidJson.refunded).toBe(true);
+
+    const winAfterVoidRes = await worker.fetch(
+      new Request('http://127.0.0.1/matches/solo/result', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+        },
+        body: JSON.stringify({
+          ticketId: t1.ticketId,
+          matchId: t1.matchId,
+          outcome: 'win',
+          myScore: 2,
+          oppScore: 0,
+          correctAnswers: 4,
+          endedBy: 'normal',
+        }),
+      }),
+      env
+    );
+    expect(winAfterVoidRes.status).toBe(400);
+    const winAfterVoidJson = (await winAfterVoidRes.json()) as any;
+    expect(winAfterVoidJson.error).toBe('ticket_already_used');
+
+    // B) Önce win, sonra void -> void isteği 400 ticket_already_used almalı
+    const t2 = await profile.issueSoloTicket(uid, Date.now() - 25_000);
+    const winRes = await worker.fetch(
+      new Request('http://127.0.0.1/matches/solo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+        },
+        body: JSON.stringify({
+          ticketId: t2.ticketId,
+          matchId: t2.matchId,
+          outcome: 'win',
+          myScore: 2,
+          oppScore: 1,
+          correctAnswers: 4,
+          endedBy: 'normal',
+        }),
+      }),
+      env
+    );
+    expect(winRes.status).toBe(200);
+
+    const voidAfterWinRes = await worker.fetch(
+      new Request('http://127.0.0.1/matches/solo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+        },
+        body: JSON.stringify({ ticketId: t2.ticketId, outcome: 'void' }),
+      }),
+      env
+    );
+    expect(voidAfterWinRes.status).toBe(400);
+    const voidAfterWinJson = (await voidAfterWinRes.json()) as any;
+    expect(voidAfterWinJson.error).toBe('ticket_already_used');
+  });
+
+  it('6. Budama: issueSoloTicket 30 günden eski used=1 biletleri ve 7 günden eski daily_solo_matches satırlarını siler', async () => {
+    const { env } = createEnv();
+    const { ctx, rawDb } = createMockCtx();
+    const profileDO = new UserProfile(ctx, env);
+    const uid = 'prune_user';
+    const nowMs = 1_700_000_000_000;
+    await profileDO.getProfile(uid, 0, undefined, nowMs);
+
+    const thirtyOneDaysAgo = nowMs - 31 * 24 * 60 * 60 * 1000;
+    const fiveDaysAgo = nowMs - 5 * 24 * 60 * 60 * 1000;
+    const eightDaysAgoKey = new Date(nowMs - 8 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const twoDaysAgoKey = new Date(nowMs - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayKey = new Date(nowMs).toISOString().slice(0, 10);
+
+    rawDb
+      .prepare('INSERT INTO solo_tickets (ticket_id, match_id, issued_at, expires_at, used) VALUES (?, ?, ?, ?, 1)')
+      .run('stk_old_used_31d', 'bot:old_31d_00001', thirtyOneDaysAgo, thirtyOneDaysAgo + 900_000);
+    rawDb
+      .prepare('INSERT INTO solo_tickets (ticket_id, match_id, issued_at, expires_at, used) VALUES (?, ?, ?, ?, 1)')
+      .run('stk_recent_used_5d', 'bot:recent_5d_001', fiveDaysAgo, fiveDaysAgo + 900_000);
+
+    rawDb
+      .prepare('INSERT INTO daily_solo_matches (day_key, count, void_refund_count) VALUES (?, 50, 2)')
+      .run(eightDaysAgoKey);
+    rawDb
+      .prepare('INSERT INTO daily_solo_matches (day_key, count, void_refund_count) VALUES (?, 12, 1)')
+      .run(twoDaysAgoKey);
+    rawDb
+      .prepare('INSERT INTO daily_solo_matches (day_key, count, void_refund_count) VALUES (?, 999, 0)')
+      .run(todayKey);
+
+    // Yeni bilet üretimi budamayı tetikler
+    const issued = await profileDO.issueSoloTicket(uid, nowMs);
+    expect(issued.ok).toBe(true);
+
+    const oldTicket = rawDb
+      .prepare('SELECT ticket_id FROM solo_tickets WHERE ticket_id = ?')
+      .get('stk_old_used_31d');
+    const recentTicket = rawDb
+      .prepare('SELECT ticket_id FROM solo_tickets WHERE ticket_id = ?')
+      .get('stk_recent_used_5d');
+    expect(oldTicket).toBeUndefined();
+    expect(recentTicket).toBeDefined();
+
+    const oldDaily = rawDb
+      .prepare('SELECT day_key FROM daily_solo_matches WHERE day_key = ?')
+      .get(eightDaysAgoKey);
+    const recentDaily = rawDb
+      .prepare('SELECT day_key FROM daily_solo_matches WHERE day_key = ?')
+      .get(twoDaysAgoKey);
+    const todayDaily = rawDb
+      .prepare('SELECT count FROM daily_solo_matches WHERE day_key = ?')
+      .get(todayKey) as { count: number };
+    expect(oldDaily).toBeUndefined();
+    expect(recentDaily).toBeDefined();
+    expect(todayDaily.count).toBe(999);
+  });
+
+  it('7. Silinmiş hesapta POST /matches/solo (outcome: void) 410 account_deleted döner', async () => {
+    const { env, userProfiles } = createEnv();
+    const uid = 'void_deleted_user';
+    const profile =
+      userProfiles.get(uid) ||
+      (env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid)) as unknown as UserProfile);
+    await profile.deleteProfile(uid);
+
+    const res = await worker.fetch(
+      new Request('http://127.0.0.1/matches/solo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer dev:${uid}`,
+        },
+        body: JSON.stringify({
+          ticketId: 'stk_deleted_ticket_123456',
+          outcome: 'void',
+        }),
+      }),
+      env
+    );
     expect(res.status).toBe(410);
     const data = (await res.json()) as any;
     expect(data.ok).toBe(false);

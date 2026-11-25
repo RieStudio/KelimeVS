@@ -961,25 +961,33 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
     "endedBy": "normal"
   }
   ```
-  - `matchId`: Zorunlu dize. `^bot:[A-Za-z0-9_-]{8,64}$` deseniyle eşleşmelidir.
+  - `matchId`: `'win'` veya `'loss'` için zorunlu (`^bot:[A-Za-z0-9_-]{8,64}$`); `'void'` için opsiyonel (verilirse biletin `matchId` değeriyle eşleşmelidir).
   - `ticketId`: Zorunlu dize. Sunucu tarafından `no_opponent` mesajıyla verilen tek kullanımlık bilet kimliğidir (`^stk_[A-Za-z0-9_-]{8,64}$` veya `^[A-Za-z0-9_-]{8,64}$`).
-  - `outcome`: Zorunlu dize (`'win'` veya `'loss'`).
-  - `myScore`: Sayı (tam sayı, `>= 0`).
-  - `oppScore`: Sayı (tam sayı, `>= 0`).
-  - `correctAnswers`: Sayı (tam sayı, `0 <= correctAnswers <= 50`).
+  - `outcome`: Zorunlu dize (`'win'`, `'loss'` veya `'void'`).
+  - `myScore`: Sayı (tam sayı, `>= 0`; `'void'` için opsiyonel).
+  - `oppScore`: Sayı (tam sayı, `>= 0`; `'void'` için opsiyonel).
+  - `correctAnswers`: Sayı (tam sayı, `0 <= correctAnswers <= 50`; `'void'` için opsiyonel).
   - `durationSeconds`: Sayı (opsiyonel; istemcinin beyanı doğrulamada kullanılmaz).
-  - `endedBy`: Zorunlu dize (`'normal'` veya `'forfeit'`).
+  - `endedBy`: `'win'` veya `'loss'` için zorunlu (`'normal'` veya `'forfeit'`); `'void'` için opsiyonel (`'normal'`, `'forfeit'` veya `'draw_limit_reached'`).
+- **İptal / Beraberlik (`outcome: 'void'`) İsteği:**
+  ```json
+  {
+    "ticketId": "stk_1234567890abcdef...",
+    "outcome": "void"
+  }
+  ```
 - **Doğrulama ve Güvenlik Kuralları (Sunucu Otoritesi):**
   - *Bilet Doğrulaması (Zorunlu):* İstekte geçerli bir `ticketId` bulunmalıdır. Bilet yoksa `ticket_required`, geçersizse `ticket_invalid`, önceden kullanılmışsa `ticket_already_used`, süresi dolmuşsa `ticket_expired` (HTTP 400) döner. Biletsiz geçiş yolu yoktur.
+  - *İptal / Beraberlik (`outcome: 'void'`):* Günlük iade sınırı (`SOLO_VOID_DAILY_REFUND_CAP = 5`) aşılmamışsa geçerli bileti atomik olarak `used = 1` yapar, `processed_matches` tablosuna `'solo_voided'` yazar, 1 enerji iade eder (`counted: false, voided: true, refunded: true`) ve profil sayaçlarına, seriye, başarım listesine, jetona ve lider tablosuna **dokunmaz** (aynı biletle tekrar çağrıda `alreadyProcessed: true, refunded: false` döner). Günlük sınır aşıldıysa bilet terk edilmiş bilet (`solo_abandoned`) gibi kapatılır: `played + 1`, `lost + 1`, `current_streak = 0`, jeton `0`, enerji iade edilmez (`counted: true, voided: false, refunded: false`, varsa açılan başarımlar döner). Aynı bilete `void` sonrası `win`/`loss` (veya `win`/`loss` sonrası `void`) gelirse `400 ticket_already_used` döner.
   - *Skor Tutarlılığı (`roundsToWin = 2`):*
     - `outcome = 'win'`: `myScore == 2` ve `oppScore < 2`. `endedBy` yalnızca `'normal'` olabilir.
     - `outcome = 'loss'` ve `endedBy = 'normal'`: `oppScore == 2` ve `myScore < 2`.
     - `outcome = 'loss'` ve `endedBy = 'forfeit'`: `myScore < 2` ve `oppScore < 2`.
   - *Minimum Süre (Sunucu Otoritesi):* Galibiyet durumunda sunucu saatine göre geçen süre `now - ticket.issued_at >= 20` saniye (`MIN_SOLO_WIN_SECONDS = 20`) olmalıdır. İstemci beyanı yok sayılır. Çok hızlı galibiyetlerde istek `400 Bad Request` (`{"ok": false, "error": "match_too_fast"}`) ile reddedilir ve bilet kullanılmamış (`used = 0`) kalır.
-  - *Enerji:* Enerji maç başında bilet verilirken atomik olarak düşüldüğü için sonuç bildiriminde TEKRAR DÜŞÜLMEZ.
+  - *Enerji:* Enerji maç başında bilet verilirken atomik olarak düşüldüğü için normal sonuç bildiriminde tekrar düşülmez; yalnızca `outcome: 'void'` yolunda günlük kota dahilinde iade edilir.
   - *Jeton Ödülü:* Sunucu hesaplar (galibiyet 30, mağlubiyet 5). `DAILY_MATCH_COIN_CAP` yapılandırması `'unlimited'` (sınırsız) olarak ayarlanmıştır.
   - *Günlük Güvenlik Tavanı:* Bir kullanıcı için günde en fazla 1000 solo maç sonucu işlenir (`SOLO_DAILY_SAFETY_CAP = 1000`). Tavan aşıldığında hata fırlatılmaz, nötr olarak `ok: true, counted: false, coinsAwarded: 0` dönülür.
-  - *İdempotentlik:* Aynı `matchId` tekrar gönderildiğinde bilet kullanılmış olsa dahi 400 verilmez; önceki sonuç `alreadyProcessed: true` bayrağı ile döner.
+  - *İdempotentlik:* Aynı `matchId` tekrar gönderildiğinde bilet kullanılmış olsa dahi 400 verilmez; önceki sonuç `alreadyProcessed: true` bayrağı ile döner (`solo_abandoned` ve `solo_voided` hariç; `solo_voided` yalnız tekrar `void` çağrısında idempotent döner).
   - *Lider Tablosu:* Solo maçlar lider tablosuna puan yazmaz (DO çağrısı yapılmaz).
 - **Yanıtlar ve Durum Kodları:**
   - `200 OK`: Sonuç işlendi veya zaten işlenmiş.
@@ -997,6 +1005,38 @@ Bot maçları istemci cihazında yerel (`MatchController`) çalıştığından v
         "isUnlimited": false
       },
       "unlockedAchievements": ["first_match", "first_win"]
+    }
+    ```
+    *(`outcome: 'void'` yanıt örneği:)*
+    ```json
+    {
+      "ok": true,
+      "counted": false,
+      "voided": true,
+      "refunded": true,
+      "energy": {
+        "current": 5,
+        "max": 5,
+        "secondsToNext": null,
+        "isUnlimited": false
+      },
+      "unlockedAchievements": []
+    }
+    ```
+    *(`outcome: 'void'` günlük sınır aşıldığında — `solo_abandoned` olarak kapatılır:)*
+    ```json
+    {
+      "ok": true,
+      "counted": true,
+      "voided": false,
+      "refunded": false,
+      "energy": {
+        "current": 4,
+        "max": 5,
+        "secondsToNext": 1200,
+        "isUnlimited": false
+      },
+      "unlockedAchievements": ["matches_10"]
     }
     ```
     *(Güvenlik tavanı aşıldığında: `{ "ok": true, "counted": false, "coinsAwarded": 0, "coins": 100, "energy": { ... }, "unlockedAchievements": [] }`)*

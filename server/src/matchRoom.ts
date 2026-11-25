@@ -1025,11 +1025,6 @@ export class MatchRoom extends DurableObject<Env> {
     const p2Uid = this.data.p2.uid;
     const isWinnerPresent = winnerId === p1Uid || winnerId === p2Uid;
     const isFriendly = this.data.matchType === 'friendly';
-    const isBot =
-      p1Uid === 'bot' ||
-      p1Uid.startsWith('bot_') ||
-      p2Uid === 'bot' ||
-      p2Uid.startsWith('bot_');
 
     this.data = {
       ...this.data,
