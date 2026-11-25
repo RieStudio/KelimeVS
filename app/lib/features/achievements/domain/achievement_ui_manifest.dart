@@ -7,6 +7,13 @@ class AchievementUiItem {
   /// Rozetin kart sol kenarına göre yatay konumu (px, sola negatif, varsayılan -12.0).
   final double badgeDx;
 
+  /// Rozetin dikey konum kaydırması (px; badgeAlignBottom true iken alt kenara göre
+  /// mesafe, false iken merkezden aşağı/yukarı ofset, varsayılan 0.0).
+  final double badgeDy;
+
+  /// Rozetin dikey ortalama yerine kartın alt kenarına hizalanıp hizalanmayacağı.
+  final bool badgeAlignBottom;
+
   /// Rozetin dönme açısı derece cinsinden (varsayılan -6.0).
   final double badgeRotationDeg;
 
@@ -15,6 +22,8 @@ class AchievementUiItem {
     required this.title,
     required this.description,
     this.badgeDx = -12.0,
+    this.badgeDy = 0.0,
+    this.badgeAlignBottom = false,
     this.badgeRotationDeg = -6.0,
   });
 
@@ -30,6 +39,8 @@ class AchievementUiItem {
           title == other.title &&
           description == other.description &&
           badgeDx == other.badgeDx &&
+          badgeDy == other.badgeDy &&
+          badgeAlignBottom == other.badgeAlignBottom &&
           badgeRotationDeg == other.badgeRotationDeg;
 
   @override
@@ -38,6 +49,8 @@ class AchievementUiItem {
       title.hashCode ^
       description.hashCode ^
       badgeDx.hashCode ^
+      badgeDy.hashCode ^
+      badgeAlignBottom.hashCode ^
       badgeRotationDeg.hashCode;
 }
 
@@ -49,7 +62,11 @@ abstract final class AchievementUiManifest {
       id: 'first_match',
       title: 'İlk Adım',
       description: 'İlk maçını tamamla',
-      badgeRotationDeg: -6.0,
+      // Çimen tabanı kart içinde, alt 3 px border'ın hemen üstünde ve sol kenardan içeride oturur; bayrak eğimi SVG'nin içindedir.
+      badgeDx: 4.0,
+      badgeDy: 0.0,
+      badgeAlignBottom: true,
+      badgeRotationDeg: 0.0,
     ),
     'matches_10': AchievementUiItem(
       id: 'matches_10',

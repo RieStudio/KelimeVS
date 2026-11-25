@@ -1665,7 +1665,7 @@ class _NotificationsGallerySectionContentState
                 '3. Maç İsteği Tostları (MatchRequestToastWidget): 10 farklı durum ikonu ve renk varyantıyla hızlı geri bildirim.\n'
                 '4. Bağlantı Uyarı Şeridi (ConnectionBanner): Kopma, yeniden bağlanma ve 1.5 sn "Bağlandı" hapı.\n'
                 '5. Küresel Çevrimdışı Bandı (GlobalOfflineBanner): Ağ kesintisinde tüm ekranların üstünde sabit bant.\n'
-                '6. Başarım Bildirimi (AchievementNotificationCard): Üstten hafif yaylanarak inen, -6° rozetli, 4000 ms süreli ve FIFO kuyruklu bildirim.\n'
+                '6. Başarım Bildirimi (AchievementNotificationCard): Üstten hafif yaylanarak inen, ikon bazlı konum/eğimli rozetli, 4000 ms süreli ve FIFO kuyruklu bildirim.\n'
                 '7. Kayan Sistem Uyarıları (Floating SnackBar): Hızlı işlem sonuçları ve kullanıcı bilgilendirmeleri.',
                 style: TextStyle(
                   fontFamily: AppTextStyles.fontNunito,

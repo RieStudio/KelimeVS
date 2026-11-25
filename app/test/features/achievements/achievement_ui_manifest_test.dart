@@ -98,12 +98,19 @@ void main() {
       expect(wins10.badgeDx, equals(-14.0));
       expect(wins10.badgeRotationDeg, equals(-12.0));
 
-      // 3. first_match: çimen SVG'de +6° döndürülmüş olup kart alt çizgisine paralel kalması için -6° olmalıdır
+      // 3. first_match: dönmeden (0°), kart içinde sol kenardan içeride (badgeDx = 4) ve alt kenara dayalıdır
       final firstMatch = AchievementUiManifest.get('first_match')!;
-      expect(firstMatch.badgeDx, equals(-12.0));
-      expect(firstMatch.badgeRotationDeg, equals(-6.0));
+      expect(firstMatch.badgeDx, equals(4.0));
+      expect(firstMatch.badgeDy, equals(0.0));
+      expect(firstMatch.badgeAlignBottom, isTrue);
+      expect(firstMatch.badgeRotationDeg, equals(0.0));
 
-      // 4. Diğer başarımlar varsayılan değerleri (-12px, -6°) korur
+      // 4. Diğer 10 başarım dikey ortalama (badgeAlignBottom=false, badgeDy=0) korur, 8'i varsayılan (-12px, -6°) kalır
+      expect(firstWin.badgeAlignBottom, isFalse);
+      expect(firstWin.badgeDy, equals(0.0));
+      expect(wins10.badgeAlignBottom, isFalse);
+      expect(wins10.badgeDy, equals(0.0));
+
       final defaultIds = [
         'matches_10',
         'matches_50',
@@ -117,6 +124,8 @@ void main() {
       for (final id in defaultIds) {
         final item = AchievementUiManifest.get(id)!;
         expect(item.badgeDx, equals(-12.0), reason: '$id için badgeDx -12 olmalıdır');
+        expect(item.badgeDy, equals(0.0), reason: '$id için badgeDy 0 olmalıdır');
+        expect(item.badgeAlignBottom, isFalse, reason: '$id için badgeAlignBottom false olmalıdır');
         expect(item.badgeRotationDeg, equals(-6.0), reason: '$id için badgeRotationDeg -6 olmalıdır');
       }
 
@@ -127,6 +136,8 @@ void main() {
         description: 'Açıklama',
       );
       expect(sampleItem.badgeDx, equals(-12.0));
+      expect(sampleItem.badgeDy, equals(0.0));
+      expect(sampleItem.badgeAlignBottom, isFalse);
       expect(sampleItem.badgeRotationDeg, equals(-6.0));
     });
   });

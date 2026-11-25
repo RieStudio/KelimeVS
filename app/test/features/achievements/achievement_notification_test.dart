@@ -7,7 +7,6 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:app/features/achievements/application/achievement_notification_service.dart';
 import 'package:app/features/achievements/domain/achievement_ui_manifest.dart';
 import 'package:app/features/achievements/presentation/achievement_notification_card.dart';
-import 'package:app/features/achievements/presentation/achievement_notification_overlay.dart';
 import 'package:app/features/match_request/presentation/global_match_request_overlay.dart';
 
 void main() {
@@ -142,7 +141,24 @@ void main() {
         );
       }
 
-      // first_win için varsayılan: badgeDx: -6, badgeRotationDeg: -6
+      // first_match için: badgeDx: 4, badgeDy: 0, badgeAlignBottom: true, badgeRotationDeg: 0
+      final firstMatch = AchievementUiManifest.get('first_match')!;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AchievementNotificationCard(item: firstMatch),
+          ),
+        ),
+      );
+      final positionedMatch = findBadgePositioned();
+      expect(positionedMatch.left, equals(4.0));
+      expect(positionedMatch.top, isNull);
+      expect(positionedMatch.bottom, equals(0.0));
+      final transformMatch = findBadgeTransform();
+      // 0° -> cos(0°) = 1.0
+      expect(transformMatch.transform.storage[0], closeTo(1.0, 0.0001));
+
+      // first_win için varsayılan: badgeDx: -6, badgeRotationDeg: -6, dikey ortalı
       final firstWin = AchievementUiManifest.get('first_win')!;
       await tester.pumpWidget(
         MaterialApp(
@@ -154,6 +170,8 @@ void main() {
 
       final positioned1 = findBadgePositioned();
       expect(positioned1.left, equals(-6.0));
+      expect(positioned1.top, equals(0.0));
+      expect(positioned1.bottom, equals(0.0));
       final transform1 = findBadgeTransform();
       // -6° in radians = -6 * pi / 180 ≈ -0.1047 -> cos(-6°) ≈ 0.9945
       expect(transform1.transform.storage[0], closeTo(0.9945, 0.001));
@@ -169,17 +187,21 @@ void main() {
       );
       final positioned2 = findBadgePositioned();
       expect(positioned2.left, equals(-14.0));
+      expect(positioned2.top, equals(0.0));
+      expect(positioned2.bottom, equals(0.0));
       final transform2 = findBadgeTransform();
       // -12° in radians: cos(-12°) ≈ 0.9781
       expect(transform2.transform.storage[0], closeTo(0.9781, 0.001));
 
-      // Override parametreleri
+      // Override parametreleri (badgeDx, badgeDy, badgeAlignBottom, badgeRotationDeg)
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: AchievementNotificationCard(
               item: firstWin,
               badgeDx: -25.0,
+              badgeDy: 2.0,
+              badgeAlignBottom: true,
               badgeRotationDeg: -18.0,
             ),
           ),
@@ -187,6 +209,8 @@ void main() {
       );
       final positioned3 = findBadgePositioned();
       expect(positioned3.left, equals(-25.0));
+      expect(positioned3.top, isNull);
+      expect(positioned3.bottom, equals(2.0));
       final transform3 = findBadgeTransform();
       // cos(-18°) ≈ 0.9510
       expect(transform3.transform.storage[0], closeTo(0.9510, 0.001));

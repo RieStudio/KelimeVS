@@ -26,6 +26,8 @@ class AchievementNotificationCard extends StatelessWidget {
   final AchievementUiItem item;
   final VoidCallback? onDismiss;
   final double? badgeDx;
+  final double? badgeDy;
+  final bool? badgeAlignBottom;
   final double? badgeRotationDeg;
 
   const AchievementNotificationCard({
@@ -33,13 +35,41 @@ class AchievementNotificationCard extends StatelessWidget {
     required this.item,
     this.onDismiss,
     this.badgeDx,
+    this.badgeDy,
+    this.badgeAlignBottom,
     this.badgeRotationDeg,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveBadgeDx = badgeDx ?? item.badgeDx;
+    final effectiveBadgeDy = badgeDy ?? item.badgeDy;
+    final effectiveAlignBottom = badgeAlignBottom ?? item.badgeAlignBottom;
     final effectiveRotationDeg = badgeRotationDeg ?? item.badgeRotationDeg;
+
+    final badgeWidget = Transform.rotate(
+      angle: effectiveRotationDeg * math.pi / 180,
+      child: Container(
+        width: 68,
+        height: 68,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: 0.16),
+              offset: const Offset(0, 4),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: SvgPicture.asset(
+          item.iconAsset,
+          width: 68,
+          height: 68,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
 
     return Semantics(
       container: true,
@@ -115,37 +145,20 @@ class AchievementNotificationCard extends StatelessWidget {
               ),
             ),
 
-            // Dışarı Taşan Rozet (68x68, konumu ve eğim açısı ayarlanabilir, yumuşak gölgeli)
-            Positioned(
-              left: effectiveBadgeDx,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: Transform.rotate(
-                  angle: effectiveRotationDeg * math.pi / 180,
-                  child: Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.ink.withValues(alpha: 0.16),
-                          offset: const Offset(0, 4),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: SvgPicture.asset(
-                      item.iconAsset,
-                      width: 68,
-                      height: 68,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
+            // Rozet (68x68, yatay/dikey konumu ve eğim açısı ikon bazında ayarlanabilir)
+            if (effectiveAlignBottom)
+              Positioned(
+                left: effectiveBadgeDx,
+                bottom: effectiveBadgeDy,
+                child: badgeWidget,
+              )
+            else
+              Positioned(
+                left: effectiveBadgeDx,
+                top: effectiveBadgeDy,
+                bottom: -effectiveBadgeDy,
+                child: Center(child: badgeWidget),
               ),
-            ),
           ],
         ),
       ),

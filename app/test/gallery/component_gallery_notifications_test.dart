@@ -82,20 +82,54 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
-      // 1. Başlangıçta first_match ('İlk Adım') seçilidir
+      // 1. Başlangıçta first_match ('İlk Adım') seçilidir ve alt kenara hizalı/dönmesiz yerleşir
       expect(find.text('İlk Adım'), findsWidgets);
+      final previewCardPositioned = tester.widget<Positioned>(
+        find.descendant(
+          of: find.byType(AchievementNotificationCard),
+          matching: find.byType(Positioned),
+        ),
+      );
+      expect(previewCardPositioned.left, equals(4.0));
+      expect(previewCardPositioned.top, isNull);
+      expect(previewCardPositioned.bottom, equals(0.0));
+      final previewCardTransform = tester.widgetList<Transform>(
+        find.descendant(
+          of: find.byType(AchievementNotificationCard),
+          matching: find.byType(Transform),
+        ),
+      ).first;
+      expect(previewCardTransform.transform.storage[0], closeTo(1.0, 0.0001));
 
       // 2. 'İlk Zafer' (first_win) çipine dokun
       await tester.tap(find.widgetWithText(ChoiceChip, 'İlk Zafer'));
       await tester.pumpAndSettle();
       expect(find.text('İlk Zafer'), findsWidgets);
       expect(find.text('İlk galibiyetini al'), findsOneWidget);
+      final firstWinPositioned = tester.widget<Positioned>(
+        find.descendant(
+          of: find.byType(AchievementNotificationCard),
+          matching: find.byType(Positioned),
+        ),
+      );
+      expect(firstWinPositioned.left, equals(-6.0));
+      expect(firstWinPositioned.top, equals(0.0));
+      expect(firstWinPositioned.bottom, equals(0.0));
 
       // 3. 'Yükselen Yıldız' (wins_10) çipine dokun
       await tester.tap(find.widgetWithText(ChoiceChip, 'Yükselen Yıldız'));
       await tester.pumpAndSettle();
       expect(find.text('Yükselen Yıldız'), findsWidgets);
       expect(find.text('10 galibiyet al'), findsOneWidget);
+      final wins10Positioned = tester.widget<Positioned>(
+        find.descendant(
+          of: find.byType(AchievementNotificationCard),
+          matching: find.byType(Positioned),
+        ),
+      );
+      expect(wins10Positioned.left, equals(-14.0));
+      expect(wins10Positioned.top, equals(0.0));
+      expect(wins10Positioned.bottom, equals(0.0));
     });
 
     testWidgets('3\'lü seri başarım butonu FIFO kuyruğu doğru sırayla tetikler', (tester) async {
