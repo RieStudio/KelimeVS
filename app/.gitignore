@@ -53,8 +53,9 @@ serviceAccount*.json
 node_modules/
 functions/lib/
 key.properties
+admob.properties
 *.jks
 *.keystore
 
 # Tool output
-tool/output/
+tool/output/

@@ -9,6 +9,8 @@ server/.ghost-session.json
 # Android keystore & release secrets & bundles
 **/key.properties
 !**/key.properties.example
+**/admob.properties
+!**/admob.properties.example
 *.jks
 **/*.jks
 *.keystore

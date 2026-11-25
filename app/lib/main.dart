@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/ads/ad_providers.dart';
 import 'core/network/app_build_info.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
@@ -158,6 +159,9 @@ class _MainShellState extends ConsumerState<MainShell>
       _userInboxCoordinator?.start();
       if (mounted) {
         VisualFrameRegistry.precacheFrames(context);
+        if (ref.read(networkStatusProvider).status == NetworkStatus.online) {
+          _initAds();
+        }
       }
     });
   }
@@ -192,15 +196,21 @@ class _MainShellState extends ConsumerState<MainShell>
     } catch (_) {}
   }
 
+  void _initAds() {
+    unawaited(ref.read(adConsentProvider.notifier).initialize());
+  }
+
   Future<void> _retryStartupSequence() async {
     await _initAuth();
     if (mounted) {
+      _initAds();
       ref.read(profileProvider.notifier).syncWithServer(force: true);
       ref.read(matchReconcilerProvider).reconcile();
     }
   }
 
   void _onNetworkRestored() {
+    _initAds();
     ref.read(profileProvider.notifier).syncWithServer();
     ref.invalidate(leaderboardNotifierProvider);
     ref.read(matchReconcilerProvider).reconcile();

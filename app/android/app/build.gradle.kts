@@ -1,4 +1,5 @@
 import java.io.FileInputStream
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -17,6 +18,31 @@ val hasKeyProperties = keystorePropertiesFile.exists()
 if (hasKeyProperties) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+
+val admobPropertiesFile = rootProject.file("admob.properties")
+val admobProperties = Properties()
+if (admobPropertiesFile.exists()) {
+    admobProperties.load(FileInputStream(admobPropertiesFile))
+}
+
+val releaseAdmobAppId: String? = (
+    admobProperties.getProperty("ADMOB_APP_ID")
+        ?: System.getenv("ADMOB_APP_ID")
+)?.trim()?.takeIf { it.isNotEmpty() }
+
+val dartDefinesMap: Map<String, String> = (project.findProperty("dart-defines") as String?)
+    ?.split(",")
+    ?.mapNotNull { encoded ->
+        try {
+            val decoded = String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            val idx = decoded.indexOf('=')
+            if (idx > 0) decoded.substring(0, idx) to decoded.substring(idx + 1) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+    ?.toMap()
+    ?: emptyMap()
 
 android {
     namespace = "com.kelimevs.app"
@@ -41,6 +67,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
     }
 
     signingConfigs {
@@ -68,6 +95,9 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
 
+            manifestPlaceholders["admobAppId"] =
+                releaseAdmobAppId ?: "ca-app-pub-3940256099942544~3347511713"
+
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(
@@ -84,6 +114,34 @@ gradle.taskGraph.whenReady {
     val isReleaseTask = allTasks.any { task ->
         val name = task.name.lowercase()
         (name.contains("release") && (name.contains("bundle") || name.contains("assemble") || name.contains("package")))
+    }
+    if (isReleaseTask) {
+        val admobEnabledDefine = dartDefinesMap["ADMOB_ENABLED"]?.trim()?.lowercase()
+        val hasDartBanner = !dartDefinesMap["ADMOB_BANNER_ID"].isNullOrBlank()
+        val hasDartRewarded = !dartDefinesMap["ADMOB_REWARDED_ID"].isNullOrBlank()
+        val isTestAppId = releaseAdmobAppId == "ca-app-pub-3940256099942544~3347511713"
+        val wantsAdsEnabled = admobEnabledDefine == "true" ||
+            (admobEnabledDefine != "false" && (hasDartBanner || hasDartRewarded))
+
+        if (admobEnabledDefine == "false") {
+            logger.lifecycle("[AdMob] Release derlemesi reklamlar kapalı (ADMOB_ENABLED=false) olarak yapılıyor.")
+        } else if (wantsAdsEnabled && (releaseAdmobAppId == null || isTestAppId)) {
+            throw GradleException(
+                "\n" +
+                "========================================================================\n" +
+                "[HATA] Android Release Derlemesi Durduruldu!\n" +
+                "Sebep: Reklamlar açık (ADMOB_ENABLED=true veya reklam birimi kimliği verilmiş) " +
+                "ancak geçerli bir gerçek ADMOB_APP_ID bulunamadı.\n" +
+                "\n" +
+                "Çözüm Adımları:\n" +
+                "1. 'app/android/admob.properties.example' dosyasını 'app/android/admob.properties' " +
+                "olarak kopyalayıp ADMOB_APP_ID=... değerini girin (veya ADMOB_APP_ID ortam değişkenini ayarlayın).\n" +
+                "2. Reklamsız release derlemesi için --dart-define=ADMOB_ENABLED=false kullanın.\n" +
+                "========================================================================\n"
+            )
+        } else if (releaseAdmobAppId == null) {
+            logger.warn("[AdMob] UYARI: ADMOB_APP_ID tanımlı değil; release derlemesinde reklamlar Dart kill-switch ile kapalı kalacak.")
+        }
     }
     if (isReleaseTask && !hasKeyProperties) {
         throw GradleException(

@@ -730,6 +730,7 @@ abstract final class AppStrings {
   static const String privacyPolicyConsentLink = 'Gizlilik Politikası';
   static const String privacyPolicyConsentSuffix = "'nı kabul etmiş olursun.";
   static const String thirdPartyLicenses = 'Üçüncü Taraf Lisansları';
+  static const String adPrivacyOptions = 'Reklam Gizliliği Seçenekleri';
   static const String licensesTitle = 'Lisanslar';
   static String licenseCount(int count) => '$count lisans';
   static const String noLicensesFound = 'Lisans bulunamadı.';

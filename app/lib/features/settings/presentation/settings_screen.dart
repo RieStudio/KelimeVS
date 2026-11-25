@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/ads/ad_providers.dart';
+import '../../../core/ads/ad_service.dart';
+import '../../../core/config/ad_config.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_guard.dart';
@@ -58,6 +61,9 @@ class SettingsScreen extends ConsumerWidget {
     final versionAsync = ref.watch(packageInfoProvider);
     final allowMatchRequests =
         ref.watch(profileProvider.select((p) => p.allowMatchRequests));
+    final adConsent = ref.watch(adConsentProvider);
+    final showAdPrivacyOptions = AdConfig.isAdsEnabled &&
+        adConsent.privacyOptionsStatus == AdConsentPrivacyStatus.required;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -213,6 +219,29 @@ class SettingsScreen extends ConsumerWidget {
                               );
                             },
                           ),
+                          if (showAdPrivacyOptions) ...[
+                            const Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: AppColors.surface,
+                            ),
+                            _SettingsTile(
+                              key: const Key('settings_ad_privacy_options'),
+                              icon: Icons.privacy_tip_outlined,
+                              title: AppStrings.adPrivacyOptions,
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                size: 20,
+                                color: AppColors.muted,
+                              ),
+                              onTap: () async {
+                                if (!ensureNetworkConnected(context, ref)) return;
+                                await ref
+                                    .read(adConsentProvider.notifier)
+                                    .showPrivacyOptionsForm();
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),

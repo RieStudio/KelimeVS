@@ -1,0 +1,4 @@
+# Gerçek AdMob Uygulama Kimliği (Android)
+# Bu dosyayı kopyalayarak 'app/android/admob.properties' oluşturun ve gerçek kimliği girin.
+# Bu dosya .gitignore içindedir; git'e eklenmez.
+ADMOB_APP_ID=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY

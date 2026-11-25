@@ -1,0 +1,102 @@
+import 'package:flutter/foundation.dart';
+
+/// Çözümlenmiş reklam çalışma zamanı yapılandırması.
+@immutable
+class AdRuntimeConfig {
+  final bool isAdsEnabled;
+  final String bannerAdUnitId;
+  final String rewardedAdUnitId;
+
+  const AdRuntimeConfig({
+    required this.isAdsEnabled,
+    required this.bannerAdUnitId,
+    required this.rewardedAdUnitId,
+  });
+}
+
+/// Google AdMob reklam birimi kimlikleri ve kill-switch yapılandırması.
+///
+/// - Debug/Profile (`!kReleaseMode`): Daima Google test kimliklerini kullanır.
+/// - Release (`kReleaseMode`): `--dart-define` ile verilen gerçek kimlikleri kullanır.
+///   Gerçek kimlikler tanımlı değilse, test kimliği içeriyorsa veya
+///   `ADMOB_ENABLED=false` ise reklamlar güvenle devre dışı bırakılır.
+abstract final class AdConfig {
+  static const String testAppId = 'ca-app-pub-3940256099942544~3347511713';
+  static const String testBannerAdUnitId =
+      'ca-app-pub-3940256099942544/9214589741';
+  static const String testRewardedAdUnitId =
+      'ca-app-pub-3940256099942544/5224354917';
+  static const String _googleTestPublisherPrefix = 'ca-app-pub-3940256099942544';
+
+  /// Debug derlemelerinde test cihazı kimliklerini eklemek için yapılandırma noktası.
+  static const List<String> testDeviceIds = <String>[];
+
+  static const bool _envAdsEnabled = bool.fromEnvironment(
+    'ADMOB_ENABLED',
+    defaultValue: true,
+  );
+
+  static const String _envReleaseBannerId = String.fromEnvironment(
+    'ADMOB_BANNER_ID',
+    defaultValue: '',
+  );
+
+  static const String _envReleaseRewardedId = String.fromEnvironment(
+    'ADMOB_REWARDED_ID',
+    defaultValue: '',
+  );
+
+  /// Mevcut derleme modu ve `--dart-define` bayraklarına göre çözümlenmiş yapılandırma.
+  static AdRuntimeConfig get current => resolve(
+        isRelease: kReleaseMode,
+        enabled: _envAdsEnabled,
+        releaseBannerId: _envReleaseBannerId,
+        releaseRewardedId: _envReleaseRewardedId,
+      );
+
+  static bool get isAdsEnabled => current.isAdsEnabled;
+  static String get bannerAdUnitId => current.bannerAdUnitId;
+  static String get rewardedAdUnitId => current.rewardedAdUnitId;
+
+  /// Test edilebilir saf çözümleyici.
+  @visibleForTesting
+  static AdRuntimeConfig resolve({
+    required bool isRelease,
+    required bool enabled,
+    required String releaseBannerId,
+    required String releaseRewardedId,
+  }) {
+    if (!isRelease) {
+      return const AdRuntimeConfig(
+        isAdsEnabled: true,
+        bannerAdUnitId: testBannerAdUnitId,
+        rewardedAdUnitId: testRewardedAdUnitId,
+      );
+    }
+
+    final banner = releaseBannerId.trim();
+    final rewarded = releaseRewardedId.trim();
+
+    if (!enabled ||
+        banner.isEmpty ||
+        rewarded.isEmpty ||
+        _isTestAdUnitId(banner) ||
+        _isTestAdUnitId(rewarded)) {
+      return const AdRuntimeConfig(
+        isAdsEnabled: false,
+        bannerAdUnitId: '',
+        rewardedAdUnitId: '',
+      );
+    }
+
+    return AdRuntimeConfig(
+      isAdsEnabled: true,
+      bannerAdUnitId: banner,
+      rewardedAdUnitId: rewarded,
+    );
+  }
+
+  static bool _isTestAdUnitId(String id) {
+    return id.startsWith(_googleTestPublisherPrefix);
+  }
+}
