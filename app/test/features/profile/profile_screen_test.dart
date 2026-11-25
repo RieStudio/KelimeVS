@@ -7,8 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
 import 'package:app/core/widgets/secondary_button.dart';
+import 'package:app/features/achievements/domain/user_achievement.dart';
+import 'package:app/features/achievements/presentation/widgets/achievement_badges_row.dart';
+import 'package:app/features/achievements/presentation/widgets/achievement_detail_sheet.dart';
 import 'package:app/features/auth/application/auth_notifier.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
+import 'package:app/features/profile/application/profile_notifier.dart';
 import 'package:app/features/profile/data/profile_repository.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
 
@@ -33,6 +37,17 @@ class _TestAuthNotifier extends AuthNotifier {
         isGoogleLinked: isGoogleLinked,
         linkedEmail: isGoogleLinked ? 'test@google.com' : null,
       );
+}
+
+class _TestProfileNotifier extends ProfileNotifier {
+  final ProfileState _state;
+  _TestProfileNotifier(this._state);
+
+  @override
+  ProfileState build() => _state;
+
+  @override
+  Future<bool> syncWithServer({bool force = false}) async => true;
 }
 
 void main() {
@@ -129,5 +144,72 @@ void main() {
     expect(svg.height, 44);
     expect(svg.colorFilter, isNull);
     expect(find.byIcon(Icons.check), findsNothing);
+  });
+
+  testWidgets('4. Kendi profilinde başarım yoksa rozet satırı hiç çizilmez', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_ProfileTestAuthRepo()),
+          authNotifierProvider.overrideWith(() => _TestAuthNotifier()),
+          profileProvider.overrideWith(
+            () => _TestProfileNotifier(
+              const ProfileState(
+                nickname: 'Mehmet',
+                isLoaded: true,
+                achievements: [],
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AchievementBadgesRow), findsNothing);
+  });
+
+  testWidgets('5. Kendi profilinde 5 rozette kaydırma+solma görünür ve dokununca detay sheet açılır', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.reset());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_ProfileTestAuthRepo()),
+          authNotifierProvider.overrideWith(() => _TestAuthNotifier()),
+          profileProvider.overrideWith(
+            () => _TestProfileNotifier(
+              const ProfileState(
+                nickname: 'Mehmet',
+                isLoaded: true,
+                achievements: [
+                  UserAchievement(id: 'first_match', unlockedAt: 1700000000000),
+                  UserAchievement(id: 'first_win', unlockedAt: 1700000100000),
+                  UserAchievement(id: 'matches_10', unlockedAt: 1700000200000),
+                  UserAchievement(id: 'streak_3', unlockedAt: 1700000300000, count: 4),
+                  UserAchievement(id: 'wins_10', unlockedAt: 1700000400000),
+                ],
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: ProfileScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AchievementBadgesRow), findsOneWidget);
+    expect(find.byType(ShaderMask), findsOneWidget);
+    expect(find.text('x4'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel(AppStrings.achievementBadgeSemantic('Üçlü Seri', 4)));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AchievementDetailSheet), findsOneWidget);
+    expect(find.text('Üçlü Seri'), findsOneWidget);
+    expect(find.text('x4 kez kazanıldı'), findsOneWidget);
   });
 }

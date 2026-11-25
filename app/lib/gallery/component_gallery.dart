@@ -1606,7 +1606,7 @@ class _NotificationsGallerySectionContentState
         ),
         const SizedBox(height: AppDimens.space4),
         const Text(
-          '3 rozet (kaydırma ve sağ solma yok):',
+          '3 rozet (kutusuz, kaydırma ve sağ solma yok):',
           style: AppTextStyles.secondaryText,
         ),
         const SizedBox(height: AppDimens.space6),

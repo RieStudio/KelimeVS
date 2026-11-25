@@ -15,6 +15,8 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/stat_card.dart';
+import '../../achievements/domain/achievement_ui_manifest.dart';
+import '../../achievements/presentation/widgets/achievement_badges_row.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../auth/domain/auth_link_result.dart';
 import '../application/profile_notifier.dart';
@@ -530,7 +532,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Oyuncu İstatistikleri (3 Kart: Oynanan, Doğru, Kazanma Oranı)
               _ProfileStatsRow(stats: profile.stats),
 
-              const SizedBox(height: AppDimens.space16),
+              if (AchievementUiManifest.sortByPrestige(profile.achievements)
+                  .isNotEmpty) ...[
+                const SizedBox(height: AppDimens.space8),
+                AchievementBadgesRow(
+                  achievements: profile.achievements,
+                  horizontalPadding: 0,
+                ),
+                const SizedBox(height: AppDimens.space8),
+              ] else ...[
+                const SizedBox(height: AppDimens.space16),
+              ],
 
               // Bağlı Hesap Kartı (Yalnızca Google bağlıysa)
               if (authState.isGoogleLinked) ...[

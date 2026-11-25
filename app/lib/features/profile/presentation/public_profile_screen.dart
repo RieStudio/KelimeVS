@@ -13,6 +13,8 @@ import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/secondary_button.dart';
 import '../../../core/widgets/stat_card.dart';
+import '../../achievements/domain/achievement_ui_manifest.dart';
+import '../../achievements/presentation/widgets/achievement_badges_row.dart';
 import '../../match_request/application/match_requests_notifier.dart';
 import '../../match_request/application/match_requests_providers.dart';
 import '../../match_request/domain/match_request_models.dart';
@@ -417,7 +419,16 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: AppDimens.space24),
+                  if (AchievementUiManifest.sortByPrestige(profile.achievements)
+                      .isNotEmpty) ...[
+                    const SizedBox(height: AppDimens.space10),
+                    AchievementBadgesRow(
+                      achievements: profile.achievements,
+                    ),
+                    const SizedBox(height: AppDimens.space14),
+                  ] else ...[
+                    const SizedBox(height: AppDimens.space24),
+                  ],
 
                   // Aksiyon Alanı
                   Padding(

@@ -15,7 +15,8 @@ import 'achievement_detail_sheet.dart';
 /// - Bilinmeyen başarım kimliklerini sessizce eler.
 /// - Sabit prestij sırasına ([AchievementUiManifest.sortByPrestige]) göre sıralar.
 /// - Hiç başarım yoksa [SizedBox.shrink] döner.
-/// - Yalnızca sağda taşan içerik varken sağ kenara [ShaderMask] ile hafif solma uygular.
+/// - Ekran genişliğine göre tek satırda 4 rozet sığacak şekilde ölçeklenir; 5. rozet ve
+///   sonrası için yatay kaydırma ve sağ kenarda [ShaderMask] ile hafif solma uygular.
 class AchievementBadgesRow extends StatefulWidget {
   final List<UserAchievement> achievements;
   final double horizontalPadding;
@@ -31,9 +32,8 @@ class AchievementBadgesRow extends StatefulWidget {
 }
 
 class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
-  static const double _badgeSize = 54.0;
-  static const double _badgeSpacing = AppDimens.space8;
-  static const double _rowHeight = 68.0;
+  static const double _badgeSpacing = AppDimens.space10;
+  static const double _verticalPadding = AppDimens.space8;
 
   late final ScrollController _scrollController;
   bool _showRightFade = false;
@@ -73,6 +73,13 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
     }
   }
 
+  double _computeBadgeSize(double maxWidth) {
+    final availableWidth =
+        (maxWidth - (widget.horizontalPadding * 2)).clamp(0.0, double.infinity);
+    final raw = (availableWidth - (_badgeSpacing * 3)) / 4.0;
+    return raw.clamp(48.0, 84.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final sorted = AchievementUiManifest.sortByPrestige(widget.achievements);
@@ -80,57 +87,64 @@ class _AchievementBadgesRowState extends State<AchievementBadgesRow> {
       return const SizedBox.shrink();
     }
 
-    Widget listView = NotificationListener<ScrollMetricsNotification>(
-      onNotification: (notification) {
-        _updateFadeMetrics(
-          notification.metrics.pixels,
-          notification.metrics.maxScrollExtent,
-        );
-        return false;
-      },
-      child: ListView.separated(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.horizontalPadding,
-          vertical: AppDimens.space6,
-        ),
-        itemCount: sorted.length,
-        separatorBuilder: (_, __) => const SizedBox(width: _badgeSpacing),
-        itemBuilder: (context, index) {
-          final achievement = sorted[index];
-          final item = AchievementUiManifest.get(achievement.id)!;
-          return _AchievementBadgeTile(
-            achievement: achievement,
-            item: item,
-            size: _badgeSize,
-            onTap: () => showAchievementDetailSheet(
-              context,
-              achievement: achievement,
-              item: item,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final badgeSize = _computeBadgeSize(constraints.maxWidth);
+        final rowHeight = badgeSize + (_verticalPadding * 2);
+
+        Widget listView = NotificationListener<ScrollMetricsNotification>(
+          onNotification: (notification) {
+            _updateFadeMetrics(
+              notification.metrics.pixels,
+              notification.metrics.maxScrollExtent,
+            );
+            return false;
+          },
+          child: ListView.separated(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.horizontalPadding,
+              vertical: _verticalPadding,
             ),
+            itemCount: sorted.length,
+            separatorBuilder: (_, __) => const SizedBox(width: _badgeSpacing),
+            itemBuilder: (context, index) {
+              final achievement = sorted[index];
+              final item = AchievementUiManifest.get(achievement.id)!;
+              return _AchievementBadgeTile(
+                achievement: achievement,
+                item: item,
+                size: badgeSize,
+                onTap: () => showAchievementDetailSheet(
+                  context,
+                  achievement: achievement,
+                  item: item,
+                ),
+              );
+            },
+          ),
+        );
+
+        if (_showRightFade) {
+          listView = ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (bounds) => const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Colors.white, Colors.white, Colors.transparent],
+              stops: [0.0, 0.86, 1.0],
+            ).createShader(bounds),
+            child: listView,
           );
-        },
-      ),
-    );
+        }
 
-    if (_showRightFade) {
-      listView = ShaderMask(
-        blendMode: BlendMode.dstIn,
-        shaderCallback: (bounds) => const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Colors.white, Colors.white, Colors.transparent],
-          stops: [0.0, 0.86, 1.0],
-        ).createShader(bounds),
-        child: listView,
-      );
-    }
-
-    return SizedBox(
-      height: _rowHeight,
-      child: listView,
+        return SizedBox(
+          height: rowHeight,
+          child: listView,
+        );
+      },
     );
   }
 }
@@ -150,80 +164,72 @@ class _AchievementBadgeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pillHeight = (size * 0.30).clamp(18.0, 24.0);
+    final pillFontSize = (pillHeight * 0.52).clamp(10.0, 12.5);
+
     return Semantics(
       button: true,
       label: AppStrings.achievementBadgeSemantic(item.title, achievement.count),
       child: AppPressable(
         ensureMinTouchTarget: true,
-        pressOffset: AppDimens.secondaryButtonPressOffset,
+        pressOffset: 0.0,
         onTap: onTap,
         builder: (context, isPressed) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: size,
-                height: size,
-                padding: const EdgeInsets.all(AppDimens.space6),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.ink,
-                    width: AppDimens.borderThin,
+          return AnimatedScale(
+            scale: isPressed ? 0.92 : 1.0,
+            duration: const Duration(milliseconds: 90),
+            curve: Curves.easeOut,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: SvgPicture.asset(
+                      item.iconAsset,
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                  boxShadow: isPressed
-                      ? null
-                      : const [
-                          BoxShadow(
+                  if (achievement.count >= 2)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          minWidth: pillHeight,
+                          minHeight: pillHeight,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.coin,
+                          borderRadius: AppDimens.borderRadiusFull,
+                          border: Border.all(
                             color: AppColors.ink,
-                            offset: Offset(0, 3),
-                            blurRadius: 0,
+                            width: 1.5,
                           ),
-                        ],
-                ),
-                child: SvgPicture.asset(
-                  item.iconAsset,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              if (achievement.count >= 2)
-                Positioned(
-                  right: -4,
-                  bottom: -4,
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      minWidth: 20,
-                      minHeight: 20,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.coin,
-                      borderRadius: AppDimens.borderRadiusFull,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: 1.5,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: ExcludeSemantics(
-                      child: Text(
-                        'x${achievement.count}',
-                        style: const TextStyle(
-                          fontFamily: AppTextStyles.fontNunito,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
-                          height: 1.1,
+                        ),
+                        alignment: Alignment.center,
+                        child: ExcludeSemantics(
+                          child: Text(
+                            'x${achievement.count}',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.fontNunito,
+                              fontSize: pillFontSize,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                              height: 1.1,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              ),
+            ),
           );
         },
       ),

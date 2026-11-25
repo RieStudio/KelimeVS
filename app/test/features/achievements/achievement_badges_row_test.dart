@@ -136,32 +136,35 @@ void main() {
       expect(find.byType(ListView), findsNothing);
     });
 
-    testWidgets('<=5 rozette sağ solma (ShaderMask) yoktur, count=1 sayaç göstermez', (tester) async {
-      tester.view.physicalSize = const Size(390, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.reset());
+    testWidgets('<=4 rozette 360dp ve 320dp ekranlarda 4 rozet tam sığar ve sağ solma (ShaderMask) yoktur, count=1 sayaç göstermez', (tester) async {
+      for (final width in [360.0, 320.0]) {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.reset());
 
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: AchievementBadgesRow(
-              achievements: [
-                UserAchievement(id: 'first_match', unlockedAt: 1000, count: 1),
-                UserAchievement(id: 'first_win', unlockedAt: 2000, count: 1),
-                UserAchievement(id: 'matches_10', unlockedAt: 3000, count: 1),
-              ],
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: AchievementBadgesRow(
+                achievements: [
+                  UserAchievement(id: 'first_match', unlockedAt: 1000, count: 1),
+                  UserAchievement(id: 'first_win', unlockedAt: 2000, count: 1),
+                  UserAchievement(id: 'matches_10', unlockedAt: 3000, count: 1),
+                  UserAchievement(id: 'wins_10', unlockedAt: 4000, count: 1),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.byType(ShaderMask), findsNothing);
-      expect(find.text('x1'), findsNothing);
+        expect(find.byType(ShaderMask), findsNothing);
+        expect(find.text('x1'), findsNothing);
+      }
     });
 
-    testWidgets('>5 rozette sağ kenarda ShaderMask solması aktif olur ve count>=2 x8 görünür', (tester) async {
-      tester.view.physicalSize = const Size(390, 800);
+    testWidgets('5. rozet ve sonrasında yatay kaydırma ile sağ kenar ShaderMask solması aktif olur ve count>=2 x8 görünür', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.reset());
 
@@ -175,8 +178,6 @@ void main() {
                 UserAchievement(id: 'matches_10', unlockedAt: 3000),
                 UserAchievement(id: 'streak_3', unlockedAt: 4000, count: 8),
                 UserAchievement(id: 'wins_10', unlockedAt: 5000),
-                UserAchievement(id: 'matches_50', unlockedAt: 6000),
-                UserAchievement(id: 'wins_50', unlockedAt: 7000),
               ],
             ),
           ),

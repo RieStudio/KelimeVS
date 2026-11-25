@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/primary_button.dart';
+import 'package:app/features/achievements/domain/user_achievement.dart';
+import 'package:app/features/achievements/presentation/widgets/achievement_badges_row.dart';
+import 'package:app/features/achievements/presentation/widgets/achievement_detail_sheet.dart';
 import 'package:app/features/auth/data/auth_repository.dart';
 import 'package:app/features/profile/application/public_profile_provider.dart';
 import 'package:app/features/profile/data/public_profile_api_client.dart';
@@ -491,6 +494,98 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining(RegExp(r'^\s*adlı')), findsNothing);
+    });
+
+    testWidgets('Başarımsız profilde rozet satırı hiç çizilmez', (tester) async {
+      const profile = PublicProfile(
+        uid: 'user_no_ach',
+        nickname: 'NoAchUser',
+        achievements: [],
+      );
+      final fakeClient = FakePublicProfileApiClient(profileToReturn: profile);
+
+      await tester.pumpWidget(
+        buildTestWidget(
+          child: const PublicProfileScreen(uid: 'user_no_ach'),
+          overrides: [
+            publicProfileApiClientProvider.overrideWithValue(fakeClient),
+            authRepositoryProvider
+                .overrideWithValue(FakeAuthRepository(FakeUser('my_self_uid'))),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AchievementBadgesRow), findsNothing);
+    });
+
+    testWidgets('Başarımlı ve 5+ rozetli profilde rozet satırı, kaydırma+solma ve detay sheet çalışır', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.reset());
+
+      const profile = PublicProfile(
+        uid: 'user_with_ach',
+        nickname: 'AchUser',
+        achievements: [
+          UserAchievement(id: 'first_match', unlockedAt: 1700000000000),
+          UserAchievement(id: 'first_win', unlockedAt: 1700000100000),
+          UserAchievement(id: 'matches_10', unlockedAt: 1700000200000),
+          UserAchievement(id: 'streak_3', unlockedAt: 1700000300000, count: 6),
+          UserAchievement(id: 'wins_10', unlockedAt: 1700000400000),
+        ],
+      );
+      final fakeClient = FakePublicProfileApiClient(profileToReturn: profile);
+
+      await tester.pumpWidget(
+        buildTestWidget(
+          child: const PublicProfileScreen(uid: 'user_with_ach'),
+          overrides: [
+            publicProfileApiClientProvider.overrideWithValue(fakeClient),
+            authRepositoryProvider
+                .overrideWithValue(FakeAuthRepository(FakeUser('my_self_uid'))),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AchievementBadgesRow), findsOneWidget);
+      expect(find.byType(ShaderMask), findsOneWidget);
+      expect(find.text('x6'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsLabel(AppStrings.achievementBadgeSemantic('Üçlü Seri', 6)));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AchievementDetailSheet), findsOneWidget);
+      expect(find.text('Üçlü Seri'), findsOneWidget);
+      expect(find.text('x6 kez kazanıldı'), findsOneWidget);
+    });
+
+    testWidgets('Engellenmiş oyuncuda da başarımlar görünür kalır', (tester) async {
+      const profile = PublicProfile(
+        uid: 'user_blocked_ach',
+        nickname: 'BlockedAchUser',
+        isBlocked: true,
+        achievements: [
+          UserAchievement(id: 'first_match', unlockedAt: 1700000000000),
+        ],
+      );
+      final fakeClient = FakePublicProfileApiClient(profileToReturn: profile);
+
+      await tester.pumpWidget(
+        buildTestWidget(
+          child: const PublicProfileScreen(uid: 'user_blocked_ach'),
+          overrides: [
+            publicProfileApiClientProvider.overrideWithValue(fakeClient),
+            authRepositoryProvider
+                .overrideWithValue(FakeAuthRepository(FakeUser('my_self_uid'))),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.profileBlockedBanner), findsOneWidget);
+      expect(find.byType(AchievementBadgesRow), findsOneWidget);
     });
   });
 }
