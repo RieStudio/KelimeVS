@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app/features/achievements/application/achievement_notification_service.dart';
 import 'package:app/features/achievements/presentation/achievement_notification_card.dart';
+import 'package:app/features/achievements/presentation/widgets/achievement_badges_row.dart';
 import 'package:app/features/match_request/presentation/widgets/incoming_match_request_banner.dart';
 import 'package:app/features/match_request/presentation/widgets/match_request_toast.dart';
 import 'package:app/features/match_request/presentation/widgets/outgoing_match_request_chip.dart';
@@ -53,6 +54,12 @@ void main() {
       expect(find.byType(AchievementNotificationCard), findsOneWidget);
       expect(find.byType(ChoiceChip), findsNWidgets(11));
       expect(find.text("3'lü Seri Başarım Göster (FIFO Kuyruk Testi)"), findsOneWidget);
+
+      // e2) Profil Başarım Rozetleri
+      expect(find.text('e2) Profil Başarım Rozetleri (AchievementBadgesRow)'), findsOneWidget);
+      expect(find.byType(AchievementBadgesRow), findsNWidgets(3));
+      expect(find.text('x8'), findsOneWidget);
+      expect(find.text('x2'), findsOneWidget);
 
       // f) Sistem Uyarıları
       expect(find.text('Bilgi SnackBar Göster'), findsOneWidget);

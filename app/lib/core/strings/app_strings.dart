@@ -745,4 +745,12 @@ abstract final class AppStrings {
 
   // Genel
   static const String more = 'Daha fazla';
+
+  // Başarım Rozetleri
+  static String achievementBadgeSemantic(String title, int count) =>
+      count >= 2 ? '$title, $count kez kazanıldı' : title;
+  static String achievementFirstUnlocked(String formattedDate) =>
+      'İlk açılış: $formattedDate';
+  static String achievementRepeatCount(int count) =>
+      'x$count kez kazanıldı';
 }

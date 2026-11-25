@@ -24,6 +24,9 @@ class ProfileState {
   final FrameMigrationInfo? pendingMigrationNotice;
   final bool isGuest;
   final bool allowMatchRequests;
+  final List<UserAchievement> achievements;
+  final int currentStreak;
+  final int maxStreak;
 
   const ProfileState({
     this.nickname,
@@ -38,6 +41,9 @@ class ProfileState {
     this.pendingMigrationNotice,
     this.isGuest = false,
     this.allowMatchRequests = true,
+    this.achievements = const [],
+    this.currentStreak = 0,
+    this.maxStreak = 0,
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -58,6 +64,9 @@ class ProfileState {
     bool clearMigrationNotice = false,
     bool? isGuest,
     bool? allowMatchRequests,
+    List<UserAchievement>? achievements,
+    int? currentStreak,
+    int? maxStreak,
   }) {
     return ProfileState(
       nickname: clearNickname ? null : (nickname ?? this.nickname),
@@ -74,6 +83,9 @@ class ProfileState {
           : (pendingMigrationNotice ?? this.pendingMigrationNotice),
       isGuest: isGuest ?? this.isGuest,
       allowMatchRequests: allowMatchRequests ?? this.allowMatchRequests,
+      achievements: achievements ?? this.achievements,
+      currentStreak: currentStreak ?? this.currentStreak,
+      maxStreak: maxStreak ?? this.maxStreak,
     );
   }
 }
@@ -210,6 +222,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
           allowMatchRequests: isTogglingSettings
               ? state.allowMatchRequests
               : remote.allowMatchRequests,
+          achievements: remote.achievements,
+          currentStreak: remote.currentStreak,
+          maxStreak: remote.maxStreak,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
           isLoaded: true,
@@ -339,6 +354,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
       isSyncing: true,
       clearNickname: true,
       clearSyncError: true,
+      achievements: const [],
+      currentStreak: 0,
+      maxStreak: 0,
     );
 
     final repo = ref.read(profileRepositoryProvider);
@@ -373,6 +391,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
             isLoaded: true,
             isSyncing: false,
             isGuest: remote.isGuest,
+            achievements: remote.achievements,
+            currentStreak: remote.currentStreak,
+            maxStreak: remote.maxStreak,
           );
         } else {
           // Sunucuda profil var ama takma ad meşru olarak boş
@@ -386,6 +407,9 @@ class ProfileNotifier extends Notifier<ProfileState> {
             isLoaded: true,
             isSyncing: false,
             isGuest: remote.isGuest,
+            achievements: remote.achievements,
+            currentStreak: remote.currentStreak,
+            maxStreak: remote.maxStreak,
           );
         }
       } else {

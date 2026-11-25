@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app/features/achievements/data/achievements_asset_loader.dart';
 import 'package:app/features/achievements/domain/achievement_ui_manifest.dart';
+import 'package:app/features/achievements/domain/user_achievement.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -139,6 +140,40 @@ void main() {
       expect(sampleItem.badgeDy, equals(0.0));
       expect(sampleItem.badgeAlignBottom, isFalse);
       expect(sampleItem.badgeRotationDeg, equals(-6.0));
+    });
+
+    test('Sabit prestij rank sırası ve sortByPrestige bilinmeyen ID elemesi', () {
+      const expectedPrestigeOrder = [
+        'wins_100',
+        'streak_10',
+        'matches_100',
+        'wins_50',
+        'streak_5',
+        'matches_50',
+        'wins_10',
+        'streak_3',
+        'matches_10',
+        'first_win',
+        'first_match',
+      ];
+
+      for (var i = 0; i < expectedPrestigeOrder.length; i++) {
+        final item = AchievementUiManifest.get(expectedPrestigeOrder[i]);
+        expect(item, isNotNull);
+        expect(item!.rank, equals(i));
+      }
+
+      final sorted = AchievementUiManifest.sortByPrestige(const [
+        UserAchievement(id: 'first_match', unlockedAt: 100),
+        UserAchievement(id: 'unknown_future_id', unlockedAt: 200),
+        UserAchievement(id: 'wins_100', unlockedAt: 300),
+        UserAchievement(id: 'streak_3', unlockedAt: 400, count: 5),
+      ]);
+
+      expect(
+        sorted.map((e) => e.id).toList(),
+        equals(['wins_100', 'streak_3', 'first_match']),
+      );
     });
   });
 }

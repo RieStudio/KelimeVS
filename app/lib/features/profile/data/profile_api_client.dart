@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import '../../../core/config/server_config.dart';
 import '../../../core/network/auth_http_executor.dart';
 import '../../../core/strings/app_strings.dart';
+import '../../achievements/domain/user_achievement.dart';
+export '../../achievements/domain/user_achievement.dart';
 import '../../online/data/auth_token_provider.dart';
 import '../domain/energy_state.dart';
 
@@ -114,39 +116,6 @@ Map<String, dynamic>? _asMap(dynamic val) {
   if (val is Map<String, dynamic>) return val;
   if (val is Map) return Map<String, dynamic>.from(val);
   return null;
-}
-
-class UserAchievement {
-  final String id;
-  final int unlockedAt;
-
-  const UserAchievement({
-    required this.id,
-    required this.unlockedAt,
-  });
-
-  factory UserAchievement.fromJson(Map<String, dynamic> json) {
-    return UserAchievement(
-      id: json['id'] as String? ?? '',
-      unlockedAt: (json['unlockedAt'] ?? json['unlocked_at'] as num?)?.toInt() ?? 0,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'unlockedAt': unlockedAt,
-      };
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is UserAchievement &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          unlockedAt == other.unlockedAt;
-
-  @override
-  int get hashCode => id.hashCode ^ unlockedAt.hashCode;
 }
 
 class UserProfileModel {

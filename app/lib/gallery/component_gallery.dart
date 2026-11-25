@@ -17,7 +17,9 @@ import '../features/online/application/network_diagnostics.dart';
 import '../features/online/application/server_connection_test.dart';
 import '../features/achievements/application/achievement_notification_service.dart';
 import '../features/achievements/domain/achievement_ui_manifest.dart';
+import '../features/achievements/domain/user_achievement.dart';
 import '../features/achievements/presentation/achievement_notification_card.dart';
+import '../features/achievements/presentation/widgets/achievement_badges_row.dart';
 import '../features/game/application/match_ui_state.dart';
 import '../features/match_request/application/match_requests_providers.dart';
 import '../features/match_request/domain/match_request_models.dart';
@@ -1595,6 +1597,56 @@ class _NotificationsGallerySectionContentState
             ),
           ),
         ],
+        const SizedBox(height: AppDimens.space16),
+
+        // e2) Profil Başarım Rozetleri (AchievementBadgesRow & DetailSheet)
+        Text(
+          'e2) Profil Başarım Rozetleri (AchievementBadgesRow)',
+          style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+        ),
+        const SizedBox(height: AppDimens.space4),
+        const Text(
+          '3 rozet (kaydırma ve sağ solma yok):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space6),
+        const AchievementBadgesRow(
+          horizontalPadding: 0,
+          achievements: [
+            UserAchievement(id: 'first_match', unlockedAt: 1700000000000),
+            UserAchievement(id: 'first_win', unlockedAt: 1700000100000),
+            UserAchievement(id: 'matches_10', unlockedAt: 1700000200000),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space10),
+        const Text(
+          '9 rozet (prestij sırası, sağ kenar solma, x8 / x2 sayaç, dokununca detay):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const SizedBox(height: AppDimens.space6),
+        const AchievementBadgesRow(
+          horizontalPadding: 0,
+          achievements: [
+            UserAchievement(id: 'first_match', unlockedAt: 1700000000000),
+            UserAchievement(id: 'first_win', unlockedAt: 1700000100000),
+            UserAchievement(id: 'matches_10', unlockedAt: 1700000200000),
+            UserAchievement(id: 'streak_3', unlockedAt: 1700000300000, count: 8),
+            UserAchievement(id: 'wins_10', unlockedAt: 1700000400000),
+            UserAchievement(id: 'matches_50', unlockedAt: 1700000500000),
+            UserAchievement(id: 'streak_5', unlockedAt: 1700000600000, count: 2),
+            UserAchievement(id: 'wins_50', unlockedAt: 1700000700000),
+            UserAchievement(id: 'matches_100', unlockedAt: 1700000800000),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space8),
+        const Text(
+          'Boş liste (hiç başarım yoksa bölüm tamamen gizlenir):',
+          style: AppTextStyles.secondaryText,
+        ),
+        const AchievementBadgesRow(
+          horizontalPadding: 0,
+          achievements: [],
+        ),
         const SizedBox(height: AppDimens.space16),
 
         // f) Diğer Bildirimler (SnackBarlar)

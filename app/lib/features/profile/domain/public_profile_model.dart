@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../achievements/domain/user_achievement.dart';
+
 @immutable
 class PublicProfileStats {
   final int played;
@@ -68,6 +70,7 @@ class PublicProfile {
   final bool isGuest;
   final bool isBlocked;
   final String? blockId;
+  final List<UserAchievement> achievements;
 
   const PublicProfile({
     required this.uid,
@@ -77,6 +80,7 @@ class PublicProfile {
     this.isGuest = false,
     this.isBlocked = false,
     this.blockId,
+    this.achievements = const [],
   });
 
   factory PublicProfile.fromJson(Map<String, dynamic> json) {
@@ -90,6 +94,14 @@ class PublicProfile {
         ? rawFrame.trim()
         : 'classic';
 
+    final rawAchievements = json['achievements'] as List<dynamic>?;
+    final achievements = rawAchievements != null
+        ? rawAchievements
+            .whereType<Map>()
+            .map((e) => UserAchievement.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : const <UserAchievement>[];
+
     return PublicProfile(
       uid: (json['uid'] as String?)?.trim() ?? '',
       nickname: (json['nickname'] as String?)?.trim() ?? '',
@@ -98,6 +110,7 @@ class PublicProfile {
       isGuest: json['isGuest'] == true,
       isBlocked: json['isBlocked'] == true,
       blockId: json['blockId'] as String?,
+      achievements: achievements,
     );
   }
 
@@ -109,6 +122,7 @@ class PublicProfile {
         'isGuest': isGuest,
         'isBlocked': isBlocked,
         if (blockId != null) 'blockId': blockId,
+        'achievements': achievements.map((a) => a.toJson()).toList(),
       };
 
   PublicProfile copyWith({
@@ -120,6 +134,7 @@ class PublicProfile {
     bool? isBlocked,
     String? blockId,
     bool clearBlockId = false,
+    List<UserAchievement>? achievements,
   }) {
     return PublicProfile(
       uid: uid ?? this.uid,
@@ -129,6 +144,7 @@ class PublicProfile {
       isGuest: isGuest ?? this.isGuest,
       isBlocked: isBlocked ?? this.isBlocked,
       blockId: clearBlockId ? null : (blockId ?? this.blockId),
+      achievements: achievements ?? this.achievements,
     );
   }
 
@@ -143,7 +159,8 @@ class PublicProfile {
           stats == other.stats &&
           isGuest == other.isGuest &&
           isBlocked == other.isBlocked &&
-          blockId == other.blockId;
+          blockId == other.blockId &&
+          listEquals(achievements, other.achievements);
 
   @override
   int get hashCode => Object.hash(
@@ -154,11 +171,12 @@ class PublicProfile {
         isGuest,
         isBlocked,
         blockId,
+        Object.hashAll(achievements),
       );
 
   @override
   String toString() =>
-      'PublicProfile(uid: $uid, nickname: $nickname, equippedFrame: $equippedFrame, stats: $stats, isGuest: $isGuest, isBlocked: $isBlocked, blockId: $blockId)';
+      'PublicProfile(uid: $uid, nickname: $nickname, equippedFrame: $equippedFrame, stats: $stats, isGuest: $isGuest, isBlocked: $isBlocked, blockId: $blockId, achievements: ${achievements.length})';
 }
 
 enum PublicProfileErrorKind {
