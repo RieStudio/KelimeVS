@@ -43,6 +43,13 @@ class _AchievementNotificationOverlayState
       duration: const Duration(milliseconds: 350),
       reverseDuration: const Duration(milliseconds: 250),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final initialState = ref.read(achievementNotificationProvider);
+      if (initialState.currentItem != null && _activeItem == null) {
+        _showItem(initialState.currentItem!, initialState.displayDurationMs);
+      }
+    });
   }
 
   @override

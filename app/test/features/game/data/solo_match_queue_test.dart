@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:app/features/achievements/application/achievement_notification_service.dart';
 import 'package:app/features/game/application/solo_match_queue_manager.dart';
 import 'package:app/features/game/data/solo_match_api_client.dart';
 import 'package:app/features/game/data/solo_match_queue_repository.dart';
@@ -329,6 +330,122 @@ void main() {
       final list = await repo.getPendingSubmissions();
       expect(list.length, equals(2));
       expect(fakeApi.receivedSubmissions.length, equals(1));
+    });
+
+    test('SharedPreferences kuyruğu outcome=void kaydını ve eski kayıtları bozmadan saklar/okur', () async {
+      final repo = const LocalSoloMatchQueueRepository();
+      final voidSub = SoloMatchSubmission(
+        matchId: 'bot:void_q_1',
+        ticketId: 'stk_void_q_12345678',
+        outcome: 'void',
+        myScore: 1,
+        oppScore: 1,
+        correctAnswers: 0,
+        durationSeconds: 30,
+        endedBy: 'draw_limit_reached',
+        submittedAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await repo.enqueue(sub1);
+      await repo.enqueue(voidSub);
+
+      final list = await repo.getPendingSubmissions();
+      expect(list.length, equals(2));
+      expect(list[0].outcome, equals('win'));
+      expect(list[1].outcome, equals('void'));
+      expect(list[1].ticketId, equals('stk_void_q_12345678'));
+      expect(list[1].matchId, equals('bot:void_q_1'));
+    });
+
+    test('Kuyruktan void (refunded: true) gönderilince enerji güncellenir, jeton ezilmez ve 400/410 kalıcı hatada düşer', () async {
+      final repo = const LocalSoloMatchQueueRepository();
+      final voidSubRefund = SoloMatchSubmission(
+        matchId: 'bot:void_refund_1',
+        ticketId: 'stk_void_refund_123456',
+        outcome: 'void',
+        myScore: 1,
+        oppScore: 1,
+        correctAnswers: 0,
+        durationSeconds: 30,
+        endedBy: 'draw_limit_reached',
+        submittedAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      final voidSubPerm = SoloMatchSubmission(
+        matchId: 'bot:void_perm_1',
+        ticketId: 'stk_void_perm_123456',
+        outcome: 'void',
+        myScore: 1,
+        oppScore: 1,
+        correctAnswers: 0,
+        durationSeconds: 30,
+        endedBy: 'draw_limit_reached',
+        submittedAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await repo.enqueue(voidSubRefund);
+      await repo.enqueue(voidSubPerm);
+
+      fakeProfile.updatedCoins = 250;
+      final fakeApi = FakeSoloMatchApiClient(
+        onSubmit: (sub) {
+          if (sub.matchId == 'bot:void_refund_1') {
+            return const SubmitSoloMatchSuccess(
+              ok: true,
+              counted: false,
+              voided: true,
+              refunded: true,
+              energy: EnergyState(enabled: true, current: 5, max: 5),
+            );
+          }
+          return const SubmitSoloMatchPermanentError(
+            statusCode: 410,
+            error: 'account_deleted',
+          );
+        },
+      );
+
+      final manager = SoloMatchQueueManager(
+        repository: repo,
+        apiClient: fakeApi,
+        ref: container.read(Provider((ref) => ref)),
+      );
+
+      await manager.processQueue();
+
+      expect(await repo.getPendingSubmissions(), isEmpty);
+      expect(fakeProfile.updatedEnergy?.current, equals(5));
+      expect(fakeProfile.updatedCoins, equals(250)); // void'da jeton ezilmemeli
+      expect(fakeProfile.syncCalls, equals(1));
+    });
+
+    test('Kuyruktan sonradan gönderilen solo maçta unlockedAchievements varsa bildirim tetiklenir', () async {
+      final repo = const LocalSoloMatchQueueRepository();
+      await repo.enqueue(sub1);
+
+      final fakeApi = FakeSoloMatchApiClient(
+        onSubmit: (sub) => const SubmitSoloMatchSuccess(
+          ok: true,
+          counted: true,
+          coins: 150,
+          coinsAwarded: 30,
+          unlockedAchievements: ['first_match', 'first_win'],
+        ),
+      );
+
+      final manager = SoloMatchQueueManager(
+        repository: repo,
+        apiClient: fakeApi,
+        ref: container.read(Provider((ref) => ref)),
+      );
+
+      await manager.processQueue();
+
+      final notifState = container.read(achievementNotificationProvider);
+      expect(notifState.currentItem?.id, equals('first_match'));
+      expect(
+        container.read(achievementNotificationProvider.notifier).queueLength,
+        equals(1),
+      );
     });
   });
 }

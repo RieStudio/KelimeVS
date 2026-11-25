@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../achievements/application/achievement_notification_service.dart';
 import '../../profile/application/profile_notifier.dart';
 import '../data/solo_match_api_client.dart';
 import '../data/solo_match_queue_repository.dart';
@@ -37,11 +38,23 @@ class SoloMatchQueueManager {
           // Başarılı (veya alreadyProcessed) veya counted:false -> kuyruktan kaldır
           await repository.remove(submission.matchId);
 
+          if (result.refunded && result.energy != null) {
+            ref.read(profileProvider.notifier).updateEnergy(result.energy!);
+            unawaited(ref.read(profileProvider.notifier).syncWithServer());
+          }
+
           if (result.counted) {
-            // Jeton ve enerjiyi sessizce profil durumuna uygula
-            await ref.read(profileProvider.notifier).updateCoins(result.coins);
+            // Jeton, enerji ve açılan başarımları profil/bildirim durumuna uygula
+            if (submission.outcome != 'void') {
+              await ref.read(profileProvider.notifier).updateCoins(result.coins);
+            }
             if (result.energy != null) {
               ref.read(profileProvider.notifier).updateEnergy(result.energy!);
+            }
+            if (result.unlockedAchievements.isNotEmpty) {
+              ref
+                  .read(achievementNotificationProvider.notifier)
+                  .showAll(result.unlockedAchievements);
             }
             unawaited(ref.read(profileProvider.notifier).syncWithServer());
           }

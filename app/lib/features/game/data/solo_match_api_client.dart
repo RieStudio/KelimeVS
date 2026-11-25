@@ -10,12 +10,12 @@ import '../../profile/domain/energy_state.dart';
 class SoloMatchSubmission {
   final String matchId;
   final String? ticketId;
-  final String outcome; // 'win' | 'loss'
+  final String outcome; // 'win' | 'loss' | 'void'
   final int myScore;
   final int oppScore;
   final int correctAnswers;
   final int durationSeconds;
-  final String endedBy; // 'normal' | 'forfeit'
+  final String endedBy; // 'normal' | 'forfeit' | 'draw_limit_reached'
   final int submittedAtMs;
 
   const SoloMatchSubmission({
@@ -66,6 +66,8 @@ sealed class SubmitSoloMatchResult {
 class SubmitSoloMatchSuccess extends SubmitSoloMatchResult {
   final bool ok;
   final bool counted;
+  final bool voided;
+  final bool refunded;
   final bool alreadyProcessed;
   final int coinsAwarded;
   final int coins;
@@ -75,9 +77,11 @@ class SubmitSoloMatchSuccess extends SubmitSoloMatchResult {
   const SubmitSoloMatchSuccess({
     required this.ok,
     required this.counted,
+    this.voided = false,
+    this.refunded = false,
     this.alreadyProcessed = false,
-    required this.coinsAwarded,
-    required this.coins,
+    this.coinsAwarded = 0,
+    this.coins = 0,
     this.energy,
     this.unlockedAchievements = const [],
   });
@@ -134,16 +138,21 @@ class HttpSoloMatchApiClient implements SoloMatchApiClient {
         uri: uri,
         method: 'POST',
         clientFactory: clientFactory,
-        jsonBody: {
-          if (submission.ticketId != null) 'ticketId': submission.ticketId,
-          'matchId': submission.matchId,
-          'outcome': submission.outcome,
-          'myScore': submission.myScore,
-          'oppScore': submission.oppScore,
-          'correctAnswers': submission.correctAnswers,
-          'durationSeconds': submission.durationSeconds,
-          'endedBy': submission.endedBy,
-        },
+        jsonBody: submission.outcome == 'void'
+            ? {
+                if (submission.ticketId != null) 'ticketId': submission.ticketId,
+                'outcome': 'void',
+              }
+            : {
+                if (submission.ticketId != null) 'ticketId': submission.ticketId,
+                'matchId': submission.matchId,
+                'outcome': submission.outcome,
+                'myScore': submission.myScore,
+                'oppScore': submission.oppScore,
+                'correctAnswers': submission.correctAnswers,
+                'durationSeconds': submission.durationSeconds,
+                'endedBy': submission.endedBy,
+              },
         timeout: const Duration(seconds: 4),
       );
 
@@ -155,6 +164,8 @@ class HttpSoloMatchApiClient implements SoloMatchApiClient {
         final decoded = response.decodeJsonMap();
         final ok = decoded['ok'] == true;
         final counted = decoded['counted'] == true;
+        final voided = decoded['voided'] == true;
+        final refunded = decoded['refunded'] == true;
         final alreadyProcessed = decoded['alreadyProcessed'] == true;
         final coinsAwarded = (decoded['coinsAwarded'] as num?)?.toInt() ?? 0;
         final coins = (decoded['coins'] as num?)?.toInt() ?? 0;
@@ -167,6 +178,8 @@ class HttpSoloMatchApiClient implements SoloMatchApiClient {
         return SubmitSoloMatchSuccess(
           ok: ok,
           counted: counted,
+          voided: voided,
+          refunded: refunded,
           alreadyProcessed: alreadyProcessed,
           coinsAwarded: coinsAwarded,
           coins: coins,

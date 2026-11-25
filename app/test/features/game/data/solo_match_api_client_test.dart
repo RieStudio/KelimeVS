@@ -350,5 +350,107 @@ void main() {
       expect(map.containsKey('coinsAwarded'), isFalse);
       expect(map.containsKey('reward'), isFalse);
     });
+
+    test('outcome=void gönderiminde { ticketId, outcome: void } gönderir ve voided/refunded/energy doğru parse edilir', () async {
+      final fakeHttp = FakeHttpClient(
+        statusCode: 200,
+        responseBody: jsonEncode({
+          'ok': true,
+          'counted': false,
+          'voided': true,
+          'refunded': true,
+          'energy': {
+            'enabled': true,
+            'current': 5,
+            'max': 5,
+            'nextEnergyAtMs': null,
+            'regenSeconds': 1200,
+            'packs': [],
+          },
+          'unlockedAchievements': [],
+        }),
+      );
+
+      final client = HttpSoloMatchApiClient(
+        authTokenProvider: const MockAuthTokenProvider('test-token'),
+        clientFactory: () => fakeHttp,
+      );
+
+      const voidSub = SoloMatchSubmission(
+        matchId: 'bot:voidMatch12345678',
+        ticketId: 'stk_voidTicket12345678',
+        outcome: 'void',
+        myScore: 1,
+        oppScore: 1,
+        correctAnswers: 0,
+        durationSeconds: 45,
+        endedBy: 'draw_limit_reached',
+        submittedAtMs: 1700000000000,
+      );
+
+      final result = await client.submit(voidSub);
+      expect(result, isA<SubmitSoloMatchSuccess>());
+      final success = result as SubmitSoloMatchSuccess;
+      expect(success.ok, isTrue);
+      expect(success.counted, isFalse);
+      expect(success.voided, isTrue);
+      expect(success.refunded, isTrue);
+      expect(success.energy, isNotNull);
+      expect(success.energy!.enabled, isTrue);
+      expect(success.energy!.current, equals(5));
+      expect(success.energy!.max, equals(5));
+      expect(success.energy!.regenSeconds, equals(1200));
+      expect(success.unlockedAchievements, isEmpty);
+
+      final sentMap = jsonDecode(fakeHttp.lastRequest!.bodyAsString) as Map<String, dynamic>;
+      expect(sentMap, equals({'ticketId': 'stk_voidTicket12345678', 'outcome': 'void'}));
+    });
+
+    test('outcome=void günlük sınır aşımında counted=true, voided=false, refunded=false ve unlockedAchievements parse edilir', () async {
+      final fakeHttp = FakeHttpClient(
+        statusCode: 200,
+        responseBody: jsonEncode({
+          'ok': true,
+          'counted': true,
+          'voided': false,
+          'refunded': false,
+          'energy': {
+            'enabled': true,
+            'current': 4,
+            'max': 5,
+            'nextEnergyAtMs': 1700001200000,
+            'regenSeconds': 1200,
+            'packs': [],
+          },
+          'unlockedAchievements': ['matches_10'],
+        }),
+      );
+
+      final client = HttpSoloMatchApiClient(
+        authTokenProvider: const MockAuthTokenProvider('test-token'),
+        clientFactory: () => fakeHttp,
+      );
+
+      const voidSub = SoloMatchSubmission(
+        matchId: 'bot:voidCapMatch123456',
+        ticketId: 'stk_voidCapTicket123456',
+        outcome: 'void',
+        myScore: 1,
+        oppScore: 1,
+        correctAnswers: 0,
+        durationSeconds: 45,
+        endedBy: 'draw_limit_reached',
+        submittedAtMs: 1700000000000,
+      );
+
+      final result = await client.submit(voidSub);
+      expect(result, isA<SubmitSoloMatchSuccess>());
+      final success = result as SubmitSoloMatchSuccess;
+      expect(success.counted, isTrue);
+      expect(success.voided, isFalse);
+      expect(success.refunded, isFalse);
+      expect(success.energy?.current, equals(4));
+      expect(success.unlockedAchievements, equals(['matches_10']));
+    });
   });
 }

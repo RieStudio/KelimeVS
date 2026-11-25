@@ -278,6 +278,27 @@ void main() {
       expect(container.read(achievementNotificationProvider).currentItem, isNull);
       expect(notifier.queueLength, equals(0));
     });
+
+    test('Çapraz dedupe: aktif veya kuyrukta bekleyen kimlikler showAll ile tekrar eklenmez', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(achievementNotificationProvider.notifier);
+
+      // İlk çağrı: first_match aktif, first_win kuyrukta
+      notifier.showAll(['first_match', 'first_win']);
+      expect(container.read(achievementNotificationProvider).currentItem?.id, equals('first_match'));
+      expect(notifier.queueLength, equals(1));
+
+      // İkinci çağrı: aktif ('first_match') ve kuyruktaki ('first_win') elenir, yalnız 'wins_10' eklenir
+      notifier.showAll(['first_match', 'first_win', 'wins_10']);
+      expect(container.read(achievementNotificationProvider).currentItem?.id, equals('first_match'));
+      expect(notifier.queueLength, equals(2));
+
+      // Üçüncü çağrı: tamamı zaten aktif/bekleyen ise kuyruk uzunluğu değişmez
+      notifier.showAll(['first_match', 'wins_10']);
+      expect(notifier.queueLength, equals(2));
+    });
   });
 
   group('AchievementNotificationOverlay Widget & Animation Tests', () {
@@ -346,6 +367,34 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(AchievementNotificationCard), findsNothing);
+    });
+
+    testWidgets('Overlay mount edilmeden önce kuyruğa alınan başarım, overlay mount olunca güvenle gösterilir', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Overlay henüz ağaca eklenmeden bildirim tetiklenir (çökmemelidir)
+      container.read(achievementNotificationProvider.notifier).show('first_win');
+      expect(container.read(achievementNotificationProvider).currentItem?.id, equals('first_win'));
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: GlobalMatchRequestOverlay(
+              child: Scaffold(
+                body: Text('Ana İçerik'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(find.byType(AchievementNotificationCard), findsOneWidget);
+      expect(find.text('İlk Zafer'), findsOneWidget);
     });
   });
 }

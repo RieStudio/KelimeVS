@@ -94,16 +94,25 @@ class AchievementNotificationNotifier
   }
 
   void _enqueueItems(List<AchievementUiItem> items) {
+    final activeOrPendingIds = <String>{
+      if (state.currentItem != null) state.currentItem!.id,
+      for (final pending in _pendingQueue) pending.id,
+    };
+    final filtered = items
+        .where((item) => !activeOrPendingIds.contains(item.id))
+        .toList();
+    if (filtered.isEmpty) return;
+
     if (state.currentItem == null) {
-      final first = items.removeAt(0);
-      _pendingQueue.addAll(items);
+      final first = filtered.removeAt(0);
+      _pendingQueue.addAll(filtered);
       _tokenCounter++;
       state = AchievementNotificationState(
         currentItem: first,
         token: _tokenCounter,
       );
     } else {
-      _pendingQueue.addAll(items);
+      _pendingQueue.addAll(filtered);
     }
   }
 

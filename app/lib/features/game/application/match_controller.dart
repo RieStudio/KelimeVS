@@ -26,6 +26,7 @@ import '../domain/match/match_state.dart';
 import '../domain/history/match_history_entry.dart';
 import '../domain/models.dart';
 import '../domain/text_filter.dart';
+import '../../achievements/application/achievement_notification_service.dart';
 import '../../match_request/application/match_requests_providers.dart';
 import '../../match_request/application/presence_controller.dart';
 import '../../profile/application/profile_notifier.dart';
@@ -1016,6 +1017,7 @@ class MatchController extends Notifier<MatchUiState>
       if (nextState.endedBy == 'draw_limit_reached') {
         _unregisterLifecycleObserver();
         _cancelAllTimers();
+        _submitSoloMatchVoidIfTicketed(nextState, clock);
         state = state.copyWith(
           isVoided: true,
           isLoading: false,
@@ -1470,6 +1472,36 @@ class MatchController extends Notifier<MatchUiState>
     unawaited(_executeSoloMatchSubmission(submission));
   }
 
+  void _submitSoloMatchVoidIfTicketed(
+    MatchState finishedState,
+    GameClock clock,
+  ) {
+    final ticketId = _soloTicketId;
+    if (ticketId == null || ticketId.trim().isEmpty) return;
+    if (_hasSubmittedSoloMatch) return;
+    _hasSubmittedSoloMatch = true;
+
+    final durationSeconds = math.max(
+      0,
+      ((clock.nowMs() - _matchStartedAtMs) / 1000).round(),
+    );
+
+    final submission = SoloMatchSubmission(
+      matchId: _botMatchId,
+      ticketId: ticketId.trim(),
+      outcome: 'void',
+      myScore: finishedState.scores['me'] ?? 0,
+      oppScore: finishedState.scores['bot'] ?? 0,
+      correctAnswers: 0,
+      durationSeconds: durationSeconds,
+      endedBy: 'draw_limit_reached',
+      submittedAtMs:
+          math.max(clock.nowMs(), DateTime.now().millisecondsSinceEpoch),
+    );
+
+    unawaited(_executeSoloMatchSubmission(submission));
+  }
+
   Future<void> _executeSoloMatchSubmission(
     SoloMatchSubmission submission,
   ) async {
@@ -1481,7 +1513,31 @@ class MatchController extends Notifier<MatchUiState>
       final res = await _soloMatchApiClient.submit(submission);
 
       if (res is SubmitSoloMatchSuccess) {
-        if (res.counted) {
+        if (submission.outcome == 'void') {
+          if ((res.refunded || res.counted) && res.energy != null) {
+            try {
+              ref.read(profileProvider.notifier).updateEnergy(res.energy!);
+            } catch (_) {}
+          }
+          if (res.counted && !res.voided) {
+            state = state.copyWith(
+              coinsAwarded: res.coinsAwarded,
+              unlockedAchievements: res.unlockedAchievements,
+            );
+            if (res.unlockedAchievements.isNotEmpty) {
+              try {
+                ref
+                    .read(achievementNotificationProvider.notifier)
+                    .showAll(res.unlockedAchievements);
+              } catch (_) {}
+            }
+          }
+          if (res.refunded || res.counted) {
+            try {
+              unawaited(ref.read(profileProvider.notifier).syncWithServer());
+            } catch (_) {}
+          }
+        } else if (res.counted) {
           state = state.copyWith(
             coinsAwarded: res.coinsAwarded,
             unlockedAchievements: res.unlockedAchievements,
