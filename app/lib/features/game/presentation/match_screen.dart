@@ -500,39 +500,29 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                   ),
                   const SizedBox(height: AppDimens.space8),
 
-                  // 4.5 Maç İçi Sabit Banner (maç başında hazırsa ve ekran yüksekliği yeterliyse)
-                  if (_resolveInMatchBannerDecision(context) &&
-                      !uiState.isMatchFinished) ...[
-                    Builder(
-                      builder: (context) {
-                        final bannerWidget =
-                            _adService.buildInMatchBannerWidget();
-                        if (bannerWidget == null) {
-                          return const SizedBox.shrink();
-                        }
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              key: const Key('in_match_banner_slot'),
-                              height: AdConfig.inMatchBannerHeight,
-                              child: Center(child: bannerWidget),
-                            ),
-                            const SizedBox(
-                              height: AdConfig.inMatchBannerBottomGap,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-
-                  // 5. Giriş Alanı ve Gönder Butonu
+                  // 5. Giriş Alanı, Gönder Butonu ve (etkinken) Maç İçi Sabit Banner
                   AnswerInputBar(
                     isMyTurn: isMyTurn,
                     feedback: uiState.lastFeedback,
                     feedbackCounter: uiState.feedbackCounter,
                     controller: _inputController,
+                    topBanner: (_resolveInMatchBannerDecision(context) &&
+                            !uiState.isMatchFinished)
+                        ? Builder(
+                            builder: (context) {
+                              final bannerWidget =
+                                  _adService.buildInMatchBannerWidget();
+                              if (bannerWidget == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return SizedBox(
+                                key: const Key('in_match_banner_slot'),
+                                height: AdConfig.inMatchBannerHeight,
+                                child: Center(child: bannerWidget),
+                              );
+                            },
+                          )
+                        : null,
                     onSubmitted: (text) {
                       ref.read(activeMatchSessionProvider).submit(text);
                     },

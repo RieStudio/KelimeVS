@@ -2,6 +2,7 @@ import 'package:app/core/ads/ad_providers.dart';
 import 'package:app/core/ads/ad_service.dart';
 import 'package:app/core/config/ad_config.dart';
 import 'package:app/core/network/network_status_provider.dart';
+import 'package:app/core/strings/app_strings.dart';
 import 'package:app/core/widgets/answer_input_bar.dart';
 import 'package:app/features/game/application/match_controller.dart';
 import 'package:app/features/game/application/match_providers.dart';
@@ -66,9 +67,17 @@ class _TestMatchController extends MatchController {
 
   @override
   MatchUiState build() => _initial;
+
+  void setStateForTest(MatchUiState next) {
+    state = next;
+  }
 }
 
-MatchUiState _activeMatchUiState({bool isMatchFinished = false}) {
+MatchUiState _activeMatchUiState({
+  bool isMatchFinished = false,
+  MatchFeedbackType? feedback,
+  int feedbackCounter = 0,
+}) {
   const q = Question(
     id: 'q1',
     categoryId: 'genel',
@@ -95,6 +104,8 @@ MatchUiState _activeMatchUiState({bool isMatchFinished = false}) {
     myPlayerId: 'me',
     opponentName: 'Rakip',
     remainingMs: 12000,
+    lastFeedback: feedback,
+    feedbackCounter: feedbackCounter,
   );
 }
 
@@ -102,11 +113,14 @@ void main() {
   Widget buildMatchHost({
     required FakeAdService fakeAdService,
     required MatchUiState uiState,
+    _TestMatchController? controllerOverride,
     Size screenSize = const Size(412, 915),
+    EdgeInsets viewInsets = EdgeInsets.zero,
     bool? isAdsEnabledOverride = true,
   }) {
-    final controller = _TestMatchController(uiState);
+    final controller = controllerOverride ?? _TestMatchController(uiState);
     return ProviderScope(
+      key: controllerOverride == null ? UniqueKey() : null,
       overrides: [
         adServiceProvider.overrideWithValue(fakeAdService),
         networkStatusProvider.overrideWith(_OnlineNetworkNotifier.new),
@@ -130,7 +144,7 @@ void main() {
       ],
       child: MaterialApp(
         home: MediaQuery(
-          data: MediaQueryData(size: screenSize),
+          data: MediaQueryData(size: screenSize, viewInsets: viewInsets),
           child: MatchScreen(isAdsEnabledOverride: isAdsEnabledOverride),
         ),
       ),
@@ -138,32 +152,63 @@ void main() {
   }
 
   testWidgets(
-      'banner hazırken AnswerInputBar üstünde 24 px boşlukla görünür ve çıkınca dispose edilir',
+      'banner hazırken görünür kutu çizgisinin tam 24 dp üstünde durur (klavye açık/kapalı) ve çıkınca dispose edilir',
       (tester) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
     final fakeAd = FakeAdService(
       initialInMatchBannerLoaded: true,
       initialBannerLoaded: true,
     );
+    final controller = _TestMatchController(_activeMatchUiState());
 
+    // 1. Klavye kapalıyken tam 24 dp
     await tester.pumpWidget(
-      buildMatchHost(fakeAdService: fakeAd, uiState: _activeMatchUiState()),
+      buildMatchHost(
+        fakeAdService: fakeAd,
+        uiState: _activeMatchUiState(),
+        controllerOverride: controller,
+      ),
     );
     await tester.pump();
 
     final bannerSlot = find.byKey(const Key('in_match_banner_slot'));
-    final inputBar = find.byType(AnswerInputBar);
+    final inputBox = find.byKey(const Key('answer_input_box'));
     expect(bannerSlot, findsOneWidget);
     expect(
       find.byKey(const Key('fake_in_match_banner_ad_widget')),
       findsOneWidget,
     );
 
-    final bannerRect = tester.getRect(bannerSlot);
-    final inputRect = tester.getRect(inputBar);
-    expect(bannerRect.height, AdConfig.inMatchBannerHeight);
+    final bannerRectClosed = tester.getRect(bannerSlot);
+    final inputBoxRectClosed = tester.getRect(inputBox);
+    expect(bannerRectClosed.height, AdConfig.inMatchBannerHeight);
     expect(
-      inputRect.top - bannerRect.bottom,
-      greaterThanOrEqualTo(AdConfig.inMatchBannerBottomGap),
+      inputBoxRectClosed.top - bannerRectClosed.bottom,
+      closeTo(AdConfig.inMatchBannerBottomGap, 0.01),
+    );
+
+    // 2. Klavye açıkken de tam 24 dp
+    await tester.pumpWidget(
+      buildMatchHost(
+        fakeAdService: fakeAd,
+        uiState: _activeMatchUiState(),
+        controllerOverride: controller,
+        viewInsets: const EdgeInsets.only(bottom: 280),
+      ),
+    );
+    await tester.pump();
+
+    final bannerRectOpen = tester.getRect(bannerSlot);
+    final inputBoxRectOpen = tester.getRect(inputBox);
+    expect(
+      inputBoxRectOpen.top - bannerRectOpen.bottom,
+      closeTo(AdConfig.inMatchBannerBottomGap, 0.01),
     );
 
     // Maçtan çıkınca yalnızca in-match banner dispose edilir, MainShell banner'ı etkilenmez
@@ -171,6 +216,46 @@ void main() {
     await tester.pump();
     expect(fakeAd.disposeInMatchBannerCallCount, 1);
     expect(fakeAd.isBannerLoadedListenable.value, isTrue);
+  });
+
+  testWidgets(
+      'geri bildirim gösterilince banner yerinden oynamaz ve geri bildirim görünür kalır',
+      (tester) async {
+    final fakeAd = FakeAdService(initialInMatchBannerLoaded: true);
+    final controller = _TestMatchController(_activeMatchUiState());
+
+    await tester.pumpWidget(
+      buildMatchHost(
+        fakeAdService: fakeAd,
+        uiState: _activeMatchUiState(),
+        controllerOverride: controller,
+      ),
+    );
+    await tester.pump();
+
+    final bannerBefore =
+        tester.getRect(find.byKey(const Key('in_match_banner_slot')));
+    final boxBefore =
+        tester.getRect(find.byKey(const Key('answer_input_box')));
+
+    controller.setStateForTest(
+      _activeMatchUiState(
+        feedback: MatchFeedbackType.wrong,
+        feedbackCounter: 1,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text(AppStrings.wrongAnswer), findsOneWidget);
+    final bannerAfter =
+        tester.getRect(find.byKey(const Key('in_match_banner_slot')));
+    final boxAfter =
+        tester.getRect(find.byKey(const Key('answer_input_box')));
+    final feedbackRect = tester.getRect(find.text(AppStrings.wrongAnswer));
+
+    expect(bannerAfter, bannerBefore);
+    expect(boxAfter, boxBefore);
+    expect(feedbackRect.bottom, lessThanOrEqualTo(bannerAfter.top));
   });
 
   testWidgets(

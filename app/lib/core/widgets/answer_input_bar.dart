@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../features/game/application/match_ui_state.dart';
+import '../config/ad_config.dart';
 import '../icons/app_icons.dart';
 import '../strings/app_strings.dart';
 import '../theme/app_colors.dart';
@@ -31,6 +32,8 @@ class AnswerInputBar extends StatefulWidget {
   final int feedbackCounter;
   final TextEditingController? controller;
   final FocusNode? focusNode;
+  final Widget? topBanner;
+  final double topBannerGap;
 
   const AnswerInputBar({
     super.key,
@@ -40,6 +43,8 @@ class AnswerInputBar extends StatefulWidget {
     this.feedbackCounter = 0,
     this.controller,
     this.focusNode,
+    this.topBanner,
+    this.topBannerGap = AdConfig.inMatchBannerBottomGap,
   });
 
   @override
@@ -251,102 +256,129 @@ class _AnswerInputBarState extends State<AnswerInputBar>
   Widget build(BuildContext context) {
     final borderColor = _showDangerBorder ? AppColors.danger : AppColors.ink;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Geri bildirim alanı (Canlı Bölge)
-        _buildFeedbackBanner(),
-
-        // Giriş alanı ve Gönder butonu
-        AnimatedBuilder(
-          animation: _shakeController,
-          builder: (context, child) {
-            final offset = math.sin(_shakeController.value * math.pi * 6) * 6.0;
-            return Transform.translate(
-              offset: Offset(offset, 0),
-              child: child,
-            );
-          },
-          child: Row(
-            children: [
-              // Metin giriş kutusu
-              Expanded(
-                child: Opacity(
-                  opacity: widget.isMyTurn ? 1.0 : 0.6,
-                  child: Container(
-                    height: AppDimens.inputHeight,
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: AppDimens.borderRadiusInput,
-                      border: Border.all(
-                        color: borderColor,
-                        width: AppDimens.borderThick,
-                      ),
+    final inputRow = AnimatedBuilder(
+      animation: _shakeController,
+      builder: (context, child) {
+        final offset = math.sin(_shakeController.value * math.pi * 6) * 6.0;
+        return Transform.translate(
+          offset: Offset(offset, 0),
+          child: child,
+        );
+      },
+      child: Row(
+        children: [
+          // Metin giriş kutusu
+          Expanded(
+            child: Opacity(
+              opacity: widget.isMyTurn ? 1.0 : 0.6,
+              child: Container(
+                key: const Key('answer_input_box'),
+                height: AppDimens.inputHeight,
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: AppDimens.borderRadiusInput,
+                  border: Border.all(
+                    color: borderColor,
+                    width: AppDimens.borderThick,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  readOnly: !widget.isMyTurn,
+                  keyboardType: TextInputType.text,
+                  maxLength: AttemptTextSanitizer.maxLength,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                  autocorrect: true,
+                  enableSuggestions: true,
+                  textCapitalization: TextCapitalization.none,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _handleSend(),
+                  style: AppTextStyles.inputField,
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: widget.isMyTurn
+                        ? AppStrings.inputPlaceholder
+                        : AppStrings.turnOpponentHint,
+                    hintStyle: AppTextStyles.inputField.copyWith(
+                      color: AppColors.muted.withValues(alpha: 0.6),
                     ),
-                    alignment: Alignment.center,
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      readOnly: !widget.isMyTurn,
-                      keyboardType: TextInputType.text,
-                      maxLength: AttemptTextSanitizer.maxLength,
-                      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                      autocorrect: true,
-                      enableSuggestions: true,
-                      textCapitalization: TextCapitalization.none,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _handleSend(),
-                      style: AppTextStyles.inputField,
-                      decoration: InputDecoration(
-                        counterText: '',
-                        hintText: widget.isMyTurn
-                            ? AppStrings.inputPlaceholder
-                            : AppStrings.turnOpponentHint,
-                        hintStyle: AppTextStyles.inputField.copyWith(
-                          color: AppColors.muted.withValues(alpha: 0.6),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: AppDimens.space16,
-                          vertical: 14,
-                        ),
-                      ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppDimens.space16,
+                      vertical: 14,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: AppDimens.space10),
-
-              // Gönder Butonu (54x54, primary zemin, 18 köşe, 0 4px 0 ink gölge)
-              Semantics(
-                button: true,
-                label: AppStrings.send,
-                child: GestureDetector(
-                  onTap: _handleSend,
-                  child: Container(
-                    width: AppDimens.inputHeight,
-                    height: AppDimens.inputHeight,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: AppDimens.borderRadiusInput,
-                      border: Border.all(
-                        color: AppColors.ink,
-                        width: AppDimens.borderThick,
-                      ),
-                      boxShadow: AppDimens.shadowSendButton,
-                    ),
-                    alignment: Alignment.center,
-                    child: const AppIcon(
-                      AppIcons.arrowSend,
-                      color: AppColors.card,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
+          const SizedBox(width: AppDimens.space10),
+
+          // Gönder Butonu (54x54, primary zemin, 18 köşe, 0 4px 0 ink gölge)
+          Semantics(
+            button: true,
+            label: AppStrings.send,
+            child: GestureDetector(
+              onTap: _handleSend,
+              child: Container(
+                width: AppDimens.inputHeight,
+                height: AppDimens.inputHeight,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: AppDimens.borderRadiusInput,
+                  border: Border.all(
+                    color: AppColors.ink,
+                    width: AppDimens.borderThick,
+                  ),
+                  boxShadow: AppDimens.shadowSendButton,
+                ),
+                alignment: Alignment.center,
+                child: const AppIcon(
+                  AppIcons.arrowSend,
+                  color: AppColors.card,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.topBanner == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Geri bildirim alanı (Canlı Bölge)
+          _buildFeedbackBanner(),
+          inputRow,
+        ],
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            widget.topBanner!,
+            SizedBox(height: widget.topBannerGap),
+            inputRow,
+          ],
+        ),
+        Positioned(
+          bottom: AppDimens.inputHeight +
+              widget.topBannerGap +
+              AdConfig.inMatchBannerHeight +
+              AppDimens.space4,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(child: _buildFeedbackBanner()),
         ),
       ],
     );
