@@ -1,4 +1,5 @@
 import { authenticateRequest, authenticateAuth, type AuthEnv, type AuthContext } from './auth';
+import { isValidAdClaimId, type AdRewardsEnv } from './adRewards';
 import type { EnergyEnv } from './energy';
 import {
   getExtraTimeConfig,
@@ -23,7 +24,7 @@ export {
   ReportStore,
 };
 
-export interface Env extends AuthEnv, EnergyEnv, PowerupEnv {
+export interface Env extends AuthEnv, EnergyEnv, PowerupEnv, AdRewardsEnv {
   readonly MATCHMAKER: DurableObjectNamespace<Matchmaker>;
   readonly MATCH_ROOM: DurableObjectNamespace<MatchRoom>;
   readonly USER_PROFILE: DurableObjectNamespace<UserProfile>;
@@ -704,6 +705,134 @@ export default {
           }
           return new Response(
             JSON.stringify({ error: 'invalid_pack', message: 'Geçersiz paket' }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+
+        return new Response(JSON.stringify(res), {
+          status: 200,
+          headers: jsonHeaders,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === 'account_deleted') {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'internal_error', message: msg }), {
+          status: 500,
+          headers: jsonHeaders,
+        });
+      }
+    }
+
+    // Ödüllü reklam talebi: POST /ads/reward (Faz 2: istemci beyanı + günlük sınır; SSV sonra)
+    if (request.method === 'POST' && pathname === '/ads/reward') {
+      const uid = await authenticateRequest(request, env);
+      if (!uid) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: jsonHeaders,
+        });
+      }
+
+      let rawBody = '';
+      try {
+        rawBody = await request.text();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz istek gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (new TextEncoder().encode(rawBody).byteLength > 4096) {
+        return new Response(
+          JSON.stringify({ error: 'payload_too_large', message: 'İstek gövdesi 4 KB sınırını aşıyor' }),
+          { status: 413, headers: jsonHeaders }
+        );
+      }
+
+      let body: { type?: unknown; claimId?: unknown };
+      try {
+        body = JSON.parse(rawBody) as { type?: unknown; claimId?: unknown };
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'bad_request', message: 'Geçersiz JSON gövdesi' }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (body?.type !== 'energy' && body?.type !== 'coins') {
+        return new Response(
+          JSON.stringify({ error: 'invalid_type', message: "type alanı 'energy' veya 'coins' olmalıdır" }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      if (!isValidAdClaimId(body?.claimId)) {
+        return new Response(
+          JSON.stringify({
+            error: 'invalid_claim_id',
+            message: 'claimId 8-64 karakter uzunluğunda [A-Za-z0-9_-] olmalıdır',
+          }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+
+      try {
+        const profileStub = env.USER_PROFILE.get(env.USER_PROFILE.idFromName(uid));
+        if (await profileStub.isDeleted()) {
+          return new Response(
+            JSON.stringify({ error: 'account_deleted', message: 'Hesap silinmiş' }),
+            { status: 410, headers: jsonHeaders }
+          );
+        }
+
+        const res = await profileStub.claimAdReward({
+          type: body.type,
+          claimId: body.claimId,
+          uid,
+        });
+
+        if (!res.ok) {
+          if (res.error === 'ads_disabled') {
+            return new Response(
+              JSON.stringify({ error: 'ads_disabled', message: 'Ödüllü reklamlar şu anda aktif değil' }),
+              { status: 503, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'energy_full') {
+            return new Response(
+              JSON.stringify({ error: 'energy_full', message: 'Enerjin zaten dolu' }),
+              { status: 409, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'too_soon') {
+            return new Response(
+              JSON.stringify({
+                error: 'too_soon',
+                message: 'Lütfen yeni bir reklam ödülü için biraz bekle',
+                retryAfterSeconds: res.retryAfterSeconds,
+                nextClaimAtMs: res.nextClaimAtMs,
+              }),
+              { status: 429, headers: jsonHeaders }
+            );
+          }
+          if (res.error === 'daily_limit_reached') {
+            return new Response(
+              JSON.stringify({
+                error: 'daily_limit_reached',
+                message: 'Bugünkü reklam ödülü sınırına ulaştın',
+                remainingToday: res.remainingToday,
+              }),
+              { status: 429, headers: jsonHeaders }
+            );
+          }
+          return new Response(
+            JSON.stringify({ error: res.error }),
             { status: 400, headers: jsonHeaders }
           );
         }

@@ -98,6 +98,7 @@ export const CONTAINS_WORDS: readonly string[] = [
   'ananisikeyim',
   'ananisikim',
   'anani',
+  'ananın amı',
   'ananinami',
   'bacinisikeyim',
   'bacinissikeyim',

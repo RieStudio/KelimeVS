@@ -30,6 +30,18 @@ import {
   type EnergyState,
   type EnergyPack,
 } from './energy';
+import {
+  getAdRewardCoinsAmount,
+  getAdRewardCoinsDailyCap,
+  getAdRewardDayKey,
+  getAdRewardEnergyAmount,
+  getAdRewardEnergyDailyCap,
+  getAdRewardMinIntervalSeconds,
+  isAdRewardsEnabled,
+  isValidAdClaimId,
+  type AdRewardType,
+  type AdRewardsStatus,
+} from './adRewards';
 
 export const GUEST_NICKNAME_LOCK_MIN_BUILD = 13;
 
@@ -184,7 +196,33 @@ export interface UserProfileData {
   readonly currentStreak?: number;
   readonly maxStreak?: number;
   readonly achievements?: readonly UserAchievementItem[];
+  readonly adRewards?: AdRewardsStatus;
 }
+
+export type ClaimAdRewardResult =
+  | {
+      readonly ok: true;
+      readonly type: AdRewardType;
+      readonly granted: boolean;
+      readonly alreadyProcessed?: boolean;
+      readonly coins: number;
+      readonly energy: EnergyState;
+      readonly remainingToday: { readonly energy: number; readonly coins: number };
+      readonly nextClaimAtMs: number | null;
+    }
+  | {
+      readonly ok: false;
+      readonly error:
+        | 'ads_disabled'
+        | 'invalid_type'
+        | 'invalid_claim_id'
+        | 'too_soon'
+        | 'daily_limit_reached'
+        | 'energy_full';
+      readonly retryAfterSeconds?: number;
+      readonly remainingToday?: { readonly energy: number; readonly coins: number };
+      readonly nextClaimAtMs?: number | null;
+    };
 
 export interface MatchRewardResult {
   readonly coinsAwarded: number;
@@ -439,6 +477,20 @@ export class UserProfile extends DurableObject<Env> {
         pack TEXT NOT NULL,
         amount INTEGER NOT NULL,
         cost INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS ad_rewards_daily (
+        day_key TEXT NOT NULL,
+        reward_type TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day_key, reward_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS processed_ad_rewards (
+        reward_id TEXT PRIMARY KEY,
+        reward_type TEXT NOT NULL,
+        amount INTEGER NOT NULL,
         created_at INTEGER NOT NULL
       );
     `);
@@ -727,6 +779,8 @@ export class UserProfile extends DurableObject<Env> {
       DELETE FROM user_presence;
       DELETE FROM daily_solo_matches;
       DELETE FROM solo_tickets;
+      DELETE FROM ad_rewards_daily;
+      DELETE FROM processed_ad_rewards;
     `);
 
     // Tombstone kaydı ekle veya güncelle
@@ -1132,6 +1186,7 @@ export class UserProfile extends DurableObject<Env> {
         currentStreak: (row.current_streak as number | undefined) ?? 0,
         maxStreak: (row.max_streak as number | undefined) ?? 0,
         achievements,
+        adRewards: this.getAdRewardsStatusInternal(nowMs),
         ...(frameMigration ? { frameMigration } : {}),
       };
     }
@@ -1170,6 +1225,7 @@ export class UserProfile extends DurableObject<Env> {
       currentStreak: 0,
       maxStreak: 0,
       achievements: [],
+      adRewards: this.getAdRewardsStatusInternal(nowMs),
     };
   }
 
@@ -4949,5 +5005,312 @@ export class UserProfile extends DurableObject<Env> {
     }
 
     return new Response('Not Found', { status: 404 });
+  }
+
+  private getAdRewardsStatusInternal(nowMs: number): AdRewardsStatus {
+    const enabled = isAdRewardsEnabled(this.env);
+    const energyCap = getAdRewardEnergyDailyCap(this.env);
+    const coinsCap = getAdRewardCoinsDailyCap(this.env);
+    const energyAmount = getAdRewardEnergyAmount(this.env);
+    const coinsAmount = getAdRewardCoinsAmount(this.env);
+    const minIntervalMs = getAdRewardMinIntervalSeconds(this.env) * 1000;
+    const dayKey = getAdRewardDayKey(nowMs);
+
+    const dailyRows = this.ctx.storage.sql
+      .exec<{ reward_type: string; count: number }>(
+        'SELECT reward_type, count FROM ad_rewards_daily WHERE day_key = ?',
+        dayKey
+      )
+      .toArray();
+
+    let energyUsed = 0;
+    let coinsUsed = 0;
+    for (const r of dailyRows) {
+      if (r.reward_type === 'energy') energyUsed = Number(r.count ?? 0);
+      if (r.reward_type === 'coins') coinsUsed = Number(r.count ?? 0);
+    }
+
+    const lastRows = this.ctx.storage.sql
+      .exec<{ last_created_at: number | null }>(
+        'SELECT MAX(created_at) AS last_created_at FROM processed_ad_rewards'
+      )
+      .toArray();
+    const lastCreatedAt =
+      lastRows.length > 0 && lastRows[0].last_created_at !== null
+        ? Number(lastRows[0].last_created_at)
+        : null;
+
+    const nextClaimAtMs =
+      lastCreatedAt !== null && minIntervalMs > 0 && lastCreatedAt + minIntervalMs > nowMs
+        ? lastCreatedAt + minIntervalMs
+        : null;
+
+    return {
+      enabled,
+      energy: {
+        remaining: Math.max(0, energyCap - energyUsed),
+        cap: energyCap,
+      },
+      coins: {
+        remaining: Math.max(0, coinsCap - coinsUsed),
+        cap: coinsCap,
+      },
+      nextClaimAtMs,
+      energyAmount,
+      coinsAmount,
+    };
+  }
+
+  private buildEnergyStateInTransaction(effectiveUid: string, nowMs: number): EnergyState {
+    const enabled = isEnergyEnabledForUser(this.env, effectiveUid);
+    const maxEnergy = getEnergyMax(this.env);
+    const regenMinutes = getEnergyRegenMinutes(this.env);
+
+    const rows = this.ctx.storage.sql
+      .exec<{ energy?: number; energy_updated_at?: number }>(
+        'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+      )
+      .toArray();
+
+    const savedEnergy =
+      rows.length > 0 && rows[0].energy !== undefined && rows[0].energy !== null
+        ? Number(rows[0].energy)
+        : maxEnergy;
+    const savedUpdatedAt =
+      rows.length > 0 &&
+      rows[0].energy_updated_at !== undefined &&
+      rows[0].energy_updated_at !== null
+        ? Number(rows[0].energy_updated_at)
+        : 0;
+
+    const regen = calculateRegeneratedEnergy(
+      savedEnergy,
+      savedUpdatedAt,
+      nowMs,
+      maxEnergy,
+      regenMinutes
+    );
+
+    if (regen.gained > 0) {
+      this.ctx.storage.sql.exec(
+        'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+        regen.current,
+        regen.updatedAtMs
+      );
+    }
+
+    if (!enabled) {
+      return {
+        enabled: false,
+        current: maxEnergy,
+        max: maxEnergy,
+        nextEnergyAtMs: null,
+        regenSeconds: regenMinutes * 60,
+        packs: [],
+      };
+    }
+
+    return {
+      enabled: true,
+      current: regen.current,
+      max: maxEnergy,
+      nextEnergyAtMs: regen.nextEnergyAtMs,
+      regenSeconds: regenMinutes * 60,
+      packs: buildEnergyPacks(this.env),
+    };
+  }
+
+  /**
+   * Ödüllü reklam talebini (istemci beyanı + günlük sınır + bekleme süresi) atomik olarak işler.
+   */
+  async claimAdReward(params: {
+    readonly type: AdRewardType;
+    readonly claimId: string;
+    readonly uid?: string;
+    readonly nowMs?: number;
+  }): Promise<ClaimAdRewardResult> {
+    const nowMs = params.nowMs ?? Date.now();
+    this.ensureSchema(nowMs);
+
+    if (this.isDeleted()) {
+      throw new Error('account_deleted');
+    }
+
+    if (params.type !== 'energy' && params.type !== 'coins') {
+      return { ok: false, error: 'invalid_type' };
+    }
+
+    if (!isValidAdClaimId(params.claimId)) {
+      return { ok: false, error: 'invalid_claim_id' };
+    }
+
+    const profile = await this.getProfile(params.uid, 0, undefined, nowMs);
+    const effectiveUid = profile.uid;
+
+    return this.runInTransaction(() => {
+      if (!isAdRewardsEnabled(this.env)) {
+        return { ok: false, error: 'ads_disabled' };
+      }
+
+      const existing = this.ctx.storage.sql
+        .exec<{ reward_type: string; amount: number }>(
+          'SELECT reward_type, amount FROM processed_ad_rewards WHERE reward_id = ? LIMIT 1',
+          params.claimId
+        )
+        .toArray();
+
+      if (existing.length > 0) {
+        const coinRows = this.ctx.storage.sql
+          .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+          .toArray();
+        const currentCoins = coinRows.length > 0 ? Number(coinRows[0].coins) : 0;
+        const energyState = this.buildEnergyStateInTransaction(effectiveUid, nowMs);
+        const status = this.getAdRewardsStatusInternal(nowMs);
+        return {
+          ok: true,
+          type: params.type,
+          granted: false,
+          alreadyProcessed: true,
+          coins: currentCoins,
+          energy: energyState,
+          remainingToday: {
+            energy: status.energy.remaining,
+            coins: status.coins.remaining,
+          },
+          nextClaimAtMs: status.nextClaimAtMs,
+        };
+      }
+
+      const statusBefore = this.getAdRewardsStatusInternal(nowMs);
+      if (statusBefore.nextClaimAtMs !== null && statusBefore.nextClaimAtMs > nowMs) {
+        const retryAfterSeconds = Math.max(
+          1,
+          Math.ceil((statusBefore.nextClaimAtMs - nowMs) / 1000)
+        );
+        return {
+          ok: false,
+          error: 'too_soon',
+          retryAfterSeconds,
+          nextClaimAtMs: statusBefore.nextClaimAtMs,
+        };
+      }
+
+      const remainingForType =
+        params.type === 'energy'
+          ? statusBefore.energy.remaining
+          : statusBefore.coins.remaining;
+      if (remainingForType <= 0) {
+        return {
+          ok: false,
+          error: 'daily_limit_reached',
+          remainingToday: {
+            energy: statusBefore.energy.remaining,
+            coins: statusBefore.coins.remaining,
+          },
+        };
+      }
+
+      const dayKey = getAdRewardDayKey(nowMs);
+      let grantedAmount = 0;
+
+      if (params.type === 'energy') {
+        const maxEnergy = getEnergyMax(this.env);
+        const regenMinutes = getEnergyRegenMinutes(this.env);
+        const energyRows = this.ctx.storage.sql
+          .exec<{ energy?: number; energy_updated_at?: number }>(
+            'SELECT energy, energy_updated_at FROM profiles LIMIT 1'
+          )
+          .toArray();
+
+        const savedEnergy =
+          energyRows.length > 0 &&
+          energyRows[0].energy !== undefined &&
+          energyRows[0].energy !== null
+            ? Number(energyRows[0].energy)
+            : maxEnergy;
+        const savedUpdatedAt =
+          energyRows.length > 0 &&
+          energyRows[0].energy_updated_at !== undefined &&
+          energyRows[0].energy_updated_at !== null
+            ? Number(energyRows[0].energy_updated_at)
+            : 0;
+
+        const regen = calculateRegeneratedEnergy(
+          savedEnergy,
+          savedUpdatedAt,
+          nowMs,
+          maxEnergy,
+          regenMinutes
+        );
+
+        if (regen.current >= maxEnergy) {
+          return { ok: false, error: 'energy_full' };
+        }
+
+        const addAmount = getAdRewardEnergyAmount(this.env);
+        const newEnergy = Math.min(maxEnergy, regen.current + addAmount);
+        const newUpdatedAtMs = newEnergy >= maxEnergy ? nowMs : regen.updatedAtMs;
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET energy = ?, energy_updated_at = ?',
+          newEnergy,
+          newUpdatedAtMs
+        );
+        grantedAmount = newEnergy - regen.current;
+      } else {
+        grantedAmount = getAdRewardCoinsAmount(this.env);
+        this.ctx.storage.sql.exec(
+          'UPDATE profiles SET coins = coins + ?',
+          grantedAmount
+        );
+      }
+
+      this.ctx.storage.sql.exec(
+        `INSERT INTO ad_rewards_daily (day_key, reward_type, count) VALUES (?, ?, 1)
+         ON CONFLICT(day_key, reward_type) DO UPDATE SET count = count + 1`,
+        dayKey,
+        params.type
+      );
+
+      this.ctx.storage.sql.exec(
+        'INSERT INTO processed_ad_rewards (reward_id, reward_type, amount, created_at) VALUES (?, ?, ?, ?)',
+        params.claimId,
+        params.type,
+        grantedAmount,
+        nowMs
+      );
+
+      this.ctx.storage.sql.exec(
+        `DELETE FROM processed_ad_rewards
+         WHERE reward_id NOT IN (
+           SELECT reward_id FROM processed_ad_rewards ORDER BY created_at DESC LIMIT 100
+         )`
+      );
+
+      const cutoffDayKey = getAdRewardDayKey(nowMs - 7 * 24 * 60 * 60 * 1000);
+      this.ctx.storage.sql.exec(
+        'DELETE FROM ad_rewards_daily WHERE day_key < ?',
+        cutoffDayKey
+      );
+
+      const coinRows = this.ctx.storage.sql
+        .exec<{ coins: number }>('SELECT coins FROM profiles LIMIT 1')
+        .toArray();
+      const updatedCoins = coinRows.length > 0 ? Number(coinRows[0].coins) : 0;
+      const updatedEnergy = this.buildEnergyStateInTransaction(effectiveUid, nowMs);
+      const updatedStatus = this.getAdRewardsStatusInternal(nowMs);
+
+      return {
+        ok: true,
+        type: params.type,
+        granted: true,
+        coins: updatedCoins,
+        energy: updatedEnergy,
+        remainingToday: {
+          energy: updatedStatus.energy.remaining,
+          coins: updatedStatus.coins.remaining,
+        },
+        nextClaimAtMs: updatedStatus.nextClaimAtMs,
+      };
+    });
   }
 }
