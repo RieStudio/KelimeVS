@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/ads/ad_providers.dart';
+import '../../../core/ads/ad_service.dart';
+import '../../../core/config/ad_config.dart';
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
@@ -21,7 +25,9 @@ import 'round_end_view.dart';
 
 /// DESIGN.md Bölüm 7: Maç Ekranı
 class MatchScreen extends ConsumerStatefulWidget {
-  const MatchScreen({super.key});
+  final bool? isAdsEnabledOverride;
+
+  const MatchScreen({super.key, this.isAdsEnabledOverride});
 
   @override
   ConsumerState<MatchScreen> createState() => _MatchScreenState();
@@ -32,6 +38,8 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _inputController = TextEditingController();
   late final BannerSuppressionNotifier _suppressionNotifier;
+  late final AdService _adService;
+  bool? _showInMatchBanner;
   int _scrollGeneration = 0;
   double _lastBottomInset = 0.0;
   bool _isPowerupPanelOpen = false;
@@ -77,6 +85,7 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
   void initState() {
     super.initState();
     _suppressionNotifier = ref.read(bannerSuppressionProvider.notifier);
+    _adService = ref.read(adServiceProvider);
     _radialAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 160),
@@ -106,9 +115,32 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
   void dispose() {
     _radialAnimController.dispose();
     _suppressionNotifier.unsuppress();
+    unawaited(_adService.disposeInMatchBanner());
     _scrollController.dispose();
     _inputController.dispose();
     super.dispose();
+  }
+
+  bool _resolveInMatchBannerDecision(BuildContext context) {
+    final existing = _showInMatchBanner;
+    if (existing != null) return existing;
+
+    final adsEnabled = widget.isAdsEnabledOverride ?? AdConfig.isAdsEnabled;
+    bool decision = false;
+    if (adsEnabled &&
+        ref.read(networkStatusProvider).status != NetworkStatus.offline) {
+      final consent = ref.read(adConsentProvider);
+      final screenHeight = MediaQuery.sizeOf(context).height;
+      if (consent.isSdkInitialized &&
+          consent.canRequestAds &&
+          screenHeight >= AdConfig.inMatchBannerMinScreenHeight &&
+          _adService.isInMatchBannerLoadedListenable.value &&
+          _adService.buildInMatchBannerWidget() != null) {
+        decision = true;
+      }
+    }
+    _showInMatchBanner = decision;
+    return decision;
   }
 
   void _scrollToBottom({bool immediate = false}) {
@@ -467,6 +499,33 @@ class _MatchScreenState extends ConsumerState<MatchScreen>
                     ),
                   ),
                   const SizedBox(height: AppDimens.space8),
+
+                  // 4.5 Maç İçi Sabit Banner (maç başında hazırsa ve ekran yüksekliği yeterliyse)
+                  if (_resolveInMatchBannerDecision(context) &&
+                      !uiState.isMatchFinished) ...[
+                    Builder(
+                      builder: (context) {
+                        final bannerWidget =
+                            _adService.buildInMatchBannerWidget();
+                        if (bannerWidget == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              key: const Key('in_match_banner_slot'),
+                              height: AdConfig.inMatchBannerHeight,
+                              child: Center(child: bannerWidget),
+                            ),
+                            const SizedBox(
+                              height: AdConfig.inMatchBannerBottomGap,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
 
                   // 5. Giriş Alanı ve Gönder Butonu
                   AnswerInputBar(

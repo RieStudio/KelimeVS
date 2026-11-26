@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/network_status_provider.dart';
+import '../../../core/ads/ad_providers.dart';
+import '../../../core/config/ad_config.dart';
+import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -70,6 +73,17 @@ class _FriendMatchRevealScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _suppressionNotifier.suppress();
+        if (AdConfig.isAdsEnabled &&
+            ref.read(networkStatusProvider).status != NetworkStatus.offline) {
+          final consent = ref.read(adConsentProvider);
+          if (consent.isSdkInitialized && consent.canRequestAds) {
+            unawaited(
+              ref.read(adServiceProvider).loadInMatchBanner(
+                    adUnitId: AdConfig.bannerAdUnitId,
+                  ),
+            );
+          }
+        }
       }
     });
 

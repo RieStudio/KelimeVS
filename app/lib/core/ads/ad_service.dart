@@ -72,6 +72,7 @@ class AdConsentState {
 /// Reklam SDK ve UMP onay yaşam döngüsü soyutlaması.
 abstract interface class AdService {
   ValueListenable<bool> get isBannerLoadedListenable;
+  ValueListenable<bool> get isInMatchBannerLoadedListenable;
   ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable;
 
   /// UMP onay akışını çalıştırır ve izin varsa MobileAds SDK'yı başlatır.
@@ -80,7 +81,7 @@ abstract interface class AdService {
   /// Ayarlar ekranından gizlilik seçenekleri formunu yeniden açar.
   Future<AdConsentPrivacyStatus> showPrivacyOptionsForm();
 
-  /// Paylaşımlı adaptive banner'ı yükler/önbellekler.
+  /// Paylaşımlı adaptive banner'ı yükler/önbellekler (MainShell).
   Future<void> loadBanner({required String adUnitId, required int width});
 
   /// Banner widget'ını döndürür (yüklü değilse null).
@@ -88,6 +89,15 @@ abstract interface class AdService {
 
   /// Banner kaynağını serbest bırakır.
   Future<void> disposeBanner();
+
+  /// Maç içi sabit `AdSize.banner` (320x50) reklamını ön yükler (MainShell'den bağımsız).
+  Future<void> loadInMatchBanner({required String adUnitId});
+
+  /// Maç içi banner widget'ını döndürür (yüklü değilse null).
+  Widget? buildInMatchBannerWidget();
+
+  /// Maç içi banner kaynağını serbest bırakır.
+  Future<void> disposeInMatchBanner();
 
   /// Ödüllü reklamı ön yükler (10 sn zaman aşımı + üstel geri çekilme).
   Future<void> preloadRewarded({required String adUnitId});
@@ -114,12 +124,15 @@ class GoogleMobileAdsService implements AdService {
   final Future<void> Function() _showPrivacyOptionsForm;
 
   final ValueNotifier<bool> _isBannerLoaded = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isInMatchBannerLoaded = ValueNotifier<bool>(false);
   final ValueNotifier<AdRewardedLoadStatus> _rewardedStatus =
       ValueNotifier<AdRewardedLoadStatus>(AdRewardedLoadStatus.idle);
 
   BannerAd? _bannerAd;
   int? _bannerWidth;
   bool _isBannerLoading = false;
+  BannerAd? _inMatchBannerAd;
+  bool _isInMatchBannerLoading = false;
   bool _sdkReady = false;
 
   RewardedAd? _rewardedAd;
@@ -156,6 +169,10 @@ class GoogleMobileAdsService implements AdService {
 
   @override
   ValueListenable<bool> get isBannerLoadedListenable => _isBannerLoaded;
+
+  @override
+  ValueListenable<bool> get isInMatchBannerLoadedListenable =>
+      _isInMatchBannerLoaded;
 
   @override
   ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable =>
@@ -348,6 +365,69 @@ class GoogleMobileAdsService implements AdService {
   }
 
   @override
+  Future<void> loadInMatchBanner({required String adUnitId}) async {
+    if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty) {
+      return;
+    }
+    if ((_inMatchBannerAd != null && _isInMatchBannerLoaded.value) ||
+        _isInMatchBannerLoading) {
+      return;
+    }
+
+    _isInMatchBannerLoading = true;
+    try {
+      await _inMatchBannerAd?.dispose();
+      _inMatchBannerAd = null;
+      _isInMatchBannerLoaded.value = false;
+
+      final banner = BannerAd(
+        adUnitId: adUnitId,
+        size: AdSize.banner,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            _isInMatchBannerLoading = false;
+            _inMatchBannerAd = ad as BannerAd;
+            _isInMatchBannerLoaded.value = true;
+          },
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+            _isInMatchBannerLoading = false;
+            _inMatchBannerAd = null;
+            _isInMatchBannerLoaded.value = false;
+          },
+        ),
+      );
+      _inMatchBannerAd = banner;
+      await banner.load();
+    } catch (_) {
+      _isInMatchBannerLoading = false;
+      _inMatchBannerAd = null;
+      _isInMatchBannerLoaded.value = false;
+    }
+  }
+
+  @override
+  Widget? buildInMatchBannerWidget() {
+    final ad = _inMatchBannerAd;
+    if (ad == null || !_isInMatchBannerLoaded.value) return null;
+    return SizedBox(
+      width: AdSize.banner.width.toDouble(),
+      height: AdSize.banner.height.toDouble(),
+      child: AdWidget(ad: ad),
+    );
+  }
+
+  @override
+  Future<void> disposeInMatchBanner() async {
+    _isInMatchBannerLoading = false;
+    _isInMatchBannerLoaded.value = false;
+    final ad = _inMatchBannerAd;
+    _inMatchBannerAd = null;
+    await ad?.dispose();
+  }
+
+  @override
   Future<void> preloadRewarded({required String adUnitId}) async {
     if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty) {
       return;
@@ -490,12 +570,15 @@ class FakeAdService implements AdService {
   bool simulateBannerLoadSuccess;
 
   final ValueNotifier<bool> _isBannerLoaded = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isInMatchBannerLoaded = ValueNotifier<bool>(false);
   final ValueNotifier<AdRewardedLoadStatus> _rewardedStatus =
       ValueNotifier<AdRewardedLoadStatus>(AdRewardedLoadStatus.idle);
 
   int initializeCallCount = 0;
   int showPrivacyOptionsCallCount = 0;
   int loadBannerCallCount = 0;
+  int loadInMatchBannerCallCount = 0;
+  int disposeInMatchBannerCallCount = 0;
   int preloadRewardedCallCount = 0;
   int showRewardedCallCount = 0;
   final List<String> callLog = <String>[];
@@ -511,9 +594,11 @@ class FakeAdService implements AdService {
     this.rewardEarnedOnShow = true,
     this.simulateBannerLoadSuccess = true,
     bool initialBannerLoaded = false,
+    bool initialInMatchBannerLoaded = false,
     AdRewardedLoadStatus initialRewardedStatus = AdRewardedLoadStatus.ready,
   }) {
     _isBannerLoaded.value = initialBannerLoaded;
+    _isInMatchBannerLoaded.value = initialInMatchBannerLoaded;
     _rewardedStatus.value = initialRewardedStatus;
   }
 
@@ -521,11 +606,19 @@ class FakeAdService implements AdService {
   ValueListenable<bool> get isBannerLoadedListenable => _isBannerLoaded;
 
   @override
+  ValueListenable<bool> get isInMatchBannerLoadedListenable =>
+      _isInMatchBannerLoaded;
+
+  @override
   ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable =>
       _rewardedStatus;
 
   void setBannerLoaded(bool value) {
     _isBannerLoaded.value = value;
+  }
+
+  void setInMatchBannerLoaded(bool value) {
+    _isInMatchBannerLoaded.value = value;
   }
 
   void setRewardedStatus(AdRewardedLoadStatus status) {
@@ -568,6 +661,32 @@ class FakeAdService implements AdService {
   Future<void> disposeBanner() async {
     callLog.add('disposeBanner');
     _isBannerLoaded.value = false;
+  }
+
+  @override
+  Future<void> loadInMatchBanner({required String adUnitId}) async {
+    loadInMatchBannerCallCount++;
+    callLog.add('loadInMatchBanner:$adUnitId');
+    _isInMatchBannerLoaded.value = simulateBannerLoadSuccess;
+  }
+
+  @override
+  Widget? buildInMatchBannerWidget() {
+    if (!_isInMatchBannerLoaded.value) return null;
+    return Container(
+      key: const Key('fake_in_match_banner_ad_widget'),
+      width: 320,
+      height: 50,
+      alignment: Alignment.center,
+      child: const Text('TEST IN-MATCH BANNER'),
+    );
+  }
+
+  @override
+  Future<void> disposeInMatchBanner() async {
+    disposeInMatchBannerCallCount++;
+    callLog.add('disposeInMatchBanner');
+    _isInMatchBannerLoaded.value = false;
   }
 
   @override

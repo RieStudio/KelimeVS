@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/ads/ad_providers.dart';
+import '../../../core/config/ad_config.dart';
 import '../../../core/icons/app_icons.dart';
 import '../../../core/network/network_status_provider.dart';
 import '../../../core/strings/app_strings.dart';
@@ -343,9 +345,22 @@ class _MatchmakingScreenState extends ConsumerState<MatchmakingScreen>
     _startReveal();
   }
 
+  void _preloadInMatchBanner() {
+    if (!AdConfig.isAdsEnabled) return;
+    if (ref.read(networkStatusProvider).status == NetworkStatus.offline) return;
+    final consent = ref.read(adConsentProvider);
+    if (!consent.isSdkInitialized || !consent.canRequestAds) return;
+    unawaited(
+      ref.read(adServiceProvider).loadInMatchBanner(
+            adUnitId: AdConfig.bannerAdUnitId,
+          ),
+    );
+  }
+
   void _startReveal() {
     _dotsTimer?.cancel();
     _dotsTimer = null;
+    _preloadInMatchBanner();
 
     // Bot maçı için henüz soru seçilmediyse ve havuz yüklendiyse seç
     if (!_isOnlineMatch &&
