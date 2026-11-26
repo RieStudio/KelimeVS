@@ -39,10 +39,10 @@ abstract final class AdConfig {
   static const double inMatchBannerHeight = 50.0;
 
   /// Maç içi banner ile `AnswerInputBar` arasındaki en az dokunma güvenlik boşluğu (px).
-  static const double inMatchBannerBottomGap = 24.0;
+  static const double inMatchBannerBottomGap = 12.0;
 
   /// Klavye açıkken üst çubuk + oyuncu kartları + soru kartı + giriş alanı + okunabilir
-  /// cevap geçmişi alanı korunduktan sonra maç içi banner'ın (50 + 24 = 74 px)
+  /// cevap geçmişi alanı korunduktan sonra maç içi banner'ın (50 + 12 = 62 px)
   /// sığabilmesi için gereken en düşük mantıksal ekran yüksekliği (dp).
   /// Hesap: ~354 dp sabit oyun alanı + ~270 dp klavye tahmini + 74 dp banner/boşluk + ~62 dp okunabilir alan = 760 dp.
   static const double inMatchBannerMinScreenHeight = 760.0;

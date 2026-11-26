@@ -152,7 +152,7 @@ void main() {
   }
 
   testWidgets(
-      'banner hazırken görünür kutu çizgisinin tam 24 dp üstünde durur (klavye açık/kapalı) ve çıkınca dispose edilir',
+      'banner hazırken görünür kutu çizgisinin tam 12 dp üstünde durur (klavye açık/kapalı) ve çıkınca dispose edilir',
       (tester) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1.0;
@@ -167,7 +167,7 @@ void main() {
     );
     final controller = _TestMatchController(_activeMatchUiState());
 
-    // 1. Klavye kapalıyken tam 24 dp
+    // 1. Klavye kapalıyken tam 12 dp
     await tester.pumpWidget(
       buildMatchHost(
         fakeAdService: fakeAd,
@@ -193,7 +193,7 @@ void main() {
       closeTo(AdConfig.inMatchBannerBottomGap, 0.01),
     );
 
-    // 2. Klavye açıkken de tam 24 dp
+    // 2. Klavye açıkken de tam 12 dp
     await tester.pumpWidget(
       buildMatchHost(
         fakeAdService: fakeAd,
