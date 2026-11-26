@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/ads/ad_rewards_state.dart';
 import '../../../core/config/server_config.dart';
 import '../../../core/network/auth_http_executor.dart';
 import '../../../core/strings/app_strings.dart';
@@ -133,6 +134,7 @@ class UserProfileModel {
   final List<UserAchievement> achievements;
   final int currentStreak;
   final int maxStreak;
+  final AdRewardsInfo adRewards;
 
   const UserProfileModel({
     required this.uid,
@@ -149,6 +151,7 @@ class UserProfileModel {
     this.achievements = const [],
     this.currentStreak = 0,
     this.maxStreak = 0,
+    this.adRewards = const AdRewardsInfo.disabled(),
   });
 
   int get played => stats.played;
@@ -174,6 +177,7 @@ class UserProfileModel {
         (json['currentStreak'] ?? json['current_streak'] as num?)?.toInt() ?? 0;
     final maxStreak =
         (json['maxStreak'] ?? json['max_streak'] as num?)?.toInt() ?? 0;
+    final adRewardsJson = _asMap(json['adRewards'] ?? json['ad_rewards']);
 
     return UserProfileModel(
       uid: json['uid'] as String? ?? '',
@@ -195,6 +199,7 @@ class UserProfileModel {
       achievements: achievements,
       currentStreak: currentStreak,
       maxStreak: maxStreak,
+      adRewards: AdRewardsInfo.fromJson(adRewardsJson),
     );
   }
 }

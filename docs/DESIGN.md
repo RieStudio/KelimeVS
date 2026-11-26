@@ -205,6 +205,22 @@ Kodda renkler **tek bir tema dosyasında** tanımlanır. Widget'larda sabit renk
    - **Onboarding Koruması:** Kullanıcı henüz takma ad seçmemişken (`!profile.hasNickname`) istek bileşenleri gösterilmez.
    - **Erişilebilirlik:** `Semantics(liveRegion: true)` ile yeni istek geldiğinde ekran okuyucuya anons edilir.
 
+### 6d) Reklam Alanları ve Ödüllü Reklam Butonları
+1. **Paylaşımlı Adaptive Banner (`AdBannerSlot`):**
+   - **Konum:** Yalnızca `MainShell` içindeki `Scaffold.bottomNavigationBar` sütununda `AppBottomNavBar`'ın hemen üstünde yer alır (`AdConfig.bannerTabIndices = {0, 1, 2, 3}`; Ana Sayfa, Sıralama, Mağaza, Profil).
+   - **Güvenli Ayrım:** Yanlışlıkla tıklamayı önlemek için banner ile alt gezinme çubuğu arasında `10 px` (`AppDimens.space10`) dikey boşluk bulunur.
+   - **Daraltma:** Reklamlar kapalıysa (`!AdConfig.isAdsEnabled`), cihaz çevrimdışıysa, UMP izni yoksa veya reklam yüklenmediyse `SizedBox.shrink()` döner; yüklendiğinde `200 ms` `AnimatedSize` ile açılır.
+   - **Maç ve Ayarlar Koruması:** Eşleşme, aktif maç, maç sonu, dostluk maçı ve Ayarlar ekranları `MainShell` üstüne yeni rota olarak açıldığından banner bu ekranlarda yer almaz.
+2. **Ödüllü Reklam Butonu (`RewardedAdActionButton`):**
+   - **Yerleşim:** Yalnızca `AdConfig.isAdsEnabled && profile.adRewards.enabled` iken `EnergyDepletedBottomSheet` (`"Reklam İzle · +1 Enerji"`) ve Mağaza > Jeton sekmesi (`"Reklam İzle · +15 Jeton"`) içinde gösterilir; miktar ve günlük sınır değerleri `profile.adRewards` alanından okunur.
+   - **Tasarım ve Durumlar:** Neo-brutalist stil (`AppColors.mint` dolgu, 2 px `ink` kenarlık, `0 3px 0 ink` sert gölge) ve altında `"Bugün kalan: X/Y"` bilgisi.
+     - *Hazır:* Etkin mint buton.
+     - *Yükleniyor:* Spinner + `"Reklam yükleniyor..."` (pasif).
+     - *Hak bitti:* `"Yarın tekrar"` (pasif).
+     - *Bekleme süresi:* `"Bekle: NN sn"` canlı geri sayım (pasif).
+     - *Çevrimdışı:* Pasif.
+     - *Hazır değil:* Dokunulunca kısa bilgi snackbar'ı ve ön yükleme tetiklenir.
+
 ## 7. Ekranlar
 
 Tüm ekranlar zemin `surface`, yan boşluk 20, üst 24.
@@ -355,6 +371,11 @@ Henüz çizilmemiş ekranlar (giriş, sıralama, mağaza, profil, ayarlar) ilgil
 - **Eşleşme bekleme ekranı:** Enerji açıkken aramaya girerken enerji düşmez, yalnızca maç gerçekten başlayınca düşer (bu yüzden kullanıcıya "enerji harcanacak" uyarısı gösterilmez).
 - **Rakip terk ederse veya maç iptal edilirse:** Maçı terk eden (maçtan çıkan ya da bağlantısı kopup 30 saniyelik süre içinde dönmeyen, yani kopma yenilgisi alan) oyuncu enerjisini kaybeder; maçta kalan oyuncuya **1 enerji iade edilir**. Eşleşme sonrası rakip hiç bağlanmazsa (`opponent_absent`) ya da maç sırasında her iki oyuncunun da bağlantısı kopup süreleri dolarsa (`both_disconnected`) maç iptal (`voided`) edilir ve **harcama yapmış her iki oyuncuya da enerjileri iade edilir**. Normal süre aşımı (cevap vermeme) terk sayılmaz, o durumda iade yoktur. Oyuncu kendi bağlantısını kaybedip süre içinde dönerse enerjisi düşmüş kalır, maç normal devam eder.
 - **Özellik anahtarı:** Enerji sistemi sunucuda `ENERGY_ENABLED` anahtarıyla açılıp kapanır. Varsayılan **kapalı**. Kapalıyken enerji hapı, Enerji sekmesi ve "Enerjin bitti" akışı görünmez, tüm maçlar sınırsızdır.
+
+**9c) Reklam Alanları ve Ödüllü Reklam Butonları (AdMob)** – `AdConfig.isAdsEnabled` kapalıyken veya `profile.adRewards.enabled` `false` iken hiçbir reklam alanı çizilmez.
+- **Paylaşımlı Adaptive Banner (`AdBannerSlot`):** `MainShell` `bottomNavigationBar` içinde `AppBottomNavBar` hemen üstünde yer alır (`AdConfig.bannerTabIndices`: Ana Sayfa, Sıralama, Mağaza, Profil). Yanlışlıkla tıklamayı önlemek için banner ile gezinme çubuğu arasında `10 px` (`AppDimens.space10`) dikey boşluk bulunur. Çevrimdışıysa, yüklenmediyse veya kapalıysa `SizedBox.shrink()` ile gizlenir. Ayarlar ekranı ile eşleşme/oyun/maç sonu/dostluk maçı rotalarında banner bulunmaz.
+- **Ödüllü Reklam Butonları (`RewardedAdActionButton`):** `EnergyDepletedBottomSheet` (+1 Enerji) ve `CoinsTabView` (Ücretsiz Jeton, +15 Jeton) içinde yer alır. Miktar ve günlük haklar (`Bugün kalan: X/Y`) sunucudaki `adRewards` alanından okunur.
+  - **Durumlar:** *Hazır* (`mint` dolgu, `ink` kenarlık, etkin), *Yükleniyor* (döner gösterge + "Reklam yükleniyor..."), *Hak bitti* (pasif, "Yarın tekrar"), *Bekleme süresi* (pasif, canlı "Bekle: XX sn" geri sayımı), *Çevrimdışı* (pasif), *Hazır değil* (dokununca kısa bilgi snackbar'ı ve ön yükleme tetiklemesi).
 
 **10) Ayarlar Ekranı** – Ana ekrandaki ayarlar ikon butonuyla tam ekran rota (`SettingsScreen`) olarak açılır. Geri tuşuyla ana ekrana dönülür. Zemin `surface`, kartlar `card` zemin + 2 px `mint` kenarlık + `borderRadiusListCard` (16 px).
 - **Yasal ve Bilgilendirme:**

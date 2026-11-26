@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/ads/ad_rewards_state.dart';
 import '../../../core/strings/app_strings.dart';
 import '../../auth/application/auth_notifier.dart';
 import '../../auth/data/auth_repository.dart';
@@ -27,6 +28,7 @@ class ProfileState {
   final List<UserAchievement> achievements;
   final int currentStreak;
   final int maxStreak;
+  final AdRewardsInfo adRewards;
 
   const ProfileState({
     this.nickname,
@@ -44,6 +46,7 @@ class ProfileState {
     this.achievements = const [],
     this.currentStreak = 0,
     this.maxStreak = 0,
+    this.adRewards = const AdRewardsInfo.disabled(),
   });
 
   bool get hasNickname => nickname != null && nickname!.trim().isNotEmpty;
@@ -67,6 +70,7 @@ class ProfileState {
     List<UserAchievement>? achievements,
     int? currentStreak,
     int? maxStreak,
+    AdRewardsInfo? adRewards,
   }) {
     return ProfileState(
       nickname: clearNickname ? null : (nickname ?? this.nickname),
@@ -86,6 +90,7 @@ class ProfileState {
       achievements: achievements ?? this.achievements,
       currentStreak: currentStreak ?? this.currentStreak,
       maxStreak: maxStreak ?? this.maxStreak,
+      adRewards: adRewards ?? this.adRewards,
     );
   }
 }
@@ -225,6 +230,7 @@ class ProfileNotifier extends Notifier<ProfileState> {
           achievements: remote.achievements,
           currentStreak: remote.currentStreak,
           maxStreak: remote.maxStreak,
+          adRewards: remote.adRewards,
           clearSyncError: true,
           pendingMigrationNotice: remote.frameMigration,
           isLoaded: true,
@@ -522,6 +528,11 @@ class ProfileNotifier extends Notifier<ProfileState> {
       energy: energy,
       serverNowMs: serverNowMs ?? state.serverNowMs,
     );
+  }
+
+  /// Ödüllü reklam kotasını günceller.
+  void updateAdRewards(AdRewardsInfo adRewards) {
+    state = state.copyWith(adRewards: adRewards);
   }
 
   /// Kuşanılan avatar çerçevesini yerelde ve durumda günceller.

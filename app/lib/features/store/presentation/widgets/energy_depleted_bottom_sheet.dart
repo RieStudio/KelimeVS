@@ -2,10 +2,17 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/ads/ad_providers.dart';
+import '../../../../core/ads/ad_service.dart';
+import '../../../../core/ads/widgets/rewarded_ad_button.dart';
+import '../../../../core/config/ad_config.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/network/network_guard.dart';
+import '../../../../core/network/network_status_provider.dart';
+import '../../../profile/application/profile_notifier.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
@@ -143,6 +150,52 @@ class _EnergyDepletedBottomSheetState
     }
   }
 
+  Future<void> _handleWatchRewardedAd() async {
+    if (!ensureNetworkConnected(context, ref)) return;
+    final outcome = await ref
+        .read(adRewardControllerProvider.notifier)
+        .watchAndClaim('energy');
+    if (!mounted) return;
+    if (outcome.status == RewardedClaimOutcomeStatus.granted) {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              outcome.message,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            backgroundColor: AppColors.ink,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      Navigator.of(context).pop();
+      widget.onEnergyPurchased?.call();
+    } else {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              outcome.message,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.fontNunito,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            backgroundColor: AppColors.ink,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final packOne = widget.energy.packs.firstWhere(
@@ -152,6 +205,13 @@ class _EnergyDepletedBottomSheetState
     final countdownStr = _formatRemainingCountdown(
       widget.energy.nextEnergyAtMs,
     );
+    final profile = ref.watch(profileProvider);
+    final adRewards = profile.adRewards;
+    final isOnline =
+        ref.watch(networkStatusProvider).status != NetworkStatus.offline;
+    final adService = ref.watch(adServiceProvider);
+    final isClaiming = ref.watch(adRewardControllerProvider).isClaiming;
+    final showAdButton = AdConfig.isAdsEnabled && adRewards.enabled;
 
     return Container(
       decoration: const BoxDecoration(
@@ -233,6 +293,50 @@ class _EnergyDepletedBottomSheetState
             ],
 
             const SizedBox(height: AppDimens.space20),
+
+            if (showAdButton) ...[
+              ValueListenableBuilder<AdRewardedLoadStatus>(
+                valueListenable: adService.rewardedStatusListenable,
+                builder: (context, loadStatus, _) {
+                  return RewardedAdActionButton(
+                    buttonKey: const Key('energy_sheet_watch_ad_button'),
+                    label: AppStrings.adWatchForEnergy(adRewards.energyAmount),
+                    remaining: adRewards.energy.remaining,
+                    cap: adRewards.energy.cap,
+                    nextClaimAtMs: adRewards.nextClaimAtMs,
+                    serverNowMs: widget.serverNowMs ?? profile.serverNowMs,
+                    isOnline: isOnline,
+                    loadStatus: loadStatus,
+                    isClaiming: isClaiming,
+                    onPressed: _handleWatchRewardedAd,
+                    onNotReadyTap: () {
+                      unawaited(
+                        ref
+                            .read(adRewardControllerProvider.notifier)
+                            .preloadIfReady(),
+                      );
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              AppStrings.adRewardNotReady,
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.fontNunito,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            backgroundColor: AppColors.ink,
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: AppDimens.space12),
+            ],
 
             // Buton 1: "1 Enerji · 20 Jeton"
             PrimaryButton(

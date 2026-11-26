@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../config/ad_config.dart';
@@ -10,6 +11,14 @@ enum AdConsentPrivacyStatus {
   unknown,
   notRequired,
   required,
+}
+
+/// Ödüllü reklam yükleme durumu.
+enum AdRewardedLoadStatus {
+  idle,
+  loading,
+  ready,
+  failed,
 }
 
 /// Reklam onayı ve SDK başlatma durumu.
@@ -62,28 +71,36 @@ class AdConsentState {
 
 /// Reklam SDK ve UMP onay yaşam döngüsü soyutlaması.
 abstract interface class AdService {
+  ValueListenable<bool> get isBannerLoadedListenable;
+  ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable;
+
   /// UMP onay akışını çalıştırır ve izin varsa MobileAds SDK'yı başlatır.
   Future<AdConsentState> initialize();
 
   /// Ayarlar ekranından gizlilik seçenekleri formunu yeniden açar.
   Future<AdConsentPrivacyStatus> showPrivacyOptionsForm();
 
-  /// Banner yükleme iskeleti (Faz 3'te doldurulacak).
+  /// Paylaşımlı adaptive banner'ı yükler/önbellekler.
   Future<void> loadBanner({required String adUnitId, required int width});
 
-  /// Banner temizleme iskeleti (Faz 3'te doldurulacak).
+  /// Banner widget'ını döndürür (yüklü değilse null).
+  Widget? buildBannerWidget();
+
+  /// Banner kaynağını serbest bırakır.
   Future<void> disposeBanner();
 
-  /// Ödüllü reklam ön yükleme iskeleti (Faz 3'te doldurulacak).
+  /// Ödüllü reklamı ön yükler (10 sn zaman aşımı + üstel geri çekilme).
   Future<void> preloadRewarded({required String adUnitId});
 
-  /// Ödüllü reklam gösterim iskeleti (Faz 3'te doldurulacak).
+  /// Ödüllü reklamı gösterir; yalnızca ödül kazanılırsa `true` döner.
   Future<bool> showRewarded();
 }
 
 /// Gerçek `google_mobile_ads` ve UMP implementasyonu.
 class GoogleMobileAdsService implements AdService {
   static const Duration _umpTimeout = Duration(seconds: 8);
+  static const Duration _rewardedLoadTimeout = Duration(seconds: 10);
+  static const int _maxBackoffSeconds = 32;
 
   final bool Function() _isAdsEnabled;
   final Future<void> Function(RequestConfiguration config) _updateRequestConfig;
@@ -95,6 +112,21 @@ class GoogleMobileAdsService implements AdService {
       _getPrivacyOptionsStatus;
   final Future<void> Function() _initializeMobileAds;
   final Future<void> Function() _showPrivacyOptionsForm;
+
+  final ValueNotifier<bool> _isBannerLoaded = ValueNotifier<bool>(false);
+  final ValueNotifier<AdRewardedLoadStatus> _rewardedStatus =
+      ValueNotifier<AdRewardedLoadStatus>(AdRewardedLoadStatus.idle);
+
+  BannerAd? _bannerAd;
+  int? _bannerWidth;
+  bool _isBannerLoading = false;
+  bool _sdkReady = false;
+
+  RewardedAd? _rewardedAd;
+  bool _isRewardedLoading = false;
+  String? _lastRewardedAdUnitId;
+  int _retryAttempt = 0;
+  Timer? _retryTimer;
 
   GoogleMobileAdsService({
     bool Function()? isAdsEnabled,
@@ -121,6 +153,13 @@ class GoogleMobileAdsService implements AdService {
             initializeMobileAds ?? (() => MobileAds.instance.initialize()),
         _showPrivacyOptionsForm =
             showPrivacyOptionsForm ?? _defaultShowPrivacyOptionsForm;
+
+  @override
+  ValueListenable<bool> get isBannerLoadedListenable => _isBannerLoaded;
+
+  @override
+  ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable =>
+      _rewardedStatus;
 
   static Future<void> _defaultRequestConsentInfoUpdate(
     ConsentRequestParameters params,
@@ -204,6 +243,7 @@ class GoogleMobileAdsService implements AdService {
       if (canRequest) {
         await _initializeMobileAds();
         sdkInitialized = true;
+        _sdkReady = true;
       }
     } catch (_) {
       // Hata veya zaman aşımı durumunda uygulama akışı bozulmaz.
@@ -233,16 +273,200 @@ class GoogleMobileAdsService implements AdService {
   }
 
   @override
-  Future<void> loadBanner({required String adUnitId, required int width}) async {}
+  Future<void> loadBanner({required String adUnitId, required int width}) async {
+    if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty || width <= 0) {
+      return;
+    }
+    if (_bannerAd != null && _bannerWidth == width && _isBannerLoaded.value) {
+      return;
+    }
+    if (_isBannerLoading && _bannerWidth == width) {
+      return;
+    }
+
+    _isBannerLoading = true;
+    _bannerWidth = width;
+
+    try {
+      final size =
+          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+      if (size == null) {
+        _isBannerLoading = false;
+        return;
+      }
+
+      await _bannerAd?.dispose();
+      _bannerAd = null;
+      _isBannerLoaded.value = false;
+
+      final banner = BannerAd(
+        adUnitId: adUnitId,
+        size: size,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            _isBannerLoading = false;
+            _bannerAd = ad as BannerAd;
+            _isBannerLoaded.value = true;
+          },
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+            _isBannerLoading = false;
+            _bannerAd = null;
+            _isBannerLoaded.value = false;
+          },
+        ),
+      );
+      _bannerAd = banner;
+      await banner.load();
+    } catch (_) {
+      _isBannerLoading = false;
+      _bannerAd = null;
+      _isBannerLoaded.value = false;
+    }
+  }
 
   @override
-  Future<void> disposeBanner() async {}
+  Widget? buildBannerWidget() {
+    final ad = _bannerAd;
+    if (ad == null || !_isBannerLoaded.value) return null;
+    return SizedBox(
+      width: ad.size.width.toDouble(),
+      height: ad.size.height.toDouble(),
+      child: AdWidget(ad: ad),
+    );
+  }
 
   @override
-  Future<void> preloadRewarded({required String adUnitId}) async {}
+  Future<void> disposeBanner() async {
+    _isBannerLoading = false;
+    _bannerWidth = null;
+    _isBannerLoaded.value = false;
+    final ad = _bannerAd;
+    _bannerAd = null;
+    await ad?.dispose();
+  }
 
   @override
-  Future<bool> showRewarded() async => false;
+  Future<void> preloadRewarded({required String adUnitId}) async {
+    if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty) {
+      return;
+    }
+    _lastRewardedAdUnitId = adUnitId;
+    if (_rewardedAd != null) {
+      _rewardedStatus.value = AdRewardedLoadStatus.ready;
+      return;
+    }
+    if (_isRewardedLoading) return;
+
+    _retryTimer?.cancel();
+    _isRewardedLoading = true;
+    _rewardedStatus.value = AdRewardedLoadStatus.loading;
+
+    final completer = Completer<void>();
+    Timer? timeoutTimer;
+    timeoutTimer = Timer(_rewardedLoadTimeout, () {
+      if (!completer.isCompleted) {
+        _isRewardedLoading = false;
+        _rewardedStatus.value = AdRewardedLoadStatus.failed;
+        _scheduleRewardedRetry();
+        completer.complete();
+      }
+    });
+
+    try {
+      await RewardedAd.load(
+        adUnitId: adUnitId,
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (ad) {
+            timeoutTimer?.cancel();
+            _isRewardedLoading = false;
+            _retryAttempt = 0;
+            _rewardedAd = ad;
+            _rewardedStatus.value = AdRewardedLoadStatus.ready;
+            if (!completer.isCompleted) completer.complete();
+          },
+          onAdFailedToLoad: (error) {
+            timeoutTimer?.cancel();
+            _isRewardedLoading = false;
+            _rewardedAd = null;
+            _rewardedStatus.value = AdRewardedLoadStatus.failed;
+            _scheduleRewardedRetry();
+            if (!completer.isCompleted) completer.complete();
+          },
+        ),
+      );
+    } catch (_) {
+      timeoutTimer.cancel();
+      _isRewardedLoading = false;
+      _rewardedAd = null;
+      _rewardedStatus.value = AdRewardedLoadStatus.failed;
+      _scheduleRewardedRetry();
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    return completer.future;
+  }
+
+  void _scheduleRewardedRetry() {
+    final unitId = _lastRewardedAdUnitId;
+    if (unitId == null || unitId.isEmpty || !_isAdsEnabled() || !_sdkReady) {
+      return;
+    }
+    _retryTimer?.cancel();
+    final delaySec = (2 << _retryAttempt).clamp(2, _maxBackoffSeconds);
+    _retryAttempt = (_retryAttempt + 1).clamp(0, 5);
+    _retryTimer = Timer(Duration(seconds: delaySec), () {
+      unawaited(preloadRewarded(adUnitId: unitId));
+    });
+  }
+
+  @override
+  Future<bool> showRewarded() async {
+    final ad = _rewardedAd;
+    if (ad == null) {
+      return false;
+    }
+
+    _rewardedAd = null;
+    _rewardedStatus.value = AdRewardedLoadStatus.idle;
+
+    final completer = Completer<bool>();
+    var earned = false;
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        if (!completer.isCompleted) completer.complete(earned);
+        final unitId = _lastRewardedAdUnitId;
+        if (unitId != null && unitId.isNotEmpty) {
+          unawaited(preloadRewarded(adUnitId: unitId));
+        }
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        if (!completer.isCompleted) completer.complete(false);
+        final unitId = _lastRewardedAdUnitId;
+        if (unitId != null && unitId.isNotEmpty) {
+          unawaited(preloadRewarded(adUnitId: unitId));
+        }
+      },
+    );
+
+    try {
+      await ad.show(
+        onUserEarnedReward: (ad, reward) {
+          earned = true;
+        },
+      );
+    } catch (_) {
+      ad.dispose();
+      if (!completer.isCompleted) completer.complete(false);
+    }
+
+    return completer.future;
+  }
 
   static AdConsentPrivacyStatus _mapPrivacyStatus(
     PrivacyOptionsRequirementStatus status,
@@ -262,9 +486,18 @@ class GoogleMobileAdsService implements AdService {
 class FakeAdService implements AdService {
   final AdConsentState initialConsentState;
   final AdConsentPrivacyStatus privacyStatusAfterForm;
+  bool rewardEarnedOnShow;
+  bool simulateBannerLoadSuccess;
+
+  final ValueNotifier<bool> _isBannerLoaded = ValueNotifier<bool>(false);
+  final ValueNotifier<AdRewardedLoadStatus> _rewardedStatus =
+      ValueNotifier<AdRewardedLoadStatus>(AdRewardedLoadStatus.idle);
 
   int initializeCallCount = 0;
   int showPrivacyOptionsCallCount = 0;
+  int loadBannerCallCount = 0;
+  int preloadRewardedCallCount = 0;
+  int showRewardedCallCount = 0;
   final List<String> callLog = <String>[];
 
   FakeAdService({
@@ -275,7 +508,29 @@ class FakeAdService implements AdService {
       privacyOptionsStatus: AdConsentPrivacyStatus.notRequired,
     ),
     this.privacyStatusAfterForm = AdConsentPrivacyStatus.required,
-  });
+    this.rewardEarnedOnShow = true,
+    this.simulateBannerLoadSuccess = true,
+    bool initialBannerLoaded = false,
+    AdRewardedLoadStatus initialRewardedStatus = AdRewardedLoadStatus.ready,
+  }) {
+    _isBannerLoaded.value = initialBannerLoaded;
+    _rewardedStatus.value = initialRewardedStatus;
+  }
+
+  @override
+  ValueListenable<bool> get isBannerLoadedListenable => _isBannerLoaded;
+
+  @override
+  ValueListenable<AdRewardedLoadStatus> get rewardedStatusListenable =>
+      _rewardedStatus;
+
+  void setBannerLoaded(bool value) {
+    _isBannerLoaded.value = value;
+  }
+
+  void setRewardedStatus(AdRewardedLoadStatus status) {
+    _rewardedStatus.value = status;
+  }
 
   @override
   Future<AdConsentState> initialize() async {
@@ -293,22 +548,39 @@ class FakeAdService implements AdService {
 
   @override
   Future<void> loadBanner({required String adUnitId, required int width}) async {
+    loadBannerCallCount++;
     callLog.add('loadBanner:$adUnitId:$width');
+    _isBannerLoaded.value = simulateBannerLoadSuccess;
+  }
+
+  @override
+  Widget? buildBannerWidget() {
+    if (!_isBannerLoaded.value) return null;
+    return Container(
+      key: const Key('fake_banner_ad_widget'),
+      height: 50,
+      alignment: Alignment.center,
+      child: const Text('TEST BANNER'),
+    );
   }
 
   @override
   Future<void> disposeBanner() async {
     callLog.add('disposeBanner');
+    _isBannerLoaded.value = false;
   }
 
   @override
   Future<void> preloadRewarded({required String adUnitId}) async {
+    preloadRewardedCallCount++;
     callLog.add('preloadRewarded:$adUnitId');
+    _rewardedStatus.value = AdRewardedLoadStatus.ready;
   }
 
   @override
   Future<bool> showRewarded() async {
+    showRewardedCallCount++;
     callLog.add('showRewarded');
-    return true;
+    return rewardEarnedOnShow;
   }
 }

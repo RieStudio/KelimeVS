@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/ads/ad_service.dart';
+import '../core/ads/widgets/rewarded_ad_button.dart';
 import '../core/icons/app_icons.dart';
 import '../core/strings/app_strings.dart';
 import '../core/theme/app_colors.dart';
@@ -1728,6 +1730,89 @@ class _NotificationsGallerySectionContentState
               ),
             ],
           ),
+        ),
+        const SizedBox(height: AppDimens.space24),
+        const SectionLabel('Reklam Bileşenleri (Test / Galeri)'),
+        const SizedBox(height: AppDimens.space10),
+        _AdsGallerySection(),
+      ],
+    );
+  }
+}
+
+class _AdsGallerySection extends StatelessWidget {
+  final FakeAdService _fakeAdService = FakeAdService(initialBannerLoaded: true);
+
+  @override
+  Widget build(BuildContext context) {
+    final futureCooldownMs = DateTime.now().millisecondsSinceEpoch + 45000;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AppDimens.space12),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppDimens.borderRadiusListCard,
+            border: Border.all(
+              color: AppColors.mint,
+              width: AppDimens.borderThin,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Adaptive Banner Yer Tutucusu (FakeAdService):',
+                style: AppTextStyles.secondaryText,
+              ),
+              const SizedBox(height: AppDimens.space8),
+              _fakeAdService.buildBannerWidget() ?? const SizedBox.shrink(),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDimens.space12),
+        RewardedAdActionButton(
+          label: AppStrings.adWatchForEnergy(1),
+          remaining: 2,
+          cap: 3,
+          isOnline: true,
+          loadStatus: AdRewardedLoadStatus.ready,
+          onPressed: () {},
+        ),
+        const SizedBox(height: AppDimens.space12),
+        RewardedAdActionButton(
+          label: AppStrings.adWatchForCoins(15),
+          remaining: 3,
+          cap: 3,
+          isOnline: true,
+          loadStatus: AdRewardedLoadStatus.loading,
+        ),
+        const SizedBox(height: AppDimens.space12),
+        RewardedAdActionButton(
+          label: AppStrings.adWatchForCoins(15),
+          remaining: 0,
+          cap: 3,
+          isOnline: true,
+          loadStatus: AdRewardedLoadStatus.ready,
+        ),
+        const SizedBox(height: AppDimens.space12),
+        RewardedAdActionButton(
+          label: AppStrings.adWatchForEnergy(1),
+          remaining: 1,
+          cap: 3,
+          nextClaimAtMs: futureCooldownMs,
+          isOnline: true,
+          loadStatus: AdRewardedLoadStatus.ready,
+          enableCooldownTicker: false,
+        ),
+        const SizedBox(height: AppDimens.space12),
+        RewardedAdActionButton(
+          label: AppStrings.adWatchForCoins(15),
+          remaining: 2,
+          cap: 3,
+          isOnline: false,
+          loadStatus: AdRewardedLoadStatus.ready,
         ),
       ],
     );

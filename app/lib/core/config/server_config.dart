@@ -53,6 +53,9 @@ abstract final class ServerConfig {
   /// Enerji satın alma yolu.
   static const String energyPath = '/store/energy';
 
+  /// Ödüllü reklam talep yolu.
+  static const String adsRewardPath = '/ads/reward';
+
   /// Güçlendirici harcama yolu.
   static const String powerupsSpendPath = '/powerups/spend';
 
@@ -94,6 +97,9 @@ abstract final class ServerConfig {
 
   /// Tam Enerji Satın Alma HTTP URL'si.
   static String get energyUrl => joinUrl(serverUrl, energyPath);
+
+  /// Tam Ödüllü Reklam Talep HTTP URL'si.
+  static String get adsRewardUrl => joinUrl(serverUrl, adsRewardPath);
 
   /// Tam Güçlendirici Harcama HTTP URL'si.
   static String get powerupsSpendUrl => joinUrl(serverUrl, powerupsSpendPath);

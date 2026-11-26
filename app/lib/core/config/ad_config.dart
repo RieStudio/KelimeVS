@@ -31,6 +31,10 @@ abstract final class AdConfig {
   /// Debug derlemelerinde test cihazı kimliklerini eklemek için yapılandırma noktası.
   static const List<String> testDeviceIds = <String>[];
 
+  /// Banner reklamın gösterileceği MainShell sekme indeksleri
+  /// (0: Ana Sayfa, 1: Sıralama, 2: Mağaza, 3: Profil).
+  static const Set<int> bannerTabIndices = <int>{0, 1, 2, 3};
+
   static const bool _envAdsEnabled = bool.fromEnvironment(
     'ADMOB_ENABLED',
     defaultValue: true,

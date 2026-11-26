@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/ads/ad_providers.dart';
+import 'core/ads/widgets/ad_banner_slot.dart';
+import 'core/config/ad_config.dart';
 import 'core/network/app_build_info.dart';
 import 'core/network/network_status_provider.dart';
 import 'core/strings/app_strings.dart';
@@ -173,6 +175,8 @@ class _MainShellState extends ConsumerState<MainShell>
       _reconcilePendingMatches();
       ref.read(profileProvider.notifier).retryPendingNicknameSync();
       _processPendingSoloMatches();
+      unawaited(ref.read(adRewardControllerProvider.notifier).retryPendingClaim());
+      unawaited(ref.read(adRewardControllerProvider.notifier).preloadIfReady());
     }
   }
 
@@ -198,6 +202,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _initAds() {
     unawaited(ref.read(adConsentProvider.notifier).initialize());
+    unawaited(ref.read(adRewardControllerProvider.notifier).retryPendingClaim());
   }
 
   Future<void> _retryStartupSequence() async {
@@ -398,15 +403,23 @@ class _MainShellState extends ConsumerState<MainShell>
           const ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: currentIndex,
-        onTap: (index) {
-          if (index == 1 && currentIndex == 1 && _hasVisitedLeaderboard) {
-            ref.read(leaderboardNotifierProvider.notifier).refresh();
-          }
-          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-        },
-        items: _navItems,
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AdBannerSlot(
+            isVisibleForTab: AdConfig.bannerTabIndices.contains(currentIndex),
+          ),
+          AppBottomNavBar(
+            currentIndex: currentIndex,
+            onTap: (index) {
+              if (index == 1 && currentIndex == 1 && _hasVisitedLeaderboard) {
+                ref.read(leaderboardNotifierProvider.notifier).refresh();
+              }
+              ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+            },
+            items: _navItems,
+          ),
+        ],
       ),
     );
   }

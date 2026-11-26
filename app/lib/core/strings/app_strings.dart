@@ -731,6 +731,29 @@ abstract final class AppStrings {
   static const String privacyPolicyConsentSuffix = "'nı kabul etmiş olursun.";
   static const String thirdPartyLicenses = 'Üçüncü Taraf Lisansları';
   static const String adPrivacyOptions = 'Reklam Gizliliği Seçenekleri';
+  static String adWatchForEnergy(int amount) => 'Reklam İzle · +$amount Enerji';
+  static String adWatchForCoins(int amount) => 'Reklam İzle · +$amount Jeton';
+  static String adRemainingToday(int remaining, int cap) =>
+      'Bugün kalan: $remaining/$cap';
+  static const String adRewardLoading = 'Reklam yükleniyor...';
+  static const String adRewardLimitReached = 'Yarın tekrar';
+  static String adRewardCooldown(int seconds) => 'Bekle: $seconds sn';
+  static const String adRewardNotReady =
+      'Reklam şu an hazır değil, lütfen biraz sonra tekrar dene.';
+  static const String adRewardDismissed =
+      'Ödül için reklamı sonuna kadar izlemelisin.';
+  static String adRewardEnergyGranted(int amount) => '+$amount enerji eklendi!';
+  static String adRewardCoinsGranted(int amount) => '+$amount jeton eklendi!';
+  static String adRewardTooSoon(int seconds) =>
+      'Yeni reklam için $seconds sn bekle.';
+  static const String adRewardDailyLimitError =
+      'Bugünkü reklam ödülü sınırına ulaştın.';
+  static const String adRewardEnergyFullError = 'Enerjin zaten dolu.';
+  static const String adRewardDisabledError =
+      'Ödüllü reklamlar şu anda aktif değil.';
+  static const String adRewardGenericError =
+      'Ödül doğrulanamadı, lütfen tekrar dene.';
+  static const String adCoinsCardTitle = 'Ücretsiz Jeton';
   static const String licensesTitle = 'Lisanslar';
   static String licenseCount(int count) => '$count lisans';
   static const String noLicensesFound = 'Lisans bulunamadı.';
