@@ -1,8 +1,22 @@
 import 'package:app/core/ads/ad_providers.dart';
 import 'package:app/core/ads/ad_service.dart';
+import 'package:app/core/network/network_status_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+class _OnlineNetworkNotifier extends NetworkStatusNotifier {
+  @override
+  NetworkState build() => const NetworkState(status: NetworkStatus.online);
+}
+
+class _TestAdConsentNotifier extends AdConsentNotifier {
+  final AdConsentState _state;
+  _TestAdConsentNotifier(this._state) : super(isAdsEnabledOverride: () => true);
+
+  @override
+  AdConsentState build() => _state;
+}
 
 void main() {
   group('AdService & AdConsentNotifier', () {
@@ -127,26 +141,73 @@ void main() {
       expect(result.privacyOptionsStatus, AdConsentPrivacyStatus.notRequired);
     });
 
-    test('UMP hata verirse initialize sessizce tamamlanır', () async {
-      var sdkInitCalled = false;
-      final service = GoogleMobileAdsService(
+    test('UMP hata verirse canRequestAds false ise SDK başlatılmaz, true ise önbellekten başlatılır', () async {
+      var sdkInitCalledFalse = false;
+      final serviceFalse = GoogleMobileAdsService(
+        isAdsEnabled: () => true,
+        updateRequestConfig: (_) async {},
+        requestConsentInfoUpdate: (_) async => throw Exception('ump error'),
+        loadAndShowConsentFormIfRequired: () async {},
+        canRequestAds: () async => false,
+        getPrivacyOptionsStatus: () async =>
+            PrivacyOptionsRequirementStatus.unknown,
+        initializeMobileAds: () async {
+          sdkInitCalledFalse = true;
+        },
+      );
+
+      final resultFalse = await serviceFalse.initialize();
+      expect(sdkInitCalledFalse, isFalse);
+      expect(resultFalse.isConsentChecked, isTrue);
+      expect(resultFalse.canRequestAds, isFalse);
+      expect(resultFalse.isSdkInitialized, isFalse);
+
+      var sdkInitCalledCachedTrue = false;
+      final serviceCachedTrue = GoogleMobileAdsService(
         isAdsEnabled: () => true,
         updateRequestConfig: (_) async {},
         requestConsentInfoUpdate: (_) async => throw Exception('ump error'),
         loadAndShowConsentFormIfRequired: () async {},
         canRequestAds: () async => true,
         getPrivacyOptionsStatus: () async =>
-            PrivacyOptionsRequirementStatus.unknown,
+            PrivacyOptionsRequirementStatus.notRequired,
         initializeMobileAds: () async {
-          sdkInitCalled = true;
+          sdkInitCalledCachedTrue = true;
         },
       );
 
-      final result = await service.initialize();
+      final resultCachedTrue = await serviceCachedTrue.initialize();
+      expect(sdkInitCalledCachedTrue, isTrue);
+      expect(resultCachedTrue.canRequestAds, isTrue);
+      expect(resultCachedTrue.isSdkInitialized, isTrue);
+    });
 
-      expect(sdkInitCalled, isFalse);
-      expect(result.isConsentChecked, isTrue);
-      expect(result.isSdkInitialized, isFalse);
+    test('canRequestAds false iken preloadIfReady hiçbir yükleme çağrısı yapmaz', () async {
+      final fakeService = FakeAdService(
+        initialRewardedStatus: AdRewardedLoadStatus.idle,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          adServiceProvider.overrideWithValue(fakeService),
+          networkStatusProvider.overrideWith(_OnlineNetworkNotifier.new),
+          adConsentProvider.overrideWith(
+            () => _TestAdConsentNotifier(
+              const AdConsentState(
+                isConsentChecked: true,
+                canRequestAds: false,
+                isSdkInitialized: false,
+              ),
+            ),
+          ),
+          adRewardControllerProvider.overrideWith(
+            () => AdRewardController(isAdsEnabledOverride: () => true),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(adRewardControllerProvider.notifier).preloadIfReady();
+      expect(fakeService.preloadRewardedCallCount, 0);
     });
   });
 }

@@ -62,20 +62,23 @@ class _AdBannerSlotState extends ConsumerState<AdBannerSlot> {
       return const SizedBox.shrink();
     }
 
-    final widthPx = MediaQuery.sizeOf(context).width.truncate();
-    _maybeLoadBanner(widthPx);
-
     final adService = ref.watch(adServiceProvider);
+
     return ValueListenableBuilder<bool>(
       valueListenable: adService.isBannerLoadedListenable,
       builder: (context, isLoaded, _) {
+        // Banner yüklenememişse veya dispose edilmişse kilit genişliğini sıfırla ki yeniden denenebilsin
         if (!isLoaded) {
+          final widthPx = MediaQuery.sizeOf(context).width.truncate();
+          _maybeLoadBanner(widthPx);
           return const SizedBox.shrink();
         }
+
         final bannerWidget = adService.buildBannerWidget();
         if (bannerWidget == null) {
           return const SizedBox.shrink();
         }
+
         return AnimatedSize(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,

@@ -106,10 +106,22 @@ abstract interface class AdService {
   Future<bool> showRewarded();
 }
 
+void _adLog(String message) {
+  debugPrint('[ADS] $message');
+}
+
+String _maskAdId(String id) {
+  final trimmed = id.trim();
+  if (trimmed.isEmpty) return 'empty';
+  final tail =
+      trimmed.length >= 4 ? trimmed.substring(trimmed.length - 4) : trimmed;
+  return 'len=${trimmed.length},tail=***$tail';
+}
+
 /// Gerçek `google_mobile_ads` ve UMP implementasyonu.
 class GoogleMobileAdsService implements AdService {
   static const Duration _umpTimeout = Duration(seconds: 8);
-  static const Duration _rewardedLoadTimeout = Duration(seconds: 10);
+  static const Duration _rewardedLoadTimeout = Duration(seconds: 30);
   static const int _maxBackoffSeconds = 32;
 
   final bool Function() _isAdsEnabled;
@@ -163,9 +175,17 @@ class GoogleMobileAdsService implements AdService {
         _getPrivacyOptionsStatus = getPrivacyOptionsStatus ??
             ConsentInformation.instance.getPrivacyOptionsRequirementStatus,
         _initializeMobileAds =
-            initializeMobileAds ?? (() => MobileAds.instance.initialize()),
+            initializeMobileAds ?? _defaultInitializeMobileAds,
         _showPrivacyOptionsForm =
             showPrivacyOptionsForm ?? _defaultShowPrivacyOptionsForm;
+
+  static Future<void> _defaultInitializeMobileAds() async {
+    final status = await MobileAds.instance.initialize();
+    final adapters = status.adapterStatuses.entries
+        .map((e) => '${e.key}:${e.value.state.name}')
+        .join(', ');
+    _adLog('MobileAds.initialize done adapters=[$adapters]');
+  }
 
   @override
   ValueListenable<bool> get isBannerLoadedListenable => _isBannerLoaded;
@@ -224,7 +244,14 @@ class GoogleMobileAdsService implements AdService {
 
   @override
   Future<AdConsentState> initialize() async {
-    if (!_isAdsEnabled()) {
+    final enabled = _isAdsEnabled();
+    _adLog(
+      'initialize start isRelease=$kReleaseMode isAdsEnabled=$enabled '
+      'bannerId=(${_maskAdId(AdConfig.bannerAdUnitId)}) '
+      'rewardedId=(${_maskAdId(AdConfig.rewardedAdUnitId)})',
+    );
+    if (!enabled) {
+      _adLog('initialize skipped: isAdsEnabled=false');
       return const AdConsentState();
     }
 
@@ -232,6 +259,7 @@ class GoogleMobileAdsService implements AdService {
     var privacyStatus = AdConsentPrivacyStatus.unknown;
     var sdkInitialized = false;
 
+    // 1. İstek yapılandırması
     try {
       await _updateRequestConfig(
         RequestConfiguration(
@@ -245,27 +273,50 @@ class GoogleMobileAdsService implements AdService {
               : null,
         ),
       );
+    } catch (e) {
+      _adLog('RequestConfiguration update warning: $e');
+    }
 
+    // 2. UMP Onay akışı (Hata/timeout durumunda canRequestAds ASLA true zorlanmaz;
+    //    yalnızca önceki oturumdan önbellekteki gerçek canRequestAds() değerine bakılır.)
+    try {
       await _requestConsentInfoUpdate(
         ConsentRequestParameters(tagForUnderAgeOfConsent: false),
       ).timeout(_umpTimeout);
 
       await _loadAndShowConsentFormIfRequired().timeout(_umpTimeout);
+    } catch (e) {
+      _adLog('UMP update/form warning (checking cached canRequestAds): $e');
+    }
 
+    try {
       canRequest = await _canRequestAds().timeout(_umpTimeout);
       final rawPrivacyStatus =
           await _getPrivacyOptionsStatus().timeout(_umpTimeout);
       privacyStatus = _mapPrivacyStatus(rawPrivacyStatus);
+      _adLog('UMP done canRequestAds=$canRequest privacyStatus=$privacyStatus');
+    } catch (e) {
+      _adLog('UMP status query failed (canRequestAds=false): $e');
+      canRequest = false;
+    }
 
-      if (canRequest) {
+    // 3. MobileAds SDK Başlatma (Yalnızca canRequestAds == true ise)
+    if (canRequest) {
+      try {
         await _initializeMobileAds();
         sdkInitialized = true;
         _sdkReady = true;
+      } catch (e) {
+        _adLog('MobileAds.initialize failed: $e');
       }
-    } catch (_) {
-      // Hata veya zaman aşımı durumunda uygulama akışı bozulmaz.
+    } else {
+      _adLog('MobileAds.initialize skipped: canRequestAds=false');
     }
 
+    _adLog(
+      'initialize end isConsentChecked=true canRequestAds=$canRequest '
+      'isSdkInitialized=$sdkInitialized privacyStatus=$privacyStatus',
+    );
     return AdConsentState(
       isConsentChecked: true,
       canRequestAds: canRequest,
@@ -292,6 +343,10 @@ class GoogleMobileAdsService implements AdService {
   @override
   Future<void> loadBanner({required String adUnitId, required int width}) async {
     if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty || width <= 0) {
+      _adLog(
+        'loadBanner skipped: enabled=${_isAdsEnabled()} sdkReady=$_sdkReady '
+        'id=(${_maskAdId(adUnitId)}) width=$width',
+      );
       return;
     }
     if (_bannerAd != null && _bannerWidth == width && _isBannerLoaded.value) {
@@ -322,11 +377,19 @@ class GoogleMobileAdsService implements AdService {
         request: const AdRequest(),
         listener: BannerAdListener(
           onAdLoaded: (ad) {
+            final loaded = ad as BannerAd;
+            _adLog(
+              'banner onAdLoaded (${loaded.size.width}x${loaded.size.height})',
+            );
             _isBannerLoading = false;
-            _bannerAd = ad as BannerAd;
+            _bannerAd = loaded;
             _isBannerLoaded.value = true;
           },
           onAdFailedToLoad: (ad, error) {
+            _adLog(
+              'banner onAdFailedToLoad code=${error.code} '
+              'domain=${error.domain} msg=${error.message}',
+            );
             ad.dispose();
             _isBannerLoading = false;
             _bannerAd = null;
@@ -336,7 +399,8 @@ class GoogleMobileAdsService implements AdService {
       );
       _bannerAd = banner;
       await banner.load();
-    } catch (_) {
+    } catch (e) {
+      _adLog('banner load exception: $e');
       _isBannerLoading = false;
       _bannerAd = null;
       _isBannerLoaded.value = false;
@@ -367,6 +431,10 @@ class GoogleMobileAdsService implements AdService {
   @override
   Future<void> loadInMatchBanner({required String adUnitId}) async {
     if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty) {
+      _adLog(
+        'loadInMatchBanner skipped: enabled=${_isAdsEnabled()} '
+        'sdkReady=$_sdkReady id=(${_maskAdId(adUnitId)})',
+      );
       return;
     }
     if ((_inMatchBannerAd != null && _isInMatchBannerLoaded.value) ||
@@ -386,11 +454,16 @@ class GoogleMobileAdsService implements AdService {
         request: const AdRequest(),
         listener: BannerAdListener(
           onAdLoaded: (ad) {
+            _adLog('inMatchBanner onAdLoaded');
             _isInMatchBannerLoading = false;
             _inMatchBannerAd = ad as BannerAd;
             _isInMatchBannerLoaded.value = true;
           },
           onAdFailedToLoad: (ad, error) {
+            _adLog(
+              'inMatchBanner onAdFailedToLoad code=${error.code} '
+              'domain=${error.domain} msg=${error.message}',
+            );
             ad.dispose();
             _isInMatchBannerLoading = false;
             _inMatchBannerAd = null;
@@ -400,7 +473,8 @@ class GoogleMobileAdsService implements AdService {
       );
       _inMatchBannerAd = banner;
       await banner.load();
-    } catch (_) {
+    } catch (e) {
+      _adLog('inMatchBanner load exception: $e');
       _isInMatchBannerLoading = false;
       _inMatchBannerAd = null;
       _isInMatchBannerLoaded.value = false;
@@ -430,6 +504,10 @@ class GoogleMobileAdsService implements AdService {
   @override
   Future<void> preloadRewarded({required String adUnitId}) async {
     if (!_isAdsEnabled() || !_sdkReady || adUnitId.isEmpty) {
+      _adLog(
+        'preloadRewarded skipped: enabled=${_isAdsEnabled()} '
+        'sdkReady=$_sdkReady id=(${_maskAdId(adUnitId)})',
+      );
       return;
     }
     _lastRewardedAdUnitId = adUnitId;
@@ -437,8 +515,12 @@ class GoogleMobileAdsService implements AdService {
       _rewardedStatus.value = AdRewardedLoadStatus.ready;
       return;
     }
-    if (_isRewardedLoading) return;
+    if (_isRewardedLoading) {
+      _adLog('preloadRewarded skipped: alreadyLoading');
+      return;
+    }
 
+    _adLog('preloadRewarded start id=(${_maskAdId(adUnitId)})');
     _retryTimer?.cancel();
     _isRewardedLoading = true;
     _rewardedStatus.value = AdRewardedLoadStatus.loading;
@@ -447,6 +529,7 @@ class GoogleMobileAdsService implements AdService {
     Timer? timeoutTimer;
     timeoutTimer = Timer(_rewardedLoadTimeout, () {
       if (!completer.isCompleted) {
+        _adLog('rewarded load timeout (10s)');
         _isRewardedLoading = false;
         _rewardedStatus.value = AdRewardedLoadStatus.failed;
         _scheduleRewardedRetry();
@@ -460,6 +543,7 @@ class GoogleMobileAdsService implements AdService {
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
+            _adLog('rewarded onAdLoaded');
             timeoutTimer?.cancel();
             _isRewardedLoading = false;
             _retryAttempt = 0;
@@ -468,6 +552,10 @@ class GoogleMobileAdsService implements AdService {
             if (!completer.isCompleted) completer.complete();
           },
           onAdFailedToLoad: (error) {
+            _adLog(
+              'rewarded onAdFailedToLoad code=${error.code} '
+              'domain=${error.domain} msg=${error.message}',
+            );
             timeoutTimer?.cancel();
             _isRewardedLoading = false;
             _rewardedAd = null;
@@ -477,7 +565,8 @@ class GoogleMobileAdsService implements AdService {
           },
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      _adLog('rewarded load exception: $e');
       timeoutTimer.cancel();
       _isRewardedLoading = false;
       _rewardedAd = null;

@@ -176,6 +176,10 @@ class _MainShellState extends ConsumerState<MainShell>
       ref.read(profileProvider.notifier).retryPendingNicknameSync();
       _processPendingSoloMatches();
       unawaited(ref.read(adRewardControllerProvider.notifier).retryPendingClaim());
+      if (ref.read(networkStatusProvider).status != NetworkStatus.offline &&
+          !ref.read(adConsentProvider).isSdkInitialized) {
+        unawaited(ref.read(adConsentProvider.notifier).initialize());
+      }
       unawaited(ref.read(adRewardControllerProvider.notifier).preloadIfReady());
     }
   }

@@ -310,17 +310,35 @@ class _EnergyDepletedBottomSheetState
                     isClaiming: isClaiming,
                     onPressed: _handleWatchRewardedAd,
                     onNotReadyTap: () {
-                      unawaited(
-                        ref
-                            .read(adRewardControllerProvider.notifier)
-                            .preloadIfReady(),
-                      );
+                      final consent = ref.read(adConsentProvider);
+                      if (!consent.isSdkInitialized) {
+                        unawaited(
+                          ref.read(adConsentProvider.notifier).initialize(),
+                        );
+                      } else {
+                        unawaited(
+                          ref
+                              .read(adRewardControllerProvider.notifier)
+                              .preloadIfReady(),
+                        );
+                        final status = adService.rewardedStatusListenable.value;
+                        if (AdConfig.isAdsEnabled &&
+                            AdConfig.rewardedAdUnitId.isNotEmpty &&
+                            status != AdRewardedLoadStatus.loading &&
+                            status != AdRewardedLoadStatus.ready) {
+                          unawaited(
+                            adService.preloadRewarded(
+                              adUnitId: AdConfig.rewardedAdUnitId,
+                            ),
+                          );
+                        }
+                      }
                       ScaffoldMessenger.of(context)
                         ..hideCurrentSnackBar()
                         ..showSnackBar(
                           const SnackBar(
                             content: Text(
-                              AppStrings.adRewardNotReady,
+                              'Reklam hazırlanıyor, lütfen bekleyin...',
                               style: TextStyle(
                                 fontFamily: AppTextStyles.fontNunito,
                                 fontWeight: FontWeight.w700,

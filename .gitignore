@@ -17,4 +17,5 @@ server/.ghost-session.json
 **/*.keystore
 *.aab
 **/*.aab
+admob_ids.json
 

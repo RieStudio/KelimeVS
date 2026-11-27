@@ -1787,6 +1787,7 @@ class _AdsGallerySection extends StatelessWidget {
           cap: 3,
           isOnline: true,
           loadStatus: AdRewardedLoadStatus.loading,
+          enableCooldownTicker: false,
         ),
         const SizedBox(height: AppDimens.space12),
         RewardedAdActionButton(

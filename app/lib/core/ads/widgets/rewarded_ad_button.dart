@@ -154,13 +154,27 @@ class _RewardedAdActionButtonState extends State<RewardedAdActionButton> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  isLoading
-                      ? Icons.hourglass_top_rounded
-                      : Icons.play_circle_outline_rounded,
-                  size: 20,
-                  color: fgColor,
-                ),
+                if (isLoading && widget.enableCooldownTicker)
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(fgColor),
+                    ),
+                  )
+                else if (isLoading)
+                  Icon(
+                    Icons.hourglass_top_rounded,
+                    size: 20,
+                    color: fgColor,
+                  )
+                else
+                  Icon(
+                    Icons.play_circle_outline_rounded,
+                    size: 20,
+                    color: fgColor,
+                  ),
                 const SizedBox(width: AppDimens.space8),
                 Flexible(
                   child: Text(

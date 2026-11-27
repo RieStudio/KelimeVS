@@ -70,5 +70,37 @@ void main() {
       expect(config.bannerAdUnitId, realBanner);
       expect(config.rewardedAdUnitId, realRewarded);
     });
+
+    test('resolveEnabledFlag hem string hem boolean ADMOB_ENABLED değerlerini doğru okur', () {
+      expect(
+        AdConfig.resolveEnabledFlag(boolValue: true, stringValue: 'true'),
+        isTrue,
+      );
+      expect(
+        AdConfig.resolveEnabledFlag(boolValue: false, stringValue: 'true'),
+        isTrue,
+      );
+      expect(
+        AdConfig.resolveEnabledFlag(boolValue: true, stringValue: 'false'),
+        isFalse,
+      );
+      expect(
+        AdConfig.resolveEnabledFlag(boolValue: false, stringValue: ''),
+        isFalse,
+      );
+    });
+
+    test('release modunda ödüllü kimlik de test kimliği ise kilit devreye girer', () {
+      final config = AdConfig.resolve(
+        isRelease: true,
+        enabled: true,
+        releaseBannerId: 'ca-app-pub-1111111111111111/1111111111',
+        releaseRewardedId: AdConfig.testRewardedAdUnitId,
+      );
+
+      expect(config.isAdsEnabled, isFalse);
+      expect(config.bannerAdUnitId, isEmpty);
+      expect(config.rewardedAdUnitId, isEmpty);
+    });
   });
 }

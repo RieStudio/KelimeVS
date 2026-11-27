@@ -34,8 +34,10 @@ final pendingAdClaimStoreProvider = Provider<PendingAdClaimStore>((ref) {
 
 /// Reklam onay ve başlatma durumunu yöneten Riverpod Notifier.
 class AdConsentNotifier extends Notifier<AdConsentState> {
+  static const Duration _retryCooldown = Duration(seconds: 15);
   final bool Function()? isAdsEnabledOverride;
   bool _isInitializing = false;
+  DateTime? _lastAttemptAt;
 
   AdConsentNotifier({this.isAdsEnabledOverride});
 
@@ -46,18 +48,42 @@ class AdConsentNotifier extends Notifier<AdConsentState> {
   AdConsentState build() => const AdConsentState();
 
   /// Kill-switch kapalıysa (devre dışıysa) UMP veya SDK'yı hiç çağırmaz.
-  Future<void> initialize() async {
-    if (!_isAdsEnabled) return;
-    if (_isInitializing || state.isSdkInitialized) return;
+  Future<void> initialize({bool force = false}) async {
+    if (!_isAdsEnabled) {
+      debugPrint('[ADS] AdConsentNotifier.initialize skipped: isAdsEnabled=false');
+      return;
+    }
+    if (_isInitializing || state.isSdkInitialized) {
+      debugPrint(
+        '[ADS] AdConsentNotifier.initialize skipped: '
+        'isInitializing=$_isInitializing isSdkInitialized=${state.isSdkInitialized}',
+      );
+      return;
+    }
+    final now = DateTime.now();
+    if (!force &&
+        _lastAttemptAt != null &&
+        now.difference(_lastAttemptAt!) < _retryCooldown) {
+      debugPrint('[ADS] AdConsentNotifier.initialize skipped: retry cooldown');
+      return;
+    }
 
     _isInitializing = true;
+    _lastAttemptAt = now;
     try {
       final service = ref.read(adServiceProvider);
       final result = await service.initialize();
       state = result;
       if (result.isSdkInitialized && AdConfig.rewardedAdUnitId.isNotEmpty) {
+        debugPrint('[ADS] AdConsentNotifier triggering preloadRewarded');
         unawaited(
           service.preloadRewarded(adUnitId: AdConfig.rewardedAdUnitId),
+        );
+      } else {
+        debugPrint(
+          '[ADS] AdConsentNotifier preloadRewarded skipped: '
+          'isSdkInitialized=${result.isSdkInitialized} '
+          'rewardedIdEmpty=${AdConfig.rewardedAdUnitId.isEmpty}',
         );
       }
     } finally {
@@ -117,16 +143,32 @@ class AdRewardController extends Notifier<AdRewardControllerState> {
   AdRewardControllerState build() => const AdRewardControllerState();
 
   Future<void> preloadIfReady() async {
-    if (!_isAdsEnabled) return;
+    if (!_isAdsEnabled) {
+      debugPrint('[ADS] preloadIfReady skipped: isAdsEnabled=false');
+      return;
+    }
     final network = ref.read(networkStatusProvider).status;
-    if (network == NetworkStatus.offline) return;
+    if (network == NetworkStatus.offline) {
+      debugPrint('[ADS] preloadIfReady skipped: network offline');
+      return;
+    }
     final consent = ref.read(adConsentProvider);
-    if (!consent.isSdkInitialized || !consent.canRequestAds) return;
+    if (!consent.isSdkInitialized || !consent.canRequestAds) {
+      debugPrint(
+        '[ADS] preloadIfReady skipped: '
+        'isSdkInitialized=${consent.isSdkInitialized} '
+        'canRequestAds=${consent.canRequestAds}',
+      );
+      return;
+    }
 
     final service = ref.read(adServiceProvider);
     final status = service.rewardedStatusListenable.value;
+    debugPrint('[ADS] preloadIfReady currentStatus=$status');
+
     if (status == AdRewardedLoadStatus.idle ||
         status == AdRewardedLoadStatus.failed) {
+      debugPrint('[ADS] preloadIfReady executing preloadRewarded...');
       await service.preloadRewarded(adUnitId: AdConfig.rewardedAdUnitId);
     }
   }
@@ -147,6 +189,7 @@ class AdRewardController extends Notifier<AdRewardControllerState> {
 
     final service = ref.read(adServiceProvider);
     if (service.rewardedStatusListenable.value != AdRewardedLoadStatus.ready) {
+      debugPrint('[ADS] watchAndClaim: not ready, triggering preloadIfReady');
       unawaited(preloadIfReady());
       return const RewardedClaimOutcome(
         status: RewardedClaimOutcomeStatus.notReady,

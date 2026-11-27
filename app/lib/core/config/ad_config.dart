@@ -44,13 +44,29 @@ abstract final class AdConfig {
   /// Klavye açıkken üst çubuk + oyuncu kartları + soru kartı + giriş alanı + okunabilir
   /// cevap geçmişi alanı korunduktan sonra maç içi banner'ın (50 + 12 = 62 px)
   /// sığabilmesi için gereken en düşük mantıksal ekran yüksekliği (dp).
-  /// Hesap: ~354 dp sabit oyun alanı + ~270 dp klavye tahmini + 74 dp banner/boşluk + ~62 dp okunabilir alan = 760 dp.
   static const double inMatchBannerMinScreenHeight = 760.0;
 
-  static const bool _envAdsEnabled = bool.fromEnvironment(
-    'ADMOB_ENABLED',
-    defaultValue: true,
-  );
+  // Hem boolean hem string tanımlamalarını güvenli karşılayan kontrol
+  static const bool _rawBoolEnabled = bool.fromEnvironment('ADMOB_ENABLED', defaultValue: true);
+  static const String _rawStringEnabled = String.fromEnvironment('ADMOB_ENABLED', defaultValue: 'true');
+
+  static bool get _envAdsEnabled => resolveEnabledFlag(
+        boolValue: _rawBoolEnabled,
+        stringValue: _rawStringEnabled,
+      );
+
+  /// `--dart-define-from-file` ile gelen hem boolean (`true`/`false`)
+  /// hem string (`"true"`/`"false"`) değerlerini güvenli çözer.
+  @visibleForTesting
+  static bool resolveEnabledFlag({
+    required bool boolValue,
+    required String stringValue,
+  }) {
+    final normalized = stringValue.trim().toLowerCase();
+    if (normalized == 'false') return false;
+    if (normalized == 'true') return true;
+    return boolValue;
+  }
 
   static const String _envReleaseBannerId = String.fromEnvironment(
     'ADMOB_BANNER_ID',

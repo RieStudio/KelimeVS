@@ -9,7 +9,6 @@ import '../../../../core/ads/ad_service.dart';
 import '../../../../core/ads/widgets/rewarded_ad_button.dart';
 import '../../../../core/config/ad_config.dart';
 import '../../../../core/network/network_guard.dart';
-import '../../../../core/network/network_status_provider.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimens.dart';
@@ -127,19 +126,38 @@ class CoinsTabView extends StatelessWidget {
                         isOnline: isOnline,
                         loadStatus: loadStatus,
                         isClaiming: isClaiming,
-                        onPressed: () => _handleWatchCoinsAd(context, ref!),
+                        onPressed: () => _handleWatchCoinsAd(context, ref),
                         onNotReadyTap: () {
-                          unawaited(
-                            ref!
-                                .read(adRewardControllerProvider.notifier)
-                                .preloadIfReady(),
-                          );
+                          final consent = ref.read(adConsentProvider);
+                          if (!consent.isSdkInitialized) {
+                            unawaited(
+                              ref.read(adConsentProvider.notifier).initialize(),
+                            );
+                          } else {
+                            unawaited(
+                              ref
+                                  .read(adRewardControllerProvider.notifier)
+                                  .preloadIfReady(),
+                            );
+                            final status =
+                                adService.rewardedStatusListenable.value;
+                            if (AdConfig.isAdsEnabled &&
+                                AdConfig.rewardedAdUnitId.isNotEmpty &&
+                                status != AdRewardedLoadStatus.loading &&
+                                status != AdRewardedLoadStatus.ready) {
+                              unawaited(
+                                adService.preloadRewarded(
+                                  adUnitId: AdConfig.rewardedAdUnitId,
+                                ),
+                              );
+                            }
+                          }
                           ScaffoldMessenger.of(context)
                             ..hideCurrentSnackBar()
                             ..showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                  AppStrings.adRewardNotReady,
+                                  'Reklam hazırlanıyor, lütfen bekleyin...',
                                   style: TextStyle(
                                     fontFamily: AppTextStyles.fontNunito,
                                     fontWeight: FontWeight.w700,
